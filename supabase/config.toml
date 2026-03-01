@@ -1,1 +1,4 @@
 project_id = "yeyctdphzrmyxgskehru"
+
+[functions.football-api]
+verify_jwt = false

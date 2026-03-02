@@ -106,7 +106,21 @@ serve(async (req) => {
   }
 
   try {
-    const { date } = await req.json();
+    const { date, test } = await req.json();
+    
+    if (test) {
+      // Test API connectivity
+      const url = `${BASE_URL}/status`;
+      const res = await fetch(url, {
+        headers: { "x-apisports-key": apiKey },
+      });
+      const json = await res.json();
+      console.log("[test] Status response:", JSON.stringify(json));
+      return new Response(JSON.stringify(json), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
     if (!date) throw new Error("Date required");
 
     const fixtures = await apiGet("fixtures", { date }, apiKey);

@@ -13,15 +13,13 @@ const LIGAS_ALVO_IDS = [39, 140, 78, 135, 61, 94, 88, 253, 2];
 async function apiGet(endpoint: string, params: Record<string, string>, apiKey: string) {
   const url = new URL(`${BASE_URL}/${endpoint}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  console.log(`[apiGet] Fetching: ${url.toString()}`);
   const res = await fetch(url.toString(), {
-    headers: { "x-apisports-key": apiKey },
+    headers: {
+      "x-rapidapi-key": apiKey,
+      "x-rapidapi-host": "v3.football.api-sports.io",
+    },
   });
   const json = await res.json();
-  if (json.errors && Object.keys(json.errors).length > 0) {
-    console.error(`[apiGet] API errors:`, JSON.stringify(json.errors));
-  }
-  console.log(`[apiGet] Results: ${json.results}, Remaining: ${json.paging?.total || 'N/A'}`);
   return json.response || [];
 }
 
@@ -106,31 +104,11 @@ serve(async (req) => {
   }
 
   try {
-    const { date, test } = await req.json();
-    
-    if (test) {
-      // Test API connectivity
-      const url = `${BASE_URL}/status`;
-      const res = await fetch(url, {
-        headers: { "x-apisports-key": apiKey },
-      });
-      const json = await res.json();
-      console.log("[test] Status response:", JSON.stringify(json));
-      return new Response(JSON.stringify(json), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    
+    const { date } = await req.json();
     if (!date) throw new Error("Date required");
 
     const fixtures = await apiGet("fixtures", { date }, apiKey);
-    console.log(`[football-api] Date: ${date}, Total fixtures from API: ${fixtures.length}`);
-    if (fixtures.length > 0) {
-      const leagueIds = [...new Set(fixtures.map((j: any) => j.league.id))];
-      console.log(`[football-api] League IDs found: ${JSON.stringify(leagueIds)}`);
-    }
     const jogos = fixtures.filter((j: any) => LIGAS_ALVO_IDS.includes(j.league.id));
-    console.log(`[football-api] Filtered matches (target leagues): ${jogos.length}`);
 
     const matches = [];
 

@@ -29,11 +29,6 @@ interface SeasonStats {
   goalsAgainst: number;
   goalsForAvg: number;
   goalsAgainstAvg: number;
-  shotsAvg: number;
-  shotsOnTargetAvg: number;
-  possessionAvg: number;
-  foulsAvg: number;
-  offsidesAvg: number;
   corners_for: number;
   corners_against: number;
   cards_avg: number;
@@ -51,50 +46,58 @@ async function getTeamSeasonStats(teamId: number, leagueId: number, season: numb
     const goalsFor = stats.goals?.for?.total?.total || 0;
     const goalsAgainst = stats.goals?.against?.total?.total || 0;
 
-    // Extract per-game averages from lineups/statistics or calculate manually
-    const possessionAvg = parseFloat(stats.biggest?.goals?.for?.home || "50") || 50;
-    
     return {
       played,
       goalsFor,
       goalsAgainst,
       goalsForAvg: goalsFor / played,
       goalsAgainstAvg: goalsAgainst / played,
-      shotsAvg: 12, // API doesn't provide season shot averages directly; use reasonable default
-      shotsOnTargetAvg: 4.5,
-      possessionAvg: 50, // Will be refined below
-      foulsAvg: 11,
-      offsidesAvg: 2,
       corners_for: (stats.corners?.for?.total || 0) / played,
       corners_against: (stats.corners?.against?.total || 0) / played,
       cards_avg: ((stats.cards?.yellow?.total || 0) + (stats.cards?.red?.total || 0)) / played,
     };
   } catch {
     return {
-      played: 1, goalsFor: 0, goalsAgainst: 0,
-      goalsForAvg: 1.2, goalsAgainstAvg: 1.2,
-      shotsAvg: 12, shotsOnTargetAvg: 4.5,
-      possessionAvg: 50, foulsAvg: 11, offsidesAvg: 2,
-      corners_for: 4.5, corners_against: 4.5, cards_avg: 2,
+      played: 0, goalsFor: 0, goalsAgainst: 0,
+      goalsForAvg: 0, goalsAgainstAvg: 0,
+      corners_for: 0, corners_against: 0, cards_avg: 0,
     };
   }
 }
 
-async function getLast5Stats(teamId: number, apiKey: string) {
+interface Last5Stats {
+  corners: number;
+  cards: number;
+  shots: number;
+  shotsOnTarget: number;
+  fouls: number;
+  offsides: number;
+  possession: number;
+  goals: number;
+  jogos: number;
+}
+
+async function getLast5Stats(teamId: number, apiKey: string): Promise<Last5Stats> {
   const fixtures = await apiGet("fixtures", { team: String(teamId), last: "5" }, apiKey);
   let totalCorners = 0, totalCards = 0, totalShots = 0, totalShotsOnTarget = 0;
-  let totalFouls = 0, totalOffsides = 0, totalPossession = 0, jogos = 0;
+  let totalFouls = 0, totalOffsides = 0, totalPossession = 0, totalGoals = 0, jogos = 0;
 
   for (const f of fixtures) {
+    // Count goals for this team
+    const isHome = f.teams?.home?.id === teamId;
+    totalGoals += isHome ? (f.goals?.home || 0) : (f.goals?.away || 0);
+
     const stats = await apiGet("fixtures/statistics", { fixture: String(f.fixture.id) }, apiKey);
     if (stats && stats.length) {
       jogos++;
       for (const team of stats) {
         const isTeam = team.team?.id === teamId;
         for (const s of team.statistics) {
+          // Corners and cards count for both teams (total in the match)
           if (s.type === "Corner Kicks") totalCorners += s.value || 0;
           if (s.type === "Yellow Cards") totalCards += s.value || 0;
           if (s.type === "Red Cards") totalCards += s.value || 0;
+          // Per-team stats
           if (isTeam) {
             if (s.type === "Total Shots") totalShots += s.value || 0;
             if (s.type === "Shots on Goal") totalShotsOnTarget += s.value || 0;
@@ -110,7 +113,9 @@ async function getLast5Stats(teamId: number, apiKey: string) {
     }
   }
 
-  if (jogos === 0) return { corners: 0, cards: 0, shots: 12, shotsOnTarget: 4.5, fouls: 11, offsides: 2, possession: 50 };
+  if (jogos === 0) {
+    return { corners: 0, cards: 0, shots: 0, shotsOnTarget: 0, fouls: 0, offsides: 0, possession: 0, goals: 0, jogos: 0 };
+  }
 
   return {
     corners: totalCorners / jogos,
@@ -120,6 +125,8 @@ async function getLast5Stats(teamId: number, apiKey: string) {
     fouls: totalFouls / jogos,
     offsides: totalOffsides / jogos,
     possession: totalPossession / jogos,
+    goals: totalGoals / jogos,
+    jogos,
   };
 }
 
@@ -133,11 +140,13 @@ async function getFixtureStats(fixtureId: number, apiKey: string) {
     fouls: [0, 0],
     offsides: [0, 0],
   };
+  let hasData = false;
 
   if (stats && stats.length >= 2) {
     for (let i = 0; i < 2; i++) {
       for (const s of stats[i].statistics) {
         const v = typeof s.value === "string" ? parseFloat(s.value) : (s.value || 0);
+        if (v > 0) hasData = true;
         switch (s.type) {
           case "Ball Possession": result.possession[i] = v; break;
           case "Total Shots": result.totalShots[i] = v; break;
@@ -148,14 +157,17 @@ async function getFixtureStats(fixtureId: number, apiKey: string) {
       }
     }
   }
-  return result;
+  return { ...result, hasData };
 }
 
-// Calculate real xG using Poisson-based projection
-function calculateXG(homeGoalsForAvg: number, awayGoalsAgainstAvg: number, awayGoalsForAvg: number, homeGoalsAgainstAvg: number, leagueAvgGoals: number): [number, number] {
-  // xG Home = (Home attack strength) * (Away defense weakness) * league avg
-  // Attack strength = team goals scored avg / league avg
-  // Defense weakness = opponent goals conceded avg / league avg
+// Calculate real xG using Poisson-based projection from real goal averages
+function calculateXG(
+  homeGoalsForAvg: number,
+  awayGoalsAgainstAvg: number,
+  awayGoalsForAvg: number,
+  homeGoalsAgainstAvg: number,
+  leagueAvgGoals: number
+): [number, number] {
   const safeLeagueAvg = leagueAvgGoals > 0 ? leagueAvgGoals : 1.3;
 
   const homeAttack = homeGoalsForAvg / safeLeagueAvg;
@@ -203,7 +215,7 @@ serve(async (req) => {
       const fixtureId = jogo.fixture.id;
       const isPreMatch = jogo.fixture.status?.short === "NS" || jogo.fixture.status?.short === "TBD";
 
-      // Parallel fetches
+      // Parallel fetches — all data comes from the real API
       const [homeSeason, awaySeason, homeLast5, awayLast5, pred, fixtureStats] = await Promise.all([
         getTeamSeasonStats(homeId, leagueId, season, apiKey),
         getTeamSeasonStats(awayId, leagueId, season, apiKey),
@@ -213,21 +225,23 @@ serve(async (req) => {
         getFixtureStats(fixtureId, apiKey),
       ]);
 
-      // Corners & cards projections (hybrid model: 60% season + 40% recent)
+      // Corners & cards projections (hybrid model: 60% season + 40% last 5 recent)
       const projCorners = ((homeSeason.corners_for + awaySeason.corners_for) * 0.6) +
         ((homeLast5.corners + awayLast5.corners) * 0.4);
       const projCards = ((homeSeason.cards_avg + awaySeason.cards_avg) * 0.6) +
         ((homeLast5.cards + awayLast5.cards) * 0.4);
 
-      // Real xG calculation
-      const leagueAvgGoals = ((homeSeason.goalsFor + awaySeason.goalsFor) / (homeSeason.played + awaySeason.played)) || 1.3;
+      // Real xG from season goal averages (Poisson model)
+      const leagueAvgGoals = (homeSeason.played + awaySeason.played) > 0
+        ? (homeSeason.goalsFor + awaySeason.goalsFor) / (homeSeason.played + awaySeason.played)
+        : 1.3;
       const [xgHome, xgAway] = calculateXG(
         homeSeason.goalsForAvg, awaySeason.goalsAgainstAvg,
         awaySeason.goalsForAvg, homeSeason.goalsAgainstAvg,
         leagueAvgGoals
       );
 
-      // For pre-match: fill metrics with season/recent averages instead of zeros
+      // Decide data source: live fixture stats vs projected from last 5 real games
       let possession: [number, number];
       let totalShots: [number, number];
       let shotsOnTarget: [number, number];
@@ -236,31 +250,32 @@ serve(async (req) => {
       let bigChancesHome: number;
       let bigChancesAway: number;
 
-      if (isPreMatch || (fixtureStats.possession[0] === 0 && fixtureStats.possession[1] === 0)) {
-        // Use weighted averages: 60% season estimate + 40% last 5
+      if (isPreMatch || !fixtureStats.hasData) {
+        // PRE-MATCH: 100% real data from last 5 games averages
         possession = [
-          f1(homeLast5.possession * 0.6 + 50 * 0.4),
-          f1(awayLast5.possession * 0.6 + 50 * 0.4),
+          f1(homeLast5.possession),
+          f1(awayLast5.possession),
         ];
         totalShots = [
-          f1(homeLast5.shots * 0.6 + homeSeason.shotsAvg * 0.4),
-          f1(awayLast5.shots * 0.6 + awaySeason.shotsAvg * 0.4),
+          f1(homeLast5.shots),
+          f1(awayLast5.shots),
         ];
         shotsOnTarget = [
-          f1(homeLast5.shotsOnTarget * 0.6 + homeSeason.shotsOnTargetAvg * 0.4),
-          f1(awayLast5.shotsOnTarget * 0.6 + awaySeason.shotsOnTargetAvg * 0.4),
+          f1(homeLast5.shotsOnTarget),
+          f1(awayLast5.shotsOnTarget),
         ];
         fouls = [
-          f1(homeLast5.fouls * 0.6 + homeSeason.foulsAvg * 0.4),
-          f1(awayLast5.fouls * 0.6 + awaySeason.foulsAvg * 0.4),
+          f1(homeLast5.fouls),
+          f1(awayLast5.fouls),
         ];
         offsides = [
-          f1(homeLast5.offsides * 0.6 + homeSeason.offsidesAvg * 0.4),
-          f1(awayLast5.offsides * 0.6 + awaySeason.offsidesAvg * 0.4),
+          f1(homeLast5.offsides),
+          f1(awayLast5.offsides),
         ];
         bigChancesHome = f1(homeLast5.shotsOnTarget * 0.35);
         bigChancesAway = f1(awayLast5.shotsOnTarget * 0.35);
       } else {
+        // LIVE / POST-MATCH: real fixture data
         possession = [f1(fixtureStats.possession[0]), f1(fixtureStats.possession[1])];
         totalShots = [f1(fixtureStats.totalShots[0]), f1(fixtureStats.totalShots[1])];
         shotsOnTarget = [f1(fixtureStats.shotsOnTarget[0]), f1(fixtureStats.shotsOnTarget[1])];

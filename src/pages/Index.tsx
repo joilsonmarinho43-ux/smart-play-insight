@@ -3,10 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { useAuth } from '@/hooks/useAuth';
-import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut } from 'lucide-react';
+import { useProfile } from '@/hooks/useProfile';
+import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
   const { signOut } = useAuth();
+  const { profile } = useProfile();
   const [date, setDate] = useState(() => {
     const d = new Date();
     return d.toISOString().split('T')[0];
@@ -46,6 +49,15 @@ const Index = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {profile?.is_admin && (
+              <Link
+                to="/admin"
+                className="p-2 rounded-lg text-primary hover:bg-secondary transition-colors"
+                title="Painel Admin"
+              >
+                <Shield className="w-4 h-4" />
+              </Link>
+            )}
             <button
               onClick={() => signOut()}
               className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"

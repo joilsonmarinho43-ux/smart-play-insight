@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
-import { Calendar, Brain, BarChart3, Loader2, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut } from 'lucide-react';
 
 const Index = () => {
+  const { signOut } = useAuth();
   const [date, setDate] = useState(() => {
     const d = new Date();
     return d.toISOString().split('T')[0];
@@ -44,6 +46,13 @@ const Index = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => signOut()}
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              title="Sair"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
             <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
               <Calendar className="w-4 h-4 text-primary" />
               <input

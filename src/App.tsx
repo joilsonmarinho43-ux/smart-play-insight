@@ -21,20 +21,18 @@ const LoadingScreen = () => (
 );
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, loading: authLoading } = useAuth();
-  const { hasAccess, loading: profileLoading } = useProfile();
+  const { session, hasAccess, loading } = useProfile();
 
-  if (authLoading || profileLoading) return <LoadingScreen />;
+  if (loading) return <LoadingScreen />;
   if (!session) return <Navigate to="/auth" replace />;
   if (!hasAccess()) return <Navigate to="/expired" replace />;
   return <>{children}</>;
 };
 
 const PaywallRoute = () => {
-  const { session, loading: authLoading } = useAuth();
-  const { hasAccess, loading: profileLoading } = useProfile();
+  const { session, hasAccess, loading } = useProfile();
 
-  if (authLoading || profileLoading) return <LoadingScreen />;
+  if (loading) return <LoadingScreen />;
   if (!session) return <Navigate to="/auth" replace />;
   if (hasAccess()) return <Navigate to="/" replace />;
   return <Paywall />;

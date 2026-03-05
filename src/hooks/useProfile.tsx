@@ -29,7 +29,10 @@ export const useProfile = () => {
         .eq('id', session.user.id)
         .single();
 
-      if (!error && data) {
+      if (error) {
+        console.error('Profile fetch error:', error);
+      }
+      if (data) {
         setProfile(data as Profile);
       }
       setLoading(false);

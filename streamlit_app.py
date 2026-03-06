@@ -1,16 +1,13 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
-# Configuração da página
 st.set_page_config(page_title="Smart Play Insight", layout="wide")
 
-# Título do App
-st.title("Bem-vindo ao Smart Play Insight")
+# Substitua pela URL do seu projeto que aparece no Lovable
+# Geralmente é algo como https://[id-do-projeto].lovable.app
+lovable_url = "https://smart-play-insight.lovable.app" 
 
-# Mensagem de integração
-st.write("Esta é a base do seu projeto Streamlit integrada com o Lovable.")
+st.title("Smart Play Insight Dashboard")
 
-# Exemplo de interação simples
-nome = st.text_input("Qual é o seu nome?")
-if nome:
-    st.write(f"Olá, {nome}! O seu ambiente está configurado com sucesso.")
-  
+# Isso vai mostrar o seu projeto do Lovable dentro do Streamlit
+components.iframe(lovable_url, height=800, scrolling=True)

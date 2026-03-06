@@ -1,13 +1,78 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Smart Play Insight", layout="wide")
+# ================= CONFIGURAÇÃO DA PÁGINA =================
+st.set_page_config(
+    page_title="Smart Play Insight",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# Substitua pela URL do seu projeto que aparece no Lovable
-# Geralmente é algo como https://[id-do-projeto].lovable.app
-lovable_url = "https://smart-play-insight.lovable.app" 
+# ================= REMOVER INTERFACE STREAMLIT =================
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
 
-st.title("Smart Play Insight Dashboard")
+.block-container {
+    padding:0rem;
+    margin:0rem;
+}
 
-# Isso vai mostrar o seu projeto do Lovable dentro do Streamlit
-components.iframe(lovable_url, height=800, scrolling=True)
+[data-testid="stAppViewContainer"]{
+    padding:0rem;
+}
+
+[data-testid="stVerticalBlock"]{
+    gap:0rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ================= URL DO LOVABLE =================
+lovable_url = "https://smart-play-insight.lovable.app"
+
+# ================= IFRAME FULL SCREEN OTIMIZADO =================
+components.html(
+    f"""
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+    body {{
+        margin:0;
+        padding:0;
+        overflow:hidden;
+        background:#0e1117;
+    }}
+
+    .container {{
+        position:fixed;
+        top:0;
+        left:0;
+        width:100vw;
+        height:100vh;
+    }}
+
+    iframe {{
+        width:100%;
+        height:100%;
+        border:none;
+        overflow:hidden;
+    }}
+    </style>
+    </head>
+
+    <body>
+
+    <div class="container">
+        <iframe src="{lovable_url}" allowfullscreen></iframe>
+    </div>
+
+    </body>
+    </html>
+    """,
+    height=1000,
+)

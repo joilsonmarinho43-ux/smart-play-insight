@@ -7,11 +7,25 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ================= MANIFEST PWA =================
+# ================= MANIFEST + META MOBILE =================
 st.markdown("""
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff7a00">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+""", unsafe_allow_html=True)
+
+# ================= REGISTRAR SERVICE WORKER =================
+st.markdown("""
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js')
+  .then(function(registration) {
+    console.log('Service Worker registrado:', registration);
+  }).catch(function(error) {
+    console.log('Erro ao registrar Service Worker:', error);
+  });
+}
+</script>
 """, unsafe_allow_html=True)
 
 # ================= OCULTAR INTERFACE STREAMLIT =================
@@ -28,7 +42,7 @@ margin:0;
 </style>
 """, unsafe_allow_html=True)
 
-# ================= URL DO APP =================
+# ================= URL DO SEU APP =================
 lovable_url = "https://smart-play-insight.lovable.app"
 
 # ================= REDIRECIONAMENTO =================

@@ -1,0 +1,21 @@
+{
+  "name": "Analista Pro 8.0",
+  "short_name": "AnalistaPro",
+  "start_url": "https://smart-play-insight.lovable.app",
+  "display": "standalone",
+  "background_color": "#0e1117",
+  "theme_color": "#ff7a00",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://i.imgur.com/8Km9tLL.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://i.imgur.com/8Km9tLL.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

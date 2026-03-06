@@ -10,6 +10,19 @@ export interface MatchMetrics {
   yellowCards: [number, number];
 }
 
+export interface ModelData {
+  homeGoalsAvg: number;
+  awayGoalsAvg: number;
+  homeCornersAvg: number;
+  awayCornersAvg: number;
+  homeCardsAvg: number;
+  awayCardsAvg: number;
+  homeCornersVariance: number;
+  awayCornersVariance: number;
+  homeCardsVariance: number;
+  awayCardsVariance: number;
+}
+
 export interface MatchData {
   id: string;
   time: string;
@@ -19,11 +32,22 @@ export interface MatchData {
   homeLogo?: string;
   awayLogo?: string;
   metrics: MatchMetrics;
+  modelData: ModelData;
   predictions: {
     homeWin: string;
     draw: string;
     awayWin: string;
   };
+}
+
+export type RiskProfile = 'conservador' | 'moderado' | 'agressivo';
+
+export interface MarketAnalysis {
+  market: string;
+  category: 'goals' | 'corners' | 'cards' | 'result';
+  probability: number;
+  statisticalBasis: string;
+  risk: 'Baixo' | 'Médio' | 'Alto';
 }
 
 export interface TicketSuggestion {

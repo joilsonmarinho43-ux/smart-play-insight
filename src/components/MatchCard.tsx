@@ -60,7 +60,7 @@ const MatchCard = ({ match }: Props) => {
 
       {/* Ticket Suggestion */}
       <div className="px-4 sm:px-6">
-        <TicketSuggestionCard metrics={match.metrics} />
+        <TicketSuggestionCard match={match} />
       </div>
 
       {/* Metrics */}

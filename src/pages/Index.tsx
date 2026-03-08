@@ -18,6 +18,8 @@ const Index = () => {
   });
   const [selectedLeagues, setSelectedLeagues] = useState<Set<string>>(new Set());
   const [showFilter, setShowFilter] = useState(false);
+  const [summaryFilterIds, setSummaryFilterIds] = useState<string[] | null>(null);
+  const [summaryFilterLabel, setSummaryFilterLabel] = useState<string | null>(null);
 
   const { data: matches, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['matches', date],
@@ -38,6 +40,12 @@ const Index = () => {
     if (selectedLeagues.size === 0) return matches;
     return matches.filter((m) => selectedLeagues.has(m.league));
   }, [matches, selectedLeagues]);
+
+  const displayMatches = useMemo(() => {
+    if (!summaryFilterIds) return filteredMatches;
+    const idSet = new Set(summaryFilterIds);
+    return filteredMatches.filter((m) => idSet.has(String(m.id)));
+  }, [filteredMatches, summaryFilterIds]);
 
   const toggleLeague = (league: string) => {
     setSelectedLeagues((prev) => {
@@ -120,12 +128,15 @@ const Index = () => {
       {/* Subtitle bar */}
       <div className="bg-primary/5 border-b border-primary/10">
         <div className="container max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <BarChart3 className="w-4 h-4 text-primary" />
             <span className="text-xs sm:text-sm text-primary font-medium">
               {formatDateDisplay(date)}
-              {matches ? ` — ${filteredMatches.length} de ${matches.length} jogos` : ''}
+              {matches ? ` — ${displayMatches.length} de ${matches.length} jogos` : ''}
             </span>
+            {summaryFilterLabel && (
+              <span className="text-[10px] sm:text-xs text-primary/80">• filtro: {summaryFilterLabel}</span>
+            )}
           </div>
           {matches && matches.length > 0 && (
             <button
@@ -174,8 +185,7 @@ const Index = () => {
                       : 'bg-secondary text-muted-foreground border-border hover:text-foreground hover:border-primary/50'
                   }`}
                 >
-                  {league}
-                  {' '}
+                  {league}{' '}
                   <span className="opacity-60">
                     ({matches.filter((m) => m.league === league).length})
                   </span>
@@ -228,14 +238,28 @@ const Index = () => {
           </div>
         )}
 
+        {matches && filteredMatches.length > 0 && displayMatches.length === 0 && summaryFilterLabel && (
+          <div className="text-center py-10 rounded-xl border border-primary/20 bg-primary/5 animate-fade-in">
+            <p className="text-sm text-muted-foreground">
+              Nenhum jogo com sinal forte para <span className="text-primary font-semibold">{summaryFilterLabel}</span> nas ligas filtradas.
+            </p>
+          </div>
+        )}
+
         {filteredMatches.length > 0 && (
           <>
-            <MatchSummaryBanner matches={filteredMatches} />
-            <BingoSuggestion matches={filteredMatches} />
+            <MatchSummaryBanner
+              matches={filteredMatches}
+              onFilterChange={(ids, label) => {
+                setSummaryFilterIds(ids);
+                setSummaryFilterLabel(label);
+              }}
+            />
+            {displayMatches.length > 0 && <BingoSuggestion matches={displayMatches} />}
           </>
         )}
 
-        {filteredMatches.map((match, i) => (
+        {displayMatches.map((match, i) => (
           <div key={match.id} style={{ animationDelay: `${i * 150}ms` }}>
             <MatchCard match={match} />
           </div>

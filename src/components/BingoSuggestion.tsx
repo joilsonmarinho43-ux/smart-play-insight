@@ -76,7 +76,7 @@ const BingoSuggestion = ({ matches }: Props) => {
       {/* Description */}
       <div className="px-4 sm:px-6 pt-3 pb-2">
         <p className="text-xs text-muted-foreground">
-          Seleção automática dos mercados com maior probabilidade (≥70%) de cada jogo do dia.
+          Melhor entrada por jogo entre: Over 1.5 Gols, Over 5.5 Escanteios, Over 2.5 Cartões, Chance Dupla e Vitória (≥65%).
         </p>
       </div>
 

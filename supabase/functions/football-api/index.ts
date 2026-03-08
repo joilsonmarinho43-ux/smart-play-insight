@@ -312,6 +312,12 @@ serve(async (req) => {
               homeCardsVariance: f1(calcVariance(homeForm.cards)),
               awayCardsVariance: f1(calcVariance(awayForm.cards)),
             },
+            sampleSize: {
+              homeGames: homeForm.gamesTotal,
+              awayGames: awayForm.gamesTotal,
+              homeWithStats: homeForm.gamesWithStats,
+              awayWithStats: awayForm.gamesWithStats,
+            },
             predictions,
           };
         } catch (e) {

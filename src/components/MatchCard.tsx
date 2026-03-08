@@ -1,7 +1,7 @@
 import { MatchData } from '@/types/match';
 import MetricRow from './MetricRow';
 import TicketSuggestionCard from './TicketSuggestion';
-import { Clock, Trophy } from 'lucide-react';
+import { Clock, Trophy, Database, AlertTriangle } from 'lucide-react';
 
 interface Props {
   match: MatchData;
@@ -19,6 +19,42 @@ const metricLabels: { key: keyof MatchData['metrics']; label: string; format: 'd
   { key: 'yellowCards', label: 'Cartões Amarelos', format: 'decimal' },
 ];
 
+function SampleSizeBadge({ match }: { match: MatchData }) {
+  const s = match.sampleSize;
+  if (!s) return null;
+
+  const minWithStats = Math.min(s.homeWithStats, s.awayWithStats);
+  const maxGames = Math.max(s.homeGames, s.awayGames);
+  
+  // Confidence level
+  const isHigh = minWithStats >= 4;
+  const isMedium = minWithStats >= 2;
+
+  const color = isHigh
+    ? 'bg-green-500/15 text-green-400 border-green-500/30'
+    : isMedium
+    ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+    : 'bg-red-500/15 text-red-400 border-red-500/30';
+
+  const Icon = minWithStats >= 2 ? Database : AlertTriangle;
+  const label = isHigh ? 'Alta' : isMedium ? 'Média' : 'Baixa';
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] sm:text-xs ${color}`}>
+      <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+      <span className="font-medium">
+        Confiança {label}
+      </span>
+      <span className="opacity-70 hidden sm:inline">
+        — {s.homeWithStats}/{s.homeGames} jogos casa · {s.awayWithStats}/{s.awayGames} jogos fora
+      </span>
+      <span className="opacity-70 sm:hidden">
+        {s.homeWithStats}+{s.awayWithStats} jogos
+      </span>
+    </div>
+  );
+}
+
 const MatchCard = ({ match }: Props) => {
   return (
     <div className="bg-card rounded-2xl border border-border overflow-hidden animate-slide-in">
@@ -33,6 +69,13 @@ const MatchCard = ({ match }: Props) => {
           <span className="text-xs sm:text-sm">{match.time}</span>
         </div>
       </div>
+
+      {/* Sample Size Indicator */}
+      {match.sampleSize && (
+        <div className="px-4 sm:px-6 pt-3">
+          <SampleSizeBadge match={match} />
+        </div>
+      )}
 
       {/* Teams */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6 px-4 sm:px-8 py-5 sm:py-6">

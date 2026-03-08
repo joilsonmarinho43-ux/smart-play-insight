@@ -58,6 +58,8 @@ interface RecentFormData {
   avgFouls: number;
   avgOffsides: number;
   avgBigChances: number;
+  gamesTotal: number;
+  gamesWithStats: number;
 }
 
 // Fetch last N fixtures for a team, then fetch real statistics for each
@@ -131,6 +133,8 @@ async function getRecentForm(teamId: number, count: number, apiKey: string): Pro
     avgFouls: avg(fouls),
     avgOffsides: avg(offsides),
     avgBigChances: avg(bigChances),
+    gamesTotal: fixtures.length,
+    gamesWithStats: corners.length,
   };
 }
 
@@ -307,6 +311,12 @@ serve(async (req) => {
               awayCornersVariance: f1(calcVariance(awayForm.corners)),
               homeCardsVariance: f1(calcVariance(homeForm.cards)),
               awayCardsVariance: f1(calcVariance(awayForm.cards)),
+            },
+            sampleSize: {
+              homeGames: homeForm.gamesTotal,
+              awayGames: awayForm.gamesTotal,
+              homeWithStats: homeForm.gamesWithStats,
+              awayWithStats: awayForm.gamesWithStats,
             },
             predictions,
           };

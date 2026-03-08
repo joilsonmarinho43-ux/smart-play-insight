@@ -90,7 +90,7 @@ const BingoSuggestion = ({ matches }: Props) => {
     }
 
     // Ordena por quantidade de mercados qualificados (mais = melhor jogo)
-    return results.sort((a, b) => b.markets.length - a.markets.length);
+    return results.sort((a, b) => b.markets.length - a.markets.length).slice(0, 15);
   }, [matches]);
 
   const [expanded, setExpanded] = useState(false);

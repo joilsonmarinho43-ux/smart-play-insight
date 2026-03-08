@@ -15,10 +15,12 @@ const Index = () => {
     return d.toISOString().split('T')[0];
   });
 
-  const { data: matches, isLoading, error, refetch } = useQuery({
+  const { data: matches, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    enabled: false, // only fetch on button click
+    enabled: false,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 min cache
   });
 
   const formatDateDisplay = (dateStr: string) => {

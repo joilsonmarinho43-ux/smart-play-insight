@@ -23,6 +23,13 @@ export interface ModelData {
   awayCardsVariance: number;
 }
 
+export interface SampleSize {
+  homeGames: number;
+  awayGames: number;
+  homeWithStats: number;
+  awayWithStats: number;
+}
+
 export interface MatchData {
   id: string;
   time: string;
@@ -33,6 +40,7 @@ export interface MatchData {
   awayLogo?: string;
   metrics: MatchMetrics;
   modelData: ModelData;
+  sampleSize?: SampleSize;
   predictions: {
     homeWin: string;
     draw: string;

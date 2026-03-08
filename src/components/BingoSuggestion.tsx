@@ -207,11 +207,11 @@ const BingoSuggestion = ({ matches }: Props) => {
       </div>
 
       {/* Footer */}
-      <div className="bg-secondary/30 border-t border-border px-4 sm:px-6 py-2.5 flex items-center justify-between">
-        <p className="text-[10px] text-muted-foreground">
+      <div className="bg-secondary/30 border-t border-border px-3 sm:px-6 py-2.5 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+        <p className="text-[10px] text-muted-foreground hidden sm:block">
           Poisson (gols) + média ponderada (escanteios/cartões) • 60% temporada + 40% últimos 10
         </p>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 justify-end">
           <button
             onClick={() => {
               const text = getBingoText(bingoMatches, totalSelections);
@@ -227,7 +227,7 @@ const BingoSuggestion = ({ matches }: Props) => {
             href={`https://wa.me/?text=${encodeURIComponent(getBingoText(bingoMatches, totalSelections))}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[hsl(145_60%_45%/0.2)] text-[hsl(145_60%_40%)] hover:bg-[hsl(145_60%_45%/0.3)] transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
           >
             <MessageCircle className="w-3.5 h-3.5" />
             WhatsApp

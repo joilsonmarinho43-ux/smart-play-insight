@@ -167,7 +167,7 @@ function ComboSignalBanner({ combo }: { combo: ReturnType<typeof getComboSignal>
       <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
       <div>
         <p className="text-sm font-bold text-red-400">❌ NÃO RECOMENDADO para Over 2.5 + Over 7.5 combo</p>
-        <div className="flex gap-4 mt-1.5">
+        <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 mt-1.5">
           <span className={`text-xs ${combo.goalsOk ? 'text-green-300/80' : 'text-red-300/80'}`}>
             Over 2.5 Gols: <strong>{goalsProb}%</strong> {combo.goalsOk ? '✓' : '✗'}
           </span>

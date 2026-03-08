@@ -59,10 +59,12 @@ const TicketSuggestionCard = ({ match }: Props) => {
       </div>
 
       {/* Combo Signal Banner */}
-      <ComboSignalBanner combo={combo} />
+      <div className="overflow-x-auto">
+        <ComboSignalBanner combo={combo} />
+      </div>
 
       {/* Profile Selector */}
-      <div className="flex gap-2 mb-4">
+      <div className="grid grid-cols-3 gap-1.5 sm:flex sm:gap-2 mb-4">
         {(Object.keys(profileConfig) as RiskProfile[]).map((p) => {
           const c = profileConfig[p];
           const Icon = c.icon;
@@ -71,15 +73,15 @@ const TicketSuggestionCard = ({ match }: Props) => {
             <button
               key={p}
               onClick={() => setProfile(p)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-all border ${
                 active
                   ? 'bg-accent/20 border-accent text-accent'
                   : 'bg-secondary/50 border-border text-muted-foreground hover:border-accent/40'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
-              {c.label}
-              <span className="opacity-60">≥{c.min}%</span>
+              <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span className="truncate">{c.label}</span>
+              <span className="opacity-60 hidden sm:inline">≥{c.min}%</span>
             </button>
           );
         })}
@@ -150,7 +152,7 @@ function ComboSignalBanner({ combo }: { combo: ReturnType<typeof getComboSignal>
         <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-bold text-green-400">✅ JOGO BOM para Over 2.5 Gols + Over 7.5 Escanteios</p>
-          <div className="flex gap-4 mt-1.5">
+      <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 mt-1.5">
             <span className="text-xs text-green-300/80">Over 2.5 Gols: <strong>{goalsProb}%</strong></span>
             <span className="text-xs text-green-300/80">Over 7.5 Escanteios: <strong>{cornersProb}%</strong></span>
           </div>
@@ -165,7 +167,7 @@ function ComboSignalBanner({ combo }: { combo: ReturnType<typeof getComboSignal>
       <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
       <div>
         <p className="text-sm font-bold text-red-400">❌ NÃO RECOMENDADO para Over 2.5 + Over 7.5 combo</p>
-        <div className="flex gap-4 mt-1.5">
+        <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 mt-1.5">
           <span className={`text-xs ${combo.goalsOk ? 'text-green-300/80' : 'text-red-300/80'}`}>
             Over 2.5 Gols: <strong>{goalsProb}%</strong> {combo.goalsOk ? '✓' : '✗'}
           </span>

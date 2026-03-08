@@ -85,56 +85,63 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container max-w-3xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Brain className="w-7 h-7 text-primary" />
-            <div>
-              <h1 className="font-display text-2xl sm:text-3xl text-foreground tracking-wider leading-none">
-                ANALISTA JOILSON
-              </h1>
-              <p className="text-[10px] sm:text-xs text-muted-foreground tracking-widest uppercase">
-                Modelo Híbrido Ponderado
-              </p>
+        <div className="container max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Brain className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
+              <div>
+                <h1 className="font-display text-xl sm:text-3xl text-foreground tracking-wider leading-none">
+                  ANALISTA JOILSON
+                </h1>
+                <p className="text-[9px] sm:text-xs text-muted-foreground tracking-widest uppercase">
+                  Modelo Híbrido Ponderado
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 sm:hidden">
+              {profile?.is_admin && (
+                <Link to="/admin" className="p-2 rounded-lg text-primary hover:bg-secondary transition-colors" title="Painel Admin">
+                  <Shield className="w-4 h-4" />
+                </Link>
+              )}
+              <button onClick={() => signOut()} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Sair">
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {profile?.is_admin && (
-              <Link
-                to="/admin"
-                className="p-2 rounded-lg text-primary hover:bg-secondary transition-colors"
-                title="Painel Admin"
-              >
-                <Shield className="w-4 h-4" />
-              </Link>
-            )}
-            <button
-              onClick={() => signOut()}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              title="Sair"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
-              <Calendar className="w-4 h-4 text-primary" />
+            <div className="hidden sm:flex items-center gap-1">
+              {profile?.is_admin && (
+                <Link to="/admin" className="p-2 rounded-lg text-primary hover:bg-secondary transition-colors" title="Painel Admin">
+                  <Shield className="w-4 h-4" />
+                </Link>
+              )}
+              <button onClick={() => signOut()} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Sair">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 bg-secondary rounded-lg px-2 sm:px-3 py-2 flex-1 sm:flex-none min-w-0">
+              <Calendar className="w-4 h-4 text-primary shrink-0" />
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="bg-transparent text-foreground text-sm outline-none"
+                className="bg-transparent text-foreground text-sm outline-none w-full sm:w-auto"
               />
             </div>
             <button
               onClick={() => !isFetching && refetch()}
               disabled={isFetching}
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+              className="bg-primary text-primary-foreground px-3 sm:px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5 sm:gap-2 shrink-0"
             >
               {isFetching ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <BarChart3 className="w-4 h-4" />
               )}
-              {isFetching ? 'Analisando...' : 'Analisar'}
+              <span className="hidden sm:inline">{isFetching ? 'Analisando...' : 'Analisar'}</span>
+              <span className="sm:hidden">{isFetching ? '...' : 'Analisar'}</span>
             </button>
           </div>
         </div>

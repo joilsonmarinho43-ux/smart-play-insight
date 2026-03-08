@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, UserPlus, Clock, CalendarPlus } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 

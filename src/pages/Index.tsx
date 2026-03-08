@@ -90,7 +90,7 @@ const Index = () => {
             <Brain className="w-7 h-7 text-primary" />
             <div>
               <h1 className="font-display text-2xl sm:text-3xl text-foreground tracking-wider leading-none">
-                ANALISTA PRO 8.0
+                ANALISTA JOILSON
               </h1>
               <p className="text-[10px] sm:text-xs text-muted-foreground tracking-widest uppercase">
                 Modelo Híbrido Ponderado

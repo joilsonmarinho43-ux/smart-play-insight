@@ -178,10 +178,32 @@ const BingoSuggestion = ({ matches }: Props) => {
       </div>
 
       {/* Footer */}
-      <div className="bg-secondary/30 border-t border-border px-4 sm:px-6 py-2.5">
-        <p className="text-[10px] text-muted-foreground text-center">
-          Baseado em Poisson (gols) e média ponderada ajustada por variância (escanteios/cartões) • Modelo 60% temporada + 40% últimos 10 jogos
+      <div className="bg-secondary/30 border-t border-border px-4 sm:px-6 py-2.5 flex items-center justify-between">
+        <p className="text-[10px] text-muted-foreground">
+          Poisson (gols) + média ponderada (escanteios/cartões) • 60% temporada + 40% últimos 10
         </p>
+        <button
+          onClick={() => {
+            const lines = ['🎯 *BINGO DO DIA — ANALISTA PRO 8.0*', ''];
+            for (const bm of bingoMatches) {
+              lines.push(`⚽ *${bm.match.homeTeam} vs ${bm.match.awayTeam}*`);
+              lines.push(`🕐 ${bm.match.time} • ${bm.match.league}`);
+              for (const m of bm.markets) {
+                const icon = m.category === 'goals' ? '📊' : m.category === 'corners' ? '🔄' : m.category === 'cards' ? '🟨' : '🏆';
+                lines.push(`  ${icon} ${m.market} — *${m.probability}%* (${m.risk})`);
+              }
+              lines.push('');
+            }
+            lines.push(`📈 ${bingoMatches.length} jogos • ${totalSelections} entradas`);
+            lines.push('_Modelo estatístico Poisson + média ponderada_');
+            navigator.clipboard.writeText(lines.join('\n'));
+            toast.success('Bingo copiado para a área de transferência!');
+          }}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors shrink-0"
+        >
+          <Copy className="w-3.5 h-3.5" />
+          Copiar
+        </button>
       </div>
     </div>
   );

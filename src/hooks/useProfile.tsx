@@ -55,16 +55,12 @@ export const useProfile = () => {
     if (!profile) return false;
     if (profile.is_admin) return true;
 
-    const now = new Date();
-    const createdAt = new Date(profile.created_at);
-    const trialEnd = new Date(createdAt.getTime() + 3 * 24 * 60 * 60 * 1000);
-
-    if (now <= trialEnd) return true;
-
+    // Access only if admin has set a valid subscription_expiry_date
     if (profile.subscription_expiry_date) {
-      return now <= new Date(profile.subscription_expiry_date);
+      return new Date() <= new Date(profile.subscription_expiry_date);
     }
 
+    // No subscription set = no access (admin must grant days)
     return false;
   }, [profile]);
 

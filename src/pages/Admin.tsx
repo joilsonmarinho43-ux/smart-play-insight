@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
-import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, UserPlus, CheckCircle } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, UserPlus, Clock, CalendarPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
+const DAYS_OPTIONS = [3, 7, 15, 30];
+
 const Admin = () => {
   const { profile, loading: profileLoading } = useProfile();
-  const { session } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +31,7 @@ const Admin = () => {
     setLoading(false);
   };
 
-  const extendSubscription = async (userId: string) => {
+  const grantDays = async (userId: string, days: number) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
 
@@ -39,7 +39,7 @@ const Admin = () => {
       ? new Date(Math.max(new Date(user.subscription_expiry_date).getTime(), Date.now()))
       : new Date();
 
-    const newExpiry = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const newExpiry = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
 
     const { error } = await supabase
       .from('profiles')
@@ -47,9 +47,9 @@ const Admin = () => {
       .eq('id', userId);
 
     if (error) {
-      toast.error('Erro ao atualizar assinatura');
+      toast.error('Erro ao atualizar acesso');
     } else {
-      toast.success('Assinatura renovada por +30 dias');
+      toast.success(`+${days} dias concedidos com sucesso`);
       fetchUsers();
     }
   };
@@ -67,14 +67,18 @@ const Admin = () => {
   }
 
   const getStatus = (user: Profile) => {
-    const now = new Date();
-    const trialEnd = new Date(new Date(user.created_at).getTime() + 3 * 24 * 60 * 60 * 1000);
+    if (user.is_admin) return { label: 'Admin', className: 'bg-primary/20 text-primary' };
 
-    if (user.is_admin) return { label: 'Admin', className: 'pill-orange' };
-    if (user.subscription_expiry_date && now <= new Date(user.subscription_expiry_date))
-      return { label: 'Assinante', className: 'pill-green' };
-    if (now <= trialEnd) return { label: 'Trial', className: 'pill-neutral' };
-    return { label: 'Expirado', className: 'bg-destructive/20 text-destructive font-bold' };
+    if (user.subscription_expiry_date) {
+      const expiry = new Date(user.subscription_expiry_date);
+      if (new Date() <= expiry) {
+        const daysLeft = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        return { label: `Ativo (${daysLeft}d)`, className: 'bg-[hsl(145_60%_45%/0.2)] text-[hsl(145_60%_35%)]' };
+      }
+      return { label: 'Expirado', className: 'bg-destructive/20 text-destructive' };
+    }
+
+    return { label: 'Pendente', className: 'bg-[hsl(45_80%_50%/0.2)] text-[hsl(45_80%_35%)]' };
   };
 
   return (
@@ -100,30 +104,36 @@ const Admin = () => {
             {users.map((user) => {
               const status = getStatus(user);
               return (
-                <div key={user.id} className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{user.email}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Criado: {new Date(user.created_at).toLocaleDateString('pt-BR')}
-                      {user.subscription_expiry_date && (
-                        <> · Expira: {new Date(user.subscription_expiry_date).toLocaleDateString('pt-BR')}</>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-xs ${status.className}`}>
+                <div key={user.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{user.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Criado: {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                        {user.subscription_expiry_date && (
+                          <> · Expira: {new Date(user.subscription_expiry_date).toLocaleDateString('pt-BR')}</>
+                        )}
+                      </p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${status.className}`}>
                       {status.label}
                     </span>
-                    {!user.is_admin && (
-                      <button
-                        onClick={() => extendSubscription(user.id)}
-                        className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold hover:opacity-90 transition-opacity"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                        +30 dias
-                      </button>
-                    )}
                   </div>
+
+                  {!user.is_admin && (
+                    <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
+                      {DAYS_OPTIONS.map((days) => (
+                        <button
+                          key={days}
+                          onClick={() => grantDays(user.id, days)}
+                          className="flex items-center gap-1 bg-secondary hover:bg-primary hover:text-primary-foreground text-muted-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <CalendarPlus className="w-3 h-3" />
+                          +{days} dias
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

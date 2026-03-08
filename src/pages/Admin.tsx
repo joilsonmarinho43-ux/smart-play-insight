@@ -54,6 +54,20 @@ const Admin = () => {
     }
   };
 
+  const revokeAccess = async (userId: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ subscription_expiry_date: null })
+      .eq('id', userId);
+
+    if (error) {
+      toast.error('Erro ao remover acesso');
+    } else {
+      toast.success('Acesso removido');
+      fetchUsers();
+    }
+  };
+
   if (profileLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

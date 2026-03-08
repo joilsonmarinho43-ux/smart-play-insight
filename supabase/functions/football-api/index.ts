@@ -133,6 +133,8 @@ async function getRecentForm(teamId: number, count: number, apiKey: string): Pro
     avgFouls: avg(fouls),
     avgOffsides: avg(offsides),
     avgBigChances: avg(bigChances),
+    gamesTotal: fixtures.length,
+    gamesWithStats: corners.length,
   };
 }
 

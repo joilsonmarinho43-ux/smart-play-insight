@@ -36,9 +36,14 @@ const Index = () => {
     return leagues.sort();
   }, [matches]);
 
-  const filteredMatches = useMemo(() => {
-    if (!matches) return [];
-    let result = matches;
+  const hasLowConfidence = (m: MatchData) => {
+    if (!m.sampleSize) return false;
+    return Math.min(m.sampleSize.homeWithStats, m.sampleSize.awayWithStats) < 2;
+  };
+
+  const { reliableMatches, lowConfidenceMatches } = useMemo(() => {
+    if (!matches) return { reliableMatches: [], lowConfidenceMatches: [] };
+    let result = [...matches];
 
     // Filter out matches that already started (only for today)
     const today = new Date().toISOString().split('T')[0];
@@ -54,8 +59,16 @@ const Index = () => {
     if (selectedLeagues.size > 0) {
       result = result.filter((m) => selectedLeagues.has(m.league));
     }
-    return result;
+
+    return {
+      reliableMatches: result.filter((m) => !hasLowConfidence(m)),
+      lowConfidenceMatches: result.filter((m) => hasLowConfidence(m)),
+    };
   }, [matches, selectedLeagues, date]);
+
+  const filteredMatches = useMemo(() => {
+    return [...reliableMatches, ...lowConfidenceMatches];
+  }, [reliableMatches, lowConfidenceMatches]);
 
   const displayMatches = useMemo(() => {
     if (!summaryFilterIds) return filteredMatches;

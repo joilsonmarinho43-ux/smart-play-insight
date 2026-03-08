@@ -42,7 +42,7 @@ const TicketSuggestionCard = ({ match }: Props) => {
 
   const allMarkets = analyzeMarkets(match);
   const bestMarket = getBestMarketForProfile(allMarkets, profile);
-  const cfg = profileConfig[profile];
+  const eligibleMarkets = allMarkets.filter(m => m.probability >= cfg.min);
   const combo = getComboSignal(allMarkets);
 
   return (

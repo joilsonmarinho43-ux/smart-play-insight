@@ -152,7 +152,7 @@ function ComboSignalBanner({ combo }: { combo: ReturnType<typeof getComboSignal>
         <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-bold text-green-400">✅ JOGO BOM para Over 2.5 Gols + Over 7.5 Escanteios</p>
-          <div className="flex gap-4 mt-1.5">
+      <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 mt-1.5">
             <span className="text-xs text-green-300/80">Over 2.5 Gols: <strong>{goalsProb}%</strong></span>
             <span className="text-xs text-green-300/80">Over 7.5 Escanteios: <strong>{cornersProb}%</strong></span>
           </div>

@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
 import { Sparkles, Trophy, TrendingUp, Zap, AlertTriangle, Ticket, Clock, Copy, Check } from 'lucide-react';

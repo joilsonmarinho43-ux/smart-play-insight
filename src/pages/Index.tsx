@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield } from 'lucide-react';
+import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Index = () => {
@@ -14,14 +14,37 @@ const Index = () => {
     const d = new Date();
     return d.toISOString().split('T')[0];
   });
+  const [selectedLeagues, setSelectedLeagues] = useState<Set<string>>(new Set());
+  const [showFilter, setShowFilter] = useState(false);
 
   const { data: matches, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
     enabled: false,
     retry: 1,
-    staleTime: 5 * 60 * 1000, // 5 min cache
+    staleTime: 5 * 60 * 1000,
   });
+
+  const availableLeagues = useMemo(() => {
+    if (!matches) return [];
+    const leagues = [...new Set(matches.map((m) => m.league))];
+    return leagues.sort();
+  }, [matches]);
+
+  const filteredMatches = useMemo(() => {
+    if (!matches) return [];
+    if (selectedLeagues.size === 0) return matches;
+    return matches.filter((m) => selectedLeagues.has(m.league));
+  }, [matches, selectedLeagues]);
+
+  const toggleLeague = (league: string) => {
+    setSelectedLeagues((prev) => {
+      const next = new Set(prev);
+      if (next.has(league)) next.delete(league);
+      else next.add(league);
+      return next;
+    });
+  };
 
   const formatDateDisplay = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
@@ -94,14 +117,72 @@ const Index = () => {
 
       {/* Subtitle bar */}
       <div className="bg-primary/5 border-b border-primary/10">
-        <div className="container max-w-3xl mx-auto px-4 py-2.5 flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-primary" />
-          <span className="text-xs sm:text-sm text-primary font-medium">
-            {formatDateDisplay(date)}
-            {matches ? ` — ${matches.length} jogos analisados` : ''}
-          </span>
+        <div className="container max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-primary" />
+            <span className="text-xs sm:text-sm text-primary font-medium">
+              {formatDateDisplay(date)}
+              {matches ? ` — ${filteredMatches.length} de ${matches.length} jogos` : ''}
+            </span>
+          </div>
+          {matches && matches.length > 0 && (
+            <button
+              onClick={() => setShowFilter(!showFilter)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                showFilter || selectedLeagues.size > 0
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              Filtrar
+              {selectedLeagues.size > 0 && (
+                <span className="bg-primary-foreground/20 text-primary-foreground rounded-full px-1.5 text-[10px]">
+                  {selectedLeagues.size}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* League Filter */}
+      {showFilter && matches && matches.length > 0 && (
+        <div className="bg-card border-b border-border">
+          <div className="container max-w-3xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ligas</span>
+              {selectedLeagues.size > 0 && (
+                <button
+                  onClick={() => setSelectedLeagues(new Set())}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {availableLeagues.map((league) => (
+                <button
+                  key={league}
+                  onClick={() => toggleLeague(league)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                    selectedLeagues.has(league)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-secondary text-muted-foreground border-border hover:text-foreground hover:border-primary/50'
+                  }`}
+                >
+                  {league}
+                  {' '}
+                  <span className="opacity-60">
+                    ({matches.filter((m) => m.league === league).length})
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <main className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -135,13 +216,17 @@ const Index = () => {
           </div>
         )}
 
-        {matches && matches.length === 0 && (
+        {matches && filteredMatches.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-muted-foreground text-lg">Nenhum jogo relevante encontrado para esta data.</p>
+            <p className="text-muted-foreground text-lg">
+              {selectedLeagues.size > 0
+                ? 'Nenhum jogo encontrado para as ligas selecionadas.'
+                : 'Nenhum jogo relevante encontrado para esta data.'}
+            </p>
           </div>
         )}
 
-        {matches && matches.map((match, i) => (
+        {filteredMatches.map((match, i) => (
           <div key={match.id} style={{ animationDelay: `${i * 150}ms` }}>
             <MatchCard match={match} />
           </div>

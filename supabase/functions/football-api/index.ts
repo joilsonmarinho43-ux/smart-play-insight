@@ -127,8 +127,12 @@ serve(async (req) => {
 
     console.log(`Fetching fixtures for date: ${date}`);
     const fixtures = await apiGet("fixtures", { date }, apiKey);
-    let jogos = fixtures.filter((j: any) => LIGAS_ALVO_IDS.includes(j.league.id));
-    console.log(`Found ${jogos.length} matches in target leagues`);
+    const FINISHED_STATUSES = ['FT', 'AET', 'PEN', 'WO', 'AWD', 'CANC', 'ABD'];
+    let jogos = fixtures.filter((j: any) =>
+      LIGAS_ALVO_IDS.includes(j.league.id) &&
+      !FINISHED_STATUSES.includes(j.fixture.status?.short)
+    );
+    console.log(`Found ${jogos.length} matches in target leagues (excluding finished)`);
 
     // Prioritize top leagues and limit to 15 matches max to avoid timeout
     const leaguePriority: Record<number, number> = { 2: 1, 39: 2, 140: 3, 78: 4, 135: 5, 61: 6, 71: 7, 73: 8, 94: 9, 88: 10, 253: 11, 218: 12, 144: 13, 119: 14, 262: 15 };

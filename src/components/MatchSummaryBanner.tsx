@@ -29,18 +29,19 @@ function getSignalData(matches: MatchData[]): SignalSummary[] {
 
   for (const match of matches) {
     const markets = analyzeMarkets(match);
+    const id = String(match.id);
 
     const o15 = markets.find(m => m.market === 'Over 1.5 Gols');
-    if (o15 && o15.probability >= STRONG_THRESHOLD) over15Ids.add(match.id);
+    if (o15 && o15.probability >= STRONG_THRESHOLD) over15Ids.add(id);
 
     const o25 = markets.find(m => m.market === 'Over 2.5 Gols');
-    if (o25 && o25.probability >= STRONG_THRESHOLD) over25Ids.add(match.id);
+    if (o25 && o25.probability >= STRONG_THRESHOLD) over25Ids.add(id);
 
     const o75 = markets.find(m => m.market === 'Over 7.5 Escanteios');
-    if (o75 && o75.probability >= STRONG_THRESHOLD) over75Ids.add(match.id);
+    if (o75 && o75.probability >= STRONG_THRESHOLD) over75Ids.add(id);
 
     const cd = markets.filter(m => m.market.startsWith('1X') || m.market.startsWith('X2'));
-    if (cd.some(m => m.probability >= STRONG_THRESHOLD)) cdIds.add(match.id);
+    if (cd.some(m => m.probability >= STRONG_THRESHOLD)) cdIds.add(id);
   }
 
   return [

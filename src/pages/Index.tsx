@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
+import MatchSummaryBanner from '@/components/MatchSummaryBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield, Filter } from 'lucide-react';
@@ -228,7 +229,10 @@ const Index = () => {
         )}
 
         {filteredMatches.length > 0 && (
-          <BingoSuggestion matches={filteredMatches} />
+          <>
+            <MatchSummaryBanner matches={filteredMatches} />
+            <BingoSuggestion matches={filteredMatches} />
+          </>
         )}
 
         {filteredMatches.map((match, i) => (

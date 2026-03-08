@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MatchData, RiskProfile, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets, getBestMarketForProfile } from '@/lib/matchAnalysis';
-import { Ticket, TrendingUp, AlertTriangle, Zap, Trophy, ChevronDown, ChevronUp, ShieldCheck, Target, Flame } from 'lucide-react';
+import { Ticket, TrendingUp, AlertTriangle, Zap, Trophy, ChevronDown, ChevronUp, ShieldCheck, Target, Flame, CheckCircle2, XCircle } from 'lucide-react';
 
 interface Props {
   match: MatchData;
@@ -26,6 +26,16 @@ const riskColors: Record<string, string> = {
   'Alto': 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
+const COMBO_THRESHOLD = 85;
+
+function getComboSignal(allMarkets: MarketAnalysis[]) {
+  const over25 = allMarkets.find(m => m.market === 'Over 2.5 Gols');
+  const over75 = allMarkets.find(m => m.market === 'Over 7.5 Escanteios');
+  const goalsOk = over25 && over25.probability >= COMBO_THRESHOLD;
+  const cornersOk = over75 && over75.probability >= COMBO_THRESHOLD;
+  return { over25, over75, goalsOk, cornersOk, isGood: goalsOk && cornersOk };
+}
+
 const TicketSuggestionCard = ({ match }: Props) => {
   const [profile, setProfile] = useState<RiskProfile>('conservador');
   const [showAll, setShowAll] = useState(false);
@@ -33,7 +43,7 @@ const TicketSuggestionCard = ({ match }: Props) => {
   const allMarkets = analyzeMarkets(match);
   const bestMarket = getBestMarketForProfile(allMarkets, profile);
   const cfg = profileConfig[profile];
-  const ProfileIcon = cfg.icon;
+  const combo = getComboSignal(allMarkets);
 
   return (
     <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 sm:p-5 mb-4">
@@ -46,6 +56,9 @@ const TicketSuggestionCard = ({ match }: Props) => {
           </h3>
         </div>
       </div>
+
+      {/* Combo Signal Banner */}
+      <ComboSignalBanner combo={combo} />
 
       {/* Profile Selector */}
       <div className="flex gap-2 mb-4">
@@ -105,6 +118,45 @@ const TicketSuggestionCard = ({ match }: Props) => {
     </div>
   );
 };
+
+function ComboSignalBanner({ combo }: { combo: ReturnType<typeof getComboSignal> }) {
+  const goalsProb = combo.over25?.probability ?? 0;
+  const cornersProb = combo.over75?.probability ?? 0;
+
+  if (combo.isGood) {
+    return (
+      <div className="mb-4 p-3 rounded-lg border border-green-500/40 bg-green-500/10 flex items-start gap-3">
+        <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-green-400">✅ JOGO BOM para Over 2.5 Gols + Over 7.5 Escanteios</p>
+          <div className="flex gap-4 mt-1.5">
+            <span className="text-xs text-green-300/80">Over 2.5 Gols: <strong>{goalsProb}%</strong></span>
+            <span className="text-xs text-green-300/80">Over 7.5 Escanteios: <strong>{cornersProb}%</strong></span>
+          </div>
+          <p className="text-[10px] text-green-300/60 mt-1">Ambos acima de {COMBO_THRESHOLD}% — sinal forte</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 p-3 rounded-lg border border-red-500/30 bg-red-500/10 flex items-start gap-3">
+      <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+      <div>
+        <p className="text-sm font-bold text-red-400">❌ NÃO RECOMENDADO para Over 2.5 + Over 7.5 combo</p>
+        <div className="flex gap-4 mt-1.5">
+          <span className={`text-xs ${combo.goalsOk ? 'text-green-300/80' : 'text-red-300/80'}`}>
+            Over 2.5 Gols: <strong>{goalsProb}%</strong> {combo.goalsOk ? '✓' : '✗'}
+          </span>
+          <span className={`text-xs ${combo.cornersOk ? 'text-green-300/80' : 'text-red-300/80'}`}>
+            Over 7.5 Escanteios: <strong>{cornersProb}%</strong> {combo.cornersOk ? '✓' : '✗'}
+          </span>
+        </div>
+        <p className="text-[10px] text-red-300/60 mt-1">Mínimo exigido: {COMBO_THRESHOLD}% em ambos</p>
+      </div>
+    </div>
+  );
+}
 
 function BestMarketDisplay({ market, profile }: { market: MarketAnalysis; profile: RiskProfile }) {
   const Icon = categoryIcons[market.category] || Ticket;

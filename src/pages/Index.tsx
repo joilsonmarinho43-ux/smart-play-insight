@@ -114,11 +114,11 @@ const Index = () => {
           </div>
         )}
 
-        {isLoading && (
+        {isFetching && (
           <div className="text-center py-20">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
             <p className="text-muted-foreground">Buscando dados ao vivo da API...</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">Isso pode levar alguns segundos</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Isso pode levar até 30 segundos</p>
           </div>
         )}
 

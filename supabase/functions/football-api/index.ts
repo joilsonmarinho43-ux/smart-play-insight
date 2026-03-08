@@ -58,6 +58,8 @@ interface RecentFormData {
   avgFouls: number;
   avgOffsides: number;
   avgBigChances: number;
+  gamesTotal: number;
+  gamesWithStats: number;
 }
 
 // Fetch last N fixtures for a team, then fetch real statistics for each

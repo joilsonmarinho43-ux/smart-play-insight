@@ -218,6 +218,8 @@ const BingoSuggestion = ({ matches }: Props) => {
           Copiar
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 };

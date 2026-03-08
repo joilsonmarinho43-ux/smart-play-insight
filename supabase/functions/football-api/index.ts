@@ -38,16 +38,33 @@ async function getTeamSeasonStats(teamId: number, leagueId: number, season: numb
     team: String(teamId), league: String(leagueId), season: String(season),
   }, apiKey);
   try {
-    const played = stats.fixtures?.played?.total || 1;
-    const goalsFor = stats.goals?.for?.total?.total || 0;
-    const goalsAgainst = stats.goals?.against?.total?.total || 0;
+    const played = stats?.fixtures?.played?.total || 0;
+    if (played === 0) {
+      return { played: 0, goalsFor: 0, goalsAgainst: 0, goalsForAvg: 0, goalsAgainstAvg: 0, corners_for: 0, corners_against: 0, cards_avg: 0 };
+    }
+    const goalsFor = stats?.goals?.for?.total?.total || 0;
+    const goalsAgainst = stats?.goals?.against?.total?.total || 0;
+
+    // Cards: sum all minute buckets
+    let yellowTotal = 0, redTotal = 0;
+    if (stats?.cards?.yellow) {
+      for (const bucket of Object.values(stats.cards.yellow)) {
+        yellowTotal += (bucket as any)?.total || 0;
+      }
+    }
+    if (stats?.cards?.red) {
+      for (const bucket of Object.values(stats.cards.red)) {
+        redTotal += (bucket as any)?.total || 0;
+      }
+    }
+
     return {
       played, goalsFor, goalsAgainst,
       goalsForAvg: goalsFor / played,
       goalsAgainstAvg: goalsAgainst / played,
-      corners_for: (stats.corners?.for?.total || 0) / played,
-      corners_against: (stats.corners?.against?.total || 0) / played,
-      cards_avg: ((stats.cards?.yellow?.total || 0) + (stats.cards?.red?.total || 0)) / played,
+      corners_for: 5, // API-Sports doesn't provide season corner totals; use default
+      corners_against: 4.5,
+      cards_avg: (yellowTotal + redTotal) / played,
     };
   } catch {
     return { played: 0, goalsFor: 0, goalsAgainst: 0, goalsForAvg: 0, goalsAgainstAvg: 0, corners_for: 0, corners_against: 0, cards_avg: 0 };

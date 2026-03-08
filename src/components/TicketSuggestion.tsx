@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MatchData, RiskProfile, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets, getBestMarketForProfile } from '@/lib/matchAnalysis';
-import { Ticket, TrendingUp, AlertTriangle, Zap, Trophy, ChevronDown, ChevronUp, ShieldCheck, Target, Flame } from 'lucide-react';
+import { Ticket, TrendingUp, AlertTriangle, Zap, Trophy, ChevronDown, ChevronUp, ShieldCheck, Target, Flame, CheckCircle2, XCircle } from 'lucide-react';
 
 interface Props {
   match: MatchData;
@@ -26,6 +26,16 @@ const riskColors: Record<string, string> = {
   'Alto': 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
+const COMBO_THRESHOLD = 85;
+
+function getComboSignal(allMarkets: MarketAnalysis[]) {
+  const over25 = allMarkets.find(m => m.market === 'Over 2.5 Gols');
+  const over75 = allMarkets.find(m => m.market === 'Over 7.5 Escanteios');
+  const goalsOk = over25 && over25.probability >= COMBO_THRESHOLD;
+  const cornersOk = over75 && over75.probability >= COMBO_THRESHOLD;
+  return { over25, over75, goalsOk, cornersOk, isGood: goalsOk && cornersOk };
+}
+
 const TicketSuggestionCard = ({ match }: Props) => {
   const [profile, setProfile] = useState<RiskProfile>('conservador');
   const [showAll, setShowAll] = useState(false);
@@ -33,7 +43,7 @@ const TicketSuggestionCard = ({ match }: Props) => {
   const allMarkets = analyzeMarkets(match);
   const bestMarket = getBestMarketForProfile(allMarkets, profile);
   const cfg = profileConfig[profile];
-  const ProfileIcon = cfg.icon;
+  const combo = getComboSignal(allMarkets);
 
   return (
     <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 sm:p-5 mb-4">
@@ -46,6 +56,9 @@ const TicketSuggestionCard = ({ match }: Props) => {
           </h3>
         </div>
       </div>
+
+      {/* Combo Signal Banner */}
+      <ComboSignalBanner combo={combo} />
 
       {/* Profile Selector */}
       <div className="flex gap-2 mb-4">

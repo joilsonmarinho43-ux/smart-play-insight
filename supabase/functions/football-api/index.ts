@@ -127,13 +127,21 @@ serve(async (req) => {
 
     console.log(`Fetching fixtures for date: ${date}`);
     const fixtures = await apiGet("fixtures", { date }, apiKey);
-    const jogos = fixtures.filter((j: any) => LIGAS_ALVO_IDS.includes(j.league.id));
+    let jogos = fixtures.filter((j: any) => LIGAS_ALVO_IDS.includes(j.league.id));
     console.log(`Found ${jogos.length} matches in target leagues`);
+
+    // Prioritize top leagues and limit to 15 matches max to avoid timeout
+    const leaguePriority: Record<number, number> = { 2: 1, 39: 2, 140: 3, 78: 4, 135: 5, 61: 6, 71: 7, 94: 8, 88: 9, 253: 10 };
+    jogos.sort((a: any, b: any) => (leaguePriority[a.league.id] || 99) - (leaguePriority[b.league.id] || 99));
+    if (jogos.length > 15) {
+      console.log(`Limiting from ${jogos.length} to 15 matches`);
+      jogos = jogos.slice(0, 15);
+    }
 
     const matches = [];
 
-    // Process matches in parallel batches of 3 to avoid API rate limits
-    const batchSize = 3;
+    // Process matches in parallel batches of 5
+    const batchSize = 5;
     for (let i = 0; i < jogos.length; i += batchSize) {
       const batch = jogos.slice(i, i + batchSize);
       const batchResults = await Promise.all(batch.map(async (jogo: any) => {

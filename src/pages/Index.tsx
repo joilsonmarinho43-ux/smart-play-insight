@@ -227,6 +227,10 @@ const Index = () => {
           </div>
         )}
 
+        {filteredMatches.length > 0 && (
+          <BingoSuggestion matches={filteredMatches} />
+        )}
+
         {filteredMatches.map((match, i) => (
           <div key={match.id} style={{ animationDelay: `${i * 150}ms` }}>
             <MatchCard match={match} />

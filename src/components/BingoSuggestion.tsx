@@ -73,7 +73,7 @@ function getBingoMarkets(match: MatchData): MarketAnalysis[] {
 }
 
 function getBingoText(bingoMatches: BingoMatch[], totalSelections: number): string {
-  const lines = ['🎯 *BINGO DO DIA — ANALISTA PRO 8.0*', ''];
+  const lines = ['🎯 *BINGO DO DIA — ANALISTA JOILSON*', ''];
   for (const bm of bingoMatches) {
     lines.push(`⚽ *${bm.match.homeTeam} vs ${bm.match.awayTeam}*`);
     lines.push(`🕐 ${bm.match.time} • ${bm.match.league}`);

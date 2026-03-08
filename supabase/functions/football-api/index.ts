@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const BASE_URL = "https://v3.football.api-sports.io";
-const LIGAS_ALVO_IDS = [39, 140, 78, 135, 61, 94, 88, 253, 2, 71];
+const LIGAS_ALVO_IDS = [39, 140, 78, 135, 61, 94, 88, 253, 2, 71, 218, 144, 119];
 
 async function apiGet(endpoint: string, params: Record<string, string>, apiKey: string) {
   const url = new URL(`${BASE_URL}/${endpoint}`);
@@ -131,7 +131,7 @@ serve(async (req) => {
     console.log(`Found ${jogos.length} matches in target leagues`);
 
     // Prioritize top leagues and limit to 15 matches max to avoid timeout
-    const leaguePriority: Record<number, number> = { 2: 1, 39: 2, 140: 3, 78: 4, 135: 5, 61: 6, 71: 7, 94: 8, 88: 9, 253: 10 };
+    const leaguePriority: Record<number, number> = { 2: 1, 39: 2, 140: 3, 78: 4, 135: 5, 61: 6, 71: 7, 94: 8, 88: 9, 253: 10, 218: 11, 144: 12, 119: 13 };
     jogos.sort((a: any, b: any) => (leaguePriority[a.league.id] || 99) - (leaguePriority[b.league.id] || 99));
     if (jogos.length > 15) {
       console.log(`Limiting from ${jogos.length} to 15 matches`);

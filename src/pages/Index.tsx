@@ -6,8 +6,9 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import MatchSummaryBanner from '@/components/MatchSummaryBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield, Filter } from 'lucide-react';
+import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield, Filter, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { MatchData } from '@/types/match';
 
 const Index = () => {
   const { signOut } = useAuth();
@@ -35,9 +36,14 @@ const Index = () => {
     return leagues.sort();
   }, [matches]);
 
-  const filteredMatches = useMemo(() => {
-    if (!matches) return [];
-    let result = matches;
+  const hasLowConfidence = (m: MatchData) => {
+    if (!m.sampleSize) return false;
+    return Math.min(m.sampleSize.homeWithStats, m.sampleSize.awayWithStats) < 2;
+  };
+
+  const { reliableMatches, lowConfidenceMatches } = useMemo(() => {
+    if (!matches) return { reliableMatches: [], lowConfidenceMatches: [] };
+    let result = [...matches];
 
     // Filter out matches that already started (only for today)
     const today = new Date().toISOString().split('T')[0];
@@ -53,8 +59,16 @@ const Index = () => {
     if (selectedLeagues.size > 0) {
       result = result.filter((m) => selectedLeagues.has(m.league));
     }
-    return result;
+
+    return {
+      reliableMatches: result.filter((m) => !hasLowConfidence(m)),
+      lowConfidenceMatches: result.filter((m) => hasLowConfidence(m)),
+    };
   }, [matches, selectedLeagues, date]);
+
+  const filteredMatches = useMemo(() => {
+    return [...reliableMatches, ...lowConfidenceMatches];
+  }, [reliableMatches, lowConfidenceMatches]);
 
   const displayMatches = useMemo(() => {
     if (!summaryFilterIds) return filteredMatches;
@@ -154,7 +168,8 @@ const Index = () => {
             <BarChart3 className="w-4 h-4 text-primary" />
             <span className="text-xs sm:text-sm text-primary font-medium">
               {formatDateDisplay(date)}
-              {matches ? ` — ${displayMatches.length} de ${matches.length} jogos` : ''}
+              {matches ? ` — ${reliableMatches.length} jogos confiáveis` : ''}
+              {lowConfidenceMatches.length > 0 ? ` + ${lowConfidenceMatches.length} com poucos dados` : ''}
             </span>
             {summaryFilterLabel && (
               <span className="text-[10px] sm:text-xs text-primary/80">• filtro: {summaryFilterLabel}</span>
@@ -271,21 +286,46 @@ const Index = () => {
         {filteredMatches.length > 0 && (
           <>
             <MatchSummaryBanner
-              matches={filteredMatches}
+              matches={reliableMatches}
               onFilterChange={(ids, label) => {
                 setSummaryFilterIds(ids);
                 setSummaryFilterLabel(label);
               }}
             />
-            {displayMatches.length > 0 && <BingoSuggestion matches={displayMatches} />}
+            {displayMatches.length > 0 && <BingoSuggestion matches={displayMatches.filter(m => !hasLowConfidence(m))} />}
           </>
         )}
 
-        {displayMatches.map((match, i) => (
+        {/* Reliable matches */}
+        {displayMatches.filter(m => !hasLowConfidence(m)).map((match, i) => (
           <div key={match.id} style={{ animationDelay: `${i * 150}ms` }}>
             <MatchCard match={match} />
           </div>
         ))}
+
+        {/* Low confidence separator + matches */}
+        {lowConfidenceMatches.length > 0 && (!summaryFilterIds || lowConfidenceMatches.some(m => summaryFilterIds.includes(String(m.id)))) && (
+          <>
+            <div className="flex items-center gap-3 py-4">
+              <div className="flex-1 h-px bg-border" />
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <span className="text-xs text-yellow-400 font-medium">
+                  {lowConfidenceMatches.length} jogo{lowConfidenceMatches.length !== 1 ? 's' : ''} com dados insuficientes
+                </span>
+              </div>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center -mt-4 mb-2">
+              Menos de 2 jogos com estatísticas detalhadas — análise menos precisa
+            </p>
+            {displayMatches.filter(m => hasLowConfidence(m)).map((match, i) => (
+              <div key={match.id} className="opacity-70" style={{ animationDelay: `${i * 150}ms` }}>
+                <MatchCard match={match} />
+              </div>
+            ))}
+          </>
+        )}
       </main>
 
       {/* Footer */}

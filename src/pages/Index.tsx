@@ -15,10 +15,12 @@ const Index = () => {
     return d.toISOString().split('T')[0];
   });
 
-  const { data: matches, isLoading, error, refetch } = useQuery({
+  const { data: matches, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    enabled: false, // only fetch on button click
+    enabled: false,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 min cache
   });
 
   const formatDateDisplay = (dateStr: string) => {
@@ -75,16 +77,16 @@ const Index = () => {
               />
             </div>
             <button
-              onClick={() => refetch()}
-              disabled={isLoading}
+              onClick={() => !isFetching && refetch()}
+              disabled={isFetching}
               className="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
             >
-              {isLoading ? (
+              {isFetching ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <BarChart3 className="w-4 h-4" />
               )}
-              {isLoading ? 'Analisando...' : 'Analisar'}
+              {isFetching ? 'Analisando...' : 'Analisar'}
             </button>
           </div>
         </div>
@@ -112,11 +114,11 @@ const Index = () => {
           </div>
         )}
 
-        {isLoading && (
+        {isFetching && (
           <div className="text-center py-20">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
             <p className="text-muted-foreground">Buscando dados ao vivo da API...</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">Isso pode levar alguns segundos</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Isso pode levar até 30 segundos</p>
           </div>
         )}
 

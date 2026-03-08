@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, UserPlus, Clock, CalendarPlus } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -50,6 +50,20 @@ const Admin = () => {
       toast.error('Erro ao atualizar acesso');
     } else {
       toast.success(`+${days} dias concedidos com sucesso`);
+      fetchUsers();
+    }
+  };
+
+  const revokeAccess = async (userId: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ subscription_expiry_date: null })
+      .eq('id', userId);
+
+    if (error) {
+      toast.error('Erro ao remover acesso');
+    } else {
+      toast.success('Acesso removido');
       fetchUsers();
     }
   };
@@ -121,7 +135,7 @@ const Admin = () => {
                   </div>
 
                   {!user.is_admin && (
-                    <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border">
                       {DAYS_OPTIONS.map((days) => (
                         <button
                           key={days}
@@ -132,6 +146,15 @@ const Admin = () => {
                           +{days} dias
                         </button>
                       ))}
+                      {user.subscription_expiry_date && (
+                        <button
+                          onClick={() => revokeAccess(user.id)}
+                          className="flex items-center gap-1 bg-destructive/10 hover:bg-destructive hover:text-destructive-foreground text-destructive px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ml-auto"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          Remover acesso
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

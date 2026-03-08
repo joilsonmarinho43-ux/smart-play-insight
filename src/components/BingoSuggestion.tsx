@@ -1,15 +1,15 @@
 import { useMemo } from 'react';
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
-import { Sparkles, Trophy, TrendingUp, Zap, AlertTriangle, Ticket } from 'lucide-react';
+import { Sparkles, Trophy, TrendingUp, Zap, AlertTriangle, Ticket, Clock } from 'lucide-react';
 
 interface Props {
   matches: MatchData[];
 }
 
-interface BingoEntry {
+interface BingoMatch {
   match: MatchData;
-  market: MarketAnalysis;
+  markets: MarketAnalysis[];
 }
 
 const categoryIcons: Record<string, typeof TrendingUp> = {
@@ -19,44 +19,82 @@ const categoryIcons: Record<string, typeof TrendingUp> = {
   result: Trophy,
 };
 
-const BINGO_MARKETS = [
-  'Over 1.5 Gols',
-  'Over 5.5 Escanteios',
-  'Over 2.5 Cartões',
-];
+// Thresholds realistas por tipo de mercado
+// Over 1.5 Gols é "fácil" → exige >= 82% para ter valor real
+// Vitória é difícil → 55% já é sinal forte
+const MARKET_THRESHOLDS: Record<string, number> = {
+  'Over 1.5 Gols': 82,
+  'Over 5.5 Escanteios': 65,
+  'Over 2.5 Cartões': 65,
+  'chanceDupla': 72,
+  'vitoria': 55,
+};
 
-function isBingoMarket(market: MarketAnalysis, match: MatchData): boolean {
-  if (BINGO_MARKETS.includes(market.market)) return true;
-  // Chance Dupla (1X or X2)
-  if (market.market.startsWith('1X') || market.market.startsWith('X2')) return true;
-  // Vitória
-  if (market.market === `Vitória ${match.homeTeam}` || market.market === `Vitória ${match.awayTeam}`) return true;
-  return false;
+function getBingoMarkets(match: MatchData): MarketAnalysis[] {
+  const all = analyzeMarkets(match);
+  const picked: MarketAnalysis[] = [];
+
+  // Over 1.5 Gols
+  const o15 = all.find((m) => m.market === 'Over 1.5 Gols');
+  if (o15 && o15.probability >= MARKET_THRESHOLDS['Over 1.5 Gols']) {
+    picked.push(o15);
+  }
+
+  // Over 5.5 Escanteios
+  const o55c = all.find((m) => m.market === 'Over 5.5 Escanteios');
+  if (o55c && o55c.probability >= MARKET_THRESHOLDS['Over 5.5 Escanteios']) {
+    picked.push(o55c);
+  }
+
+  // Over 2.5 Cartões
+  const o25k = all.find((m) => m.market === 'Over 2.5 Cartões');
+  if (o25k && o25k.probability >= MARKET_THRESHOLDS['Over 2.5 Cartões']) {
+    picked.push(o25k);
+  }
+
+  // Chance Dupla — pega a melhor (1X ou X2)
+  const cd = all
+    .filter((m) => m.market.startsWith('1X') || m.market.startsWith('X2'))
+    .sort((a, b) => b.probability - a.probability)[0];
+  if (cd && cd.probability >= MARKET_THRESHOLDS['chanceDupla']) {
+    picked.push(cd);
+  }
+
+  // Vitória — pega a mais provável
+  const vit = all
+    .filter((m) => m.market.startsWith('Vitória'))
+    .sort((a, b) => b.probability - a.probability)[0];
+  if (vit && vit.probability >= MARKET_THRESHOLDS['vitoria']) {
+    picked.push(vit);
+  }
+
+  return picked;
 }
 
+const riskColors: Record<string, string> = {
+  'Baixo': 'bg-green-500/20 text-green-400 border-green-500/30',
+  'Médio': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  'Alto': 'bg-red-500/20 text-red-400 border-red-500/30',
+};
+
 const BingoSuggestion = ({ matches }: Props) => {
-  const bingoEntries = useMemo(() => {
-    const entries: BingoEntry[] = [];
+  const bingoMatches = useMemo(() => {
+    const results: BingoMatch[] = [];
 
     for (const match of matches) {
-      const markets = analyzeMarkets(match);
-      // Filter only allowed bingo markets, pick best one with >= 65%
-      const eligible = markets
-        .filter((m) => isBingoMarket(m, match) && m.probability >= 65)
-        .sort((a, b) => b.probability - a.probability);
-      if (eligible.length > 0) {
-        entries.push({ match, market: eligible[0] });
+      const markets = getBingoMarkets(match);
+      if (markets.length > 0) {
+        results.push({ match, markets });
       }
     }
 
-    return entries
-      .sort((a, b) => b.market.probability - a.market.probability)
-      .slice(0, 10);
+    // Ordena por quantidade de mercados qualificados (mais = melhor jogo)
+    return results.sort((a, b) => b.markets.length - a.markets.length);
   }, [matches]);
 
-  if (bingoEntries.length < 2) return null;
+  if (bingoMatches.length === 0) return null;
 
-  const combinedProb = bingoEntries.reduce((acc, e) => acc * (e.market.probability / 100), 1) * 100;
+  const totalSelections = bingoMatches.reduce((acc, bm) => acc + bm.markets.length, 0);
 
   return (
     <div className="bg-card rounded-2xl border border-primary/30 overflow-hidden mb-6 animate-slide-in">
@@ -69,58 +107,79 @@ const BingoSuggestion = ({ matches }: Props) => {
           </h2>
         </div>
         <span className="text-xs bg-primary/20 text-primary px-2.5 py-1 rounded-full font-semibold">
-          {bingoEntries.length} seleções
+          {bingoMatches.length} jogos • {totalSelections} entradas
         </span>
       </div>
 
-      {/* Description */}
-      <div className="px-4 sm:px-6 pt-3 pb-2">
-        <p className="text-xs text-muted-foreground">
-          Melhor entrada por jogo entre: Over 1.5 Gols, Over 5.5 Escanteios, Over 2.5 Cartões, Chance Dupla e Vitória (≥65%).
+      {/* Thresholds info */}
+      <div className="px-4 sm:px-6 pt-3 pb-1">
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Filtros: Over 1.5 Gols ≥82% · Over 5.5 Escanteios ≥65% · Over 2.5 Cartões ≥65% · Chance Dupla ≥72% · Vitória ≥55%
         </p>
       </div>
 
-      {/* Entries */}
-      <div className="px-4 sm:px-6 pb-3 space-y-1.5">
-        {bingoEntries.map((entry, i) => {
-          const Icon = categoryIcons[entry.market.category] || Ticket;
-          const probColor =
-            entry.market.probability >= 80 ? 'text-green-400' :
-            entry.market.probability >= 70 ? 'text-yellow-400' :
-            'text-muted-foreground';
-
-          return (
-            <div
-              key={i}
-              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-secondary/40 border border-border/50"
-            >
+      {/* Match groups */}
+      <div className="px-4 sm:px-6 py-3 space-y-3">
+        {bingoMatches.map((bm, idx) => (
+          <div key={idx} className="rounded-lg border border-border/60 overflow-hidden">
+            {/* Match header */}
+            <div className="bg-secondary/50 px-3 py-2 flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
-                <Icon className="w-3.5 h-3.5 text-primary shrink-0" />
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-foreground truncate block">
-                    {entry.match.homeTeam} vs {entry.match.awayTeam}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground truncate block">
-                    {entry.market.market}
-                  </span>
-                </div>
+                <Trophy className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-xs font-bold text-foreground truncate">
+                  {bm.match.homeTeam} vs {bm.match.awayTeam}
+                </span>
               </div>
-              <span className={`font-bold text-sm ${probColor} shrink-0`}>
-                {entry.market.probability}%
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Clock className="w-3 h-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground">{bm.match.time}</span>
+                <span className="text-[10px] text-muted-foreground/60 ml-1">{bm.match.league}</span>
+              </div>
             </div>
-          );
-        })}
+
+            {/* Markets for this match */}
+            <div className="divide-y divide-border/30">
+              {bm.markets.map((market, mi) => {
+                const Icon = categoryIcons[market.category] || Ticket;
+                const probColor =
+                  market.probability >= 80 ? 'text-green-400' :
+                  market.probability >= 65 ? 'text-yellow-400' :
+                  'text-orange-400';
+
+                return (
+                  <div key={mi} className="flex items-center justify-between gap-2 px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-xs font-semibold text-foreground block truncate">
+                          {market.market}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground/70 block truncate">
+                          {market.statisticalBasis}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${riskColors[market.risk]}`}>
+                        {market.risk}
+                      </span>
+                      <span className={`font-bold text-sm ${probColor} w-14 text-right`}>
+                        {market.probability}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Footer */}
-      <div className="bg-secondary/30 border-t border-border px-4 sm:px-6 py-2.5 flex items-center justify-between">
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-          Prob. combinada estimada
-        </span>
-        <span className="font-display text-sm text-primary font-bold">
-          {combinedProb.toFixed(1)}%
-        </span>
+      <div className="bg-secondary/30 border-t border-border px-4 sm:px-6 py-2.5">
+        <p className="text-[10px] text-muted-foreground text-center">
+          Baseado em Poisson (gols) e média ponderada ajustada por variância (escanteios/cartões) • Modelo 60% temporada + 40% últimos 10 jogos
+        </p>
       </div>
     </div>
   );

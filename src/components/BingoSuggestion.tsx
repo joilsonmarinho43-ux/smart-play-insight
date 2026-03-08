@@ -1,8 +1,7 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
-import { Sparkles, Trophy, TrendingUp, Zap, AlertTriangle, Ticket, Clock, Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { Sparkles, Trophy, TrendingUp, Zap, AlertTriangle, Ticket, Clock, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -94,25 +93,39 @@ const BingoSuggestion = ({ matches }: Props) => {
     return results.sort((a, b) => b.markets.length - a.markets.length);
   }, [matches]);
 
+  const [expanded, setExpanded] = useState(false);
+
   if (bingoMatches.length === 0) return null;
 
   const totalSelections = bingoMatches.reduce((acc, bm) => acc + bm.markets.length, 0);
 
   return (
     <div className="bg-card rounded-2xl border border-primary/30 overflow-hidden mb-6 animate-slide-in">
-      {/* Header */}
-      <div className="bg-primary/10 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-primary/20">
+      {/* Header - always visible, clickable to toggle */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full bg-primary/10 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-primary/20 hover:bg-primary/15 transition-colors"
+      >
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
           <h2 className="font-display text-lg sm:text-xl text-primary tracking-wider">
             BINGO DO DIA
           </h2>
         </div>
-        <span className="text-xs bg-primary/20 text-primary px-2.5 py-1 rounded-full font-semibold">
-          {bingoMatches.length} jogos • {totalSelections} entradas
-        </span>
-      </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs bg-primary/20 text-primary px-2.5 py-1 rounded-full font-semibold">
+            {bingoMatches.length} jogos • {totalSelections} entradas
+          </span>
+          {expanded ? (
+            <ChevronUp className="w-4 h-4 text-primary" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-primary" />
+          )}
+        </div>
+      </button>
 
+      {expanded && (
+        <>
       {/* Thresholds info */}
       <div className="px-4 sm:px-6 pt-3 pb-1">
         <p className="text-[10px] text-muted-foreground leading-relaxed">
@@ -205,6 +218,8 @@ const BingoSuggestion = ({ matches }: Props) => {
           Copiar
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 };

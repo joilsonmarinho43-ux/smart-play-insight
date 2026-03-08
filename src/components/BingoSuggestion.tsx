@@ -72,6 +72,22 @@ function getBingoMarkets(match: MatchData): MarketAnalysis[] {
   return picked;
 }
 
+function getBingoText(bingoMatches: BingoMatch[], totalSelections: number): string {
+  const lines = ['🎯 *BINGO DO DIA — ANALISTA PRO 8.0*', ''];
+  for (const bm of bingoMatches) {
+    lines.push(`⚽ *${bm.match.homeTeam} vs ${bm.match.awayTeam}*`);
+    lines.push(`🕐 ${bm.match.time} • ${bm.match.league}`);
+    for (const m of bm.markets) {
+      const icon = m.category === 'goals' ? '📊' : m.category === 'corners' ? '🔄' : m.category === 'cards' ? '🟨' : '🏆';
+      lines.push(`  ${icon} ${m.market} — *${m.probability}%* (${m.risk})`);
+    }
+    lines.push('');
+  }
+  lines.push(`📈 ${bingoMatches.length} jogos • ${totalSelections} entradas`);
+  lines.push('_Modelo estatístico Poisson + média ponderada_');
+  return lines.join('\n');
+}
+
 const riskColors: Record<string, string> = {
   'Baixo': 'bg-green-500/20 text-green-400 border-green-500/30',
   'Médio': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',

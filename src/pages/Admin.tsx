@@ -135,7 +135,7 @@ const Admin = () => {
                   </div>
 
                   {!user.is_admin && (
-                    <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border">
                       {DAYS_OPTIONS.map((days) => (
                         <button
                           key={days}
@@ -146,6 +146,15 @@ const Admin = () => {
                           +{days} dias
                         </button>
                       ))}
+                      {user.subscription_expiry_date && (
+                        <button
+                          onClick={() => revokeAccess(user.id)}
+                          className="flex items-center gap-1 bg-destructive/10 hover:bg-destructive hover:text-destructive-foreground text-destructive px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ml-auto"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          Remover acesso
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

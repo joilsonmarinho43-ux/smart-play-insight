@@ -119,6 +119,45 @@ const TicketSuggestionCard = ({ match }: Props) => {
   );
 };
 
+function ComboSignalBanner({ combo }: { combo: ReturnType<typeof getComboSignal> }) {
+  const goalsProb = combo.over25?.probability ?? 0;
+  const cornersProb = combo.over75?.probability ?? 0;
+
+  if (combo.isGood) {
+    return (
+      <div className="mb-4 p-3 rounded-lg border border-green-500/40 bg-green-500/10 flex items-start gap-3">
+        <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-green-400">✅ JOGO BOM para Over 2.5 Gols + Over 7.5 Escanteios</p>
+          <div className="flex gap-4 mt-1.5">
+            <span className="text-xs text-green-300/80">Over 2.5 Gols: <strong>{goalsProb}%</strong></span>
+            <span className="text-xs text-green-300/80">Over 7.5 Escanteios: <strong>{cornersProb}%</strong></span>
+          </div>
+          <p className="text-[10px] text-green-300/60 mt-1">Ambos acima de {COMBO_THRESHOLD}% — sinal forte</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 p-3 rounded-lg border border-red-500/30 bg-red-500/10 flex items-start gap-3">
+      <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+      <div>
+        <p className="text-sm font-bold text-red-400">❌ NÃO RECOMENDADO para Over 2.5 + Over 7.5 combo</p>
+        <div className="flex gap-4 mt-1.5">
+          <span className={`text-xs ${combo.goalsOk ? 'text-green-300/80' : 'text-red-300/80'}`}>
+            Over 2.5 Gols: <strong>{goalsProb}%</strong> {combo.goalsOk ? '✓' : '✗'}
+          </span>
+          <span className={`text-xs ${combo.cornersOk ? 'text-green-300/80' : 'text-red-300/80'}`}>
+            Over 7.5 Escanteios: <strong>{cornersProb}%</strong> {combo.cornersOk ? '✓' : '✗'}
+          </span>
+        </div>
+        <p className="text-[10px] text-red-300/60 mt-1">Mínimo exigido: {COMBO_THRESHOLD}% em ambos</p>
+      </div>
+    </div>
+  );
+}
+
 function BestMarketDisplay({ market, profile }: { market: MarketAnalysis; profile: RiskProfile }) {
   const Icon = categoryIcons[market.category] || Ticket;
   return (

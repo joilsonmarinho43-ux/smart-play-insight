@@ -216,7 +216,7 @@ serve(async (req) => {
     }
 
     const matches = [];
-    const RECENT_COUNT = 5; // Last 5 matches for real stats
+    const RECENT_COUNT = 10; // Last 10 matches for real stats
 
     // Process matches in parallel batches of 3 (more API calls per match now)
     const batchSize = 3;

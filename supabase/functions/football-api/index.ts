@@ -131,7 +131,7 @@ serve(async (req) => {
     console.log(`Found ${jogos.length} matches in target leagues`);
 
     // Prioritize top leagues and limit to 15 matches max to avoid timeout
-    const leaguePriority: Record<number, number> = { 2: 1, 39: 2, 140: 3, 78: 4, 135: 5, 61: 6, 71: 7, 94: 8, 88: 9, 253: 10, 218: 11, 144: 12, 119: 13, 262: 14 };
+    const leaguePriority: Record<number, number> = { 2: 1, 39: 2, 140: 3, 78: 4, 135: 5, 61: 6, 71: 7, 73: 8, 94: 9, 88: 10, 253: 11, 218: 12, 144: 13, 119: 14, 262: 15 };
     jogos.sort((a: any, b: any) => (leaguePriority[a.league.id] || 99) - (leaguePriority[b.league.id] || 99));
     if (jogos.length > 50) {
       console.log(`Limiting from ${jogos.length} to 50 matches`);

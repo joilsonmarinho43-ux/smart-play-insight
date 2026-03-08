@@ -37,9 +37,24 @@ const Index = () => {
 
   const filteredMatches = useMemo(() => {
     if (!matches) return [];
-    if (selectedLeagues.size === 0) return matches;
-    return matches.filter((m) => selectedLeagues.has(m.league));
-  }, [matches, selectedLeagues]);
+    let result = matches;
+
+    // Filter out matches that already started (only for today)
+    const today = new Date().toISOString().split('T')[0];
+    if (date === today) {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      result = result.filter((m) => {
+        const [h, min] = m.time.split(':').map(Number);
+        return h * 60 + min > nowMinutes;
+      });
+    }
+
+    if (selectedLeagues.size > 0) {
+      result = result.filter((m) => selectedLeagues.has(m.league));
+    }
+    return result;
+  }, [matches, selectedLeagues, date]);
 
   const displayMatches = useMemo(() => {
     if (!summaryFilterIds) return filteredMatches;

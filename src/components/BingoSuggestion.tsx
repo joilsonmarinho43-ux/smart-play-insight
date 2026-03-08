@@ -93,11 +93,11 @@ const BingoSuggestion = ({ matches }: Props) => {
     return results.sort((a, b) => b.markets.length - a.markets.length);
   }, [matches]);
 
+  const [expanded, setExpanded] = useState(false);
+
   if (bingoMatches.length === 0) return null;
 
   const totalSelections = bingoMatches.reduce((acc, bm) => acc + bm.markets.length, 0);
-
-  const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="bg-card rounded-2xl border border-primary/30 overflow-hidden mb-6 animate-slide-in">

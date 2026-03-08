@@ -38,16 +38,33 @@ async function getTeamSeasonStats(teamId: number, leagueId: number, season: numb
     team: String(teamId), league: String(leagueId), season: String(season),
   }, apiKey);
   try {
-    const played = stats.fixtures?.played?.total || 1;
-    const goalsFor = stats.goals?.for?.total?.total || 0;
-    const goalsAgainst = stats.goals?.against?.total?.total || 0;
+    const played = stats?.fixtures?.played?.total || 0;
+    if (played === 0) {
+      return { played: 0, goalsFor: 0, goalsAgainst: 0, goalsForAvg: 0, goalsAgainstAvg: 0, corners_for: 0, corners_against: 0, cards_avg: 0 };
+    }
+    const goalsFor = stats?.goals?.for?.total?.total || 0;
+    const goalsAgainst = stats?.goals?.against?.total?.total || 0;
+
+    // Cards: sum all minute buckets
+    let yellowTotal = 0, redTotal = 0;
+    if (stats?.cards?.yellow) {
+      for (const bucket of Object.values(stats.cards.yellow)) {
+        yellowTotal += (bucket as any)?.total || 0;
+      }
+    }
+    if (stats?.cards?.red) {
+      for (const bucket of Object.values(stats.cards.red)) {
+        redTotal += (bucket as any)?.total || 0;
+      }
+    }
+
     return {
       played, goalsFor, goalsAgainst,
       goalsForAvg: goalsFor / played,
       goalsAgainstAvg: goalsAgainst / played,
-      corners_for: (stats.corners?.for?.total || 0) / played,
-      corners_against: (stats.corners?.against?.total || 0) / played,
-      cards_avg: ((stats.cards?.yellow?.total || 0) + (stats.cards?.red?.total || 0)) / played,
+      corners_for: 5, // API-Sports doesn't provide season corner totals; use default
+      corners_against: 4.5,
+      cards_avg: (yellowTotal + redTotal) / played,
     };
   } catch {
     return { played: 0, goalsFor: 0, goalsAgainst: 0, goalsForAvg: 0, goalsAgainstAvg: 0, corners_for: 0, corners_against: 0, cards_avg: 0 };
@@ -82,27 +99,24 @@ async function getLast10Stats(teamId: number, apiKey: string): Promise<Last10Sta
     const stats = await apiGet("fixtures/statistics", { fixture: String(f.fixture.id) }, apiKey);
     if (stats && stats.length) {
       jogos++;
-      let matchCorners = 0, matchCards = 0;
+      let teamCorners = 0, teamCards = 0;
       for (const team of stats) {
         const isTeam = team.team?.id === teamId;
-        for (const s of team.statistics) {
-          if (s.type === "Corner Kicks") { totalCorners += s.value || 0; matchCorners += s.value || 0; }
-          if (s.type === "Yellow Cards") { totalCards += s.value || 0; matchCards += s.value || 0; }
-          if (s.type === "Red Cards") { totalCards += s.value || 0; matchCards += s.value || 0; }
-          if (isTeam) {
-            if (s.type === "Total Shots") totalShots += s.value || 0;
-            if (s.type === "Shots on Goal") totalShotsOnTarget += s.value || 0;
-            if (s.type === "Fouls") totalFouls += s.value || 0;
-            if (s.type === "Offsides") totalOffsides += s.value || 0;
-            if (s.type === "Ball Possession") {
-              const pv = typeof s.value === "string" ? parseFloat(s.value) : (s.value || 0);
-              totalPossession += pv;
-            }
-          }
+        if (!isTeam) continue;
+        for (const s of (team.statistics || [])) {
+          const val = typeof s.value === "string" ? parseFloat(s.value) || 0 : (s.value || 0);
+          if (s.type === "Corner Kicks") { totalCorners += val; teamCorners = val; }
+          if (s.type === "Yellow Cards") { totalCards += val; teamCards += val; }
+          if (s.type === "Red Cards") { totalCards += val; teamCards += val; }
+          if (s.type === "Total Shots") totalShots += val;
+          if (s.type === "Shots on Goal") totalShotsOnTarget += val;
+          if (s.type === "Fouls") totalFouls += val;
+          if (s.type === "Offsides") totalOffsides += val;
+          if (s.type === "Ball Possession") totalPossession += val;
         }
       }
-      cornersValues.push(matchCorners);
-      cardsValues.push(matchCards);
+      cornersValues.push(teamCorners);
+      cardsValues.push(teamCards);
     }
   }
 
@@ -125,17 +139,25 @@ function variance(values: number[]): number {
   return values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
 }
 
-async function getFixtureStats(fixtureId: number, apiKey: string) {
+interface FixtureStatsResult {
+  possession: [number, number];
+  totalShots: [number, number];
+  shotsOnTarget: [number, number];
+  fouls: [number, number];
+  offsides: [number, number];
+  hasData: boolean;
+}
+
+async function getFixtureStats(fixtureId: number, apiKey: string): Promise<FixtureStatsResult> {
   const stats = await apiGet("fixtures/statistics", { fixture: String(fixtureId) }, apiKey);
-  const result: Record<string, [number, number]> = {
-    possession: [0, 0], totalShots: [0, 0], shotsOnTarget: [0, 0], fouls: [0, 0], offsides: [0, 0],
+  const result: FixtureStatsResult = {
+    possession: [0, 0], totalShots: [0, 0], shotsOnTarget: [0, 0], fouls: [0, 0], offsides: [0, 0], hasData: false,
   };
-  let hasData = false;
   if (stats && stats.length >= 2) {
     for (let i = 0; i < 2; i++) {
-      for (const s of stats[i].statistics) {
+      for (const s of (stats[i].statistics || [])) {
         const v = typeof s.value === "string" ? parseFloat(s.value) : (s.value || 0);
-        if (v > 0) hasData = true;
+        if (v > 0) result.hasData = true;
         switch (s.type) {
           case "Ball Possession": result.possession[i] = v; break;
           case "Total Shots": result.totalShots[i] = v; break;
@@ -146,7 +168,7 @@ async function getFixtureStats(fixtureId: number, apiKey: string) {
       }
     }
   }
-  return { ...result, hasData };
+  return result;
 }
 
 function calculateXG(hGFA: number, aGAA: number, aGFA: number, hGAA: number, leagueAvg: number): [number, number] {
@@ -189,11 +211,22 @@ serve(async (req) => {
         getFixtureStats(fixtureId, apiKey),
       ]);
 
-      // Hybrid projections (60% season + 40% last 10)
-      const homeCornersAvg = (homeSeason.corners_for * 0.6) + (homeLast10.corners * 0.4);
-      const awayCornersAvg = (awaySeason.corners_for * 0.6) + (awayLast10.corners * 0.4);
-      const homeCardsAvg = (homeSeason.cards_avg * 0.6) + (homeLast10.cards * 0.4);
-      const awayCardsAvg = (awaySeason.cards_avg * 0.6) + (awayLast10.cards * 0.4);
+      // Hybrid projections (60% season + 40% last 10) — fallback to season if last10 has no games
+      const hasHomeLast10 = homeLast10.jogos > 0;
+      const hasAwayLast10 = awayLast10.jogos > 0;
+
+      const homeCornersAvg = hasHomeLast10
+        ? (homeSeason.corners_for * 0.6) + (homeLast10.corners * 0.4)
+        : homeSeason.corners_for;
+      const awayCornersAvg = hasAwayLast10
+        ? (awaySeason.corners_for * 0.6) + (awayLast10.corners * 0.4)
+        : awaySeason.corners_for;
+      const homeCardsAvg = hasHomeLast10
+        ? (homeSeason.cards_avg * 0.6) + (homeLast10.cards * 0.4)
+        : homeSeason.cards_avg;
+      const awayCardsAvg = hasAwayLast10
+        ? (awaySeason.cards_avg * 0.6) + (awayLast10.cards * 0.4)
+        : awaySeason.cards_avg;
 
       const leagueAvgGoals = (homeSeason.played + awaySeason.played) > 0
         ? (homeSeason.goalsFor + awaySeason.goalsFor) / (homeSeason.played + awaySeason.played) : 1.3;
@@ -202,18 +235,34 @@ serve(async (req) => {
         awaySeason.goalsForAvg, homeSeason.goalsAgainstAvg, leagueAvgGoals
       );
 
+      // Skip matches with absolutely no usable data
+      const hasAnyData = homeSeason.played > 0 || awaySeason.played > 0 || hasHomeLast10 || hasAwayLast10;
+      if (!hasAnyData) continue;
+
       let possession: [number, number], totalShots: [number, number], shotsOnTarget: [number, number];
       let fouls: [number, number], offsides: [number, number];
       let bigChancesHome: number, bigChancesAway: number;
 
       if (isPreMatch || !fixtureStats.hasData) {
-        possession = [f1(homeLast10.possession), f1(awayLast10.possession)];
-        totalShots = [f1(homeLast10.shots), f1(awayLast10.shots)];
-        shotsOnTarget = [f1(homeLast10.shotsOnTarget), f1(awayLast10.shotsOnTarget)];
-        fouls = [f1(homeLast10.fouls), f1(awayLast10.fouls)];
-        offsides = [f1(homeLast10.offsides), f1(awayLast10.offsides)];
-        bigChancesHome = f1(homeLast10.shotsOnTarget * 0.35);
-        bigChancesAway = f1(awayLast10.shotsOnTarget * 0.35);
+        // Use last10 if available, otherwise use reasonable defaults from season
+        const homePoss = hasHomeLast10 ? homeLast10.possession : 50;
+        const awayPoss = hasAwayLast10 ? awayLast10.possession : 50;
+        const homeShots = hasHomeLast10 ? homeLast10.shots : (homeSeason.goalsForAvg * 8);
+        const awayShots = hasAwayLast10 ? awayLast10.shots : (awaySeason.goalsForAvg * 8);
+        const homeSoT = hasHomeLast10 ? homeLast10.shotsOnTarget : (homeShots * 0.35);
+        const awaySoT = hasAwayLast10 ? awayLast10.shotsOnTarget : (awayShots * 0.35);
+        const homeFouls = hasHomeLast10 ? homeLast10.fouls : 12;
+        const awayFouls = hasAwayLast10 ? awayLast10.fouls : 12;
+        const homeOff = hasHomeLast10 ? homeLast10.offsides : 1.5;
+        const awayOff = hasAwayLast10 ? awayLast10.offsides : 1.5;
+
+        possession = [f1(homePoss), f1(awayPoss)];
+        totalShots = [f1(homeShots), f1(awayShots)];
+        shotsOnTarget = [f1(homeSoT), f1(awaySoT)];
+        fouls = [f1(homeFouls), f1(awayFouls)];
+        offsides = [f1(homeOff), f1(awayOff)];
+        bigChancesHome = f1(homeSoT * 0.35);
+        bigChancesAway = f1(awaySoT * 0.35);
       } else {
         possession = [f1(fixtureStats.possession[0]), f1(fixtureStats.possession[1])];
         totalShots = [f1(fixtureStats.totalShots[0]), f1(fixtureStats.totalShots[1])];

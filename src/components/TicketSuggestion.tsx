@@ -59,7 +59,9 @@ const TicketSuggestionCard = ({ match }: Props) => {
       </div>
 
       {/* Combo Signal Banner */}
-      <ComboSignalBanner combo={combo} />
+      <div className="overflow-x-auto">
+        <ComboSignalBanner combo={combo} />
+      </div>
 
       {/* Profile Selector */}
       <div className="grid grid-cols-3 gap-1.5 sm:flex sm:gap-2 mb-4">

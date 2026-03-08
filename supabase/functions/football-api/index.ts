@@ -197,11 +197,22 @@ serve(async (req) => {
         getFixtureStats(fixtureId, apiKey),
       ]);
 
-      // Hybrid projections (60% season + 40% last 10)
-      const homeCornersAvg = (homeSeason.corners_for * 0.6) + (homeLast10.corners * 0.4);
-      const awayCornersAvg = (awaySeason.corners_for * 0.6) + (awayLast10.corners * 0.4);
-      const homeCardsAvg = (homeSeason.cards_avg * 0.6) + (homeLast10.cards * 0.4);
-      const awayCardsAvg = (awaySeason.cards_avg * 0.6) + (awayLast10.cards * 0.4);
+      // Hybrid projections (60% season + 40% last 10) — fallback to season if last10 has no games
+      const hasHomeLast10 = homeLast10.jogos > 0;
+      const hasAwayLast10 = awayLast10.jogos > 0;
+
+      const homeCornersAvg = hasHomeLast10
+        ? (homeSeason.corners_for * 0.6) + (homeLast10.corners * 0.4)
+        : homeSeason.corners_for;
+      const awayCornersAvg = hasAwayLast10
+        ? (awaySeason.corners_for * 0.6) + (awayLast10.corners * 0.4)
+        : awaySeason.corners_for;
+      const homeCardsAvg = hasHomeLast10
+        ? (homeSeason.cards_avg * 0.6) + (homeLast10.cards * 0.4)
+        : homeSeason.cards_avg;
+      const awayCardsAvg = hasAwayLast10
+        ? (awaySeason.cards_avg * 0.6) + (awayLast10.cards * 0.4)
+        : awaySeason.cards_avg;
 
       const leagueAvgGoals = (homeSeason.played + awaySeason.played) > 0
         ? (homeSeason.goalsFor + awaySeason.goalsFor) / (homeSeason.played + awaySeason.played) : 1.3;
@@ -210,18 +221,34 @@ serve(async (req) => {
         awaySeason.goalsForAvg, homeSeason.goalsAgainstAvg, leagueAvgGoals
       );
 
+      // Skip matches with absolutely no usable data
+      const hasAnyData = homeSeason.played > 0 || awaySeason.played > 0 || hasHomeLast10 || hasAwayLast10;
+      if (!hasAnyData) continue;
+
       let possession: [number, number], totalShots: [number, number], shotsOnTarget: [number, number];
       let fouls: [number, number], offsides: [number, number];
       let bigChancesHome: number, bigChancesAway: number;
 
       if (isPreMatch || !fixtureStats.hasData) {
-        possession = [f1(homeLast10.possession), f1(awayLast10.possession)];
-        totalShots = [f1(homeLast10.shots), f1(awayLast10.shots)];
-        shotsOnTarget = [f1(homeLast10.shotsOnTarget), f1(awayLast10.shotsOnTarget)];
-        fouls = [f1(homeLast10.fouls), f1(awayLast10.fouls)];
-        offsides = [f1(homeLast10.offsides), f1(awayLast10.offsides)];
-        bigChancesHome = f1(homeLast10.shotsOnTarget * 0.35);
-        bigChancesAway = f1(awayLast10.shotsOnTarget * 0.35);
+        // Use last10 if available, otherwise use reasonable defaults from season
+        const homePoss = hasHomeLast10 ? homeLast10.possession : 50;
+        const awayPoss = hasAwayLast10 ? awayLast10.possession : 50;
+        const homeShots = hasHomeLast10 ? homeLast10.shots : (homeSeason.goalsForAvg * 8);
+        const awayShots = hasAwayLast10 ? awayLast10.shots : (awaySeason.goalsForAvg * 8);
+        const homeSoT = hasHomeLast10 ? homeLast10.shotsOnTarget : (homeShots * 0.35);
+        const awaySoT = hasAwayLast10 ? awayLast10.shotsOnTarget : (awayShots * 0.35);
+        const homeFouls = hasHomeLast10 ? homeLast10.fouls : 12;
+        const awayFouls = hasAwayLast10 ? awayLast10.fouls : 12;
+        const homeOff = hasHomeLast10 ? homeLast10.offsides : 1.5;
+        const awayOff = hasAwayLast10 ? awayLast10.offsides : 1.5;
+
+        possession = [f1(homePoss), f1(awayPoss)];
+        totalShots = [f1(homeShots), f1(awayShots)];
+        shotsOnTarget = [f1(homeSoT), f1(awaySoT)];
+        fouls = [f1(homeFouls), f1(awayFouls)];
+        offsides = [f1(homeOff), f1(awayOff)];
+        bigChancesHome = f1(homeSoT * 0.35);
+        bigChancesAway = f1(awaySoT * 0.35);
       } else {
         possession = [f1(fixtureStats.possession[0]), f1(fixtureStats.possession[1])];
         totalShots = [f1(fixtureStats.totalShots[0]), f1(fixtureStats.totalShots[1])];

@@ -57,11 +57,14 @@ const MatchSummaryBanner = ({ matches }: Props) => {
 
   const summaries = useMemo(() => getSignalData(matches), [matches]);
 
-  const activeData = summaries.find(s => s.key === activeSignal);
   const signalMatches = useMemo(() => {
+    if (!activeSignal) return [];
+    const activeData = summaries.find(s => s.key === activeSignal);
     if (!activeData) return [];
-    return matches.filter(m => activeData.matchIds.has(m.id));
-  }, [matches, activeData]);
+    return matches.filter(m => activeData.matchIds.has(String(m.id)));
+  }, [matches, summaries, activeSignal]);
+
+  const activeData = summaries.find(s => s.key === activeSignal);
 
   if (matches.length === 0) return null;
 

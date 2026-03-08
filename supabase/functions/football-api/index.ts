@@ -125,17 +125,25 @@ function variance(values: number[]): number {
   return values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
 }
 
-async function getFixtureStats(fixtureId: number, apiKey: string) {
+interface FixtureStatsResult {
+  possession: [number, number];
+  totalShots: [number, number];
+  shotsOnTarget: [number, number];
+  fouls: [number, number];
+  offsides: [number, number];
+  hasData: boolean;
+}
+
+async function getFixtureStats(fixtureId: number, apiKey: string): Promise<FixtureStatsResult> {
   const stats = await apiGet("fixtures/statistics", { fixture: String(fixtureId) }, apiKey);
-  const result: Record<string, [number, number]> = {
-    possession: [0, 0], totalShots: [0, 0], shotsOnTarget: [0, 0], fouls: [0, 0], offsides: [0, 0],
+  const result: FixtureStatsResult = {
+    possession: [0, 0], totalShots: [0, 0], shotsOnTarget: [0, 0], fouls: [0, 0], offsides: [0, 0], hasData: false,
   };
-  let hasData = false;
   if (stats && stats.length >= 2) {
     for (let i = 0; i < 2; i++) {
-      for (const s of stats[i].statistics) {
+      for (const s of (stats[i].statistics || [])) {
         const v = typeof s.value === "string" ? parseFloat(s.value) : (s.value || 0);
-        if (v > 0) hasData = true;
+        if (v > 0) result.hasData = true;
         switch (s.type) {
           case "Ball Possession": result.possession[i] = v; break;
           case "Total Shots": result.totalShots[i] = v; break;
@@ -146,7 +154,7 @@ async function getFixtureStats(fixtureId: number, apiKey: string) {
       }
     }
   }
-  return { ...result, hasData };
+  return result;
 }
 
 function calculateXG(hGFA: number, aGAA: number, aGFA: number, hGAA: number, leagueAvg: number): [number, number] {

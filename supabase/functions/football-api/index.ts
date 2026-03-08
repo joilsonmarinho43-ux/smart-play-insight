@@ -99,27 +99,24 @@ async function getLast10Stats(teamId: number, apiKey: string): Promise<Last10Sta
     const stats = await apiGet("fixtures/statistics", { fixture: String(f.fixture.id) }, apiKey);
     if (stats && stats.length) {
       jogos++;
-      let matchCorners = 0, matchCards = 0;
+      let teamCorners = 0, teamCards = 0;
       for (const team of stats) {
         const isTeam = team.team?.id === teamId;
-        for (const s of team.statistics) {
-          if (s.type === "Corner Kicks") { totalCorners += s.value || 0; matchCorners += s.value || 0; }
-          if (s.type === "Yellow Cards") { totalCards += s.value || 0; matchCards += s.value || 0; }
-          if (s.type === "Red Cards") { totalCards += s.value || 0; matchCards += s.value || 0; }
-          if (isTeam) {
-            if (s.type === "Total Shots") totalShots += s.value || 0;
-            if (s.type === "Shots on Goal") totalShotsOnTarget += s.value || 0;
-            if (s.type === "Fouls") totalFouls += s.value || 0;
-            if (s.type === "Offsides") totalOffsides += s.value || 0;
-            if (s.type === "Ball Possession") {
-              const pv = typeof s.value === "string" ? parseFloat(s.value) : (s.value || 0);
-              totalPossession += pv;
-            }
-          }
+        if (!isTeam) continue;
+        for (const s of (team.statistics || [])) {
+          const val = typeof s.value === "string" ? parseFloat(s.value) || 0 : (s.value || 0);
+          if (s.type === "Corner Kicks") { totalCorners += val; teamCorners = val; }
+          if (s.type === "Yellow Cards") { totalCards += val; teamCards += val; }
+          if (s.type === "Red Cards") { totalCards += val; teamCards += val; }
+          if (s.type === "Total Shots") totalShots += val;
+          if (s.type === "Shots on Goal") totalShotsOnTarget += val;
+          if (s.type === "Fouls") totalFouls += val;
+          if (s.type === "Offsides") totalOffsides += val;
+          if (s.type === "Ball Possession") totalPossession += val;
         }
       }
-      cornersValues.push(matchCorners);
-      cardsValues.push(matchCards);
+      cornersValues.push(teamCorners);
+      cardsValues.push(teamCards);
     }
   }
 

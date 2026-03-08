@@ -19,23 +19,39 @@ const categoryIcons: Record<string, typeof TrendingUp> = {
   result: Trophy,
 };
 
+const BINGO_MARKETS = [
+  'Over 1.5 Gols',
+  'Over 5.5 Escanteios',
+  'Over 2.5 Cartões',
+];
+
+function isBingoMarket(market: MarketAnalysis, match: MatchData): boolean {
+  if (BINGO_MARKETS.includes(market.market)) return true;
+  // Chance Dupla (1X or X2)
+  if (market.market.startsWith('1X') || market.market.startsWith('X2')) return true;
+  // Vitória
+  if (market.market === `Vitória ${match.homeTeam}` || market.market === `Vitória ${match.awayTeam}`) return true;
+  return false;
+}
+
 const BingoSuggestion = ({ matches }: Props) => {
   const bingoEntries = useMemo(() => {
     const entries: BingoEntry[] = [];
 
     for (const match of matches) {
       const markets = analyzeMarkets(match);
-      // Pick the highest probability market with >= 70%
-      const best = markets.find((m) => m.probability >= 70);
-      if (best) {
-        entries.push({ match, market: best });
+      // Filter only allowed bingo markets, pick best one with >= 65%
+      const eligible = markets
+        .filter((m) => isBingoMarket(m, match) && m.probability >= 65)
+        .sort((a, b) => b.probability - a.probability);
+      if (eligible.length > 0) {
+        entries.push({ match, market: eligible[0] });
       }
     }
 
-    // Sort by probability descending, pick top 5-8
     return entries
       .sort((a, b) => b.market.probability - a.market.probability)
-      .slice(0, 8);
+      .slice(0, 10);
   }, [matches]);
 
   if (bingoEntries.length < 2) return null;

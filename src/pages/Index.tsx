@@ -38,7 +38,8 @@ const Index = () => {
 
   const hasLowConfidence = (m: MatchData) => {
     if (!m.sampleSize) return false;
-    return Math.min(m.sampleSize.homeWithStats, m.sampleSize.awayWithStats) < 2;
+    const totalWithStats = m.sampleSize.homeWithStats + m.sampleSize.awayWithStats;
+    return totalWithStats < 3;
   };
 
   const { reliableMatches, lowConfidenceMatches } = useMemo(() => {

@@ -77,16 +77,16 @@ const Index = () => {
               />
             </div>
             <button
-              onClick={() => refetch()}
-              disabled={isLoading}
+              onClick={() => !isFetching && refetch()}
+              disabled={isFetching}
               className="bg-primary text-primary-foreground px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
             >
-              {isLoading ? (
+              {isFetching ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <BarChart3 className="w-4 h-4" />
               )}
-              {isLoading ? 'Analisando...' : 'Analisar'}
+              {isFetching ? 'Analisando...' : 'Analisar'}
             </button>
           </div>
         </div>

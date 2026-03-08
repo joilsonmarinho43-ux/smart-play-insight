@@ -84,13 +84,31 @@ const TicketSuggestionCard = ({ match }: Props) => {
         })}
       </div>
 
-      {/* Best Market */}
+      {/* Best Market + eligible count */}
       {bestMarket ? (
-        <BestMarketDisplay market={bestMarket} profile={profile} />
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              Melhor entrada para perfil <span className={cfg.colorClass}>{cfg.label}</span>
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              {eligibleMarkets.length} mercado{eligibleMarkets.length !== 1 ? 's' : ''} elegível{eligibleMarkets.length !== 1 ? 'eis' : ''}
+            </span>
+          </div>
+          <BestMarketDisplay market={bestMarket} profile={profile} />
+          {eligibleMarkets.length > 1 && (
+            <div className="mt-2 space-y-1">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Outras entradas válidas:</span>
+              {eligibleMarkets.slice(1, 4).map((m, i) => (
+                <MarketRow key={i} market={m} />
+              ))}
+            </div>
+          )}
+        </>
       ) : (
         <div className="p-4 rounded-lg border border-border bg-muted/30 text-center">
           <p className="text-sm text-muted-foreground font-medium">
-            Sem entrada de valor estatístico para o perfil <span className="text-accent">{cfg.label}</span>.
+            Sem entrada de valor estatístico para o perfil <span className={cfg.colorClass}>{cfg.label}</span>.
           </p>
           <p className="text-xs text-muted-foreground/60 mt-1">
             Nenhum mercado atingiu {cfg.min}% de probabilidade modelada.

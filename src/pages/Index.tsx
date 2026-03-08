@@ -6,7 +6,7 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import MatchSummaryBanner from '@/components/MatchSummaryBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield, Filter, AlertTriangle } from 'lucide-react';
+import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield, Filter, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MatchData } from '@/types/match';
 
@@ -21,6 +21,7 @@ const Index = () => {
   const [showFilter, setShowFilter] = useState(false);
   const [summaryFilterIds, setSummaryFilterIds] = useState<string[] | null>(null);
   const [summaryFilterLabel, setSummaryFilterLabel] = useState<string | null>(null);
+  const [showLowConfidence, setShowLowConfidence] = useState(false);
 
   const { data: matches, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['matches', date],
@@ -304,27 +305,35 @@ const Index = () => {
           </div>
         ))}
 
-        {/* Low confidence separator + matches */}
+        {/* Low confidence toggle + matches */}
         {lowConfidenceMatches.length > 0 && (!summaryFilterIds || lowConfidenceMatches.some(m => summaryFilterIds.includes(String(m.id)))) && (
           <>
             <div className="flex items-center gap-3 py-4">
               <div className="flex-1 h-px bg-border" />
-              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+              <button
+                onClick={() => setShowLowConfidence(!showLowConfidence)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 transition-colors"
+              >
                 <AlertTriangle className="w-4 h-4 text-yellow-400" />
                 <span className="text-xs text-yellow-400 font-medium">
-                  {lowConfidenceMatches.length} jogo{lowConfidenceMatches.length !== 1 ? 's' : ''} com dados insuficientes
+                  {showLowConfidence ? 'Ocultar' : 'Mostrar'} {lowConfidenceMatches.length} jogo{lowConfidenceMatches.length !== 1 ? 's' : ''} com dados insuficientes
                 </span>
-              </div>
+                {showLowConfidence ? <ChevronUp className="w-3.5 h-3.5 text-yellow-400" /> : <ChevronDown className="w-3.5 h-3.5 text-yellow-400" />}
+              </button>
               <div className="flex-1 h-px bg-border" />
             </div>
-            <p className="text-[10px] text-muted-foreground text-center -mt-4 mb-2">
-              Menos de 2 jogos com estatísticas detalhadas — análise menos precisa
-            </p>
-            {displayMatches.filter(m => hasLowConfidence(m)).map((match, i) => (
-              <div key={match.id} className="opacity-70" style={{ animationDelay: `${i * 150}ms` }}>
-                <MatchCard match={match} />
-              </div>
-            ))}
+            {showLowConfidence && (
+              <>
+                <p className="text-[10px] text-muted-foreground text-center -mt-2 mb-2">
+                  Menos de 3 jogos com estatísticas detalhadas — análise menos precisa
+                </p>
+                {displayMatches.filter(m => hasLowConfidence(m)).map((match, i) => (
+                  <div key={match.id} className="opacity-75" style={{ animationDelay: `${i * 150}ms` }}>
+                    <MatchCard match={match} />
+                  </div>
+                ))}
+              </>
+            )}
           </>
         )}
       </main>

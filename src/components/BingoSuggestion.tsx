@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
-import { Sparkles, Trophy, TrendingUp, Zap, AlertTriangle, Ticket, Clock, Copy, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Trophy, TrendingUp, Zap, AlertTriangle, Ticket, Clock, Copy, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -70,6 +70,22 @@ function getBingoMarkets(match: MatchData): MarketAnalysis[] {
   }
 
   return picked;
+}
+
+function getBingoText(bingoMatches: BingoMatch[], totalSelections: number): string {
+  const lines = ['🎯 *BINGO DO DIA — ANALISTA PRO 8.0*', ''];
+  for (const bm of bingoMatches) {
+    lines.push(`⚽ *${bm.match.homeTeam} vs ${bm.match.awayTeam}*`);
+    lines.push(`🕐 ${bm.match.time} • ${bm.match.league}`);
+    for (const m of bm.markets) {
+      const icon = m.category === 'goals' ? '📊' : m.category === 'corners' ? '🔄' : m.category === 'cards' ? '🟨' : '🏆';
+      lines.push(`  ${icon} ${m.market} — *${m.probability}%* (${m.risk})`);
+    }
+    lines.push('');
+  }
+  lines.push(`📈 ${bingoMatches.length} jogos • ${totalSelections} entradas`);
+  lines.push('_Modelo estatístico Poisson + média ponderada_');
+  return lines.join('\n');
 }
 
 const riskColors: Record<string, string> = {
@@ -195,28 +211,28 @@ const BingoSuggestion = ({ matches }: Props) => {
         <p className="text-[10px] text-muted-foreground">
           Poisson (gols) + média ponderada (escanteios/cartões) • 60% temporada + 40% últimos 10
         </p>
-        <button
-          onClick={() => {
-            const lines = ['🎯 *BINGO DO DIA — ANALISTA PRO 8.0*', ''];
-            for (const bm of bingoMatches) {
-              lines.push(`⚽ *${bm.match.homeTeam} vs ${bm.match.awayTeam}*`);
-              lines.push(`🕐 ${bm.match.time} • ${bm.match.league}`);
-              for (const m of bm.markets) {
-                const icon = m.category === 'goals' ? '📊' : m.category === 'corners' ? '🔄' : m.category === 'cards' ? '🟨' : '🏆';
-                lines.push(`  ${icon} ${m.market} — *${m.probability}%* (${m.risk})`);
-              }
-              lines.push('');
-            }
-            lines.push(`📈 ${bingoMatches.length} jogos • ${totalSelections} entradas`);
-            lines.push('_Modelo estatístico Poisson + média ponderada_');
-            navigator.clipboard.writeText(lines.join('\n'));
-            toast.success('Bingo copiado para a área de transferência!');
-          }}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors shrink-0"
-        >
-          <Copy className="w-3.5 h-3.5" />
-          Copiar
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              const text = getBingoText(bingoMatches, totalSelections);
+              navigator.clipboard.writeText(text);
+              toast.success('Bingo copiado para a área de transferência!');
+            }}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copiar
+          </button>
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(getBingoText(bingoMatches, totalSelections))}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[hsl(145_60%_45%/0.2)] text-[hsl(145_60%_40%)] hover:bg-[hsl(145_60%_45%/0.3)] transition-colors"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            WhatsApp
+          </a>
+        </div>
       </div>
         </>
       )}

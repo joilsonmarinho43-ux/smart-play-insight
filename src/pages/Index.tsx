@@ -229,7 +229,10 @@ const Index = () => {
         )}
 
         {filteredMatches.length > 0 && (
-          <BingoSuggestion matches={filteredMatches} />
+          <>
+            <MatchSummaryBanner matches={filteredMatches} />
+            <BingoSuggestion matches={filteredMatches} />
+          </>
         )}
 
         {filteredMatches.map((match, i) => (

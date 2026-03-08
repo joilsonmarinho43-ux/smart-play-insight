@@ -4,32 +4,25 @@ import { Brain, Loader2, Mail, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setMessage('');
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate('/');
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        setMessage('Verifique seu e-mail para confirmar o cadastro.');
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Erro inesperado');
+      setError(err.message === 'Invalid login credentials' 
+        ? 'E-mail ou senha incorretos.' 
+        : err.message || 'Erro inesperado');
     } finally {
       setLoading(false);
     }
@@ -47,9 +40,7 @@ const Auth = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-foreground text-center">
-            {isLogin ? 'Entrar' : 'Criar conta'}
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground text-center">Entrar</h2>
 
           <div className="space-y-3">
             <div className="relative">
@@ -78,7 +69,6 @@ const Auth = () => {
           </div>
 
           {error && <p className="text-destructive text-sm text-center">{error}</p>}
-          {message && <p className="text-accent text-sm text-center">{message}</p>}
 
           <button
             type="submit"
@@ -86,18 +76,11 @@ const Auth = () => {
             className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isLogin ? 'Entrar' : 'Cadastrar'}
+            Entrar
           </button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            {isLogin ? 'Não tem conta?' : 'Já tem conta?'}{' '}
-            <button
-              type="button"
-              onClick={() => { setIsLogin(!isLogin); setError(''); setMessage(''); }}
-              className="text-primary font-medium hover:underline"
-            >
-              {isLogin ? 'Cadastre-se' : 'Entrar'}
-            </button>
+          <p className="text-center text-xs text-muted-foreground">
+            Acesso restrito. Contate o administrador para obter uma conta.
           </p>
         </form>
       </div>

@@ -168,7 +168,8 @@ const Index = () => {
             <BarChart3 className="w-4 h-4 text-primary" />
             <span className="text-xs sm:text-sm text-primary font-medium">
               {formatDateDisplay(date)}
-              {matches ? ` — ${displayMatches.length} de ${matches.length} jogos` : ''}
+              {matches ? ` — ${reliableMatches.length} jogos confiáveis` : ''}
+              {lowConfidenceMatches.length > 0 ? ` + ${lowConfidenceMatches.length} com poucos dados` : ''}
             </span>
             {summaryFilterLabel && (
               <span className="text-[10px] sm:text-xs text-primary/80">• filtro: {summaryFilterLabel}</span>

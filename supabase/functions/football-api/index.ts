@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const BASE_URL = "https://v3.football.api-sports.io";
-const LIGAS_ALVO_IDS = [39, 140, 78, 135, 61, 94, 88, 253, 2, 71, 218, 144, 119, 262];
+const LIGAS_ALVO_IDS = [39, 140, 78, 135, 61, 94, 88, 253, 2, 71, 218, 144, 119, 262, 73];
 
 async function apiGet(endpoint: string, params: Record<string, string>, apiKey: string) {
   const url = new URL(`${BASE_URL}/${endpoint}`);

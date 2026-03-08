@@ -21,6 +21,7 @@ const Index = () => {
   const [showFilter, setShowFilter] = useState(false);
   const [summaryFilterIds, setSummaryFilterIds] = useState<string[] | null>(null);
   const [summaryFilterLabel, setSummaryFilterLabel] = useState<string | null>(null);
+  const [showLowConfidence, setShowLowConfidence] = useState(false);
 
   const { data: matches, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['matches', date],

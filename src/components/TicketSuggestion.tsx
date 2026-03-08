@@ -62,7 +62,7 @@ const TicketSuggestionCard = ({ match }: Props) => {
       <ComboSignalBanner combo={combo} />
 
       {/* Profile Selector */}
-      <div className="flex gap-2 mb-4">
+      <div className="grid grid-cols-3 gap-1.5 sm:flex sm:gap-2 mb-4">
         {(Object.keys(profileConfig) as RiskProfile[]).map((p) => {
           const c = profileConfig[p];
           const Icon = c.icon;
@@ -71,15 +71,15 @@ const TicketSuggestionCard = ({ match }: Props) => {
             <button
               key={p}
               onClick={() => setProfile(p)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-all border ${
                 active
                   ? 'bg-accent/20 border-accent text-accent'
                   : 'bg-secondary/50 border-border text-muted-foreground hover:border-accent/40'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
-              {c.label}
-              <span className="opacity-60">≥{c.min}%</span>
+              <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span className="truncate">{c.label}</span>
+              <span className="opacity-60 hidden sm:inline">≥{c.min}%</span>
             </button>
           );
         })}

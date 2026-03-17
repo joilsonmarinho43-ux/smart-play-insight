@@ -6,7 +6,11 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import MatchSummaryBanner from '@/components/MatchSummaryBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Calendar, Brain, BarChart3, Loader2, AlertCircle, LogOut, Shield, Filter, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
+import { 
+  Calendar, Brain, BarChart3, Loader2, AlertCircle, 
+  LogOut, Shield, Filter, AlertTriangle, ChevronUp, 
+  ChevronDown, Zap 
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MatchData } from '@/types/match';
 
@@ -47,7 +51,6 @@ const Index = () => {
     if (!matches) return { reliableMatches: [], lowConfidenceMatches: [] };
     let result = [...matches];
 
-    // Filter out matches that already started (only for today)
     const today = new Date().toISOString().split('T')[0];
     if (date === today) {
       const now = new Date();
@@ -98,7 +101,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container max-w-3xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
@@ -338,6 +341,21 @@ const Index = () => {
         )}
       </main>
 
+      {/* Botão Flutuante de Trade Ao Vivo */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Link 
+          to="/live" 
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-3 rounded-full shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95 group"
+        >
+          <div className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+          </div>
+          <span className="font-bold tracking-wider text-sm uppercase">Live Trade</span>
+          <Zap className="w-4 h-4 fill-current group-hover:animate-bounce" />
+        </Link>
+      </div>
+
       {/* Footer */}
       <footer className="border-t border-border py-6">
         <p className="text-center text-xs text-muted-foreground">
@@ -349,3 +367,4 @@ const Index = () => {
 };
 
 export default Index;
+              

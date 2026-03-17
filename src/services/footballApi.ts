@@ -1,7 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { MatchData } from '@/types/match';
 
-// Mantém o funcionamento do Pré-jogo original
+// =============================
+// PRÉ-JOGO (MANTIDO ORIGINAL)
+// =============================
 export async function fetchMatches(date: string): Promise<MatchData[]> {
   const { data, error } = await supabase.functions.invoke('football-api', {
     body: { date },
@@ -16,13 +18,15 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
     throw new Error(data.error);
   }
 
-  return data?.matches || [];
+  return Array.isArray(data?.matches) ? data.matches : [];
 }
 
-// Nova função para o Painel de Trade Ao Vivo
+// =============================
+// LIVE (CORRIGIDO)
+// =============================
 export async function fetchLiveMatches(): Promise<MatchData[]> {
   const { data, error } = await supabase.functions.invoke('football-api', {
-    body: { mode: 'live' }, // Instrução para o backend ativar modo Live
+    body: { live: true }, // 🔥 PADRÃO CORRETO
   });
 
   if (error) {
@@ -34,5 +38,10 @@ export async function fetchLiveMatches(): Promise<MatchData[]> {
     throw new Error(data.error);
   }
 
-  return data?.matches || [];
+  // 🔥 BLINDAGEM TOTAL
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.matches)) return data.matches;
+  if (Array.isArray(data?.response)) return data.response;
+
+  return [];
 }

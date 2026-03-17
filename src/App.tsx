@@ -8,6 +8,7 @@ import { useProfile } from "@/hooks/useProfile";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import Live from "./pages/Live"; // Importando sua nova página
 import Paywall from "./pages/Paywall";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -52,7 +53,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Rota Principal (Pré-Jogo) */}
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          
+          {/* Nova Rota de Trade Ao Vivo (Protegida) */}
+          <Route path="/live" element={<ProtectedRoute><Live /></ProtectedRoute>} />
+          
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/expired" element={<PaywallRoute />} />
           <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
@@ -64,3 +70,4 @@ const App = () => (
 );
 
 export default App;
+            

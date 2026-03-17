@@ -30,6 +30,7 @@ export interface SampleSize {
   awayWithStats: number;
 }
 
+// Interface estendida para suportar Live sem quebrar Pré-jogo
 export interface MatchData {
   id: string;
   time: string;
@@ -45,6 +46,20 @@ export interface MatchData {
     homeWin: string;
     draw: string;
     awayWin: string;
+  };
+  // Novos campos para funcionalidade LIVE
+  isLive?: boolean;
+  status?: string;
+  minute?: number;
+  liveScore?: {
+    home: number;
+    away: number;
+  };
+  liveStats?: {
+    dangerousAttacks: [number, number];
+    corners: [number, number];
+    possession: [number, number];
+    pressureIndex: [number, number];
   };
 }
 

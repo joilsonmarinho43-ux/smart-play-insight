@@ -17,7 +17,7 @@ const Index = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white pb-32">
+    <div className="min-h-screen bg-[#0f172a] text-white pb-24">
       
       {/* HEADER */}
       <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
@@ -52,10 +52,11 @@ const Index = () => {
               }
             </button>
           </div>
+
         </div>
       </header>
 
-      {/* LISTA DE JOGOS */}
+      {/* LISTA DE JOGOS (PRÉ-JOGO INTACTO) */}
       <main className="container max-w-3xl mx-auto px-4 py-6">
         
         {isFetching && (
@@ -82,22 +83,22 @@ const Index = () => {
         )}
       </main>
 
-      {/* BOTÃO LIVE (CORRIGIDO) */}
-      <div className="fixed bottom-16 left-0 right-0 flex justify-center z-[9999] px-4 pointer-events-none">
+      {/* BOTÃO LIVE (CORRIGIDO SEM QUEBRAR NADA) */}
+      <div className="sticky bottom-0 left-0 right-0 flex justify-center z-50 px-4 py-4 bg-gradient-to-t from-[#0f172a] to-transparent">
         <Link 
           to="/live" 
-          className="pointer-events-auto flex items-center gap-3 bg-orange-600 hover:bg-orange-700 text-white px-6 py-4 rounded-full shadow-[0_10px_30px_rgba(234,88,12,0.4)] transition-all active:scale-95 border border-white/20 w-full max-w-xs justify-center"
+          className="flex items-center gap-3 bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-full shadow-lg transition-all active:scale-95 border border-white/20"
         >
           <div className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
           </div>
 
-          <span className="font-black tracking-widest text-sm">
-            LIVE TRADE
+          <span className="font-bold text-sm">
+            LIVE
           </span>
 
-          <Zap className="w-5 h-5 fill-current" />
+          <Zap className="w-4 h-4" />
         </Link>
       </div>
 

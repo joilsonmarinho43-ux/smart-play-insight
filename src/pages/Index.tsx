@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { useAuth } from '@/hooks/useAuth';
-import { Brain, BarChart3, Loader2, Zap } from 'lucide-react';
+import { Brain, BarChart3, Loader2, Zap, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Index = () => {
@@ -15,6 +15,12 @@ const Index = () => {
     queryFn: () => fetchMatches(date),
     staleTime: 5 * 60 * 1000,
   });
+
+  // 🔥 CONTADOR DE JOGOS
+  const totalJogos = matches?.length || 0;
+
+  // 🔥 SIMULAÇÃO DE TOP PICKS (BINGO)
+  const topPicks = matches?.slice(0, 2) || [];
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32">
@@ -51,12 +57,42 @@ const Index = () => {
                 : <BarChart3 className="w-5 h-5" />
               }
             </button>
+
+            {/* 🔥 BOTÃO ADMIN RESTAURADO */}
+            <button 
+              onClick={signOut}
+              className="bg-red-500 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-600"
+            >
+              ADMIN
+            </button>
           </div>
 
         </div>
       </header>
 
-      {/* LISTA PRÉ-JOGO (INTOCADA) */}
+      {/* 🔥 CONTADOR */}
+      <div className="max-w-3xl mx-auto px-4 mt-4">
+        <div className="bg-[#1e293b] border border-white/10 rounded-xl p-3 text-center">
+          <p className="text-sm text-gray-400">Jogos encontrados</p>
+          <p className="text-2xl font-bold text-orange-500">{totalJogos}</p>
+        </div>
+      </div>
+
+      {/* 🔥 SUGESTÃO (BINGO SIMPLES) */}
+      {topPicks.length > 0 && (
+        <div className="max-w-3xl mx-auto px-4 mt-4">
+          <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4 rounded-xl shadow-lg">
+            <p className="text-xs uppercase font-bold mb-2">Sugestão do Modelo</p>
+            {topPicks.map((m: any) => (
+              <p key={m.id} className="text-sm font-semibold">
+                {m.homeTeam} x {m.awayTeam}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* LISTA PRÉ-JOGO */}
       <main className="container max-w-3xl mx-auto px-4 py-6">
         
         {isFetching && (
@@ -83,11 +119,11 @@ const Index = () => {
         )}
       </main>
 
-      {/* BOTÃO LIVE (VERSÃO DEFINITIVA) */}
+      {/* BOTÃO LIVE */}
       <div className="fixed bottom-5 left-0 right-0 flex justify-center z-[9999] px-4">
         <Link 
           to="/live" 
-          className="flex items-center gap-3 bg-orange-600 hover:bg-orange-700 text-white px-6 py-4 rounded-full shadow-[0_10px_30px_rgba(234,88,12,0.4)] transition-all active:scale-95 border border-white/20 w-full max-w-xs justify-center"
+          className="flex items-center gap-3 bg-orange-600 hover:bg-orange-700 text-white px-6 py-4 rounded-full shadow-lg transition-all active:scale-95 w-full max-w-xs justify-center"
         >
           <div className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>

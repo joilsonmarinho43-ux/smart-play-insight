@@ -13,7 +13,14 @@ const Live = () => {
     retry: 1,
   });
 
-  const matches = data ?? [];
+  // 🔥 TRATAMENTO SEGURO (ESSA É A CORREÇÃO)
+  const matches = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.response)
+    ? data.response
+    : Array.isArray(data?.data)
+    ? data.data
+    : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,6 +58,7 @@ const Live = () => {
 
       <main className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
 
+        {/* LOADING */}
         {isLoading && (
           <div className="text-center py-20">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
@@ -60,6 +68,7 @@ const Live = () => {
           </div>
         )}
 
+        {/* ERRO */}
         {error && (
           <div className="text-center py-12 bg-destructive/10 rounded-2xl border border-destructive/20 p-6">
             <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
@@ -69,6 +78,7 @@ const Live = () => {
           </div>
         )}
 
+        {/* SEM JOGOS */}
         {!isLoading && matches.length === 0 && (
           <div className="text-center py-20 bg-secondary/20 rounded-2xl border border-dashed border-border">
             <Brain className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
@@ -82,10 +92,10 @@ const Live = () => {
           </div>
         )}
 
-        {/* Jogos LIVE */}
-        {matches.length > 0 && (
+        {/* JOGOS LIVE */}
+        {!isLoading && matches.length > 0 && (
           <div className="grid gap-6">
-            {matches.map((match) => (
+            {matches.map((match: any) => (
               <LiveMatchCard key={match.id} match={match} />
             ))}
           </div>

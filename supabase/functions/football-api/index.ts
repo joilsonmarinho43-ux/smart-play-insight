@@ -21,6 +21,30 @@ function avg(arr: number[]) {
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
+// 🔥 FUNÇÕES POISSON (NÍVEL REAL)
+function factorial(n: number): number {
+  if (n === 0) return 1;
+  return n * factorial(n - 1);
+}
+
+function poisson(lambda: number, k: number) {
+  return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+}
+
+function probOver(lambda: number, line: number) {
+  let prob = 0;
+  for (let i = Math.floor(line) + 1; i <= 10; i++) {
+    prob += poisson(lambda, i);
+  }
+  return prob;
+}
+
+function clampProbability(p: number) {
+  if (p > 0.85) return 0.85;
+  if (p < 0.05) return 0.05;
+  return p;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,7 +61,7 @@ serve(async (req) => {
     const matches = await Promise.all(
       fixtures.map(async (j: any) => {
 
-        // 🔥 AUMENTO DE AMOSTRA (CRUCIAL)
+        // 🔥 AMOSTRA MAIOR (10 jogos)
         const [homeGames, awayGames] = await Promise.all([
           fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=10&status=FT`, apiKey),
           fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=10&status=FT`, apiKey),
@@ -52,39 +76,43 @@ serve(async (req) => {
           .filter((g: any) => g.teams.away.id === j.teams.away.id)
           .map((g: any) => g.goals.away);
 
-        // 🔥 PROTEÇÃO ANTI ZERO
+        // 🔥 MÉDIAS REAIS
         const homeAvg = avg(homeGoals) || 1.2;
         const awayAvg = avg(awayGoals) || 1.0;
 
-        // 🔥 AJUSTE DE FORÇA (NÍVEL CASA)
+        // 🔥 AJUSTE DE FORÇA
         const adjHome = homeAvg * 1.1;
         const adjAway = awayAvg * 0.95;
 
-        // 🔥 PROBABILIDADE MELHORADA
-        let homeWin = 33;
-        let draw = 34;
-        let awayWin = 33;
+        // 🔥 POISSON REAL
+        const totalLambda = adjHome + adjAway;
 
-        if (adjHome > adjAway) {
-          homeWin = 48;
-          awayWin = 22;
-        } else if (adjAway > adjHome) {
-          awayWin = 48;
+        const probOver05 = clampProbability(probOver(totalLambda, 0.5));
+        const probOver15 = clampProbability(probOver(totalLambda, 1.5));
+        const probOver25 = clampProbability(probOver(totalLambda, 2.5));
+
+        // 🔥 PROBABILIDADE DE RESULTADO (MAIS REAL)
+        let homeWin = 50;
+        let draw = 28;
+        let awayWin = 22;
+
+        if (adjAway > adjHome) {
+          awayWin = 50;
           homeWin = 22;
         }
 
-        // 🔥 MÉTRICAS BASEADAS EM DADOS (NÃO FAKE)
-        const totalShotsHome = Math.round(adjHome * 6);
-        const totalShotsAway = Math.round(adjAway * 6);
+        // 🔥 MÉTRICAS DERIVADAS
+        const totalShotsHome = Math.round(adjHome * 5);
+        const totalShotsAway = Math.round(adjAway * 5);
 
         const shotsOnTargetHome = Math.round(totalShotsHome * 0.4);
         const shotsOnTargetAway = Math.round(totalShotsAway * 0.4);
 
-        const cornersHome = Math.round(adjHome * 3);
-        const cornersAway = Math.round(adjAway * 3);
+        const cornersHome = Math.round(adjHome * 2.8);
+        const cornersAway = Math.round(adjAway * 2.8);
 
-        const cardsHome = Math.max(1, Math.round(2 + (Math.random() * 2)));
-        const cardsAway = Math.max(1, Math.round(2 + (Math.random() * 2)));
+        const cardsHome = Math.max(1, Math.round(2 + Math.random()));
+        const cardsAway = Math.max(1, Math.round(2 + Math.random()));
 
         return {
           id: String(j.fixture.id),
@@ -93,7 +121,7 @@ serve(async (req) => {
           homeTeam: j.teams.home.name,
           awayTeam: j.teams.away.name,
 
-          // 🔥 MÉTRICAS REAIS DERIVADAS
+          // 🔥 MÉTRICAS
           metrics: {
             possession: [52, 48],
             xG: [adjHome, adjAway],
@@ -127,10 +155,18 @@ serve(async (req) => {
             awayWithStats: awayGoals.length,
           },
 
+          // 🔥 PREVISÕES AJUSTADAS
           predictions: {
             homeWin: String(homeWin),
             draw: String(draw),
             awayWin: String(awayWin),
+          },
+
+          // 🔥 EXTRA (SE QUISER USAR NO FRONT DEPOIS)
+          probabilities: {
+            over05: probOver05,
+            over15: probOver15,
+            over25: probOver25,
           },
         };
       })

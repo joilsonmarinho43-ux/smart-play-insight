@@ -12,26 +12,24 @@ const Index = () => {
   const [date, setDate] = useState(() =>
     new Date().toISOString().split('T')[0]
   );
-
   const [bingo, setBingo] = useState<any[]>([]);
   const [loadingBingo, setLoadingBingo] = useState(false);
 
-  // ✅ Cache persistente para evitar múltiplos fetches
+  // cache interno para não gerar Bingo ao voltar do background
   const bingoCache = useRef<any[]>([]);
 
   const { data: matches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    staleTime: Infinity,          // nunca considera obsoleto
-    cacheTime: Infinity,          // mantém em memória indefinidamente
-    refetchOnWindowFocus: false,  // desativa refetch ao voltar do background
-    refetchOnMount: false,        // não refaz ao montar
-    refetchOnReconnect: false,    // não refaz se reconectar
+    staleTime: Infinity,
+    cacheTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   const totalJogos = matches?.length || 0;
 
-  // 🔥 GARANTE DADOS SEMPRE
   const safeMatches = (matches || []).map((m: any) => ({
     ...m,
     metrics: m.metrics || {
@@ -56,10 +54,10 @@ const Index = () => {
       awayCornersVariance: 0,
       homeCardsVariance: 0,
       awayCardsVariance: 0,
-    }
+    },
   }));
 
-  // 🔥 GERADOR DE BINGO PROFISSIONAL - Modo Sniper
+  // função para gerar Bingo profissional
   const gerarBingo = () => {
     if (!safeMatches || safeMatches.length === 0) return;
 
@@ -80,44 +78,39 @@ const Index = () => {
       ];
 
       const picks = safeMatches
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 3) // pega 3 jogos para mais opções
+        .slice(0, 3)
         .map((m: any) => {
           const mercadoPicks = tipos
             .sort(() => 0.5 - Math.random())
             .slice(0, 2)
             .map((tipo) => ({
               mercado: tipo,
-              confianca: Math.floor(Math.random() * 15) + 85, // 85~100%
+              confianca: Math.floor(Math.random() * 15) + 85,
             }));
 
-          return {
-            ...m,
-            mercados: mercadoPicks,
-          };
+          return { ...m, mercados: mercadoPicks };
         });
 
-      bingoCache.current = picks; // salva no cache
+      bingoCache.current = picks;
       setBingo(picks);
       setLoadingBingo(false);
-    }, 1200);
+    }, 500); // mais rápido
   };
 
   useEffect(() => {
     if (!matches || matches.length === 0) return;
-
+    // se houver cache, usa ele
     if (bingoCache.current.length > 0) {
-      setBingo(bingoCache.current); // usa cache se existir
+      setBingo(bingoCache.current);
     } else {
       gerarBingo();
     }
   }, [matches]);
 
-  // ✅ Função para cor de confiança com destaque neon
   const getCor = (valor: number) => {
-    if (valor >= 90) return "#39FF14"; // verde neon
-    if (valor >= 85) return "#CCFF00"; // verde limão vibrante
-    return "#FFFFFF"; // branco padrão
+    if (valor >= 90) return "#39FF14";
+    if (valor >= 85) return "#CCFF00";
+    return "#FFFFFF";
   };
 
   return (
@@ -126,44 +119,36 @@ const Index = () => {
       {/* HEADER */}
       <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          
           <div className="flex items-center gap-3">
             <Brain className="w-8 h-8 text-orange-500" />
             <div>
               <h1 className="text-xl font-bold tracking-tighter">ANALISTA JOILSON</h1>
-              <p className="text-[10px] text-orange-500 font-bold uppercase">
-                MODELO HÍBRIDO PRO
-              </p>
+              <p className="text-[10px] text-orange-500 font-bold uppercase">MODELO HÍBRIDO PRO</p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
-            <input 
-              type="date" 
-              value={date} 
+            <input
+              type="date"
+              value={date}
               onChange={(e) => setDate(e.target.value)}
               className="bg-[#334155] text-xs p-2 rounded-lg outline-none border border-white/10"
             />
-
-            <button 
-              onClick={() => refetch()} 
+            <button
+              onClick={() => refetch()}
               disabled={isFetching}
               className="bg-orange-500 p-2 rounded-lg hover:bg-orange-600"
             >
-              {isFetching 
-                ? <Loader2 className="w-5 h-5 animate-spin" /> 
-                : <BarChart3 className="w-5 h-5" />
-              }
+              {isFetching
+                ? <Loader2 className="w-5 h-5 animate-spin" />
+                : <BarChart3 className="w-5 h-5" />}
             </button>
-
-            <button 
+            <button
               onClick={signOut}
               className="bg-red-500 px-3 py-2 rounded-lg text-xs font-bold"
             >
               ADMIN
             </button>
           </div>
-
         </div>
       </header>
 
@@ -185,7 +170,7 @@ const Index = () => {
         </button>
       </div>
 
-      {/* BINGO PROFISSIONAL */}
+      {/* BINGO */}
       <div className="max-w-3xl mx-auto px-4 mt-4">
         <div className="relative rounded-xl shadow-lg overflow-hidden">
           <div className="absolute inset-0 bg-black/50 z-0"></div>
@@ -227,7 +212,6 @@ const Index = () => {
 
       {/* LISTA DE JOGOS */}
       <main className="container max-w-3xl mx-auto px-4 py-6">
-        
         {isFetching && (
           <div className="flex flex-col items-center py-20 gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
@@ -246,15 +230,14 @@ const Index = () => {
 
       {/* BOTÃO LIVE */}
       <div className="fixed bottom-5 left-0 right-0 flex justify-center px-4">
-        <Link 
-          to="/live" 
+        <Link
+          to="/live"
           className="flex items-center gap-3 bg-orange-600 px-6 py-4 rounded-full w-full max-w-xs justify-center shadow-lg"
         >
           <span className="font-bold">LIVE TRADE</span>
           <Zap className="w-5 h-5" />
         </Link>
       </div>
-
     </div>
   );
 };

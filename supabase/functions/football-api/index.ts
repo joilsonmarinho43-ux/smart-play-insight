@@ -33,13 +33,12 @@ serve(async (req) => {
     const date = body?.date || new Date().toISOString().split("T")[0];
 
     const fixturesData = await fetchWithAuth(`fixtures?date=${date}`, apiKey);
-
     const fixtures = fixturesData?.response || [];
 
     const matches = await Promise.all(
       fixtures.map(async (j: any) => {
 
-        // 🔥 BUSCA HISTÓRICO REAL
+        // 🔥 HISTÓRICO
         const [homeGames, awayGames] = await Promise.all([
           fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=5&status=FT`, apiKey),
           fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey),
@@ -53,13 +52,10 @@ serve(async (req) => {
           g.teams.away.id === j.teams.away.id ? g.goals.home : g.goals.away
         );
 
-        // 🔥 MODELO REAL
         const homeAvg = avg(homeGoals);
         const awayAvg = avg(awayGoals);
 
-        // 🔥 PROBABILIDADE SIMPLES (BASE REAL)
-        const total = homeAvg + awayAvg;
-
+        // 🔥 PROBABILIDADE BASE (ainda simples)
         let homeWin = 33;
         let draw = 34;
         let awayWin = 33;
@@ -72,7 +68,6 @@ serve(async (req) => {
           homeWin = 25;
         }
 
-        // 🔥 ESTRUTURA COMPATÍVEL COM FRONT
         return {
           id: String(j.fixture.id),
           time: j.fixture.date.split("T")[1].substring(0, 5),
@@ -80,6 +75,7 @@ serve(async (req) => {
           homeTeam: j.teams.home.name,
           awayTeam: j.teams.away.name,
 
+          // 🔥 MÉTRICAS (compatível com seu front)
           metrics: {
             possession: [50, 50],
             xG: [homeAvg, awayAvg],
@@ -92,6 +88,7 @@ serve(async (req) => {
             yellowCards: [2, 2],
           },
 
+          // 🔥 MODELO
           modelData: {
             homeGoalsAvg: homeAvg,
             awayGoalsAvg: awayAvg,
@@ -105,6 +102,15 @@ serve(async (req) => {
             awayCardsVariance: 1,
           },
 
+          // 🔥 AQUI ESTÁ A CORREÇÃO DO SEU BUG
+          sampleSize: {
+            homeGames: homeGoals.length,
+            awayGames: awayGoals.length,
+            homeWithStats: homeGoals.length,
+            awayWithStats: awayGoals.length,
+          },
+
+          // 🔥 PREVISÃO
           predictions: {
             homeWin: String(homeWin),
             draw: String(draw),

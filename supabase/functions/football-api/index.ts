@@ -16,7 +16,7 @@ const LIGAS_ALVO_IDS = [39, 140, 78, 135, 61, 71, 72, 73, 13, 11, 2, 848];
 async function fetchWithAuth(endpoint: string, apiKey: string) {
   const res = await fetch(`${BASE_URL}/${endpoint}`, {
     headers: {
-      "x-apisports-key": apiKey, // 🔥 HEADER CORRETO
+      "x-apisports-key": apiKey,
     },
   });
 
@@ -50,7 +50,6 @@ serve(async (req) => {
     const apiKey = Deno.env.get("API_FUTEBOL_KEY");
     if (!apiKey) throw new Error("API Key não configurada");
 
-    // 🔥 BODY BLINDADO
     let body: any = {};
     try {
       body = await req.json();
@@ -63,34 +62,35 @@ serve(async (req) => {
 
     let endpoint = "";
 
-    // =========================
-    // 🔥 LIVE
-    // =========================
+    // 🔴 LIVE
     if (live) {
       endpoint = "fixtures?live=all";
     }
 
-    // =========================
     // 📅 PRÉ-JOGO
-    // =========================
     else if (date) {
       endpoint = `fixtures?date=${date}`;
     }
 
-    // =========================
     // 🛡️ FALLBACK
-    // =========================
     else {
       const today = new Date().toISOString().split("T")[0];
       endpoint = `fixtures?date=${today}`;
     }
 
     const fixturesData = await fetchWithAuth(endpoint, apiKey);
-    const allFixtures = fixturesData.response || [];
 
-    const filtered = allFixtures.filter((f: any) =>
-      LIGAS_ALVO_IDS.includes(f.league.id)
-    );
+    // 🔥 BLINDAGEM
+    const allFixtures = Array.isArray(fixturesData?.response)
+      ? fixturesData.response
+      : [];
+
+    // 🔥 CORREÇÃO: NÃO FILTRA LIVE
+    const filtered = live
+      ? allFixtures
+      : allFixtures.filter((f: any) =>
+          LIGAS_ALVO_IDS.includes(f.league.id)
+        );
 
     if (filtered.length === 0) {
       return new Response(JSON.stringify({ matches: [] }), {
@@ -102,23 +102,30 @@ serve(async (req) => {
       filtered.map(async (j: any) => {
 
         // =========================
-        // 🔴 LIVE (LEVE E RÁPIDO)
+        // 🔴 LIVE (CORRIGIDO)
         // =========================
         if (live) {
           return {
             id: String(j.fixture.id),
-            time: j.fixture.status.elapsed || 0,
+
+            // 🔥 NOME CORRETO
+            minute: j.fixture.status.elapsed ?? 0,
+
             league: j.league.name,
             homeTeam: j.teams.home.name,
             awayTeam: j.teams.away.name,
-            status: j.fixture.status.short,
-            goalsHome: j.goals.home,
-            goalsAway: j.goals.away,
+
+            // 🔥 PADRONIZADO
+            status: (j.fixture.status.short || '').toUpperCase(),
+
+            // 🔥 PLACAR
+            goalsHome: j.goals.home ?? 0,
+            goalsAway: j.goals.away ?? 0,
           };
         }
 
         // =========================
-        // 📊 PRÉ-JOGO (COMPLETO)
+        // 📊 PRÉ-JOGO (INALTERADO)
         // =========================
         const [hForm, aForm] = await Promise.all([
           fetchWithAuth(

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { useAuth } from '@/hooks/useAuth';
-import { Brain, BarChart3, Loader2, Zap, Shield } from 'lucide-react';
+import { Brain, BarChart3, Loader2, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Index = () => {
@@ -16,11 +16,24 @@ const Index = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // 🔥 CONTADOR DE JOGOS
+  // 🔥 CONTADOR
   const totalJogos = matches?.length || 0;
 
-  // 🔥 SIMULAÇÃO DE TOP PICKS (BINGO)
-  const topPicks = matches?.slice(0, 2) || [];
+  // 🔥 BINGO INTELIGENTE (BASEADO EM MÉTRICA DE GOLS)
+  const topPicks = Array.isArray(matches)
+    ? matches
+        .map((m: any) => {
+          const g1 = m.metrics?.goals?.[0] || 0;
+          const g2 = m.metrics?.goals?.[1] || 0;
+
+          return {
+            ...m,
+            score: g1 + g2,
+          };
+        })
+        .sort((a: any, b: any) => b.score - a.score)
+        .slice(0, 2)
+    : [];
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32">
@@ -58,7 +71,7 @@ const Index = () => {
               }
             </button>
 
-            {/* 🔥 BOTÃO ADMIN RESTAURADO */}
+            {/* BOTÃO ADMIN */}
             <button 
               onClick={signOut}
               className="bg-red-500 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-600"
@@ -70,7 +83,7 @@ const Index = () => {
         </div>
       </header>
 
-      {/* 🔥 CONTADOR */}
+      {/* CONTADOR */}
       <div className="max-w-3xl mx-auto px-4 mt-4">
         <div className="bg-[#1e293b] border border-white/10 rounded-xl p-3 text-center">
           <p className="text-sm text-gray-400">Jogos encontrados</p>
@@ -78,11 +91,12 @@ const Index = () => {
         </div>
       </div>
 
-      {/* 🔥 SUGESTÃO (BINGO SIMPLES) */}
-      {topPicks.length > 0 && (
+      {/* 🔥 BINGO CORRIGIDO */}
+      {Array.isArray(topPicks) && topPicks.length > 0 && (
         <div className="max-w-3xl mx-auto px-4 mt-4">
           <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4 rounded-xl shadow-lg">
             <p className="text-xs uppercase font-bold mb-2">Sugestão do Modelo</p>
+
             {topPicks.map((m: any) => (
               <p key={m.id} className="text-sm font-semibold">
                 {m.homeTeam} x {m.awayTeam}

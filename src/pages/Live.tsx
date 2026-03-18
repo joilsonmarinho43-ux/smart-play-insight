@@ -6,21 +6,53 @@ type Match = {
   id: number;
   home: string;
   away: string;
-  minute: string;
+  minute: number;
+  status: string;
 };
 
 const Live = () => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Simulação (depois você pode ligar API real)
   useEffect(() => {
     setTimeout(() => {
-      setMatches([
-        { id: 1, home: 'Flamengo', away: 'Palmeiras', minute: '65' },
-        { id: 2, home: 'Barcelona', away: 'Real Madrid', minute: '30' },
-      ]);
+
+      // 🔥 SIMULAÇÃO MAIS REALISTA
+      const data: Match[] = [
+        {
+          id: 1,
+          home: 'Flamengo',
+          away: 'Palmeiras',
+          minute: 65,
+          status: 'LIVE',
+        },
+        {
+          id: 2,
+          home: 'Barcelona',
+          away: 'Real Madrid',
+          minute: 30,
+          status: 'LIVE',
+        },
+        {
+          id: 3,
+          home: 'Time A',
+          away: 'Time B',
+          minute: 0,
+          status: 'FINISHED', // ❌ não deve aparecer
+        },
+      ];
+
+      // 🎯 FILTRO PROFISSIONAL (SÓ AO VIVO)
+      const liveOnly = data.filter(
+        (match) =>
+          match.status === 'LIVE' ||
+          match.status === '1H' ||
+          match.status === '2H'
+      );
+
+      setMatches(liveOnly);
       setLoading(false);
+
     }, 1500);
   }, []);
 
@@ -40,7 +72,7 @@ const Live = () => {
           <div className="text-center py-20">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
             <p className="text-muted-foreground font-medium">
-              Carregando jogos ao vivo...
+              Buscando jogos ao vivo...
             </p>
           </div>
         )}
@@ -48,7 +80,7 @@ const Live = () => {
         {!loading && matches.length === 0 && (
           <div className="text-center py-20">
             <p className="text-muted-foreground">
-              Não há jogos ao vivo agora.
+              Nenhum jogo ao vivo no momento.
             </p>
           </div>
         )}
@@ -63,8 +95,9 @@ const Live = () => {
                 <p className="font-semibold">
                   {match.home} vs {match.away}
                 </p>
+
                 <p className="text-sm text-muted-foreground">
-                  Minuto: {match.minute}'
+                  🔴 Ao vivo • {match.minute}'
                 </p>
               </div>
             ))}

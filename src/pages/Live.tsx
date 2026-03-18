@@ -1,60 +1,29 @@
 import { Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-
-type Match = {
-  id: number;
-  home: string;
-  away: string;
-  minute: number;
-  status: string;
-};
+import { useQuery } from '@tanstack/react-query';
+import { fetchLiveMatches } from '@/services/footballApi';
 
 const Live = () => {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setTimeout(() => {
+  const { data: matches = [], isLoading } = useQuery({
+    queryKey: ['live-matches'],
+    queryFn: fetchLiveMatches,
+    refetchInterval: 15000,
+  });
 
-      // 🔥 SIMULAÇÃO MAIS REALISTA
-      const data: Match[] = [
-        {
-          id: 1,
-          home: 'Flamengo',
-          away: 'Palmeiras',
-          minute: 65,
-          status: 'LIVE',
-        },
-        {
-          id: 2,
-          home: 'Barcelona',
-          away: 'Real Madrid',
-          minute: 30,
-          status: 'LIVE',
-        },
-        {
-          id: 3,
-          home: 'Time A',
-          away: 'Time B',
-          minute: 0,
-          status: 'FINISHED', // ❌ não deve aparecer
-        },
-      ];
+  // 🔥 FILTRO REAL (ANTI-JOGO FAKE)
+  const liveMatches = matches.filter((m: any) => {
+    const statusShort = m.fixture?.status?.short;
+    const statusLong = m.fixture?.status?.long;
+    const elapsed = m.fixture?.status?.elapsed;
 
-      // 🎯 FILTRO PROFISSIONAL (SÓ AO VIVO)
-      const liveOnly = data.filter(
-        (match) =>
-          match.status === 'LIVE' ||
-          match.status === '1H' ||
-          match.status === '2H'
-      );
+    // ✔ só entra se tiver minuto rolando
+    if (!elapsed || elapsed <= 0) return false;
 
-      setMatches(liveOnly);
-      setLoading(false);
-
-    }, 1500);
-  }, []);
+    // ✔ status válidos reais
+    return ['1H', '2H', 'HT'].includes(statusShort) ||
+           (statusLong && statusLong.toLowerCase().includes('live'));
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,7 +37,7 @@ const Live = () => {
 
       <main className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
 
-        {loading && (
+        {isLoading && (
           <div className="text-center py-20">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
             <p className="text-muted-foreground font-medium">
@@ -77,30 +46,36 @@ const Live = () => {
           </div>
         )}
 
-        {!loading && matches.length === 0 && (
+        {!isLoading && liveMatches.length === 0 && (
           <div className="text-center py-20">
             <p className="text-muted-foreground">
-              Nenhum jogo ao vivo no momento.
+              Nenhum jogo ao vivo agora.
             </p>
           </div>
         )}
 
-        {!loading && matches.length > 0 && (
+        {!isLoading && liveMatches.length > 0 && (
           <div className="grid gap-4">
-            {matches.map((match) => (
-              <div
-                key={match.id}
-                className="p-4 rounded-xl border border-border bg-card"
-              >
-                <p className="font-semibold">
-                  {match.home} vs {match.away}
-                </p>
+            {liveMatches.map((match: any) => {
+              const home = match.teams?.home?.name || match.homeTeam || match.home;
+              const away = match.teams?.away?.name || match.awayTeam || match.away;
+              const minute = match.fixture?.status?.elapsed || '--';
 
-                <p className="text-sm text-muted-foreground">
-                  🔴 Ao vivo • {match.minute}'
-                </p>
-              </div>
-            ))}
+              return (
+                <div
+                  key={match.id}
+                  className="p-4 rounded-xl border border-border bg-card"
+                >
+                  <p className="font-semibold">
+                    🔴 {home} vs {away}
+                  </p>
+
+                  <p className="text-sm text-muted-foreground">
+                    Minuto: {minute}'
+                  </p>
+                </div>
+              );
+            })}
           </div>
         )}
 

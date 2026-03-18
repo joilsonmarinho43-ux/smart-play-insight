@@ -1,24 +1,37 @@
 import { Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchLiveMatches } from '@/services/footballApi';
+import { fetchMatches } from '@/services/footballApi';
 
 const Live = () => {
 
   const { data: matches = [], isLoading, isError } = useQuery({
     queryKey: ['live-matches'],
-    queryFn: fetchLiveMatches,
+    queryFn: () => fetchMatches(new Date().toISOString().split('T')[0]),
     refetchInterval: 15000,
   });
 
-  // 🔥 FILTRO SEGURO (SEM QUEBRAR)
+  // 🔥 FILTRO MAIS SEGURO POSSÍVEL
   const liveMatches = (matches || []).filter((m: any) => {
-    const statusShort = m?.fixture?.status?.short || m?.status || '';
-    const elapsed = m?.fixture?.status?.elapsed || m?.minute || 0;
+    const status = (
+      m?.fixture?.status?.short ||
+      m?.status ||
+      ''
+    ).toString().toLowerCase();
+
+    const minute =
+      m?.fixture?.status?.elapsed ||
+      m?.minute ||
+      0;
 
     return (
-      elapsed > 0 &&
-      ['1H', '2H', 'HT', 'LIVE'].includes(statusShort)
+      minute > 0 &&
+      (
+        status.includes('1h') ||
+        status.includes('2h') ||
+        status.includes('live') ||
+        status.includes('playing')
+      )
     );
   });
 
@@ -34,11 +47,10 @@ const Live = () => {
 
       <main className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
 
-        {/* ERRO CONTROLADO */}
         {isError && (
           <div className="text-center py-20">
             <p className="text-red-400 font-medium">
-              Erro ao carregar jogos ao vivo.
+              Erro ao carregar jogos.
             </p>
           </div>
         )}
@@ -47,7 +59,7 @@ const Live = () => {
           <div className="text-center py-20">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
             <p className="text-muted-foreground font-medium">
-              Buscando jogos ao vivo...
+              Buscando jogos...
             </p>
           </div>
         )}
@@ -63,7 +75,7 @@ const Live = () => {
         {!isLoading && liveMatches.length > 0 && (
           <div className="grid gap-4">
             {liveMatches.map((match: any, index: number) => {
-              
+
               const home =
                 match?.teams?.home?.name ||
                 match?.homeTeam ||

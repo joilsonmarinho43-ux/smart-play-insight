@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
@@ -6,21 +6,33 @@ import { useAuth } from '@/hooks/useAuth';
 import { Brain, BarChart3, Loader2, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+// Cache global da sessão
+let sessionCache: any[] | null = null;
+
 const Index = () => {
   const { signOut } = useAuth();
 
   const [date, setDate] = useState(() =>
     new Date().toISOString().split('T')[0]
   );
-
   const [bingo, setBingo] = useState<any[]>([]);
   const [loadingBingo, setLoadingBingo] = useState(false);
 
+  const hasFetched = useRef(false);
+
+  // ✅ REACT QUERY MODO SNIPER
   const { data: matches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
-    queryFn: () => fetchMatches(date),
-    staleTime: 0,
-    cacheTime: 0,
+    queryFn: async () => {
+      if (sessionCache) return sessionCache;
+      const data = await fetchMatches(date);
+      sessionCache = data;
+      return data;
+    },
+    staleTime: Infinity,
+    cacheTime: Infinity,
+    refetchOnWindowFocus: false,
+    enabled: false,
   });
 
   const totalJogos = matches?.length || 0;
@@ -38,6 +50,7 @@ const Index = () => {
       offsides: [0, 0],
       fouls: [0, 0],
       yellowCards: [0, 0],
+      redCards: [0, 0],
     },
     modelData: m.modelData || {
       homeGoalsAvg: 0,
@@ -51,15 +64,87 @@ const Index = () => {
       homeCardsVariance: 0,
       awayCardsVariance: 0,
     },
-    mercados: m.mercados || [
-      { mercado: "Gol no 1º tempo", confianca: 92 },
-      { mercado: "Mais de 8 escanteios", confianca: 88 },
-      { mercado: "Time da casa vence", confianca: 85 },
-    ],
   }));
 
-  // 🔥 GERADOR DE BINGO PROFISSIONAL
-  const gerarBingo = () => {
+  // 🔥 FUNÇÃO DE PROBABILIDADE REAL
+  const calcularConfianca = (m: any, tipo: string) => {
+    const { metrics, modelData } = m;
+    switch (tipo) {
+      case "Over 1.5 gols":
+        return Math.min(
+          100,
+          Math.round((modelData.homeGoalsAvg + modelData.awayGoalsAvg) * 40 + 60)
+        );
+      case "Over 2.5 gols":
+        return Math.min(
+          100,
+          Math.round((modelData.homeGoalsAvg + modelData.awayGoalsAvg) * 30 + 55)
+        );
+      case "Ambas marcam":
+        return Math.min(
+          100,
+          Math.round(
+            ((metrics.totalShots[0] > 5 ? 50 : 0) +
+             (metrics.totalShots[1] > 5 ? 50 : 0))
+          )
+        );
+      case "Gol no 1º tempo":
+        return Math.min(
+          100,
+          Math.round(
+            ((metrics.shotsOnTarget[0] + metrics.shotsOnTarget[1]) / 10) * 50 + 50
+          )
+        );
+      case "Mais de 8 escanteios":
+        return Math.min(
+          100,
+          Math.round((metrics.corners[0] + metrics.corners[1]) * 5)
+        );
+      case "Time da casa vence":
+        return Math.min(
+          100,
+          Math.round(
+            ((modelData.homeGoalsAvg - modelData.awayGoalsAvg + 1) / 2) * 50 + 50
+          )
+        );
+      case "Visitante marca gol":
+        return Math.min(
+          100,
+          Math.round((metrics.shotsOnTarget[1] / 5) * 50 + 50)
+        );
+      case "Chance dupla":
+        return Math.min(
+          100,
+          Math.round(
+            ((metrics.totalShots[0] + metrics.totalShots[1]) / 20) * 50 + 50
+          )
+        );
+      case "Impedimento":
+        return Math.min(
+          100,
+          Math.round((metrics.offsides[0] + metrics.offsides[1]) * 5 + 50)
+        );
+      case "Cartão amarelo":
+        return Math.min(
+          100,
+          Math.round((metrics.yellowCards[0] + metrics.yellowCards[1]) * 10 + 50)
+        );
+      case "Cartão vermelho":
+        return Math.min(
+          100,
+          Math.round((metrics.redCards[0] + metrics.redCards[1]) * 20 + 50)
+        );
+      default:
+        return 85;
+    }
+  };
+
+  // 🔥 GERADOR DE BINGO SNIPER REAL
+  const gerarBingo = async () => {
+    if (!hasFetched.current) {
+      await refetch();
+      hasFetched.current = true;
+    }
     if (!safeMatches || safeMatches.length === 0) return;
 
     setLoadingBingo(true);
@@ -76,18 +161,19 @@ const Index = () => {
         "Chance dupla",
         "Impedimento",
         "Cartão amarelo",
+        "Cartão vermelho",
       ];
 
       const picks = safeMatches
         .sort(() => 0.5 - Math.random())
-        .slice(0, 3) // agora pega 3 jogos para mais opções
+        .slice(0, 3)
         .map((m: any) => {
           const mercadoPicks = tipos
             .sort(() => 0.5 - Math.random())
-            .slice(0, 2)
+            .slice(0, 3)
             .map((tipo) => ({
               mercado: tipo,
-              confianca: Math.floor(Math.random() * 15) + 85, // probabilidade entre 85 e 100
+              confianca: calcularConfianca(m, tipo),
             }));
 
           return {
@@ -101,19 +187,11 @@ const Index = () => {
     }, 1200);
   };
 
-  useEffect(() => {
-    if (safeMatches && safeMatches.length > 0) {
-      gerarBingo();
-    }
-  }, [matches]);
-
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32">
-
       {/* HEADER */}
       <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          
           <div className="flex items-center gap-3">
             <Brain className="w-8 h-8 text-orange-500" />
             <div>
@@ -123,7 +201,6 @@ const Index = () => {
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             <input 
               type="date" 
@@ -131,18 +208,15 @@ const Index = () => {
               onChange={(e) => setDate(e.target.value)}
               className="bg-[#334155] text-xs p-2 rounded-lg outline-none border border-white/10"
             />
-
             <button 
-              onClick={() => refetch()} 
-              disabled={isFetching}
-              className="bg-orange-500 p-2 rounded-lg hover:bg-orange-600"
+              onClick={() => gerarBingo()} 
+              className="bg-green-500 p-2 rounded-lg hover:bg-green-600"
             >
-              {isFetching 
+              {loadingBingo 
                 ? <Loader2 className="w-5 h-5 animate-spin" /> 
                 : <BarChart3 className="w-5 h-5" />
               }
             </button>
-
             <button 
               onClick={signOut}
               className="bg-red-500 px-3 py-2 rounded-lg text-xs font-bold"
@@ -150,7 +224,6 @@ const Index = () => {
               ADMIN
             </button>
           </div>
-
         </div>
       </header>
 
@@ -168,7 +241,7 @@ const Index = () => {
           onClick={gerarBingo}
           className="w-full bg-green-500 hover:bg-green-600 py-3 rounded-xl font-bold transition-all active:scale-95"
         >
-          GERAR BINGO 🔥
+          GERAR BINGO SNIPER 🔥
         </button>
       </div>
 
@@ -176,11 +249,10 @@ const Index = () => {
       <div className="max-w-3xl mx-auto px-4 mt-4">
         <div className="relative rounded-xl shadow-lg overflow-hidden">
           <div className="absolute inset-0 bg-black/50 z-0"></div>
-          <div className="relative z-10 bg-gradient-to-r from-orange-600 to-red-600 p-4">
+          <div className="relative z-10 bg-gradient-to-r from-orange-600 to-red-600 p-4 rounded-xl">
             <p className="text-xs uppercase font-bold mb-3 text-white drop-shadow-[0_0_6px_rgba(0,0,0,0.4)]">
-              Sugestão do Modelo (IA) - Multi-Bilhetes
+              Sugestão do Modelo (IA) - Sniper Real
             </p>
-
             {loadingBingo ? (
               <div className="flex justify-center py-6">
                 <Loader2 className="w-6 h-6 animate-spin text-white drop-shadow-[0_0_6px_rgba(0,0,0,0.4)]" />
@@ -195,11 +267,10 @@ const Index = () => {
                   <p className="font-bold text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.4)]">
                     {m.homeTeam} x {m.awayTeam}
                   </p>
-
                   {m.mercados.map((item: any, idx: number) => (
                     <p
                       key={idx}
-                      className={`text-sm drop-shadow-[0_0_3px_rgba(0,0,0,0.4)]`}
+                      className="text-sm drop-shadow-[0_0_3px_rgba(0,0,0,0.4)]"
                       style={{
                         color:
                           item.confianca >= 90
@@ -221,14 +292,12 @@ const Index = () => {
 
       {/* LISTA DE JOGOS */}
       <main className="container max-w-3xl mx-auto px-4 py-6">
-        
         {isFetching && (
           <div className="flex flex-col items-center py-20 gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
             <p className="text-sm text-gray-400">Processando dados...</p>
           </div>
         )}
-
         {!isFetching && safeMatches && (
           <div className="grid gap-4">
             {safeMatches.map((match: any) => (
@@ -248,7 +317,6 @@ const Index = () => {
           <Zap className="w-5 h-5" />
         </Link>
       </div>
-
     </div>
   );
 };

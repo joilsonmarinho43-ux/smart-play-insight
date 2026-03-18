@@ -2,46 +2,74 @@ import { supabase } from '@/integrations/supabase/client';
 import { MatchData } from '@/types/match';
 
 // =============================
-// PRÉ-JOGO (MANTIDO ORIGINAL)
+// CACHE SIMPLES (MEMÓRIA)
+// =============================
+let cachePre: MatchData[] = [];
+let cacheLive: MatchData[] = [];
+
+// =============================
+// PRÉ-JOGO (ROBUSTO)
 // =============================
 export async function fetchMatches(date: string): Promise<MatchData[]> {
-  const { data, error } = await supabase.functions.invoke('football-api', {
-    body: { date },
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke('football-api', {
+      body: { date },
+    });
 
-  if (error) {
-    console.error('Error fetching matches:', error);
-    throw new Error('Erro ao buscar jogos. Tente novamente.');
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    const result =
+      Array.isArray(data?.matches) ? data.matches :
+      Array.isArray(data?.response) ? data.response :
+      [];
+
+    // ✅ salva cache se vier algo válido
+    if (result.length > 0) {
+      cachePre = result;
+      return result;
+    }
+
+    // ⚠️ fallback
+    console.warn('Usando cache PRE');
+    return cachePre;
+
+  } catch (err) {
+    console.error('Erro PRE:', err);
+    return cachePre;
   }
-
-  if (data?.error) {
-    throw new Error(data.error);
-  }
-
-  return Array.isArray(data?.matches) ? data.matches : [];
 }
 
 // =============================
-// LIVE (CORRIGIDO)
+// LIVE (ESTÁVEL)
 // =============================
 export async function fetchLiveMatches(): Promise<MatchData[]> {
-  const { data, error } = await supabase.functions.invoke('football-api', {
-    body: { live: true }, // 🔥 PADRÃO CORRETO
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke('football-api', {
+      body: { live: true },
+    });
 
-  if (error) {
-    console.error('Error fetching live matches:', error);
-    throw new Error('Erro ao buscar jogos ao vivo.');
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    const result =
+      Array.isArray(data) ? data :
+      Array.isArray(data?.matches) ? data.matches :
+      Array.isArray(data?.response) ? data.response :
+      [];
+
+    // ✅ atualiza só se vier dado real
+    if (result.length > 0) {
+      cacheLive = result;
+      return result;
+    }
+
+    // ⚠️ fallback LIVE
+    console.warn('Usando cache LIVE');
+    return cacheLive;
+
+  } catch (err) {
+    console.error('Erro LIVE:', err);
+    return cacheLive;
   }
-
-  if (data?.error) {
-    throw new Error(data.error);
-  }
-
-  // 🔥 BLINDAGEM TOTAL
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.matches)) return data.matches;
-  if (Array.isArray(data?.response)) return data.response;
-
-  return [];
-}
+      }

@@ -5,24 +5,21 @@ import { fetchLiveMatches } from '@/services/footballApi';
 
 const Live = () => {
 
-  const { data: matches = [], isLoading } = useQuery({
+  const { data: matches = [], isLoading, isError } = useQuery({
     queryKey: ['live-matches'],
     queryFn: fetchLiveMatches,
     refetchInterval: 15000,
   });
 
-  // 🔥 FILTRO REAL (ANTI-JOGO FAKE)
-  const liveMatches = matches.filter((m: any) => {
-    const statusShort = m.fixture?.status?.short;
-    const statusLong = m.fixture?.status?.long;
-    const elapsed = m.fixture?.status?.elapsed;
+  // 🔥 FILTRO SEGURO (SEM QUEBRAR)
+  const liveMatches = (matches || []).filter((m: any) => {
+    const statusShort = m?.fixture?.status?.short || m?.status || '';
+    const elapsed = m?.fixture?.status?.elapsed || m?.minute || 0;
 
-    // ✔ só entra se tiver minuto rolando
-    if (!elapsed || elapsed <= 0) return false;
-
-    // ✔ status válidos reais
-    return ['1H', '2H', 'HT'].includes(statusShort) ||
-           (statusLong && statusLong.toLowerCase().includes('live'));
+    return (
+      elapsed > 0 &&
+      ['1H', '2H', 'HT', 'LIVE'].includes(statusShort)
+    );
   });
 
   return (
@@ -37,6 +34,15 @@ const Live = () => {
 
       <main className="container max-w-3xl mx-auto px-4 py-6 space-y-6">
 
+        {/* ERRO CONTROLADO */}
+        {isError && (
+          <div className="text-center py-20">
+            <p className="text-red-400 font-medium">
+              Erro ao carregar jogos ao vivo.
+            </p>
+          </div>
+        )}
+
         {isLoading && (
           <div className="text-center py-20">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
@@ -46,7 +52,7 @@ const Live = () => {
           </div>
         )}
 
-        {!isLoading && liveMatches.length === 0 && (
+        {!isLoading && !isError && liveMatches.length === 0 && (
           <div className="text-center py-20">
             <p className="text-muted-foreground">
               Nenhum jogo ao vivo agora.
@@ -56,14 +62,28 @@ const Live = () => {
 
         {!isLoading && liveMatches.length > 0 && (
           <div className="grid gap-4">
-            {liveMatches.map((match: any) => {
-              const home = match.teams?.home?.name || match.homeTeam || match.home;
-              const away = match.teams?.away?.name || match.awayTeam || match.away;
-              const minute = match.fixture?.status?.elapsed || '--';
+            {liveMatches.map((match: any, index: number) => {
+              
+              const home =
+                match?.teams?.home?.name ||
+                match?.homeTeam ||
+                match?.home ||
+                'Time A';
+
+              const away =
+                match?.teams?.away?.name ||
+                match?.awayTeam ||
+                match?.away ||
+                'Time B';
+
+              const minute =
+                match?.fixture?.status?.elapsed ||
+                match?.minute ||
+                '--';
 
               return (
                 <div
-                  key={match.id}
+                  key={match?.id || index}
                   className="p-4 rounded-xl border border-border bg-card"
                 >
                   <p className="font-semibold">

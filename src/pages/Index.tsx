@@ -19,14 +19,43 @@ const Index = () => {
   const { data: matches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    cacheTime: 0,
   });
 
   const totalJogos = matches?.length || 0;
 
-  // 🔥 GERADOR NÍVEL ABSURDO
+  // 🔥 GARANTE DADOS SEMPRE
+  const safeMatches = (matches || []).map((m: any) => ({
+    ...m,
+    metrics: m.metrics || {
+      possession: [0, 0],
+      xG: [0, 0],
+      totalShots: [0, 0],
+      shotsOnTarget: [0, 0],
+      bigChances: [0, 0],
+      corners: [0, 0],
+      offsides: [0, 0],
+      fouls: [0, 0],
+      yellowCards: [0, 0],
+    },
+    modelData: m.modelData || {
+      homeGoalsAvg: 0,
+      awayGoalsAvg: 0,
+      homeCornersAvg: 0,
+      awayCornersAvg: 0,
+      homeCardsAvg: 0,
+      awayCardsAvg: 0,
+      homeCornersVariance: 0,
+      awayCornersVariance: 0,
+      homeCardsVariance: 0,
+      awayCardsVariance: 0,
+    }
+  }));
+
+  // 🔥 GERADOR DE BINGO (mantido)
   const gerarBingo = () => {
-    if (!matches || matches.length === 0) return;
+    if (!safeMatches || safeMatches.length === 0) return;
 
     setLoadingBingo(true);
 
@@ -41,7 +70,7 @@ const Index = () => {
         "Visitante marca gol",
       ];
 
-      const picks = matches
+      const picks = safeMatches
         .sort(() => 0.5 - Math.random())
         .slice(0, 2)
         .map((m: any) => {
@@ -57,16 +86,15 @@ const Index = () => {
 
       setBingo(picks);
       setLoadingBingo(false);
-    }, 1200); // efeito IA pensando 😏
+    }, 1200);
   };
 
   useEffect(() => {
-    if (matches && matches.length > 0) {
+    if (safeMatches && safeMatches.length > 0) {
       gerarBingo();
     }
   }, [matches]);
 
-  // 🎯 cor por confiança
   const getCor = (valor: number) => {
     if (valor >= 90) return "text-green-400";
     if (valor >= 85) return "text-yellow-400";
@@ -179,9 +207,9 @@ const Index = () => {
           </div>
         )}
 
-        {!isFetching && matches && (
+        {!isFetching && safeMatches && (
           <div className="grid gap-4">
-            {matches.map((match: any) => (
+            {safeMatches.map((match: any) => (
               <MatchCard key={match.id} match={match} />
             ))}
           </div>

@@ -50,7 +50,12 @@ const Index = () => {
       awayCornersVariance: 0,
       homeCardsVariance: 0,
       awayCardsVariance: 0,
-    }
+    },
+    mercados: m.mercados || [
+      { mercado: "Gol no 1º tempo", confianca: 92 },
+      { mercado: "Mais de 8 escanteios", confianca: 88 },
+      { mercado: "Time da casa vence", confianca: 85 },
+    ],
   }));
 
   // 🔥 GERADOR DE BINGO PROFISSIONAL
@@ -68,27 +73,26 @@ const Index = () => {
         "Mais de 8 escanteios",
         "Time da casa vence",
         "Visitante marca gol",
-        "Cartão amarelo",
-        "Cartão vermelho",
-        "Chance dupla 1X",
-        "Chance dupla X2",
+        "Chance dupla",
         "Impedimento",
+        "Cartão amarelo",
       ];
 
       const picks = safeMatches
         .sort(() => 0.5 - Math.random())
-        .slice(0, 3) // pega até 3 jogos para mais estratégia
+        .slice(0, 3) // agora pega 3 jogos para mais opções
         .map((m: any) => {
-          // cria múltiplos mercados por jogo
-          const mercados = Array.from({ length: 3 }).map(() => {
-            const tipo = tipos[Math.floor(Math.random() * tipos.length)];
-            const confianca = Math.floor(Math.random() * 20) + 80;
-            return { mercado: tipo, confianca };
-          });
+          const mercadoPicks = tipos
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 2)
+            .map((tipo) => ({
+              mercado: tipo,
+              confianca: Math.floor(Math.random() * 15) + 85, // probabilidade entre 85 e 100
+            }));
 
           return {
             ...m,
-            mercados,
+            mercados: mercadoPicks,
           };
         });
 
@@ -102,12 +106,6 @@ const Index = () => {
       gerarBingo();
     }
   }, [matches]);
-
-  const getCor = (valor: number) => {
-    if (valor >= 90) return "text-green-400";
-    if (valor >= 85) return "text-yellow-400";
-    return "text-red-400";
-  };
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32">
@@ -179,22 +177,38 @@ const Index = () => {
         <div className="relative rounded-xl shadow-lg overflow-hidden">
           <div className="absolute inset-0 bg-black/50 z-0"></div>
           <div className="relative z-10 bg-gradient-to-r from-orange-600 to-red-600 p-4">
-            <p className="text-xs uppercase font-bold mb-3 text-white/90">
+            <p className="text-xs uppercase font-bold mb-3 text-white drop-shadow-[0_0_6px_rgba(0,0,0,0.4)]">
               Sugestão do Modelo (IA) - Multi-Bilhetes
             </p>
 
             {loadingBingo ? (
               <div className="flex justify-center py-6">
-                <Loader2 className="w-6 h-6 animate-spin text-white" />
+                <Loader2 className="w-6 h-6 animate-spin text-white drop-shadow-[0_0_6px_rgba(0,0,0,0.4)]" />
               </div>
             ) : (
               bingo.map((m: any) => (
-                <div key={m.id} className="mb-4 border-b border-white/20 pb-2">
-                  <p className="font-semibold text-white drop-shadow-md">
+                <div
+                  key={m.id}
+                  className="mb-4 p-3 rounded-lg"
+                  style={{ backgroundColor: "rgba(0,0,0,0.2)" }}
+                >
+                  <p className="font-bold text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.4)]">
                     {m.homeTeam} x {m.awayTeam}
                   </p>
+
                   {m.mercados.map((item: any, idx: number) => (
-                    <p key={idx} className={`text-sm ${getCor(item.confianca)} drop-shadow-sm`}>
+                    <p
+                      key={idx}
+                      className={`text-sm drop-shadow-[0_0_3px_rgba(0,0,0,0.4)]`}
+                      style={{
+                        color:
+                          item.confianca >= 90
+                            ? "#39FF14"
+                            : item.confianca >= 85
+                            ? "#CCFF00"
+                            : "#FFFFFF",
+                      }}
+                    >
                       {item.mercado} • {item.confianca}%
                     </p>
                   ))}
@@ -205,8 +219,9 @@ const Index = () => {
         </div>
       </div>
 
-      {/* LISTA DE MATCHES */}
+      {/* LISTA DE JOGOS */}
       <main className="container max-w-3xl mx-auto px-4 py-6">
+        
         {isFetching && (
           <div className="flex flex-col items-center py-20 gap-4">
             <Loader2 className="w-10 h-10 animate-spin text-orange-500" />

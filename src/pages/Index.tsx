@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
@@ -8,7 +8,12 @@ import { Link } from 'react-router-dom';
 
 const Index = () => {
   const { signOut } = useAuth();
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  const [date, setDate] = useState(() =>
+    new Date().toISOString().split('T')[0]
+  );
+
+  const [bingo, setBingo] = useState<any[]>([]);
 
   const { data: matches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
@@ -18,30 +23,41 @@ const Index = () => {
 
   const totalJogos = matches?.length || 0;
 
-  // 🔥 BINGO FORÇADO (SEMPRE FUNCIONA)
-  const topPicks = Array.isArray(matches) && matches.length > 0
-    ? matches
-        .map((m: any) => {
-          const g1 = m.metrics?.goals?.[0];
-          const g2 = m.metrics?.goals?.[1];
+  // 🔥 FUNÇÃO GERAR BINGO
+  const gerarBingo = () => {
+    if (!matches || matches.length === 0) return;
 
-          let score = 0;
+    const picks = matches
+      .map((m: any) => {
+        const g1 = m.metrics?.goals?.[0];
+        const g2 = m.metrics?.goals?.[1];
 
-          if (g1 !== undefined && g2 !== undefined) {
-            score = g1 + g2;
-          } else {
-            score = Math.random() * 2 + 1; // fallback 🔥
-          }
+        let score = 0;
 
-          return { ...m, score };
-        })
-        .sort((a: any, b: any) => b.score - a.score)
-        .slice(0, 2)
-    : [];
+        if (g1 !== undefined && g2 !== undefined) {
+          score = g1 + g2;
+        } else {
+          score = Math.random() * 2 + 1;
+        }
+
+        return { ...m, score };
+      })
+      .sort((a: any, b: any) => b.score - a.score)
+      .slice(0, 2);
+
+    setBingo(picks);
+  };
+
+  // 🔥 GERA AUTOMÁTICO AO CARREGAR
+  useEffect(() => {
+    if (matches && matches.length > 0) {
+      gerarBingo();
+    }
+  }, [matches]);
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32">
-      
+
       {/* HEADER */}
       <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -94,13 +110,23 @@ const Index = () => {
         </div>
       </div>
 
-      {/* 🔥 BINGO AGORA SEMPRE APARECE */}
-      {topPicks.length > 0 && (
+      {/* 🔥 BOTÃO GERAR BINGO */}
+      <div className="max-w-3xl mx-auto px-4 mt-4">
+        <button
+          onClick={gerarBingo}
+          className="w-full bg-green-500 hover:bg-green-600 py-3 rounded-xl font-bold"
+        >
+          GERAR BINGO 🔥
+        </button>
+      </div>
+
+      {/* 🔥 BINGO */}
+      {bingo.length > 0 && (
         <div className="max-w-3xl mx-auto px-4 mt-4">
           <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4 rounded-xl shadow-lg">
             <p className="text-xs uppercase font-bold mb-2">Sugestão do Modelo</p>
 
-            {topPicks.map((m: any) => (
+            {bingo.map((m: any) => (
               <p key={m.id} className="text-sm font-semibold">
                 {m.homeTeam} x {m.awayTeam}
               </p>

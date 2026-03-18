@@ -25,122 +25,170 @@ const Index = () => {
 
   const totalJogos = matches?.length || 0;
 
-  // 🔥 GARANTE DADOS SEMPRE
+  // 🔥 NORMALIZA DADOS
   const safeMatches = (matches || []).map((m: any) => ({
     ...m,
     metrics: m.metrics || {
-      possession: [0, 0],
       xG: [0, 0],
       totalShots: [0, 0],
-      shotsOnTarget: [0, 0],
-      bigChances: [0, 0],
       corners: [0, 0],
-      offsides: [0, 0],
-      fouls: [0, 0],
-      yellowCards: [0, 0],
     },
     modelData: m.modelData || {
-      homeGoalsAvg: 0,
-      awayGoalsAvg: 0,
-      homeCornersAvg: 0,
-      awayCornersAvg: 0,
-      homeCardsAvg: 0,
-      awayCardsAvg: 0,
-      homeCornersVariance: 0,
-      awayCornersVariance: 0,
-      homeCardsVariance: 0,
-      awayCardsVariance: 0,
+      homeGoalsAvg: 1,
+      awayGoalsAvg: 1,
     }
   }));
 
-  // 🔥 GERADOR DE BINGO (mantido)
+  // =========================
+  // 🔥 MODO SNIPER PROFISSIONAL
+  // =========================
   const gerarBingo = () => {
-    if (!safeMatches || safeMatches.length === 0) return;
+    if (!safeMatches.length) return;
 
     setLoadingBingo(true);
 
+    const poisson = (lambda: number, k: number) => {
+      let e = Math.exp(-lambda);
+      let pow = Math.pow(lambda, k);
+      let fact = 1;
+      for (let i = 1; i <= k; i++) fact *= i;
+      return (pow * e) / fact;
+    };
+
+    const probOver25 = (lambda: number) => {
+      let prob = 0;
+      for (let i = 0; i <= 2; i++) prob += poisson(lambda, i);
+      return (1 - prob) * 100;
+    };
+
+    const probBTTS = (h: number, a: number) => {
+      const pH0 = poisson(h, 0);
+      const pA0 = poisson(a, 0);
+      return (1 - (pH0 + pA0 - pH0 * pA0)) * 100;
+    };
+
+    const probHT = (lambda: number) => {
+      return (1 - poisson(lambda * 0.45, 0)) * 100;
+    };
+
+    const odd = (prob: number) => (100 / prob) * 1.08;
+
     setTimeout(() => {
-      const tipos = [
-        "Over 1.5 gols",
-        "Over 2.5 gols",
-        "Ambas marcam",
-        "Gol no 1º tempo",
-        "Mais de 8 escanteios",
-        "Time da casa vence",
-        "Visitante marca gol",
-      ];
 
       const picks = safeMatches
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 2)
         .map((m: any) => {
-          const tipo = tipos[Math.floor(Math.random() * tipos.length)];
-          const confianca = Math.floor(Math.random() * 20) + 80;
+
+          const home = m.metrics.xG[0] || m.modelData.homeGoalsAvg || 1;
+          const away = m.metrics.xG[1] || m.modelData.awayGoalsAvg || 1;
+
+          const total = home + away;
+          const diff = home - away;
+
+          const shots = (m.metrics.totalShots[0] || 8) + (m.metrics.totalShots[1] || 8);
+
+          const jogoDesequilibrado = Math.abs(diff) > 0.8;
+          const pressaoAlta = shots > 18;
+
+          const over25 = probOver25(total);
+          const btts = probBTTS(home, away);
+          const golHT = probHT(total);
+
+          let mercado: any = null;
+
+          // 🎯 LÓGICA SNIPER
+          if (jogoDesequilibrado && home > away) {
+            mercado = {
+              tipo: "Time da casa vence",
+              prob: 75 + diff * 10
+            };
+          }
+
+          if (!mercado && pressaoAlta) {
+            mercado = {
+              tipo: "Gol no 1º tempo",
+              prob: golHT
+            };
+          }
+
+          if (!mercado && total > 2.6) {
+            mercado = {
+              tipo: "Over 2.5 gols",
+              prob: over25
+            };
+          }
+
+          if (!mercado) {
+            mercado = {
+              tipo: "Ambas marcam",
+              prob: btts
+            };
+          }
+
+          const oddCasa = odd(mercado.prob);
+          const oddJusta = 100 / mercado.prob;
+          const value = oddCasa - oddJusta;
+
+          // 🔥 FILTRO PROFISSIONAL
+          if (mercado.prob < 70 || value < 0.05) return null;
 
           return {
             ...m,
-            tipo,
-            confianca,
+            tipo: mercado.tipo,
+            confianca: Math.min(90, Math.round(mercado.prob)),
+            odd: oddCasa.toFixed(2),
+            value: value.toFixed(2),
           };
-        });
+
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => b.value - a.value)
+        .slice(0, 2);
 
       setBingo(picks);
       setLoadingBingo(false);
-    }, 1200);
+
+    }, 500);
   };
 
   useEffect(() => {
-    if (safeMatches && safeMatches.length > 0) {
-      gerarBingo();
-    }
+    if (safeMatches.length > 0) gerarBingo();
   }, [matches]);
 
   const getCor = (valor: number) => {
-    if (valor >= 90) return "text-green-400";
-    if (valor >= 85) return "text-yellow-400";
+    if (valor >= 85) return "text-green-400";
+    if (valor >= 75) return "text-yellow-400";
     return "text-red-400";
   };
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32">
 
-      {/* HEADER */}
       <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          
+        <div className="container max-w-3xl mx-auto px-4 py-4 flex justify-between">
+
           <div className="flex items-center gap-3">
             <Brain className="w-8 h-8 text-orange-500" />
             <div>
-              <h1 className="text-xl font-bold tracking-tighter">ANALISTA JOILSON</h1>
-              <p className="text-[10px] text-orange-500 font-bold uppercase">
-                MODELO HÍBRIDO PRO
+              <h1 className="text-xl font-bold">ANALISTA JOILSON</h1>
+              <p className="text-[10px] text-orange-500 font-bold">
+                MODO SNIPER PRO
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex gap-2">
             <input 
               type="date" 
               value={date} 
               onChange={(e) => setDate(e.target.value)}
-              className="bg-[#334155] text-xs p-2 rounded-lg outline-none border border-white/10"
+              className="bg-[#334155] text-xs p-2 rounded-lg"
             />
 
-            <button 
-              onClick={() => refetch()} 
-              disabled={isFetching}
-              className="bg-orange-500 p-2 rounded-lg hover:bg-orange-600"
-            >
-              {isFetching 
-                ? <Loader2 className="w-5 h-5 animate-spin" /> 
-                : <BarChart3 className="w-5 h-5" />
-              }
+            <button onClick={() => refetch()} className="bg-orange-500 p-2 rounded-lg">
+              {isFetching ? <Loader2 className="animate-spin" /> : <BarChart3 />}
             </button>
 
-            <button 
-              onClick={signOut}
-              className="bg-red-500 px-3 py-2 rounded-lg text-xs font-bold"
-            >
+            <button onClick={signOut} className="bg-red-500 px-3 py-2 rounded-lg text-xs">
               ADMIN
             </button>
           </div>
@@ -148,46 +196,32 @@ const Index = () => {
         </div>
       </header>
 
-      {/* CONTADOR */}
-      <div className="max-w-3xl mx-auto px-4 mt-4">
-        <div className="bg-[#1e293b] border border-white/10 rounded-xl p-3 text-center">
-          <p className="text-sm text-gray-400">Jogos encontrados</p>
-          <p className="text-2xl font-bold text-orange-500">{totalJogos}</p>
-        </div>
+      <div className="max-w-3xl mx-auto px-4 mt-4 text-center">
+        <p className="text-gray-400">Jogos encontrados</p>
+        <p className="text-2xl text-orange-500 font-bold">{totalJogos}</p>
       </div>
 
-      {/* BOTÃO */}
       <div className="max-w-3xl mx-auto px-4 mt-4">
-        <button
-          onClick={gerarBingo}
-          className="w-full bg-green-500 hover:bg-green-600 py-3 rounded-xl font-bold transition-all active:scale-95"
-        >
+        <button onClick={gerarBingo} className="w-full bg-green-500 py-3 rounded-xl font-bold">
           GERAR BINGO 🔥
         </button>
       </div>
 
-      {/* BINGO */}
       <div className="max-w-3xl mx-auto px-4 mt-4">
-        <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4 rounded-xl shadow-lg">
+        <div className="bg-gradient-to-r from-orange-600 to-red-600 p-4 rounded-xl">
 
-          <p className="text-xs uppercase font-bold mb-3">
-            Sugestão do Modelo (IA)
-          </p>
+          <p className="text-xs font-bold mb-3">Sugestão do Modelo (IA)</p>
 
           {loadingBingo ? (
-            <div className="flex justify-center py-6">
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
+            <Loader2 className="animate-spin mx-auto" />
           ) : (
             bingo.map((m: any) => (
               <div key={m.id} className="mb-3 border-b border-white/20 pb-2">
 
-                <p className="font-semibold">
-                  {m.homeTeam} x {m.awayTeam}
-                </p>
+                <p>{m.homeTeam} x {m.awayTeam}</p>
 
-                <p className={`text-sm ${getCor(m.confianca)}`}>
-                  {m.tipo} • {m.confianca}%
+                <p className={getCor(m.confianca)}>
+                  {m.tipo} • {m.confianca}% | Odd {m.odd} | EV {m.value}
                 </p>
 
               </div>
@@ -197,33 +231,15 @@ const Index = () => {
         </div>
       </div>
 
-      {/* LISTA */}
       <main className="container max-w-3xl mx-auto px-4 py-6">
-        
-        {isFetching && (
-          <div className="flex flex-col items-center py-20 gap-4">
-            <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
-            <p className="text-sm text-gray-400">Processando dados...</p>
-          </div>
-        )}
-
-        {!isFetching && safeMatches && (
-          <div className="grid gap-4">
-            {safeMatches.map((match: any) => (
-              <MatchCard key={match.id} match={match} />
-            ))}
-          </div>
-        )}
+        {!isFetching && safeMatches.map((match: any) => (
+          <MatchCard key={match.id} match={match} />
+        ))}
       </main>
 
-      {/* BOTÃO LIVE */}
       <div className="fixed bottom-5 left-0 right-0 flex justify-center px-4">
-        <Link 
-          to="/live" 
-          className="flex items-center gap-3 bg-orange-600 px-6 py-4 rounded-full w-full max-w-xs justify-center shadow-lg"
-        >
-          <span className="font-bold">LIVE TRADE</span>
-          <Zap className="w-5 h-5" />
+        <Link to="/live" className="bg-orange-600 px-6 py-4 rounded-full flex gap-2">
+          LIVE TRADE <Zap />
         </Link>
       </div>
 

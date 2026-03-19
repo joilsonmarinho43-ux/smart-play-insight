@@ -16,7 +16,23 @@ import NotFound from "./pages/NotFound";
 
 import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+// --- CONFIGURAÇÃO CORRIGIDA PARA ECONOMIA DE API ---
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Impede que o app busque dados novos toda vez que você volta para a aba
+      refetchOnWindowFocus: false, 
+      
+      // Define que os dados de Pré-Jogo são considerados "novos" por 5 minutos
+      // Isso evita chamadas repetidas ao navegar entre telas (Ex: Voltar do Live para Home)
+      staleTime: 1000 * 60 * 5, 
+      
+      // Tenta apenas 1 vez em caso de erro, evitando gastar créditos com tentativas inúteis
+      retry: 1,
+    },
+  },
+});
+// --------------------------------------------------
 
 const LoadingScreen = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -65,7 +81,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* Página principal */}
+            {/* Página principal - Agora com Cache de 5min */}
             <Route
               path="/"
               element={
@@ -118,3 +134,4 @@ const App = () => {
 };
 
 export default App;
+            

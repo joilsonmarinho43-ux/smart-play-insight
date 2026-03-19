@@ -5,6 +5,7 @@ import MatchCard from '@/components/MatchCard';
 import { useAuth } from '@/hooks/useAuth';
 import { Brain, BarChart3, Loader2, Zap, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { generatePreGameBingo } from '@/lib/bingoEngine';
 
 // --- INTERFACES ---
 interface MatchMetrics {
@@ -35,7 +36,9 @@ interface Match {
   awayTeam: string;
   metrics: MatchMetrics;
   modelData: ModelData;
-  [key: string]: any; 
+  homeStats?: any;
+  awayStats?: any;
+  [key: string]: any;
 }
 
 interface BingoPick extends Match {
@@ -47,22 +50,18 @@ const Index = () => {
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [bingo, setBingo] = useState<BingoPick[]>([]);
   const [loadingBingo, setLoadingBingo] = useState(false);
-  
-  // TRAVA DE SEGURANÇA: Impede disparos ao minimizar/voltar
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
-  // ✅ CONFIGURAÇÃO MANUAL (ZERO AUTOMATISMO)
   const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    enabled: false,              // 🛑 BLOQUEIO TOTAL: Não busca sozinho NUNCA
-    staleTime: Infinity,         // O dado nunca fica "velho" para o React
-    refetchOnWindowFocus: false, // Não reativa ao voltar para a aba
-    refetchOnMount: false,       // Não reativa ao navegar entre páginas
-    refetchOnReconnect: false,   // Não reativa se a internet oscilar
+    enabled: false,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
-  // Gatilho controlado: Só corre uma vez no carregamento inicial real
   useEffect(() => {
     if (!hasFetchedOnce) {
       refetch();
@@ -73,40 +72,84 @@ const Index = () => {
   const safeMatches = useMemo((): Match[] => {
     return (rawMatches || []).map((m: any) => ({
       ...m,
-      metrics: m.metrics || { possession: [0, 0], xG: [0, 0], totalShots: [0, 0], shotsOnTarget: [0, 0], bigChances: [0, 0], corners: [0, 0], offsides: [0, 0], fouls: [0, 0], yellowCards: [0, 0], redCards: [0, 0] },
-      modelData: m.modelData || { homeGoalsAvg: 0, awayGoalsAvg: 0, homeCornersAvg: 0, awayCornersAvg: 0, homeCardsAvg: 0, awayCardsAvg: 0 },
+      homeTeam: m.teams?.home?.name || 'Casa',
+      awayTeam: m.teams?.away?.name || 'Fora',
+      metrics: m.metrics || {
+        possession: [0, 0],
+        xG: [0, 0],
+        totalShots: [0, 0],
+        shotsOnTarget: [0, 0],
+        bigChances: [0, 0],
+        corners: [0, 0],
+        offsides: [0, 0],
+        fouls: [0, 0],
+        yellowCards: [0, 0],
+        redCards: [0, 0],
+      },
+      modelData: m.modelData || {
+        homeGoalsAvg: 0,
+        awayGoalsAvg: 0,
+        homeCornersAvg: 0,
+        awayCornersAvg: 0,
+        homeCardsAvg: 0,
+        awayCardsAvg: 0,
+      },
     }));
   }, [rawMatches]);
 
-  const calcularConfianca = (m: Match, tipo: string): number => {
-    const { metrics, modelData } = m;
-    let score = 85;
-    switch (tipo) {
-      case "Over 1.5 gols": score = (modelData.homeGoalsAvg + modelData.awayGoalsAvg) * 40 + 60; break;
-      case "Ambas marcam": score = (metrics.totalShots[0] > 5 ? 50 : 0) + (metrics.totalShots[1] > 5 ? 50 : 0); break;
-      case "Mais de 8 escanteios": score = (metrics.corners[0] + metrics.corners[1]) * 5; break;
-      default: score = 85;
-    }
-    return Math.min(100, Math.round(score));
-  };
-
+  // 🔥 BINGO REAL (SEM ALEATORIEDADE)
   const gerarBingo = async () => {
     setLoadingBingo(true);
-    // Se a lista estiver vazia por algum motivo, forçamos o refetch manual aqui
+
     if (safeMatches.length === 0) await refetch();
 
     setTimeout(() => {
-      const tipos = ["Over 1.5 gols", "Over 2.5 gols", "Ambas marcam", "Gol no 1º tempo", "Mais de 8 escanteios", "Time da casa vence"];
-      const picks = [...safeMatches].sort(() => 0.5 - Math.random()).slice(0, 3).map((m) => ({
-        ...m,
-        mercados: [...tipos].sort(() => 0.5 - Math.random()).slice(0, 3).map((tipo) => ({
-          mercado: tipo,
-          confianca: calcularConfianca(m, tipo),
-        })),
-      }));
-      setBingo(picks);
+      const picks = safeMatches
+        .map((m) => {
+          const data = generatePreGameBingo(m);
+          if (!data) return null;
+
+          const mercados = [];
+
+          const over15 = Number(data.over15);
+          const over25 = Number(data.over25);
+          const btts = Number(data.btts);
+
+          if (over15 >= 70) {
+            mercados.push({
+              mercado: "Over 1.5 gols",
+              confianca: over15,
+            });
+          }
+
+          if (over25 >= 60) {
+            mercados.push({
+              mercado: "Over 2.5 gols",
+              confianca: over25,
+            });
+          }
+
+          if (btts >= 55) {
+            mercados.push({
+              mercado: "Ambas marcam",
+              confianca: btts,
+            });
+          }
+
+          if (mercados.length === 0) return null;
+
+          return {
+            ...m,
+            mercados,
+          };
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => b.mercados.length - a.mercados.length)
+        .slice(0, 5);
+
+      setBingo(picks as BingoPick[]);
       setLoadingBingo(false);
-    }, 800);
+    }, 600);
   };
 
   return (
@@ -117,88 +160,89 @@ const Index = () => {
             <Brain className="w-8 h-8 text-orange-500" />
             <div>
               <h1 className="text-xl font-bold tracking-tighter">ANALISTA JOILSON</h1>
-              <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest">MODELO HÍBRIDO PRO</p>
+              <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest">MODELO REAL PRO</p>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => refetch()} 
-              className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
-              title="Atualizar Dados Manualmente"
-            >
+            <button onClick={() => refetch()} className="p-2 bg-white/5 rounded-lg">
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
             </button>
+
             <input 
               type="date" 
               value={date} 
               onChange={(e) => { setDate(e.target.value); setHasFetchedOnce(false); }}
-              className="bg-[#334155] text-xs p-2 rounded-lg outline-none border border-white/10"
+              className="bg-[#334155] text-xs p-2 rounded-lg"
             />
-            <button onClick={signOut} className="bg-red-500/10 text-red-500 border border-red-500/20 px-3 py-2 rounded-lg text-xs font-bold">SAIR</button>
+
+            <button onClick={signOut} className="bg-red-500/10 text-red-500 px-3 py-2 rounded-lg text-xs font-bold">
+              SAIR
+            </button>
           </div>
         </div>
       </header>
 
       <main className="container max-w-3xl mx-auto px-4">
         <div className="grid grid-cols-2 gap-4 mt-6">
-          <div className="bg-[#1e293b] border border-white/10 rounded-xl p-4 text-center">
-            <p className="text-xs text-gray-400 uppercase font-semibold">Jogos Disponíveis</p>
+          <div className="bg-[#1e293b] rounded-xl p-4 text-center">
+            <p className="text-xs text-gray-400">Jogos</p>
             <p className="text-3xl font-black text-orange-500">{safeMatches.length}</p>
           </div>
+
           <button
             onClick={gerarBingo}
             disabled={loadingBingo || isFetching}
-            className="bg-green-600 hover:bg-green-500 disabled:opacity-50 rounded-xl flex flex-col items-center justify-center transition-all active:scale-95 border-b-4 border-green-800"
+            className="bg-green-600 rounded-xl flex flex-col items-center justify-center"
           >
-            {loadingBingo ? <Loader2 className="w-6 h-6 animate-spin" /> : <><span className="font-black text-lg">GERAR BINGO</span><span className="text-[10px] opacity-80">SNIPER REAL 🔥</span></>}
+            {loadingBingo ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : (
+              <>
+                <span className="font-black text-lg">GERAR BINGO</span>
+                <span className="text-[10px]">REAL 🔥</span>
+              </>
+            )}
           </button>
         </div>
 
         {bingo.length > 0 && (
-          <div className="mt-6 relative rounded-2xl overflow-hidden border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.15)]">
-            <div className="bg-gradient-to-br from-orange-600 to-red-700 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs uppercase font-black tracking-widest text-white/90">Sugestão Sniper (IA)</p>
-                <BarChart3 className="w-4 h-4 text-white/70" />
-              </div>
-              <div className="space-y-3">
-                {bingo.map((m) => (
-                  <div key={m.id} className="bg-black/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
-                    <p className="font-bold text-sm mb-2">{m.homeTeam} vs {m.awayTeam}</p>
-                    <div className="grid grid-cols-1 gap-1">
-                      {m.mercados.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs">
-                          <span className="text-white/80">{item.mercado}</span>
-                          <span className={`font-mono font-bold ${item.confianca >= 90 ? 'text-green-400' : 'text-yellow-300'}`}>{item.confianca}%</span>
-                        </div>
-                      ))}
-                    </div>
+          <div className="mt-6 bg-gradient-to-br from-orange-600 to-red-700 p-5 rounded-2xl">
+            <p className="text-xs font-bold mb-4">BINGO REAL (POISSON)</p>
+
+            {bingo.map((m) => (
+              <div key={m.id} className="mb-3 bg-black/20 p-3 rounded-xl">
+                <p className="font-bold text-sm mb-2">
+                  {m.homeTeam} vs {m.awayTeam}
+                </p>
+
+                {m.mercados.map((item, idx) => (
+                  <div key={idx} className="flex justify-between text-xs">
+                    <span>{item.mercado}</span>
+                    <span className="text-green-400 font-bold">
+                      {item.confianca}%
+                    </span>
                   </div>
                 ))}
               </div>
-            </div>
+            ))}
           </div>
         )}
 
         <div className="mt-8">
-          <h2 className="text-sm font-bold text-gray-400 uppercase mb-4 px-1">Análise de Mercado</h2>
           {isFetching ? (
-            <div className="flex flex-col items-center py-12">
-              <Loader2 className="w-10 h-10 animate-spin text-orange-500 mb-2" />
-              <p className="text-xs text-gray-500">Sincronizando com servidores de elite...</p>
-            </div>
+            <Loader2 className="w-10 h-10 animate-spin mx-auto" />
           ) : (
-            <div className="grid gap-3">
-              {safeMatches.map((match) => <MatchCard key={match.id} match={match} />)}
-            </div>
+            safeMatches.map((match) => (
+              <MatchCard key={match.id} match={match} />
+            ))
           )}
         </div>
       </main>
 
-      <div className="fixed bottom-6 left-0 right-0 flex justify-center px-4 z-40">
-        <Link to="/live" className="flex items-center gap-3 bg-orange-600 hover:bg-orange-500 px-8 py-4 rounded-full w-full max-w-xs justify-center shadow-2xl transition-transform active:scale-95 border-t border-white/20">
-          <Zap className="w-5 h-5 fill-current" />
-          <span className="font-black tracking-tighter">LIVE TRADE PRO</span>
+      <div className="fixed bottom-6 left-0 right-0 flex justify-center">
+        <Link to="/live" className="bg-orange-600 px-6 py-3 rounded-full flex items-center gap-2">
+          <Zap /> LIVE TRADE
         </Link>
       </div>
     </div>
@@ -206,4 +250,3 @@ const Index = () => {
 };
 
 export default Index;
-        

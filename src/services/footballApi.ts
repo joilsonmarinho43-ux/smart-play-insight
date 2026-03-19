@@ -2,58 +2,64 @@ import { supabase } from '@/integrations/supabase/client';
 import { MatchData } from '@/types/match';
 
 // =============================
-// CACHE INTELIGENTE
+// CACHE COM TIMESTAMPS (CONTROLE RIGOROSO)
 // =============================
 let cachePre: MatchData[] = [];
+let lastFetchPre = 0;
+
 let cacheLive: MatchData[] = [];
+let lastFetchLive = 0;
+
+// Configurações de tempo (em milissegundos)
+const PRE_MATCH_COOLDOWN = 1000 * 60 * 2; // 2 minutos para Pré-jogo
+const LIVE_MATCH_COOLDOWN = 1000 * 30;    // 30 segundos para Live
 
 // =============================
 // VALIDAÇÃO DE DADOS (ANTI ZERO)
 // =============================
 function isValidMatch(match: MatchData): boolean {
   if (!match) return false;
-
-  // evita jogos sem métricas reais
   const m = match.metrics;
-
   const hasStats =
     m &&
-    m.totalShots?.[0] + m.totalShots?.[1] > 0 &&
-    m.possession?.[0] + m.possession?.[1] > 0;
-
+    (m.totalShots?.[0] || 0) + (m.totalShots?.[1] || 0) > 0 &&
+    (m.possession?.[0] || 0) + (m.possession?.[1] || 0) > 0;
   return hasStats;
 }
 
 // =============================
-// PRÉ-JOGO (ROBUSTO)
+// PRÉ-JOGO (COM TRAVA DE SEGURANÇA)
 // =============================
 export async function fetchMatches(date: string): Promise<MatchData[]> {
+  const now = Date.now();
+  
+  // 🛡️ TRAVA: Se buscou há menos de 2 min, retorna o cache e economiza API
+  if (cachePre.length > 0 && (now - lastFetchPre < PRE_MATCH_COOLDOWN)) {
+    console.log('🛡️ Bloqueio de segurança: Usando cache Pré-Jogo para economizar API.');
+    return cachePre;
+  }
+
   try {
     const { data, error } = await supabase.functions.invoke('football-api', {
       body: { date },
     });
 
     if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-
+    
     const raw =
       Array.isArray(data?.matches) ? data.matches :
       Array.isArray(data?.response) ? data.response :
       [];
 
-    // 🔥 FILTRO PROFISSIONAL
     const result = raw.filter(isValidMatch);
 
-    // ✅ atualiza cache só com dados bons
     if (result.length > 0) {
       cachePre = result;
+      lastFetchPre = now; // Atualiza o cronômetro da última busca
       return result;
     }
 
-    // ⚠️ fallback inteligente
-    console.warn('Usando cache PRE (dados válidos)');
     return cachePre;
-
   } catch (err) {
     console.error('Erro PRE:', err);
     return cachePre;
@@ -61,16 +67,23 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
 }
 
 // =============================
-// LIVE (NÍVEL TRADER)
+// LIVE (NÍVEL TRADER - COM TRAVA)
 // =============================
 export async function fetchLiveMatches(): Promise<MatchData[]> {
+  const now = Date.now();
+
+  // 🛡️ TRAVA: Se buscou há menos de 30 seg, não chama a função do Supabase
+  if (cacheLive.length > 0 && (now - lastFetchLive < LIVE_MATCH_COOLDOWN)) {
+    console.log('🛡️ Bloqueio de segurança: Usando cache Live para economizar API.');
+    return cacheLive;
+  }
+
   try {
     const { data, error } = await supabase.functions.invoke('football-api', {
       body: { live: true },
     });
 
     if (error) throw error;
-    if (data?.error) throw new Error(data.error);
 
     const raw =
       Array.isArray(data) ? data :
@@ -78,27 +91,22 @@ export async function fetchLiveMatches(): Promise<MatchData[]> {
       Array.isArray(data?.response) ? data.response :
       [];
 
-    // 🔥 FILTRO LIVE (MAIS FLEXÍVEL)
     const result = raw.filter((match: MatchData) => {
       if (!match) return false;
-
-      // aceita live mesmo com menos dados
       if (match.isLive) return true;
-
       return isValidMatch(match);
     });
 
-    // ✅ atualiza cache
     if (result.length > 0) {
       cacheLive = result;
+      lastFetchLive = now; // Atualiza o cronômetro da última busca
       return result;
     }
 
-    console.warn('Usando cache LIVE (dados válidos)');
     return cacheLive;
-
   } catch (err) {
     console.error('Erro LIVE:', err);
     return cacheLive;
   }
-}
+        }
+      

@@ -16,15 +16,14 @@ import NotFound from "./pages/NotFound";
 
 import { Loader2 } from "lucide-react";
 
-// CONFIGURAÇÃO GLOBAL ANTI-CONSUMO DE API
+// 🔥 CONFIGURAÇÃO OTIMIZADA (NÃO QUEBRA O LIVE)
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false, // BLOQUEIO 1: Não atualiza ao voltar para a aba
-      refetchOnMount: false,       // BLOQUEIO 2: Não atualiza ao trocar de página no App
-      refetchOnReconnect: false,   // BLOQUEIO 3: Não atualiza se o sinal 4G oscilar
-      staleTime: 1000 * 60 * 10,   // BLOQUEIO 4: Considera o dado "novo" por 10 minutos
-      retry: false,                // BLOQUEIO 5: Se der erro, não tenta de novo automaticamente
+      refetchOnWindowFocus: true,   // 🔥 IMPORTANTE para LIVE
+      refetchOnReconnect: true,     // 🔥 garante atualização se internet cair
+      staleTime: 1000 * 60 * 2,     // 2 minutos (equilibrado)
+      retry: 1,                     // tenta só 1 vez
     },
   },
 });
@@ -41,24 +40,45 @@ type RouteProps = {
 
 const ProtectedRoute = ({ children }: RouteProps) => {
   const { session, hasAccess, loading } = useProfile();
+
   if (loading) return <LoadingScreen />;
+
   if (!session) return <Navigate to="/auth" replace />;
-  if (!hasAccess()) return <Navigate to="/expired" replace />;
+
+  try {
+    if (!hasAccess()) return <Navigate to="/expired" replace />;
+  } catch (e) {
+    console.error("Erro no hasAccess:", e);
+    return <Navigate to="/auth" replace />;
+  }
+
   return <>{children}</>;
 };
 
 const PaywallRoute = () => {
   const { session, hasAccess, loading } = useProfile();
+
   if (loading) return <LoadingScreen />;
+
   if (!session) return <Navigate to="/auth" replace />;
-  if (hasAccess()) return <Navigate to="/" replace />;
+
+  try {
+    if (hasAccess()) return <Navigate to="/" replace />;
+  } catch (e) {
+    console.error("Erro no hasAccess:", e);
+    return <Navigate to="/auth" replace />;
+  }
+
   return <Paywall />;
 };
 
 const AuthRoute = ({ children }: RouteProps) => {
   const { session, loading } = useAuth();
+
   if (loading) return <LoadingScreen />;
+
   if (session) return <Navigate to="/" replace />;
+
   return <>{children}</>;
 };
 
@@ -68,6 +88,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -78,6 +99,7 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+
       </TooltipProvider>
     </QueryClientProvider>
   );

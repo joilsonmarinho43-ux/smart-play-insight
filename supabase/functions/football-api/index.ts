@@ -17,6 +17,9 @@ async function fetchWithAuth(endpoint: string, apiKey: string) {
   return res.json();
 }
 
+// =============================
+// 🔥 EXTRAI STATS (LIVE)
+// =============================
 function extractStats(stats: any[]) {
   const get = (name: string) =>
     Number(stats.find((s: any) => s.type === name)?.value || 0);
@@ -28,6 +31,29 @@ function extractStats(stats: any[]) {
     corners: get("Corner Kicks"),
     attacks: get("Total Shots"),
     dangerousAttacks: get("Dangerous Attacks"),
+  };
+}
+
+// =============================
+// 🔥 NOVO: CALCULAR MÉDIA REAL
+// =============================
+function calcTeamStats(games: any[], teamId: number) {
+  let goalsFor = 0;
+  let goalsAgainst = 0;
+
+  games.forEach((g) => {
+    const isHome = g.teams.home.id === teamId;
+
+    const scored = isHome ? g.goals.home : g.goals.away;
+    const conceded = isHome ? g.goals.away : g.goals.home;
+
+    goalsFor += scored || 0;
+    goalsAgainst += conceded || 0;
+  });
+
+  return {
+    goalsFor: goalsFor / games.length,
+    goalsAgainst: goalsAgainst / games.length,
   };
 }
 
@@ -43,7 +69,7 @@ serve(async (req) => {
     const cacheKey = isLive ? ["live"] : ["date", date];
     const cached = await kv.get(cacheKey);
 
-    // 🔥 CACHE DIFERENTE PRA LIVE
+    // CACHE INTELIGENTE
     if (cached.value) {
       const age = Date.now() - (cached.value.timestamp || 0);
 
@@ -60,7 +86,6 @@ serve(async (req) => {
       }
     }
 
-    // 🔥 BUSCA CORRETA
     const endpoint = isLive ? "fixtures?live=all" : `fixtures?date=${date}`;
     const fixturesData = await fetchWithAuth(endpoint, apiKey);
     const fixtures = fixturesData?.response || [];
@@ -72,15 +97,51 @@ serve(async (req) => {
         let statsHome = null;
         let statsAway = null;
 
-        // 🔥 SÓ PEGA STATS SE FOR LIVE
+        let homeStats = null;
+        let awayStats = null;
+
+        // =============================
+        // 🔥 LIVE STATS
+        // =============================
         if (isLive) {
           try {
-            const statsData = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
+            const statsData = await fetchWithAuth(
+              `fixtures/statistics?fixture=${fixtureId}`,
+              apiKey
+            );
 
             const stats = statsData?.response || [];
 
             statsHome = extractStats(stats[0]?.statistics || []);
             statsAway = extractStats(stats[1]?.statistics || []);
+          } catch {}
+        }
+
+        // =============================
+        // 🔥 PRÉ-JOGO (BASE REAL)
+        // =============================
+        if (!isLive) {
+          try {
+            const [homeGames, awayGames] = await Promise.all([
+              fetchWithAuth(
+                `fixtures?team=${j.teams.home.id}&last=5&status=FT`,
+                apiKey
+              ),
+              fetchWithAuth(
+                `fixtures?team=${j.teams.away.id}&last=5&status=FT`,
+                apiKey
+              ),
+            ]);
+
+            homeStats = calcTeamStats(
+              homeGames?.response || [],
+              j.teams.home.id
+            );
+
+            awayStats = calcTeamStats(
+              awayGames?.response || [],
+              j.teams.away.id
+            );
           } catch {
             // evita crash
           }
@@ -94,6 +155,11 @@ serve(async (req) => {
           goals: j.goals,
           fixture: j.fixture,
 
+          // 🔥 BASE DO BINGO REAL
+          homeStats,
+          awayStats,
+
+          // 🔥 LIVE
           stats: {
             home: statsHome,
             away: statsAway,

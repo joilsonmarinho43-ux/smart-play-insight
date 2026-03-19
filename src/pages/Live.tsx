@@ -1,18 +1,20 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 
 const Live = () => {
-  const { data: matches = [], isLoading, isError } = useQuery({
+  // ✅ CONFIGURAÇÃO BLINDADA PARA LIVE
+  const { data: matches = [], isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['live-matches'],
     queryFn: () => fetchMatches(new Date().toISOString().split('T')[0]),
     
-    // CONFIGURAÇÃO DE SEGURANÇA LOCAL
-    refetchInterval: 30000,       // Atualiza a cada 30 seg (ajuste para 60000 se quiser economizar mais)
-    refetchOnWindowFocus: false,  // TRAVA: Mesmo no Live, não atualiza só porque você voltou para a aba
-    staleTime: 1000 * 15,         // Mantém o dado por 15 segundos antes de permitir nova busca
-    refetchOnMount: false,        // Não busca de novo se você apenas navegar pelas abas do app
+    // --- TRAVAS DE SEGURANÇA CONTRA CONSUMO AUTOMÁTICO ---
+    enabled: true,                // Permite a primeira busca ao montar
+    refetchInterval: false,       // 🛑 DESATIVADO: Não atualiza sozinho a cada 30s
+    refetchOnWindowFocus: false,  // 🛑 DESATIVADO: Não atualiza ao minimizar e voltar
+    staleTime: 1000 * 60 * 5,     // Considera o dado "fresco" por 5 minutos
+    refetchOnMount: false,        // Não busca de novo se você apenas alternar entre abas do app
   });
 
   const liveMatches = (matches || []).filter((m: any) => {
@@ -28,15 +30,29 @@ const Live = () => {
           <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           <h1 className="text-lg font-bold">Monitoramento Live</h1>
         </div>
-        <Link to="/" className="text-sm font-medium text-primary hover:opacity-80 transition-opacity">
-          Voltar para Home
-        </Link>
+        
+        <div className="flex items-center gap-3">
+          {/* BOTÃO DE ATUALIZAÇÃO MANUAL: Única forma de gastar API agora */}
+          <button 
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-primary/20 transition-all active:scale-95"
+          >
+            <RefreshCw className={`w-3.8 h-3.8 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'ATUALIZANDO...' : 'ATUALIZAR LIVE'}
+          </button>
+
+          <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+            Voltar
+          </Link>
+        </div>
       </header>
 
       <main className="container max-w-3xl mx-auto px-4 py-6">
         {isError && (
           <div className="text-center py-20 border border-dashed border-red-900/30 rounded-2xl">
             <p className="text-red-400 font-medium">Erro na conexão com a API.</p>
+            <button onClick={() => refetch()} className="mt-4 text-xs underline">Tentar novamente</button>
           </div>
         )}
 
@@ -90,3 +106,4 @@ const Live = () => {
 };
 
 export default Live;
+            

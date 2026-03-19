@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
@@ -51,14 +51,15 @@ const Index = () => {
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [bingo, setBingo] = useState<BingoPick[]>([]);
   const [loadingBingo, setLoadingBingo] = useState(false);
-  const hasFetched = useRef(false);
 
-  // ✅ REACT QUERY: GERENCIAMENTO DE CACHE PROFISSIONAL
+  // ✅ CONFIGURAÇÃO BLINDADA: Só busca se a data mudar e respeita o cache global
   const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    staleTime: 1000 * 60 * 5, // Mantém "fresco" por 5 minutos
-    enabled: false, // Disparado manualmente pelo usuário ou useEffect
+    staleTime: 1000 * 60 * 10, // Dados considerados novos por 10 minutos
+    gcTime: 1000 * 60 * 30,    // Mantém no lixo do cache por 30 minutos
+    refetchOnWindowFocus: false, // TRAVA MORTA: Não atualiza ao voltar para a aba
+    refetchOnMount: false,       // Não busca de novo ao voltar da página Live
   });
 
   // 🔥 NORMALIZAÇÃO DE DADOS (MEMOIZED)
@@ -119,16 +120,15 @@ const Index = () => {
 
   // 🔥 GERADOR DE BINGO SNIPER
   const gerarBingo = async () => {
-    if (!hasFetched.current || date) {
+    // Se não tiver jogos, tenta buscar uma vez respeitando o cache
+    if (safeMatches.length === 0) {
       await refetch();
-      hasFetched.current = true;
     }
     
     if (safeMatches.length === 0) return;
 
     setLoadingBingo(true);
 
-    // Simulação de processamento da IA
     setTimeout(() => {
       const tipos = [
         "Over 1.5 gols", "Over 2.5 gols", "Ambas marcam", "Gol no 1º tempo",
@@ -158,7 +158,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32 font-sans">
-      {/* HEADER */}
       <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -188,7 +187,6 @@ const Index = () => {
       </header>
 
       <main className="container max-w-3xl mx-auto px-4">
-        {/* DASHBOARD INFO */}
         <div className="grid grid-cols-2 gap-4 mt-6">
           <div className="bg-[#1e293b] border border-white/10 rounded-xl p-4 text-center">
             <p className="text-xs text-gray-400 uppercase font-semibold">Jogos Disponíveis</p>
@@ -210,14 +208,11 @@ const Index = () => {
           </button>
         </div>
 
-        {/* ÁREA DO BINGO (IA) */}
         {bingo.length > 0 && (
           <div className="mt-6 relative rounded-2xl overflow-hidden border border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.15)]">
             <div className="bg-gradient-to-br from-orange-600 to-red-700 p-5">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs uppercase font-black tracking-widest text-white/90">
-                  Sugestão Sniper (IA)
-                </p>
+                <p className="text-xs uppercase font-black tracking-widest text-white/90">Sugestão Sniper (IA)</p>
                 <BarChart3 className="w-4 h-4 text-white/70" />
               </div>
               
@@ -229,11 +224,7 @@ const Index = () => {
                       {m.mercados.map((item, idx) => (
                         <div key={idx} className="flex justify-between items-center text-xs">
                           <span className="text-white/80">{item.mercado}</span>
-                          <span className={`font-mono font-bold ${
-                            item.confianca >= 90 ? 'text-green-400' : 'text-yellow-300'
-                          }`}>
-                            {item.confianca}%
-                          </span>
+                          <span className={`font-mono font-bold ${item.confianca >= 90 ? 'text-green-400' : 'text-yellow-300'}`}>{item.confianca}%</span>
                         </div>
                       ))}
                     </div>
@@ -244,7 +235,6 @@ const Index = () => {
           </div>
         )}
 
-        {/* LISTA PRINCIPAL */}
         <div className="mt-8">
           <h2 className="text-sm font-bold text-gray-400 uppercase mb-4 px-1">Análise de Mercado</h2>
           {isFetching ? (
@@ -262,7 +252,6 @@ const Index = () => {
         </div>
       </main>
 
-      {/* FOOTER ACTION */}
       <div className="fixed bottom-6 left-0 right-0 flex justify-center px-4 z-40">
         <Link 
           to="/live" 
@@ -277,4 +266,4 @@ const Index = () => {
 };
 
 export default Index;
-        
+          

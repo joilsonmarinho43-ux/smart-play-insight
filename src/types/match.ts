@@ -1,6 +1,6 @@
 export interface MatchMetrics {
   possession: [number, number];
-  xG: [number, number];
+  xG: [number, number] | null;
   totalShots: [number, number];
   shotsOnTarget: [number, number];
   bigChances: [number, number];
@@ -11,16 +11,16 @@ export interface MatchMetrics {
 }
 
 export interface ModelData {
-  homeGoalsAvg: number;
-  awayGoalsAvg: number;
-  homeCornersAvg: number;
-  awayCornersAvg: number;
-  homeCardsAvg: number;
-  awayCardsAvg: number;
-  homeCornersVariance: number;
-  awayCornersVariance: number;
-  homeCardsVariance: number;
-  awayCardsVariance: number;
+  homeGoalsAvg: number | null;
+  awayGoalsAvg: number | null;
+  homeCornersAvg: number | null;
+  awayCornersAvg: number | null;
+  homeCardsAvg: number | null;
+  awayCardsAvg: number | null;
+  homeCornersVariance: number | null;
+  awayCornersVariance: number | null;
+  homeCardsVariance: number | null;
+  awayCardsVariance: number | null;
 }
 
 export interface SampleSize {
@@ -30,52 +30,40 @@ export interface SampleSize {
   awayWithStats: number;
 }
 
-// Interface estendida para suportar Live sem quebrar Pré-jogo
 export interface MatchData {
   id: string;
   time: string;
   league: string;
   homeTeam: string;
   awayTeam: string;
+
   homeLogo?: string;
   awayLogo?: string;
-  metrics: MatchMetrics;
-  modelData: ModelData;
+
+  metrics?: MatchMetrics;
+  modelData?: ModelData;
   sampleSize?: SampleSize;
-  predictions: {
+
+  predictions?: {
     homeWin: string;
     draw: string;
     awayWin: string;
   };
-  // Novos campos para funcionalidade LIVE
+
+  // LIVE
   isLive?: boolean;
   status?: string;
   minute?: number;
+
   liveScore?: {
     home: number;
     away: number;
   };
+
   liveStats?: {
     dangerousAttacks: [number, number];
     corners: [number, number];
     possession: [number, number];
     pressureIndex: [number, number];
   };
-}
-
-export type RiskProfile = 'conservador' | 'moderado' | 'agressivo';
-
-export interface MarketAnalysis {
-  market: string;
-  category: 'goals' | 'corners' | 'cards' | 'result';
-  probability: number;
-  statisticalBasis: string;
-  risk: 'Baixo' | 'Médio' | 'Alto';
-}
-
-export interface TicketSuggestion {
-  type: 'goals' | 'corners' | 'cards' | 'combined';
-  label: string;
-  reasoning: string;
-  confidence: 'alta' | 'média' | 'baixa';
 }

@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { MatchData } from '@/types/match';
 
 // =============================
-// CACHE COM TIMESTAMPS (CONTROLE RIGOROSO)
+// CACHE INTELIGENTE
 // =============================
 let cachePre: MatchData[] = [];
 let lastFetchPre = 0;
@@ -10,32 +10,28 @@ let lastFetchPre = 0;
 let cacheLive: MatchData[] = [];
 let lastFetchLive = 0;
 
-// Configurações de tempo (em milissegundos)
-const PRE_MATCH_COOLDOWN = 1000 * 60 * 2; // 2 minutos para Pré-jogo
-const LIVE_MATCH_COOLDOWN = 1000 * 30;    // 30 segundos para Live
+const PRE_MATCH_COOLDOWN = 1000 * 60 * 2;
+const LIVE_MATCH_COOLDOWN = 1000 * 30;
 
 // =============================
-// VALIDAÇÃO DE DADOS (ANTI ZERO)
+// VALIDAÇÃO (MAIS FLEXÍVEL)
 // =============================
 function isValidMatch(match: MatchData): boolean {
   if (!match) return false;
-  const m = match.metrics;
-  const hasStats =
-    m &&
-    (m.totalShots?.[0] || 0) + (m.totalShots?.[1] || 0) > 0 &&
-    (m.possession?.[0] || 0) + (m.possession?.[1] || 0) > 0;
-  return hasStats;
+
+  // 🔥 NÃO remove jogo por falta de estatística
+  if (!match.teams || !match.fixture) return false;
+
+  return true;
 }
 
 // =============================
-// PRÉ-JOGO (COM TRAVA DE SEGURANÇA)
+// PRÉ-JOGO
 // =============================
 export async function fetchMatches(date: string): Promise<MatchData[]> {
   const now = Date.now();
-  
-  // 🛡️ TRAVA: Se buscou há menos de 2 min, retorna o cache e economiza API
+
   if (cachePre.length > 0 && (now - lastFetchPre < PRE_MATCH_COOLDOWN)) {
-    console.log('🛡️ Bloqueio de segurança: Usando cache Pré-Jogo para economizar API.');
     return cachePre;
   }
 
@@ -45,7 +41,7 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
     });
 
     if (error) throw error;
-    
+
     const raw =
       Array.isArray(data?.matches) ? data.matches :
       Array.isArray(data?.response) ? data.response :
@@ -55,11 +51,11 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
 
     if (result.length > 0) {
       cachePre = result;
-      lastFetchPre = now; // Atualiza o cronômetro da última busca
-      return result;
+      lastFetchPre = now;
     }
 
-    return cachePre;
+    return result.length > 0 ? result : cachePre;
+
   } catch (err) {
     console.error('Erro PRE:', err);
     return cachePre;
@@ -67,14 +63,12 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
 }
 
 // =============================
-// LIVE (NÍVEL TRADER - COM TRAVA)
+// LIVE REAL
 // =============================
 export async function fetchLiveMatches(): Promise<MatchData[]> {
   const now = Date.now();
 
-  // 🛡️ TRAVA: Se buscou há menos de 30 seg, não chama a função do Supabase
   if (cacheLive.length > 0 && (now - lastFetchLive < LIVE_MATCH_COOLDOWN)) {
-    console.log('🛡️ Bloqueio de segurança: Usando cache Live para economizar API.');
     return cacheLive;
   }
 
@@ -91,22 +85,68 @@ export async function fetchLiveMatches(): Promise<MatchData[]> {
       Array.isArray(data?.response) ? data.response :
       [];
 
-    const result = raw.filter((match: MatchData) => {
-      if (!match) return false;
-      if (match.isLive) return true;
-      return isValidMatch(match);
+    // 🔥 FILTRO CORRETO DE LIVE
+    const liveStatuses = ['1H', '2H', 'HT', 'LIVE', 'ET', 'P'];
+
+    const result = raw.filter((match: any) => {
+      const status = (match?.fixture?.status?.short || '').toUpperCase();
+      return liveStatuses.includes(status);
     });
 
     if (result.length > 0) {
       cacheLive = result;
-      lastFetchLive = now; // Atualiza o cronômetro da última busca
-      return result;
+      lastFetchLive = now;
     }
 
-    return cacheLive;
+    return result.length > 0 ? result : cacheLive;
+
   } catch (err) {
     console.error('Erro LIVE:', err);
     return cacheLive;
   }
-        }
-      
+}
+
+// =============================
+// 🔥 NOVO: ESTATÍSTICAS DO JOGO
+// =============================
+export async function fetchMatchStats(matchId: number) {
+  try {
+    const { data, error } = await supabase.functions.invoke('football-api', {
+      body: { fixture: matchId },
+    });
+
+    if (error) throw error;
+
+    const stats = data?.response || [];
+
+    const home = stats[0]?.statistics || [];
+    const away = stats[1]?.statistics || [];
+
+    const getStat = (arr: any[], name: string) => {
+      return Number(arr.find(s => s.type === name)?.value || 0);
+    };
+
+    return {
+      home: {
+        shotsOnGoal: getStat(home, 'Shots on Goal'),
+        shotsOffGoal: getStat(home, 'Shots off Goal'),
+        possession: getStat(home, 'Ball Possession'),
+        corners: getStat(home, 'Corner Kicks'),
+        attacks: getStat(home, 'Total Shots'),
+        dangerousAttacks: getStat(home, 'Dangerous Attacks'),
+      },
+      away: {
+        shotsOnGoal: getStat(away, 'Shots on Goal'),
+        shotsOffGoal: getStat(away, 'Shots off Goal'),
+        possession: getStat(away, 'Ball Possession'),
+        corners: getStat(away, 'Corner Kicks'),
+        attacks: getStat(away, 'Total Shots'),
+        dangerousAttacks: getStat(away, 'Dangerous Attacks'),
+      }
+    };
+
+  } catch (err) {
+    console.error('Erro STATS:', err);
+    return null;
+  }
+  }

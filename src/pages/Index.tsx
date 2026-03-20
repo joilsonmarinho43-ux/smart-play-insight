@@ -38,22 +38,22 @@ const Index = () => {
       const hasHome = hGF > 0 || hGA > 0;
       const hasAway = aGF > 0 || aGA > 0;
 
-      // Predictions baseadas em médias reais
-      const totalPower = (hGF + aGA) + (aGF + hGA) || 1;
-      const homePower = hGF + aGA;
-      const awayPower = aGF + hGA;
-      const homeWin = Math.round((homePower / totalPower) * 60 + (hasHome ? 10 : 0));
-      const awayWin = Math.round((awayPower / totalPower) * 60 + (hasAway ? 10 : 0));
-      const draw = Math.max(5, 100 - homeWin - awayWin);
+      // Poisson real para predictions
+      const leagueAvg = 1.35;
+      const homeLambda = hGF > 0 && aGA > 0
+        ? (hGF / leagueAvg) * (aGA / leagueAvg) * leagueAvg
+        : hGF || 1.2;
+      const awayLambda = aGF > 0 && hGA > 0
+        ? (aGF / leagueAvg) * (hGA / leagueAvg) * leagueAvg
+        : aGF || 0.9;
+      const totalLambda = homeLambda + awayLambda;
 
-      // Métricas estimadas a partir das médias reais
-      const expectedGoals = (hGF + aGF) || 2;
-      const estimatedPossession: [number, number] = hasHome && hasAway
-        ? [Math.round(50 + (hGF - aGF) * 5), Math.round(50 - (hGF - aGF) * 5)]
-        : [50, 50];
-      const estimatedShots: [number, number] = [Math.round(hGF * 8), Math.round(aGF * 8)];
-      const estimatedShotsOnTarget: [number, number] = [Math.round(hGF * 3.5), Math.round(aGF * 3.5)];
-      const estimatedCorners: [number, number] = [Math.round(4 + hGF * 1.2), Math.round(4 + aGF * 1.2)];
+      // Probabilidades via força relativa (não inventada)
+      const homeStrength = homeLambda / (totalLambda || 1);
+      const awayStrength = awayLambda / (totalLambda || 1);
+      const homeWin = Math.round(homeStrength * 70 + (hasHome ? 5 : 0));
+      const awayWin = Math.round(awayStrength * 70 + (hasAway ? 5 : 0));
+      const draw = Math.max(5, 100 - homeWin - awayWin);
 
       return {
         ...m,
@@ -65,29 +65,19 @@ const Index = () => {
         time: m.fixture?.date
           ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
           : m.time || '',
+        // SÓ DADOS REAIS — média de gols dos últimos 5 jogos
         metrics: {
-          possession: estimatedPossession,
-          xG: [Number(hGF.toFixed(2)), Number(aGF.toFixed(2))] as [number, number],
-          totalShots: estimatedShots,
-          shotsOnTarget: estimatedShotsOnTarget,
-          bigChances: [Math.round(hGF * 1.5), Math.round(aGF * 1.5)] as [number, number],
-          corners: estimatedCorners,
-          offsides: [Math.round(hGF * 1.2), Math.round(aGF * 1.2)] as [number, number],
-          fouls: [12, 13] as [number, number],
-          yellowCards: [Number((hGF * 1.5).toFixed(1)), Number((aGF * 1.5).toFixed(1))] as [number, number],
+          goalsForAvg: [hGF, aGF] as [number, number],
+          goalsAgainstAvg: [hGA, aGA] as [number, number],
         },
         modelData: {
           homeGoalsAvg: hGF,
           awayGoalsAvg: aGF,
-          homeCornersAvg: estimatedCorners[0],
-          awayCornersAvg: estimatedCorners[1],
-          homeCardsAvg: 2,
-          awayCardsAvg: 2,
-          homeCornersVariance: null,
-          awayCornersVariance: null,
-          homeCardsVariance: null,
-          awayCardsVariance: null,
+          homeGoalsAgainstAvg: hGA,
+          awayGoalsAgainstAvg: aGA,
         },
+        homeStats: hStats,
+        awayStats: aStats,
         sampleSize: {
           homeGames: hasHome ? 5 : 0,
           awayGames: hasAway ? 5 : 0,

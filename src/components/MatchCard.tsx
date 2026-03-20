@@ -122,16 +122,20 @@ const MatchCard = ({ match }: Props) => {
       {/* MÉTRICAS */}
       <div className="px-2 sm:px-6 pb-5">
         <div className="space-y-0.5">
-          {metricLabels.map((m, i) => (
-            <MetricRow
-              key={m.key}
-              label={m.label}
-              homeValue={match.metrics[m.key][0]}
-              awayValue={match.metrics[m.key][1]}
-              format={m.format}
-              index={i}
-            />
-          ))}
+          {metricLabels.map((m, i) => {
+            const values = match.metrics?.[m.key];
+            if (!values || !Array.isArray(values)) return null;
+            return (
+              <MetricRow
+                key={m.key}
+                label={m.label}
+                homeValue={values[0] ?? 0}
+                awayValue={values[1] ?? 0}
+                format={m.format}
+                index={i}
+              />
+            );
+          })}
         </div>
       </div>
 

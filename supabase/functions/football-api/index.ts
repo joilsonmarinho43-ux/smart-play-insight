@@ -162,7 +162,7 @@ serve(async (req) => {
 
     console.log(`Returning ${matches.length} matches`);
     const responseData = { matches };
-    await kv.set(cacheKey, { timestamp: now, data: responseData });
+    cacheSet(ck2, { timestamp: now, data: responseData });
 
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

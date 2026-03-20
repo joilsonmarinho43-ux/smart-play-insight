@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { ReactNode } from "react";
 
@@ -16,69 +15,48 @@ import NotFound from "./pages/NotFound";
 
 import { Loader2 } from "lucide-react";
 
-// 🔥 CONFIGURAÇÃO OTIMIZADA (NÃO QUEBRA O LIVE)
+// 🔥 CONFIGURAÇÃO PROFISSIONAL: Economiza API Pro
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: true,   // 🔥 IMPORTANTE para LIVE
-      refetchOnReconnect: true,     // 🔥 garante atualização se internet cair
-      staleTime: 1000 * 60 * 2,     // 2 minutos (equilibrado)
-      retry: 1,                     // tenta só 1 vez
+      refetchOnWindowFocus: false,   // 🛡️ Impedimos o gasto de API ao alternar abas
+      refetchOnReconnect: true,
+      staleTime: 1000 * 60 * 5,     // Dados "frescos" por 5 minutos
+      retry: 1,
     },
   },
 });
 
 const LoadingScreen = () => (
-  <div className="min-h-screen bg-background flex items-center justify-center">
+  <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
     <Loader2 className="w-8 h-8 text-primary animate-spin" />
   </div>
 );
 
-type RouteProps = {
-  children: ReactNode;
-};
-
-const ProtectedRoute = ({ children }: RouteProps) => {
-  const { session, hasAccess, loading } = useProfile();
+// 🛡️ PROTEÇÃO DE ACESSO PAGO
+const ProtectedRoute = ({ children }: { children: ReactNode }) => {
+  const { session, profile, loading } = useProfile();
 
   if (loading) return <LoadingScreen />;
-
   if (!session) return <Navigate to="/auth" replace />;
 
-  try {
-    if (!hasAccess()) return <Navigate to="/expired" replace />;
-  } catch (e) {
-    console.error("Erro no hasAccess:", e);
-    return <Navigate to="/auth" replace />;
+  // Se não for admin e o acesso expirou
+  const isExpired = profile?.subscription_expiry_date 
+    ? new Date(profile.subscription_expiry_date) < new Date() 
+    : true;
+
+  if (!profile?.is_admin && isExpired) {
+    return <Navigate to="/expired" replace />;
   }
 
   return <>{children}</>;
 };
 
-const PaywallRoute = () => {
-  const { session, hasAccess, loading } = useProfile();
-
+// 🛡️ PROTEÇÃO EXCLUSIVA ADMIN
+const AdminRoute = ({ children }: { children: ReactNode }) => {
+  const { profile, loading } = useProfile();
   if (loading) return <LoadingScreen />;
-
-  if (!session) return <Navigate to="/auth" replace />;
-
-  try {
-    if (hasAccess()) return <Navigate to="/" replace />;
-  } catch (e) {
-    console.error("Erro no hasAccess:", e);
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <Paywall />;
-};
-
-const AuthRoute = ({ children }: RouteProps) => {
-  const { session, loading } = useAuth();
-
-  if (loading) return <LoadingScreen />;
-
-  if (session) return <Navigate to="/" replace />;
-
+  if (!profile?.is_admin) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -88,21 +66,27 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-
         <BrowserRouter>
           <Routes>
+            {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/live" element={<ProtectedRoute><Live /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-            <Route path="/expired" element={<PaywallRoute />} />
-            <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+            
+            {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
+            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+            
+            {/* Rotas de Fluxo de Usuário */}
+            <Route path="/expired" element={<Paywall />} />
+            <Route path="/auth" element={<Auth />} />
+            
+            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-
       </TooltipProvider>
     </QueryClientProvider>
   );
 };
 
 export default App;
+              

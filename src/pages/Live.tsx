@@ -34,21 +34,18 @@ const Live = () => {
   });
 
   // Fetch stats for every live match
-  const { data: statsMap = {} } = useQuery({
-    queryKey: ['live-stats', matches.map((m: any) => m.fixture?.id || m.id).join(',')],
-    queryFn: async () => {
-      const result: Record<string, any> = {};
-      for (const match of matches as any[]) {
-        const id = match?.fixture?.id || match?.id;
-        if (!id) continue;
-        result[id] = await fetchMatchStats(id);
+  // Use stats already embedded in match data from edge function
+  const statsMap = useMemo(() => {
+    const result: Record<string, any> = {};
+    for (const match of matches as any[]) {
+      const id = match?.fixture?.id || match?.id;
+      if (!id) continue;
+      if (match?.stats?.home || match?.stats?.away) {
+        result[id] = match.stats;
       }
-      return result;
-    },
-    enabled: matches.length > 0,
-    refetchInterval: 25000,
-    staleTime: 20000,
-  });
+    }
+    return result;
+  }, [matches]);
 
   // Build pressure analysis per match
   const analysisMap = useMemo(() => {

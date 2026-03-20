@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { useAuth } from '@/hooks/useAuth';
-import { Brain, BarChart3, Loader2, Zap, RefreshCw } from 'lucide-react';
+import { Brain, Loader2, Zap, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { generatePreGameBingo } from '@/lib/bingoEngine';
+import { analyzeMarkets } from '@/lib/matchAnalysis';
 
 // --- INTERFACES ---
 interface MatchMetrics {
@@ -36,8 +36,6 @@ interface Match {
   awayTeam: string;
   metrics: MatchMetrics;
   modelData: ModelData;
-  homeStats?: any;
-  awayStats?: any;
   [key: string]: any;
 }
 
@@ -87,17 +85,17 @@ const Index = () => {
         redCards: [0, 0],
       },
       modelData: m.modelData || {
-        homeGoalsAvg: 0,
-        awayGoalsAvg: 0,
-        homeCornersAvg: 0,
-        awayCornersAvg: 0,
-        homeCardsAvg: 0,
-        awayCardsAvg: 0,
+        homeGoalsAvg: 1.2,
+        awayGoalsAvg: 1.0,
+        homeCornersAvg: 4,
+        awayCornersAvg: 4,
+        homeCardsAvg: 2,
+        awayCardsAvg: 2,
       },
     }));
   }, [rawMatches]);
 
-  // 🔥 BINGO REAL (SEM ALEATORIEDADE)
+  // 🔥 BINGO REAL (POISSON)
   const gerarBingo = async () => {
     setLoadingBingo(true);
 
@@ -106,41 +104,28 @@ const Index = () => {
     setTimeout(() => {
       const picks = safeMatches
         .map((m) => {
-          const data = generatePreGameBingo(m);
-          if (!data) return null;
+          const markets = analyzeMarkets(m);
 
-          const mercados = [];
+          if (!markets || markets.length === 0) return null;
 
-          const over15 = Number(data.over15);
-          const over25 = Number(data.over25);
-          const btts = Number(data.btts);
+          const selecionados = markets.filter((mk) => {
+            if (mk.market.includes('Over 1.5') && mk.probability >= 75) return true;
+            if (mk.market.includes('Over 2.5') && mk.probability >= 65) return true;
+            if (mk.market === '1X' && mk.probability >= 70) return true;
+            if (mk.market === 'X2' && mk.probability >= 70) return true;
+            if (mk.market.includes('Vitória') && mk.probability >= 55) return true;
 
-          if (over15 >= 70) {
-            mercados.push({
-              mercado: "Over 1.5 gols",
-              confianca: over15,
-            });
-          }
+            return false;
+          });
 
-          if (over25 >= 60) {
-            mercados.push({
-              mercado: "Over 2.5 gols",
-              confianca: over25,
-            });
-          }
-
-          if (btts >= 55) {
-            mercados.push({
-              mercado: "Ambas marcam",
-              confianca: btts,
-            });
-          }
-
-          if (mercados.length === 0) return null;
+          if (selecionados.length === 0) return null;
 
           return {
             ...m,
-            mercados,
+            mercados: selecionados.slice(0, 3).map((mk) => ({
+              mercado: mk.market,
+              confianca: mk.probability,
+            })),
           };
         })
         .filter(Boolean)

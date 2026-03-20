@@ -4,7 +4,8 @@ import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
 import { useAuth } from '@/hooks/useAuth';
-import { Brain, Loader2, Zap, RefreshCw } from 'lucide-react';
+import { useProfile } from '@/hooks/useProfile';
+import { Brain, Loader2, Zap, RefreshCw, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Index = () => {

@@ -7,10 +7,13 @@ import { Brain, Loader2, Zap, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { generatePreGameBingo } from '@/lib/bingoEngine';
 
-interface MatchMetrics { ... } // igual ao código que você já tem
-interface ModelData { ... }
-interface Match { ... }
-interface BingoPick extends Match { mercados: { mercado: string; confianca: number }[] }
+interface BingoPick {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  mercados: { mercado: string; confianca: number }[];
+  [key: string]: any;
+}
 
 const Index = () => {
   const { signOut } = useAuth();

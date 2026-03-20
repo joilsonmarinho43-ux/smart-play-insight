@@ -120,6 +120,11 @@ const Index = () => {
               onChange={e => { setDate(e.target.value); setHasFetchedOnce(false); }}
               className="bg-[#334155] text-xs p-2 rounded-lg border border-white/10"
             />
+            {profile?.is_admin && (
+              <Link to="/admin" className="p-2 bg-orange-500/10 rounded-lg hover:bg-orange-500/20 transition-colors">
+                <Shield className="w-4 h-4 text-orange-500" />
+              </Link>
+            )}
             <button onClick={signOut} className="bg-red-500/10 text-red-500 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-colors">
               SAIR
             </button>

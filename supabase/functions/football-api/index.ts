@@ -94,16 +94,16 @@ serve(async (req) => {
     }
 
     // ========== LIVE or PRE-MATCH fixtures ==========
-    const cacheKey = isLive ? ["live_v3"] : ["date_v3", date];
-    const cached = await kv.get(cacheKey);
+    const ck2 = isLive ? "live_v3" : `date_v3_${date}`;
+    const cached2 = cacheGet(ck2);
     const now = Date.now();
 
-    if (cached.value) {
-      const age = now - ((cached.value as any).timestamp || 0);
+    if (cached2) {
+      const age = now - (cached2.timestamp || 0);
       const ttl = isLive ? 15000 : 3600000;
       if (age < ttl) {
         console.log(`Cache hit (${isLive ? 'live' : 'pre'})`);
-        return new Response(JSON.stringify((cached.value as any).data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify(cached2.data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 

@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 
 const Index = () => {
   const { signOut } = useAuth();
+  const { profile } = useProfile();
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 

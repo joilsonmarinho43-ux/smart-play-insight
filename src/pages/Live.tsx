@@ -117,13 +117,22 @@ const Live = () => {
               <h1 className="font-bold text-lg tracking-tight">LIVE TRADER PRO</h1>
             </div>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="flex items-center gap-2 text-xs bg-white/5 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
-            Atualizar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-lg transition-colors ${soundEnabled ? 'bg-orange-500/20 text-orange-400' : 'bg-white/5 text-gray-500'}`}
+              title={soundEnabled ? 'Alertas sonoros ativados' : 'Alertas sonoros desativados'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => refetch()}
+              className="flex items-center gap-2 text-xs bg-white/5 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
+              Atualizar
+            </button>
+          </div>
         </div>
       </header>
 

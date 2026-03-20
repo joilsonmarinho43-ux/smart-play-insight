@@ -64,6 +64,47 @@ const Live = () => {
     return map;
   }, [matches, statsMap]);
 
+  // 🔊 Sound alert system for PI > 70
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const alertedRef = useRef<Set<string>>(new Set());
+
+  const playAlertSound = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      console.warn('Audio not available');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!soundEnabled) return;
+    for (const [id, { pressure }] of Object.entries(analysisMap)) {
+      const homeKey = `${id}_home`;
+      const awayKey = `${id}_away`;
+      if (pressure.homePI >= 70 && !alertedRef.current.has(homeKey)) {
+        alertedRef.current.add(homeKey);
+        playAlertSound();
+      }
+      if (pressure.awayPI >= 70 && !alertedRef.current.has(awayKey)) {
+        alertedRef.current.add(awayKey);
+        playAlertSound();
+      }
+      // Reset alert if PI drops below 60
+      if (pressure.homePI < 60) alertedRef.current.delete(homeKey);
+      if (pressure.awayPI < 60) alertedRef.current.delete(awayKey);
+    }
+  }, [analysisMap, soundEnabled, playAlertSound]);
+
   return (
     <div className="min-h-screen bg-[#0a0f1c] text-white">
       {/* HEADER */}

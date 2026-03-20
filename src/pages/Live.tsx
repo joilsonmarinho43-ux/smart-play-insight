@@ -189,6 +189,16 @@ const Live = () => {
                 </div>
               </div>
 
+              {/* High PI Alert Banner */}
+              {(pressure.homePI >= 70 || pressure.awayPI >= 70) && (
+                <div className="mx-4 mb-2 py-2 px-3 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center gap-2 animate-pulse">
+                  <Volume2 className="w-4 h-4 text-orange-400" />
+                  <span className="text-xs font-bold text-orange-300">
+                    🔥 ALERTA PI — {pressure.homePI >= 70 ? `${homeName} (${pressure.homePI.toFixed(1)})` : `${awayName} (${pressure.awayPI.toFixed(1)})`} em pressão extrema!
+                  </span>
+                </div>
+              )}
+
               {/* Pressure Bars */}
               <div className="px-4 pb-3 space-y-2">
                 <div>

@@ -114,10 +114,15 @@ serve(async (req) => {
     console.log(`Got ${fixtures.length} fixtures (${isLive ? 'live' : 'pre'})`);
 
     if (!isLive) {
-      fixtures = fixtures.filter((f: any) =>
-        LEAGUES_TO_ANALYZE.includes(f.league?.id) || f.league?.country === "Brazil"
-      ).slice(0, 40);
-      console.log(`Filtered to ${fixtures.length} target league fixtures`);
+      // Filtra: apenas ligas alvo + SOMENTE jogos que ainda NÃO começaram
+      const preMatchStatuses = ['NS', 'TBD', 'SUSP', 'PST', 'CANC'];
+      fixtures = fixtures.filter((f: any) => {
+        const status = f.fixture?.status?.short || '';
+        const isPreMatch = preMatchStatuses.includes(status);
+        const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id) || f.league?.country === "Brazil";
+        return isPreMatch && isTargetLeague;
+      }).slice(0, 40);
+      console.log(`Filtered to ${fixtures.length} upcoming fixtures (excluded finished/live)`);
     }
 
     const matches = await Promise.all(

@@ -38,13 +38,10 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
 
     if (error) throw error;
 
-    console.log('[fetchMatches] raw response:', JSON.stringify(data).slice(0, 500));
     const raw = Array.isArray(data?.matches) ? data.matches : [];
-    console.log(`[fetchMatches] ${raw.length} raw matches, filtering...`);
     
-    // Filtro profissional: remove jogos sem dados essenciais para o Trade
-    const result = raw.filter((m: any) => m.teams?.home?.name && m.fixture?.id);
-    console.log(`[fetchMatches] ${result.length} matches after filter`);
+    // Filtro: aceita tanto formato transformado (id, homeTeam) quanto bruto (fixture.id, teams.home.name)
+    const result = raw.filter((m: any) => (m.id || m.fixture?.id) && (m.homeTeam || m.teams?.home?.name));
 
     if (result.length > 0) {
       localStorage.setItem(CACHE_KEYS.PRE, JSON.stringify(result));

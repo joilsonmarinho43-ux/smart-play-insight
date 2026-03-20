@@ -2,38 +2,34 @@ import { supabase } from '@/integrations/supabase/client';
 import { MatchData } from '@/types/match';
 
 // =============================
-// CACHE INTELIGENTE
+// CACHE PERSISTENTE (LocalStorage para não gastar API Pro no Refresh)
 // =============================
-let cachePre: MatchData[] = [];
-let lastFetchPre = 0;
+const CACHE_KEYS = {
+  PRE: 'football_cache_pre',
+  LIVE: 'football_cache_live',
+  TIME_PRE: 'football_cache_pre_time',
+  TIME_LIVE: 'football_cache_live_time'
+};
 
-let cacheLive: MatchData[] = [];
-let lastFetchLive = 0;
+const PRE_MATCH_COOLDOWN = 1000 * 60 * 10; // 10 minutos para Pré-Jogo
+const LIVE_MATCH_COOLDOWN = 1000 * 20;     // 20 segundos para Live
 
-const PRE_MATCH_COOLDOWN = 1000 * 60 * 2;
-const LIVE_MATCH_COOLDOWN = 1000 * 30;
-
-// =============================
-// VALIDAÇÃO (MAIS FLEXÍVEL)
-// =============================
-function isValidMatch(match: MatchData): boolean {
-  if (!match) return false;
-
-  // 🔥 NÃO remove jogo por falta de estatística
-  if (!match.teams || !match.fixture) return false;
-
-  return true;
+function getStorageCache(key: string, timeKey: string, cooldown: number) {
+  const data = localStorage.getItem(key);
+  const time = localStorage.getItem(timeKey);
+  const now = Date.now();
+  if (data && time && (now - Number(time) < cooldown)) {
+    return JSON.parse(data);
+  }
+  return null;
 }
 
 // =============================
-// PRÉ-JOGO
+// PRÉ-JOGO (Corrigido para economizar API)
 // =============================
 export async function fetchMatches(date: string): Promise<MatchData[]> {
-  const now = Date.now();
-
-  if (cachePre.length > 0 && (now - lastFetchPre < PRE_MATCH_COOLDOWN)) {
-    return cachePre;
-  }
+  const cached = getStorageCache(CACHE_KEYS.PRE, CACHE_KEYS.TIME_PRE, PRE_MATCH_COOLDOWN);
+  if (cached) return cached;
 
   try {
     const { data, error } = await supabase.functions.invoke('football-api', {
@@ -42,35 +38,29 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
 
     if (error) throw error;
 
-    const raw =
-      Array.isArray(data?.matches) ? data.matches :
-      Array.isArray(data?.response) ? data.response :
-      [];
-
-    const result = raw.filter(isValidMatch);
+    const raw = Array.isArray(data?.matches) ? data.matches : [];
+    
+    // Filtro profissional: remove jogos sem dados essenciais para o Trade
+    const result = raw.filter((m: any) => m.teams?.home?.name && m.fixture?.id);
 
     if (result.length > 0) {
-      cachePre = result;
-      lastFetchPre = now;
+      localStorage.setItem(CACHE_KEYS.PRE, JSON.stringify(result));
+      localStorage.setItem(CACHE_KEYS.TIME_PRE, String(Date.now()));
     }
 
-    return result.length > 0 ? result : cachePre;
-
+    return result;
   } catch (err) {
     console.error('Erro PRE:', err);
-    return cachePre;
+    return [];
   }
 }
 
 // =============================
-// LIVE REAL
+// LIVE REAL (Filtro de Status de Alta Precisão)
 // =============================
 export async function fetchLiveMatches(): Promise<MatchData[]> {
-  const now = Date.now();
-
-  if (cacheLive.length > 0 && (now - lastFetchLive < LIVE_MATCH_COOLDOWN)) {
-    return cacheLive;
-  }
+  const cached = getStorageCache(CACHE_KEYS.LIVE, CACHE_KEYS.TIME_LIVE, LIVE_MATCH_COOLDOWN);
+  if (cached) return cached;
 
   try {
     const { data, error } = await supabase.functions.invoke('football-api', {
@@ -79,14 +69,10 @@ export async function fetchLiveMatches(): Promise<MatchData[]> {
 
     if (error) throw error;
 
-    const raw =
-      Array.isArray(data) ? data :
-      Array.isArray(data?.matches) ? data.matches :
-      Array.isArray(data?.response) ? data.response :
-      [];
+    const raw = Array.isArray(data?.matches) ? data.matches : (Array.isArray(data) ? data : []);
 
-    // 🔥 FILTRO CORRETO DE LIVE
-    const liveStatuses = ['1H', '2H', 'HT', 'LIVE', 'ET', 'P'];
+    // Status reais da API-Sports para jogo rolando
+    const liveStatuses = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE'];
 
     const result = raw.filter((match: any) => {
       const status = (match?.fixture?.status?.short || '').toUpperCase();
@@ -94,20 +80,19 @@ export async function fetchLiveMatches(): Promise<MatchData[]> {
     });
 
     if (result.length > 0) {
-      cacheLive = result;
-      lastFetchLive = now;
+      localStorage.setItem(CACHE_KEYS.LIVE, JSON.stringify(result));
+      localStorage.setItem(CACHE_KEYS.TIME_LIVE, String(Date.now()));
     }
 
-    return result.length > 0 ? result : cacheLive;
-
+    return result;
   } catch (err) {
     console.error('Erro LIVE:', err);
-    return cacheLive;
+    return [];
   }
 }
 
 // =============================
-// 🔥 NOVO: ESTATÍSTICAS DO JOGO
+// ESTATÍSTICAS (Otimizado para não repetir chamadas)
 // =============================
 export async function fetchMatchStats(matchId: number) {
   try {
@@ -116,37 +101,25 @@ export async function fetchMatchStats(matchId: number) {
     });
 
     if (error) throw error;
-
     const stats = data?.response || [];
+    if (!stats.length) return null;
 
-    const home = stats[0]?.statistics || [];
-    const away = stats[1]?.statistics || [];
-
-    const getStat = (arr: any[], name: string) => {
-      return Number(arr.find(s => s.type === name)?.value || 0);
+    const extract = (teamStats: any) => {
+      const get = (type: string) => teamStats.find((s: any) => s.type === type)?.value || 0;
+      return {
+        shotsOnGoal: Number(get('Shots on Goal')),
+        possession: String(get('Ball Possession')).replace('%', ''),
+        corners: Number(get('Corner Kicks')),
+        dangerousAttacks: Number(get('Dangerous Attacks')),
+        totalShots: Number(get('Total Shots')),
+      };
     };
 
     return {
-      home: {
-        shotsOnGoal: getStat(home, 'Shots on Goal'),
-        shotsOffGoal: getStat(home, 'Shots off Goal'),
-        possession: getStat(home, 'Ball Possession'),
-        corners: getStat(home, 'Corner Kicks'),
-        attacks: getStat(home, 'Total Shots'),
-        dangerousAttacks: getStat(home, 'Dangerous Attacks'),
-      },
-      away: {
-        shotsOnGoal: getStat(away, 'Shots on Goal'),
-        shotsOffGoal: getStat(away, 'Shots off Goal'),
-        possession: getStat(away, 'Ball Possession'),
-        corners: getStat(away, 'Corner Kicks'),
-        attacks: getStat(away, 'Total Shots'),
-        dangerousAttacks: getStat(away, 'Dangerous Attacks'),
-      }
+      home: extract(stats[0]?.statistics || []),
+      away: extract(stats[1]?.statistics || [])
     };
-
   } catch (err) {
-    console.error('Erro STATS:', err);
     return null;
   }
-  }
+                    }

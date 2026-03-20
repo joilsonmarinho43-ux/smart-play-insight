@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Loader2, RefreshCw, ArrowLeft, Zap, TrendingUp, AlertTriangle } from 'lucide-react';
+import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
+import { Loader2, RefreshCw, ArrowLeft, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMatches } from '@/services/footballApi';
@@ -64,6 +64,47 @@ const Live = () => {
     return map;
   }, [matches, statsMap]);
 
+  // 🔊 Sound alert system for PI > 70
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const alertedRef = useRef<Set<string>>(new Set());
+
+  const playAlertSound = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      console.warn('Audio not available');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!soundEnabled) return;
+    for (const [id, { pressure }] of Object.entries(analysisMap)) {
+      const homeKey = `${id}_home`;
+      const awayKey = `${id}_away`;
+      if (pressure.homePI >= 70 && !alertedRef.current.has(homeKey)) {
+        alertedRef.current.add(homeKey);
+        playAlertSound();
+      }
+      if (pressure.awayPI >= 70 && !alertedRef.current.has(awayKey)) {
+        alertedRef.current.add(awayKey);
+        playAlertSound();
+      }
+      // Reset alert if PI drops below 60
+      if (pressure.homePI < 60) alertedRef.current.delete(homeKey);
+      if (pressure.awayPI < 60) alertedRef.current.delete(awayKey);
+    }
+  }, [analysisMap, soundEnabled, playAlertSound]);
+
   return (
     <div className="min-h-screen bg-[#0a0f1c] text-white">
       {/* HEADER */}
@@ -76,13 +117,22 @@ const Live = () => {
               <h1 className="font-bold text-lg tracking-tight">LIVE TRADER PRO</h1>
             </div>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="flex items-center gap-2 text-xs bg-white/5 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
-            Atualizar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-2 rounded-lg transition-colors ${soundEnabled ? 'bg-orange-500/20 text-orange-400' : 'bg-white/5 text-gray-500'}`}
+              title={soundEnabled ? 'Alertas sonoros ativados' : 'Alertas sonoros desativados'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => refetch()}
+              className="flex items-center gap-2 text-xs bg-white/5 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
+              Atualizar
+            </button>
+          </div>
         </div>
       </header>
 
@@ -138,6 +188,16 @@ const Live = () => {
                   <p className="text-[10px] text-gray-400 mt-0.5">{pressure.awaySignal}</p>
                 </div>
               </div>
+
+              {/* High PI Alert Banner */}
+              {(pressure.homePI >= 70 || pressure.awayPI >= 70) && (
+                <div className="mx-4 mb-2 py-2 px-3 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center gap-2 animate-pulse">
+                  <Volume2 className="w-4 h-4 text-orange-400" />
+                  <span className="text-xs font-bold text-orange-300">
+                    🔥 ALERTA PI — {pressure.homePI >= 70 ? `${homeName} (${pressure.homePI.toFixed(1)})` : `${awayName} (${pressure.awayPI.toFixed(1)})`} em pressão extrema!
+                  </span>
+                </div>
+              )}
 
               {/* Pressure Bars */}
               <div className="px-4 pb-3 space-y-2">

@@ -3,14 +3,12 @@ import { MatchData, MarketAnalysis } from '@/types/match';
 export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
   const markets: MarketAnalysis[] = [];
   
-  // Captura de dados reais vindos da Edge Function
   const isLive = match.isLive;
-  const hStats = match.homeStats || { goalsFor: 0, goalsAgainst: 0 };
-  const aStats = match.awayStats || { goalsFor: 0, goalsAgainst: 0 };
+  const hStats = (match as any).homeStats || { goalsFor: 0, goalsAgainst: 0 };
+  const aStats = (match as any).awayStats || { goalsFor: 0, goalsAgainst: 0 };
   
-  // Stats de Live (se houver)
-  const lH = match.stats?.home || { dangerousAttacks: 0, corners: 0, possession: 0, shotsOnGoal: 0 };
-  const lA = match.stats?.away || { dangerousAttacks: 0, corners: 0, possession: 0, shotsOnGoal: 0 };
+  const lH = (match as any).stats?.home || { dangerousAttacks: 0, corners: 0, possession: 0, shotsOnGoal: 0 };
+  const lA = (match as any).stats?.away || { dangerousAttacks: 0, corners: 0, possession: 0, shotsOnGoal: 0 };
 
   // --- LÓGICA DE GOLS (BINGO REAL) ---
   // Expectativa de gols baseada em médias reais (Last 8) + Momento Live

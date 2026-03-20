@@ -67,3 +67,25 @@ export interface MatchData {
     pressureIndex: [number, number];
   };
 }
+
+export type RiskProfile = 'conservador' | 'moderado' | 'agressivo';
+
+export interface MarketAnalysis {
+  market: string;
+  probability: number;
+  risk: string;
+  category: string;
+  odd?: number;
+}
+
+export interface HomeAwayStats {
+  goalsFor: number;
+  goalsAgainst: number;
+}
+
+export interface LiveSideStats {
+  dangerousAttacks: number;
+  corners: number;
+  possession: number;
+  shotsOnGoal: number;
+}

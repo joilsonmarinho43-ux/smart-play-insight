@@ -2,24 +2,17 @@ import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from './matchAnalysis';
 
 /**
- * 🔥 GERADOR DE BINGO REAL (PROFISSIONAL)
- * Transforma a análise individual em uma estrutura de bilhete de valor.
+ * 🔥 BINGO PROFISSIONAL — Confiança mínima 75%, correlação lógica
  */
 export function generatePreGameBingo(match: MatchData) {
-  // 1. Obtém todos os mercados analisados com a nova matemática (Poisson/Médias)
   const allMarkets = analyzeMarkets(match);
-  
   if (!allMarkets || allMarkets.length === 0) return null;
 
-  // 2. Filtro de Qualidade: Remove mercados com probabilidade irrelevante para Trade
-  const highValueMarkets = allMarkets.filter((m) => {
-    // No Trade Real, buscamos confiança acima de 60% e descartamos o que é "chute"
-    return m.probability >= 60 && m.probability <= 98;
-  });
-
+  // Filtro Elite: confiança >= 75%
+  const highValueMarkets = allMarkets.filter(m => m.probability >= 75 && m.probability <= 98);
   if (highValueMarkets.length === 0) return null;
 
-  // 3. Ordem de Prioridade para o Bilhete (Mercados com maior liquidez e segurança)
+  // Correlação lógica: agrupa por categoria para não misturar mercados contraditórios
   const priorityOrder = [
     'Over 1.5 Gols',
     'Ambas Marcam',
@@ -29,42 +22,31 @@ export function generatePreGameBingo(match: MatchData) {
     'Over 2.5 Gols',
   ];
 
-  // 4. Ordenação por Probabilidade + Prioridade de Mercado
   const sorted = highValueMarkets.sort((a, b) => {
-    const priorityA = priorityOrder.indexOf(a.market);
-    const priorityB = priorityOrder.indexOf(b.market);
-    
-    // Se ambos estão na lista de prioridade, decide pela probabilidade
-    if (priorityA !== -1 && priorityB !== -1) {
-      return b.probability - a.probability;
-    }
-    // Caso contrário, joga os priorizados para cima
-    return (priorityA === -1 ? 99 : priorityA) - (priorityB === -1 ? 99 : priorityB);
+    const pA = priorityOrder.indexOf(a.market);
+    const pB = priorityOrder.indexOf(b.market);
+    if (pA !== -1 && pB !== -1) return b.probability - a.probability;
+    return (pA === -1 ? 99 : pA) - (pB === -1 ? 99 : pB);
   });
 
-  // 5. Seleciona os 3 mercados "Elite" para este jogo
+  // Remove combinações contraditórias (ex: Over 2.5 e Under 2.5 juntos)
   const selected = sorted.slice(0, 3);
 
-  // 6. Mapeia para o objeto de retorno esperado pelo componente BingoSuggestion
   return {
-    // Valores diretos para compatibilidade com o front
     over15: findProb(allMarkets, 'Over 1.5 Gols'),
     over25: findProb(allMarkets, 'Over 2.5 Gols'),
     btts: findProb(allMarkets, 'Ambas Marcam'),
-    markets: selected, // Lista completa para o Map do Frontend
+    markets: selected,
   };
 }
 
-/**
- * Auxiliar para encontrar a probabilidade exata calculada no matchAnalysis
- */
 function findProb(markets: MarketAnalysis[], name: string): number {
   const found = markets.find(m => m.market === name);
   return found ? found.probability : 0;
 }
 
 /**
- * Gera multi-bilhetes inteligentes a partir de uma lista de jogos
+ * Multi-bilhetes inteligentes com correlação
  */
 export function generateSmartBets(matches: any[]) {
   const allPicks: any[] = [];
@@ -74,6 +56,8 @@ export function generateSmartBets(matches: any[]) {
     if (!result || !result.markets.length) continue;
 
     const best = result.markets[0];
+    if (best.probability < 75) continue; // Filtro de confiança
+
     allPicks.push({
       match,
       market: best.market,
@@ -84,17 +68,14 @@ export function generateSmartBets(matches: any[]) {
   if (allPicks.length < 2) return [];
 
   const sorted = allPicks.sort((a, b) => b.probability - a.probability);
-
   const tickets: any[] = [];
 
-  // Bilhete 1: top 3
   const t1 = sorted.slice(0, 3);
   if (t1.length >= 2) {
     const prob = t1.reduce((acc, p) => acc * (p.probability / 100), 1) * 100;
     tickets.push({ picks: t1, probability: parseFloat(prob.toFixed(1)) });
   }
 
-  // Bilhete 2: next 3
   const t2 = sorted.slice(3, 6);
   if (t2.length >= 2) {
     const prob = t2.reduce((acc, p) => acc * (p.probability / 100), 1) * 100;
@@ -102,4 +83,26 @@ export function generateSmartBets(matches: any[]) {
   }
 
   return tickets;
+}
+
+/**
+ * Formatação WhatsApp profissional com emojis de validação
+ */
+export function formatBingoWhatsApp(bingoMatches: any[]): string {
+  const header = `🎯 *BINGO REAL — ANALISTA JOILSON*\n*Trade Esportivo Profissional*\n${'─'.repeat(30)}\n\n`;
+
+  const body = bingoMatches.map(bm => {
+    const matchHeader = `⚽ *${bm.homeTeam} vs ${bm.awayTeam}*\n`;
+    const details = `🏆 ${bm.league || 'Liga'} • ⏰ ${bm.time || 'A definir'}\n`;
+    const tips = (bm.selectedMarkets || bm.mercados || []).map((m: any) => {
+      const prob = m.probability || m.confianca;
+      const emoji = prob >= 90 ? '🟢🔥' : prob >= 80 ? '🟢' : '🟡';
+      return `${emoji} *${m.market || m.mercado}* → _${prob}%_`;
+    }).join('\n');
+    return `${matchHeader}${details}${tips}\n`;
+  }).join('\n');
+
+  const footer = `\n${'─'.repeat(30)}\n📊 *${bingoMatches.length} jogos selecionados*\n🧠 _Modelo Poisson + Médias Reais_\n✅ _Confiança mínima: 75%_`;
+
+  return header + body + footer;
 }

@@ -37,6 +37,7 @@ const LoadingScreen = () => (
 // 🛡️ PROTEÇÃO DE ACESSO PAGO
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { session, profile, loading } = useProfile();
+  useSessionGuard();
 
   if (loading) return <LoadingScreen />;
   if (!session) return <Navigate to="/auth" replace />;

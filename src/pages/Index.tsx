@@ -4,11 +4,13 @@ import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
 import { useAuth } from '@/hooks/useAuth';
-import { Brain, Loader2, Zap, RefreshCw } from 'lucide-react';
+import { useProfile } from '@/hooks/useProfile';
+import { Brain, Loader2, Zap, RefreshCw, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Index = () => {
   const { signOut } = useAuth();
+  const { profile } = useProfile();
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
@@ -87,10 +89,10 @@ const Index = () => {
           awayCardsVariance: null,
         },
         sampleSize: {
-          homeGames: hasHome ? 8 : 0,
-          awayGames: hasAway ? 8 : 0,
-          homeWithStats: hasHome ? 8 : 0,
-          awayWithStats: hasAway ? 8 : 0,
+          homeGames: hasHome ? 5 : 0,
+          awayGames: hasAway ? 5 : 0,
+          homeWithStats: hasHome ? 5 : 0,
+          awayWithStats: hasAway ? 5 : 0,
         },
         predictions: { homeWin: String(homeWin), draw: String(draw), awayWin: String(awayWin) },
       };
@@ -118,6 +120,11 @@ const Index = () => {
               onChange={e => { setDate(e.target.value); setHasFetchedOnce(false); }}
               className="bg-[#334155] text-xs p-2 rounded-lg border border-white/10"
             />
+            {profile?.is_admin && (
+              <Link to="/admin" className="p-2 bg-orange-500/10 rounded-lg hover:bg-orange-500/20 transition-colors">
+                <Shield className="w-4 h-4 text-orange-500" />
+              </Link>
+            )}
             <button onClick={signOut} className="bg-red-500/10 text-red-500 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-colors">
               SAIR
             </button>

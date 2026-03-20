@@ -36,9 +36,8 @@ function SampleSizeBadge({ match }: { match: MatchData }) {
   const awayGames = s.awayGames || 0;
   const totalGames = homeGames + awayGames;
 
-  // 🔥 NÍVEL PROFISSIONAL
-  const isHigh = totalGames >= 8;
-  const isMedium = totalGames >= 4;
+  const isHigh = totalGames >= 6;
+  const isMedium = totalGames >= 3;
 
   const color = isHigh
     ? 'bg-green-500/15 text-green-400 border-green-500/30'

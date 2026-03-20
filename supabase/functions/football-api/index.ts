@@ -138,8 +138,8 @@ serve(async (req) => {
         } else {
           try {
             const [hG, aG] = await Promise.all([
-              fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=8&status=FT`, apiKey),
-              fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=8&status=FT`, apiKey),
+              fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=5&status=FT`, apiKey),
+              fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey),
             ]);
             hStats = calcTeamStats(hG?.response || [], j.teams.home.id);
             aStats = calcTeamStats(aG?.response || [], j.teams.away.id);

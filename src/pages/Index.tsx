@@ -89,10 +89,10 @@ const Index = () => {
           awayCardsVariance: null,
         },
         sampleSize: {
-          homeGames: hasHome ? 8 : 0,
-          awayGames: hasAway ? 8 : 0,
-          homeWithStats: hasHome ? 8 : 0,
-          awayWithStats: hasAway ? 8 : 0,
+          homeGames: hasHome ? 5 : 0,
+          awayGames: hasAway ? 5 : 0,
+          homeWithStats: hasHome ? 5 : 0,
+          awayWithStats: hasAway ? 5 : 0,
         },
         predictions: { homeWin: String(homeWin), draw: String(draw), awayWin: String(awayWin) },
       };

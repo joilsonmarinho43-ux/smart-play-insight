@@ -31,19 +31,30 @@ function calculateEV(prob: number, odd: number) {
   return prob / 100 * odd - 1;
 }
 
+// Estima odd justa com margem de casa (~8%) quando API não fornece odds
+function estimateOdd(probability: number): number {
+  const fairOdd = 100 / probability;
+  const margin = 1.08; // margem típica de casa de apostas
+  return parseFloat((fairOdd * margin).toFixed(2));
+}
+
 function generateEVTicket(markets: MarketAnalysis[], stakeBase: number = 10) {
-  // Filtra apenas mercados com odd disponível e EV positivo
   const evMarkets = markets
-    .filter(m => m.odd && calculateEV(m.probability, m.odd) > 0)
-    .sort((a, b) => calculateEV(b.probability, b.odd) - calculateEV(a.probability, a.odd)) // do maior EV
+    .map(m => {
+      const odd = m.odd || estimateOdd(m.probability);
+      const ev = calculateEV(m.probability, odd);
+      return { ...m, odd, ev };
+    })
+    .filter(m => m.ev > 0)
+    .sort((a, b) => b.ev - a.ev)
     .slice(0, 3);
 
   return evMarkets.map(m => ({
     market: m.market,
     prob: m.probability,
-    odd: m.odd!,
-    ev: parseFloat(calculateEV(m.probability, m.odd!).toFixed(2)),
-    suggestedStake: parseFloat((stakeBase * calculateEV(m.probability, m.odd!)).toFixed(2)),
+    odd: m.odd,
+    ev: parseFloat(m.ev.toFixed(2)),
+    suggestedStake: parseFloat((stakeBase * m.ev).toFixed(2)),
   }));
 }
 

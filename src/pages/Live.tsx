@@ -59,7 +59,7 @@ const Live = () => {
         )}
 
         {matches.map((match: any) => {
-          const id = match?.fixture?.id;
+          const id = match?.fixture?.id || match?.id;
           const stats = statsMap[id];
 
           const homePressure = calculatePressure(stats, 'home');

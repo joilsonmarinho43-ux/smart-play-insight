@@ -61,4 +61,45 @@ export function generatePreGameBingo(match: MatchData) {
 function findProb(markets: MarketAnalysis[], name: string): number {
   const found = markets.find(m => m.market === name);
   return found ? found.probability : 0;
-                  }
+}
+
+/**
+ * Gera multi-bilhetes inteligentes a partir de uma lista de jogos
+ */
+export function generateSmartBets(matches: any[]) {
+  const allPicks: any[] = [];
+
+  for (const match of matches) {
+    const result = generatePreGameBingo(match);
+    if (!result || !result.markets.length) continue;
+
+    const best = result.markets[0];
+    allPicks.push({
+      match,
+      market: best.market,
+      probability: best.probability,
+    });
+  }
+
+  if (allPicks.length < 2) return [];
+
+  const sorted = allPicks.sort((a, b) => b.probability - a.probability);
+
+  const tickets: any[] = [];
+
+  // Bilhete 1: top 3
+  const t1 = sorted.slice(0, 3);
+  if (t1.length >= 2) {
+    const prob = t1.reduce((acc, p) => acc * (p.probability / 100), 1) * 100;
+    tickets.push({ picks: t1, probability: parseFloat(prob.toFixed(1)) });
+  }
+
+  // Bilhete 2: next 3
+  const t2 = sorted.slice(3, 6);
+  if (t2.length >= 2) {
+    const prob = t2.reduce((acc, p) => acc * (p.probability / 100), 1) * 100;
+    tickets.push({ picks: t2, probability: parseFloat(prob.toFixed(1)) });
+  }
+
+  return tickets;
+}

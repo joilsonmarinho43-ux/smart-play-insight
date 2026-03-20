@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_sessions: {
+        Row: {
+          device_info: string | null
+          id: string
+          ip_address: string | null
+          logged_in_at: string
+          session_token: string
+          user_id: string
+        }
+        Insert: {
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          logged_in_at?: string
+          session_token: string
+          user_id: string
+        }
+        Update: {
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          logged_in_at?: string
+          session_token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -35,6 +62,42 @@ export type Database = {
           id?: string
           is_admin?: boolean
           subscription_expiry_date?: string | null
+        }
+        Relationships: []
+      }
+      session_conflicts: {
+        Row: {
+          created_at: string
+          id: string
+          new_device_info: string | null
+          new_ip: string | null
+          old_device_info: string | null
+          old_ip: string | null
+          seen: boolean
+          user_email: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_device_info?: string | null
+          new_ip?: string | null
+          old_device_info?: string | null
+          old_ip?: string | null
+          seen?: boolean
+          user_email?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_device_info?: string | null
+          new_ip?: string | null
+          old_device_info?: string | null
+          old_ip?: string | null
+          seen?: boolean
+          user_email?: string | null
+          user_id?: string
         }
         Relationships: []
       }

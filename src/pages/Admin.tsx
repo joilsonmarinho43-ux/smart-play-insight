@@ -2,20 +2,32 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DAYS_OPTIONS = [3, 7, 15, 30];
 
+interface SessionConflict {
+  id: string;
+  user_email: string;
+  old_device_info: string;
+  new_device_info: string;
+  created_at: string;
+  seen: boolean;
+}
+
 const Admin = () => {
   const { profile, loading: profileLoading } = useProfile();
   const [users, setUsers] = useState<Profile[]>([]);
+  const [conflicts, setConflicts] = useState<SessionConflict[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showConflicts, setShowConflicts] = useState(false);
 
   useEffect(() => {
     if (profile?.is_admin) {
       fetchUsers();
+      fetchConflicts();
     }
   }, [profile]);
 
@@ -32,6 +44,30 @@ const Admin = () => {
       setUsers(data as Profile[]);
     }
     setLoading(false);
+  };
+
+  const fetchConflicts = async () => {
+    const { data } = await supabase
+      .from('session_conflicts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50) as { data: SessionConflict[] | null };
+
+    if (data) {
+      setConflicts(data);
+    }
+  };
+
+  const markConflictsSeen = async () => {
+    const unseenIds = conflicts.filter(c => !c.seen).map(c => c.id);
+    if (unseenIds.length === 0) return;
+
+    await supabase
+      .from('session_conflicts')
+      .update({ seen: true })
+      .in('id', unseenIds);
+
+    setConflicts(prev => prev.map(c => ({ ...c, seen: true })));
   };
 
   const grantDays = async (userId: string, days: number) => {
@@ -68,7 +104,6 @@ const Admin = () => {
     }
   };
 
-  // Filtro de busca em tempo real
   const filteredUsers = users.filter(u => 
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -78,6 +113,8 @@ const Admin = () => {
     active: users.filter(u => u.subscription_expiry_date && new Date(u.subscription_expiry_date) > new Date()).length,
     expired: users.filter(u => u.subscription_expiry_date && new Date(u.subscription_expiry_date) <= new Date()).length
   };
+
+  const unseenConflicts = conflicts.filter(c => !c.seen).length;
 
   if (profileLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   if (!profile?.is_admin) return <Navigate to="/" replace />;
@@ -93,10 +130,51 @@ const Admin = () => {
               <h1 className="font-bold text-xl tracking-tight">CENTRAL DO ANALISTA</h1>
             </div>
           </div>
+          <button
+            onClick={() => {
+              setShowConflicts(!showConflicts);
+              if (!showConflicts) markConflictsSeen();
+            }}
+            className="relative p-2 hover:bg-white/5 rounded-lg transition-all"
+          >
+            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+            {unseenConflicts > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {unseenConflicts}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
       <main className="container max-w-5xl mx-auto px-4 py-8">
+        {/* ALERTAS DE COMPARTILHAMENTO */}
+        {showConflicts && (
+          <div className="mb-8 space-y-3">
+            <h2 className="text-sm font-bold text-yellow-500 uppercase flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> Alertas de Dispositivo Duplicado
+            </h2>
+            {conflicts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum alerta registrado.</p>
+            ) : (
+              conflicts.slice(0, 20).map((c) => (
+                <div key={c.id} className={`border rounded-xl p-4 text-xs space-y-1 ${c.seen ? 'border-white/5 bg-card/20' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
+                  <p className="font-bold text-yellow-400">⚠️ {c.user_email}</p>
+                  <p className="text-muted-foreground">
+                    <span className="text-red-400">Antigo:</span> {c.old_device_info?.slice(0, 60) || 'Desconhecido'}
+                  </p>
+                  <p className="text-muted-foreground">
+                    <span className="text-green-400">Novo:</span> {c.new_device_info?.slice(0, 60) || 'Desconhecido'}
+                  </p>
+                  <p className="text-muted-foreground/60">
+                    {new Date(c.created_at).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* DASHBOARD DE MÉTRICAS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-card/40 border border-white/5 p-4 rounded-2xl">

@@ -28,7 +28,7 @@ const Live = () => {
       const stats: any = {};
 
       for (const match of matches) {
-        const id = match?.fixture?.id;
+        const id = (match as any)?.fixture?.id || (match as any)?.id;
         if (!id) continue;
 
         stats[id] = await fetchMatchStats(id);

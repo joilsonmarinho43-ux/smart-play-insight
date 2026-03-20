@@ -1,49 +1,58 @@
-import { MatchData } from '@/types/match';
+import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from './matchAnalysis';
 
 export function generatePreGameBingo(match: MatchData) {
   const markets = analyzeMarkets(match);
-
   if (!markets || markets.length === 0) return null;
 
-  // 🔥 FILTRO REAL (SEM QUEBRAR MODELO)
+  // 🔥 FILTRO NÍVEL CASA DE APOSTA
   const validMarkets = markets.filter((m) => {
-    if (m.probability < 60) return false; // corte mínimo
-    if (m.risk === 'Alto') return false;  // evita risco alto
-
-    // 🎯 só mercados confiáveis
-    if (
-      m.category !== 'goals' &&
-      m.category !== 'corners' &&
-      m.category !== 'result'
-    ) return false;
-
+    if (m.probability > 85) return false; // evita valores inflados
+    if (m.probability < 55) return false; // descarta mercado fraco
+    if (m.risk === 'Alto') return false; // descarta mercado de alto risco
     return true;
   });
 
   if (validMarkets.length === 0) return null;
 
-  // 🔥 ORDEM PROFISSIONAL
-  const priority = [
+  const priorityOrder = [
     'Over 1.5 Gols',
     'Over 2.5 Gols',
     '1X',
     'X2',
-    'Vitória'
+    'Gol no 1º tempo',
+    'Chance dupla',
+    'Visitante marca gol',
+    'Impedimento',
+    'Over 5.5 Escanteios',
   ];
 
   const sorted = validMarkets.sort((a, b) => {
-    const pa = priority.findIndex(p => a.market.includes(p));
-    const pb = priority.findIndex(p => b.market.includes(p));
+    const pa = priorityOrder.indexOf(a.market);
+    const pb = priorityOrder.indexOf(b.market);
     return (pa === -1 ? 99 : pa) - (pb === -1 ? 99 : pb);
   });
 
   const selected = sorted.slice(0, 3);
 
   return {
-    markets: selected.map((m) => ({
-      market: m.market,
-      probability: Math.min(m.probability, 85), // 🔥 LIMITADOR FINAL
-    })),
+    over15: findProb(selected, 'Over 1.5 Gols'),
+    over25: findProb(selected, 'Over 2.5 Gols'),
+    btts: findBTTS(match),
+    markets: selected,
   };
-                                  }
+}
+
+function findBTTS(match: MatchData): number {
+  const metrics = match.metrics;
+  if (!metrics) return 0;
+  const shotsH = metrics.totalShots?.[0] || 0;
+  const shotsA = metrics.totalShots?.[1] || 0;
+  if (shotsH < 5 || shotsA < 5) return 40;
+  return Math.min(75, 50 + shotsH + shotsA);
+}
+
+function findProb(markets: MarketAnalysis[], name: string): number {
+  const found = markets.find(m => m.market === name);
+  return found ? found.probability : 0;
+    }

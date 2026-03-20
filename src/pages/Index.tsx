@@ -67,14 +67,16 @@ const Index = () => {
     }
   }, [refetch, hasFetchedOnce]);
 
+  // 🔥 NORMALIZAÇÃO DE DADOS
   const safeMatches = useMemo((): Match[] => {
     return (rawMatches || []).map((m: any) => ({
       ...m,
       homeTeam: m.teams?.home?.name || 'Casa',
       awayTeam: m.teams?.away?.name || 'Fora',
+
       metrics: m.metrics || {
         possession: [0, 0],
-        xG: [0, 0],
+        xG: [1.2, 1.0], // 🔥 fallback REALISTA
         totalShots: [0, 0],
         shotsOnTarget: [0, 0],
         bigChances: [0, 0],
@@ -84,6 +86,7 @@ const Index = () => {
         yellowCards: [0, 0],
         redCards: [0, 0],
       },
+
       modelData: m.modelData || {
         homeGoalsAvg: 1.2,
         awayGoalsAvg: 1.0,
@@ -95,7 +98,7 @@ const Index = () => {
     }));
   }, [rawMatches]);
 
-  // 🔥 BINGO REAL (POISSON)
+  // 🔥 BINGO PROFISSIONAL REAL
   const gerarBingo = async () => {
     setLoadingBingo(true);
 
@@ -105,31 +108,37 @@ const Index = () => {
       const picks = safeMatches
         .map((m) => {
           const markets = analyzeMarkets(m);
+          if (!markets.length) return null;
 
-          if (!markets || markets.length === 0) return null;
+          // 🎯 FILTRO PROFISSIONAL
+          const selecionados = markets
+            .filter((mk) => {
+              if (mk.category === 'goals' && mk.probability >= 65) return true;
+              if (mk.category === 'corners' && mk.probability >= 60) return true;
+              if (mk.market === '1X' && mk.probability >= 70) return true;
+              if (mk.market === 'X2' && mk.probability >= 70) return true;
+              if (mk.market.includes('Vitória') && mk.probability >= 55) return true;
+              return false;
+            })
+            .slice(0, 3)
+            .map((mk) => ({
+              mercado: mk.market,
+              confianca: Math.min(mk.probability, 85), // 🔥 LIMITADOR ANTI-99%
+            }));
 
-          const selecionados = markets.filter((mk) => {
-            if (mk.market.includes('Over 1.5') && mk.probability >= 75) return true;
-            if (mk.market.includes('Over 2.5') && mk.probability >= 65) return true;
-            if (mk.market === '1X' && mk.probability >= 70) return true;
-            if (mk.market === 'X2' && mk.probability >= 70) return true;
-            if (mk.market.includes('Vitória') && mk.probability >= 55) return true;
-
-            return false;
-          });
-
-          if (selecionados.length === 0) return null;
+          if (!selecionados.length) return null;
 
           return {
             ...m,
-            mercados: selecionados.slice(0, 3).map((mk) => ({
-              mercado: mk.market,
-              confianca: mk.probability,
-            })),
+            mercados: selecionados,
           };
         })
         .filter(Boolean)
-        .sort((a: any, b: any) => b.mercados.length - a.mercados.length)
+        .sort((a: any, b: any) => {
+          const avgA = a.mercados.reduce((acc: number, x: any) => acc + x.confianca, 0);
+          const avgB = b.mercados.reduce((acc: number, x: any) => acc + x.confianca, 0);
+          return avgB - avgA;
+        })
         .slice(0, 5);
 
       setBingo(picks as BingoPick[]);
@@ -139,37 +148,44 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32 font-sans">
-      <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+      
+      {/* HEADER */}
+      <header className="border-b border-white/10 bg-[#1e293b]/80 sticky top-0 z-50">
+        <div className="container max-w-3xl mx-auto px-4 py-4 flex justify-between">
+          
           <div className="flex items-center gap-3">
             <Brain className="w-8 h-8 text-orange-500" />
             <div>
-              <h1 className="text-xl font-bold tracking-tighter">ANALISTA JOILSON</h1>
-              <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest">MODELO REAL PRO</p>
+              <h1 className="text-xl font-bold">ANALISTA JOILSON</h1>
+              <p className="text-[10px] text-orange-500 font-bold">MODELO TRADER PRO</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex gap-2">
             <button onClick={() => refetch()} className="p-2 bg-white/5 rounded-lg">
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
             </button>
 
             <input 
-              type="date" 
-              value={date} 
+              type="date"
+              value={date}
               onChange={(e) => { setDate(e.target.value); setHasFetchedOnce(false); }}
               className="bg-[#334155] text-xs p-2 rounded-lg"
             />
 
-            <button onClick={signOut} className="bg-red-500/10 text-red-500 px-3 py-2 rounded-lg text-xs font-bold">
+            <button onClick={signOut} className="bg-red-500/10 text-red-500 px-3 py-2 rounded-lg text-xs">
               SAIR
             </button>
           </div>
+
         </div>
       </header>
 
+      {/* MAIN */}
       <main className="container max-w-3xl mx-auto px-4">
+
         <div className="grid grid-cols-2 gap-4 mt-6">
+
           <div className="bg-[#1e293b] rounded-xl p-4 text-center">
             <p className="text-xs text-gray-400">Jogos</p>
             <p className="text-3xl font-black text-orange-500">{safeMatches.length}</p>
@@ -180,23 +196,25 @@ const Index = () => {
             disabled={loadingBingo || isFetching}
             className="bg-green-600 rounded-xl flex flex-col items-center justify-center"
           >
-            {loadingBingo ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
-            ) : (
+            {loadingBingo ? <Loader2 className="animate-spin" /> : (
               <>
-                <span className="font-black text-lg">GERAR BINGO</span>
-                <span className="text-[10px]">REAL 🔥</span>
+                <span className="font-black">GERAR BINGO</span>
+                <span className="text-[10px]">TRADER 🔥</span>
               </>
             )}
           </button>
+
         </div>
 
+        {/* RESULTADO */}
         {bingo.length > 0 && (
           <div className="mt-6 bg-gradient-to-br from-orange-600 to-red-700 p-5 rounded-2xl">
-            <p className="text-xs font-bold mb-4">BINGO REAL (POISSON)</p>
+
+            <p className="text-xs font-bold mb-4">BINGO PROFISSIONAL</p>
 
             {bingo.map((m) => (
               <div key={m.id} className="mb-3 bg-black/20 p-3 rounded-xl">
+                
                 <p className="font-bold text-sm mb-2">
                   {m.homeTeam} vs {m.awayTeam}
                 </p>
@@ -209,11 +227,14 @@ const Index = () => {
                     </span>
                   </div>
                 ))}
+
               </div>
             ))}
+
           </div>
         )}
 
+        {/* LISTA DE JOGOS */}
         <div className="mt-8">
           {isFetching ? (
             <Loader2 className="w-10 h-10 animate-spin mx-auto" />
@@ -223,13 +244,16 @@ const Index = () => {
             ))
           )}
         </div>
+
       </main>
 
+      {/* BOTÃO LIVE */}
       <div className="fixed bottom-6 left-0 right-0 flex justify-center">
         <Link to="/live" className="bg-orange-600 px-6 py-3 rounded-full flex items-center gap-2">
           <Zap /> LIVE TRADE
         </Link>
       </div>
+
     </div>
   );
 };

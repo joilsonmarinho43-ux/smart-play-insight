@@ -1,194 +1,140 @@
 import { MatchData, MarketAnalysis, RiskProfile } from '@/types/match';
 
-// ── POISSON BASE ────────────────────────────────────────────────
-function poissonPmf(lambda: number, k: number): number {
-  if (lambda <= 0) return k === 0 ? 1 : 0;
-
-  let logP = -lambda + k * Math.log(lambda);
-  for (let i = 2; i <= k; i++) logP -= Math.log(i);
-
-  return Math.exp(logP);
+// ── POISSON ─────────────────────────────────────────
+function poisson(lambda: number, k: number): number {
+  return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
 }
 
-function poissonOverProb(lambda1: number, lambda2: number, threshold: number): number {
-  let pUnder = 0;
-  const n = Math.floor(threshold);
+function factorial(n: number): number {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
 
-  for (let total = 0; total <= n; total++) {
-    for (let h = 0; h <= total; h++) {
-      pUnder += poissonPmf(lambda1, h) * poissonPmf(lambda2, total - h);
+// ── OVER (GOLOS) ───────────────────────────────────
+function overProb(lambda: number, line: number): number {
+  let prob = 0;
+  for (let i = Math.floor(line) + 1; i <= 10; i++) {
+    prob += poisson(lambda, i);
+  }
+  return prob;
+}
+
+// ── RESULTADO ──────────────────────────────────────
+function resultProb(lambdaH: number, lambdaA: number) {
+  let home = 0, draw = 0, away = 0;
+
+  for (let h = 0; h <= 5; h++) {
+    for (let a = 0; a <= 5; a++) {
+      const p = poisson(lambdaH, h) * poisson(lambdaA, a);
+
+      if (h > a) home += p;
+      else if (h === a) draw += p;
+      else away += p;
     }
   }
 
-  return Math.max(0, Math.min(1, 1 - pUnder));
+  return { home, draw, away };
 }
 
-function poissonSingleOver(lambda: number, threshold: number): number {
-  let pUnder = 0;
-  const n = Math.floor(threshold);
+// ── LIMITADOR REAL (ANTI 99%) ──────────────────────
+function clampProb(p: number): number {
+  const value = p * 100;
 
-  for (let k = 0; k <= n; k++) {
-    pUnder += poissonPmf(lambda, k);
-  }
+  if (value > 85) return 85; // 🔥 limite realista
+  if (value < 5) return 5;
 
-  return Math.max(0, Math.min(1, 1 - pUnder));
+  return Math.round(value);
 }
 
-// ── AJUSTE DE VARIÂNCIA ─────────────────────────────────────────
-function adjustedMean(mean: number, variance: number): number {
-  if (!mean || mean <= 0) return 0.1;
-
-  const cv = variance > 0 ? Math.sqrt(variance) / mean : 0;
-  return mean * (1 - cv * 0.05);
-}
-
-// ── RESULTADOS ──────────────────────────────────────────────────
-function resultProbabilities(lambdaH: number, lambdaA: number) {
-  let pHome = 0, pDraw = 0, pAway = 0;
-  const maxGoals = 8;
-
-  for (let h = 0; h <= maxGoals; h++) {
-    for (let a = 0; a <= maxGoals; a++) {
-      const p = poissonPmf(lambdaH, h) * poissonPmf(lambdaA, a);
-
-      if (h > a) pHome += p;
-      else if (h === a) pDraw += p;
-      else pAway += p;
-    }
-  }
-
-  return { pHome, pDraw, pAway };
-}
-
-// ── FUNÇÃO PRINCIPAL (AGORA REAL) ───────────────────────────────
+// ── FUNÇÃO PRINCIPAL ───────────────────────────────
 export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
   const markets: MarketAnalysis[] = [];
 
-  const metrics = match.metrics || ({} as any);
-  const modelData = match.modelData || ({} as any);
+  const md = match.modelData;
 
-  // 🔥 PEGAR XG REAL
-  let [xgH, xgA] = metrics.xG || [null, null];
-
-  // 🔥 FALLBACK INTELIGENTE
-  if (xgH === null || xgA === null) {
-    if (modelData.homeGoalsAvg && modelData.awayGoalsAvg) {
-      xgH = modelData.homeGoalsAvg;
-      xgA = modelData.awayGoalsAvg;
-    } else {
-      return []; // ❗ SEM DADO = NÃO ANALISA
-    }
+  if (!md || !md.homeGoalsAvg || !md.awayGoalsAvg) {
+    return []; // sem dados = sem análise
   }
 
-  // 🔥 LIMITADOR (ANTI 99%)
-  xgH = Math.min(Math.max(xgH, 0.3), 3.5);
-  xgA = Math.min(Math.max(xgA, 0.3), 3.5);
+  // 🔥 AJUSTE REALISTA
+  let lambdaH = md.homeGoalsAvg;
+  let lambdaA = md.awayGoalsAvg;
+
+  // 🔥 LIMITADOR DE LAMBDA (ESSENCIAL)
+  lambdaH = Math.min(Math.max(lambdaH, 0.5), 2.2);
+  lambdaA = Math.min(Math.max(lambdaA, 0.5), 2.0);
+
+  const totalLambda = lambdaH + lambdaA;
 
   // ── GOLOS ──
-  const goalLines = [0.5, 1.5, 2.5];
+  const over15 = overProb(totalLambda, 1.5);
+  const over25 = overProb(totalLambda, 2.5);
 
-  for (const line of goalLines) {
-    const prob = poissonOverProb(xgH, xgA, line);
+  markets.push({
+    market: 'Over 1.5 Gols',
+    category: 'goals',
+    probability: clampProb(over15),
+    statisticalBasis: `λ=${totalLambda.toFixed(2)}`,
+    risk: over15 > 0.7 ? 'Baixo' : over15 > 0.55 ? 'Médio' : 'Alto',
+  });
 
-    markets.push({
-      market: `Over ${line} Gols`,
-      category: 'goals',
-      probability: round(prob * 100),
-      statisticalBasis: `Poisson real (λH=${xgH.toFixed(2)}, λA=${xgA.toFixed(2)})`,
-      risk: prob >= 0.75 ? 'Baixo' : prob >= 0.55 ? 'Médio' : 'Alto',
-    });
-  }
-
-  // ── ESCANTEIOS ──
-  const lambdaCorners =
-    adjustedMean(modelData.homeCornersAvg || 4, modelData.homeCornersVariance || 1) +
-    adjustedMean(modelData.awayCornersAvg || 4, modelData.awayCornersVariance || 1);
-
-  for (const line of [5.5, 6.5, 7.5]) {
-    const prob = poissonSingleOver(lambdaCorners, line);
-
-    markets.push({
-      market: `Over ${line} Escanteios`,
-      category: 'corners',
-      probability: round(prob * 100),
-      statisticalBasis: `Modelo (μ=${lambdaCorners.toFixed(1)})`,
-      risk: prob >= 0.75 ? 'Baixo' : prob >= 0.55 ? 'Médio' : 'Alto',
-    });
-  }
-
-  // ── CARTÕES ──
-  const lambdaCards =
-    adjustedMean(modelData.homeCardsAvg || 2, modelData.homeCardsVariance || 1) +
-    adjustedMean(modelData.awayCardsAvg || 2, modelData.awayCardsVariance || 1);
-
-  for (const line of [2.5, 3.5]) {
-    const prob = poissonSingleOver(lambdaCards, line);
-
-    markets.push({
-      market: `Over ${line} Cartões`,
-      category: 'cards',
-      probability: round(prob * 100),
-      statisticalBasis: `Modelo (μ=${lambdaCards.toFixed(1)})`,
-      risk: prob >= 0.75 ? 'Baixo' : prob >= 0.55 ? 'Médio' : 'Alto',
-    });
-  }
+  markets.push({
+    market: 'Over 2.5 Gols',
+    category: 'goals',
+    probability: clampProb(over25),
+    statisticalBasis: `λ=${totalLambda.toFixed(2)}`,
+    risk: over25 > 0.65 ? 'Baixo' : over25 > 0.5 ? 'Médio' : 'Alto',
+  });
 
   // ── RESULTADO ──
-  const { pHome, pDraw, pAway } = resultProbabilities(xgH, xgA);
+  const { home, draw, away } = resultProb(lambdaH, lambdaA);
 
   markets.push({
     market: `Vitória ${match.homeTeam}`,
     category: 'result',
-    probability: round(pHome * 100),
-    statisticalBasis: `Poisson`,
-    risk: pHome >= 0.6 ? 'Baixo' : pHome >= 0.4 ? 'Médio' : 'Alto',
+    probability: clampProb(home),
+    statisticalBasis: 'Poisson',
+    risk: home > 0.6 ? 'Baixo' : home > 0.4 ? 'Médio' : 'Alto',
   });
 
   markets.push({
     market: `Vitória ${match.awayTeam}`,
     category: 'result',
-    probability: round(pAway * 100),
-    statisticalBasis: `Poisson`,
-    risk: pAway >= 0.6 ? 'Baixo' : pAway >= 0.4 ? 'Médio' : 'Alto',
+    probability: clampProb(away),
+    statisticalBasis: 'Poisson',
+    risk: away > 0.6 ? 'Baixo' : away > 0.4 ? 'Médio' : 'Alto',
   });
 
   markets.push({
-    market: `1X`,
+    market: '1X',
     category: 'result',
-    probability: round((pHome + pDraw) * 100),
-    statisticalBasis: `Poisson`,
-    risk: (pHome + pDraw) >= 0.75 ? 'Baixo' : (pHome + pDraw) >= 0.55 ? 'Médio' : 'Alto',
+    probability: clampProb(home + draw),
+    statisticalBasis: 'Poisson',
+    risk: (home + draw) > 0.7 ? 'Baixo' : 'Médio',
   });
 
   markets.push({
-    market: `X2`,
+    market: 'X2',
     category: 'result',
-    probability: round((pAway + pDraw) * 100),
-    statisticalBasis: `Poisson`,
-    risk: (pAway + pDraw) >= 0.75 ? 'Baixo' : (pAway + pDraw) >= 0.55 ? 'Médio' : 'Alto',
+    probability: clampProb(away + draw),
+    statisticalBasis: 'Poisson',
+    risk: (away + draw) > 0.7 ? 'Baixo' : 'Médio',
   });
 
   return markets.sort((a, b) => b.probability - a.probability);
 }
 
-// ── PERFIL ─────────────────────────────────────────────────────
+// ── PERFIL ─────────────────────────────────────────
 export function getBestMarketForProfile(
   markets: MarketAnalysis[],
   profile: RiskProfile
 ): MarketAnalysis | null {
 
-  const thresholds: Record<RiskProfile, number> = {
+  const limits = {
     conservador: 75,
     moderado: 65,
     agressivo: 55,
   };
 
-  const filtered = markets.filter((m) => m.probability >= thresholds[profile]);
-
-  return filtered.length ? filtered[0] : null;
+  return markets.find((m) => m.probability >= limits[profile]) || null;
 }
-
-// ── UTIL ───────────────────────────────────────────────────────
-function round(v: number): number {
-  return Math.round(v * 10) / 10;
-      }

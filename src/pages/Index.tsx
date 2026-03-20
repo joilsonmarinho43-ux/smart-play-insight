@@ -22,6 +22,9 @@ const Index = () => {
 
   useEffect(() => {
     if (!hasFetchedOnce) {
+      // Limpa cache antigo para forçar dados frescos
+      localStorage.removeItem('football_cache_pre');
+      localStorage.removeItem('football_cache_pre_time');
       refetch();
       setHasFetchedOnce(true);
     }

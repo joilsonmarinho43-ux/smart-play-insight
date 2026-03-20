@@ -1,58 +1,64 @@
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from './matchAnalysis';
 
+/**
+ * 🔥 GERADOR DE BINGO REAL (PROFISSIONAL)
+ * Transforma a análise individual em uma estrutura de bilhete de valor.
+ */
 export function generatePreGameBingo(match: MatchData) {
-  const markets = analyzeMarkets(match);
-  if (!markets || markets.length === 0) return null;
+  // 1. Obtém todos os mercados analisados com a nova matemática (Poisson/Médias)
+  const allMarkets = analyzeMarkets(match);
+  
+  if (!allMarkets || allMarkets.length === 0) return null;
 
-  // 🔥 FILTRO NÍVEL CASA DE APOSTA
-  const validMarkets = markets.filter((m) => {
-    if (m.probability > 85) return false; // evita valores inflados
-    if (m.probability < 55) return false; // descarta mercado fraco
-    if (m.risk === 'Alto') return false; // descarta mercado de alto risco
-    return true;
+  // 2. Filtro de Qualidade: Remove mercados com probabilidade irrelevante para Trade
+  const highValueMarkets = allMarkets.filter((m) => {
+    // No Trade Real, buscamos confiança acima de 60% e descartamos o que é "chute"
+    return m.probability >= 60 && m.probability <= 98;
   });
 
-  if (validMarkets.length === 0) return null;
+  if (highValueMarkets.length === 0) return null;
 
+  // 3. Ordem de Prioridade para o Bilhete (Mercados com maior liquidez e segurança)
   const priorityOrder = [
     'Over 1.5 Gols',
+    'Ambas Marcam',
+    'Over 7.5 Cantos',
+    '1X ou 2X',
+    'Over 0.5 HT',
     'Over 2.5 Gols',
-    '1X',
-    'X2',
-    'Gol no 1º tempo',
-    'Chance dupla',
-    'Visitante marca gol',
-    'Impedimento',
-    'Over 5.5 Escanteios',
   ];
 
-  const sorted = validMarkets.sort((a, b) => {
-    const pa = priorityOrder.indexOf(a.market);
-    const pb = priorityOrder.indexOf(b.market);
-    return (pa === -1 ? 99 : pa) - (pb === -1 ? 99 : pb);
+  // 4. Ordenação por Probabilidade + Prioridade de Mercado
+  const sorted = highValueMarkets.sort((a, b) => {
+    const priorityA = priorityOrder.indexOf(a.market);
+    const priorityB = priorityOrder.indexOf(b.market);
+    
+    // Se ambos estão na lista de prioridade, decide pela probabilidade
+    if (priorityA !== -1 && priorityB !== -1) {
+      return b.probability - a.probability;
+    }
+    // Caso contrário, joga os priorizados para cima
+    return (priorityA === -1 ? 99 : priorityA) - (priorityB === -1 ? 99 : priorityB);
   });
 
+  // 5. Seleciona os 3 mercados "Elite" para este jogo
   const selected = sorted.slice(0, 3);
 
+  // 6. Mapeia para o objeto de retorno esperado pelo componente BingoSuggestion
   return {
-    over15: findProb(selected, 'Over 1.5 Gols'),
-    over25: findProb(selected, 'Over 2.5 Gols'),
-    btts: findBTTS(match),
-    markets: selected,
+    // Valores diretos para compatibilidade com o front
+    over15: findProb(allMarkets, 'Over 1.5 Gols'),
+    over25: findProb(allMarkets, 'Over 2.5 Gols'),
+    btts: findProb(allMarkets, 'Ambas Marcam'),
+    markets: selected, // Lista completa para o Map do Frontend
   };
 }
 
-function findBTTS(match: MatchData): number {
-  const metrics = match.metrics;
-  if (!metrics) return 0;
-  const shotsH = metrics.totalShots?.[0] || 0;
-  const shotsA = metrics.totalShots?.[1] || 0;
-  if (shotsH < 5 || shotsA < 5) return 40;
-  return Math.min(75, 50 + shotsH + shotsA);
-}
-
+/**
+ * Auxiliar para encontrar a probabilidade exata calculada no matchAnalysis
+ */
 function findProb(markets: MarketAnalysis[], name: string): number {
   const found = markets.find(m => m.market === name);
   return found ? found.probability : 0;
-    }
+                  }

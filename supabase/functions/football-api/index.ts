@@ -78,20 +78,17 @@ serve(async (req) => {
     // ========== STATS for a specific fixture ==========
     if (fixtureId) {
       console.log(`Fetching stats for fixture: ${fixtureId}`);
-      const cacheKey = ["stats_v2", String(fixtureId)];
-      const cached = await kv.get(cacheKey);
+      const ck = `stats_${fixtureId}`;
+      const cached = cacheGet(ck);
       const now = Date.now();
 
-      if (cached.value) {
-        const age = now - (cached.value as any).timestamp;
-        if (age < 20000) {
-          return new Response(JSON.stringify((cached.value as any).data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
+      if (cached && (now - cached.timestamp < 20000)) {
+        return new Response(JSON.stringify(cached.data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
       const responseData = { response: sData?.response || [] };
-      await kv.set(cacheKey, { timestamp: now, data: responseData });
+      cacheSet(ck, { timestamp: now, data: responseData });
 
       return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

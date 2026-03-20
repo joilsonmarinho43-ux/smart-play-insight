@@ -6,8 +6,10 @@ const corsHeaders = {
 };
 
 const BASE_URL = "https://v3.football.api-sports.io";
-
 const kv = await Deno.openKv();
+
+// 🔥 Ligas Principais para economizar sua API Pro (Adicione IDs conforme necessário)
+const LEAGUES_TO_ANALYZE = [13, 71, 72, 39, 140, 78, 135, 94, 2, 3, 848]; 
 
 async function fetchWithAuth(endpoint: string, apiKey: string) {
   const res = await fetch(`${BASE_URL}/${endpoint}`, {
@@ -17,43 +19,36 @@ async function fetchWithAuth(endpoint: string, apiKey: string) {
   return res.json();
 }
 
-// =============================
-// 🔥 EXTRAI STATS (LIVE)
-// =============================
 function extractStats(stats: any[]) {
-  const get = (name: string) =>
-    Number(stats.find((s: any) => s.type === name)?.value || 0);
+  if (!stats || stats.length === 0) return null;
+  const get = (name: string) => {
+    const val = stats.find((s: any) => s.type === name)?.value;
+    return val === null || val === undefined ? 0 : Number(String(val).replace('%', ''));
+  };
 
   return {
     shotsOnGoal: get("Shots on Goal"),
-    shotsOffGoal: get("Shots off Goal"),
     possession: get("Ball Possession"),
     corners: get("Corner Kicks"),
-    attacks: get("Total Shots"),
+    totalShots: get("Total Shots"),
     dangerousAttacks: get("Dangerous Attacks"),
   };
 }
 
-// =============================
-// 🔥 NOVO: CALCULAR MÉDIA REAL
-// =============================
 function calcTeamStats(games: any[], teamId: number) {
+  if (!games || games.length === 0) return { goalsFor: 0, goalsAgainst: 0 };
   let goalsFor = 0;
   let goalsAgainst = 0;
 
   games.forEach((g) => {
     const isHome = g.teams.home.id === teamId;
-
-    const scored = isHome ? g.goals.home : g.goals.away;
-    const conceded = isHome ? g.goals.away : g.goals.home;
-
-    goalsFor += scored || 0;
-    goalsAgainst += conceded || 0;
+    goalsFor += (isHome ? g.goals.home : g.goals.away) || 0;
+    goalsAgainst += (isHome ? g.goals.away : g.goals.home) || 0;
   });
 
   return {
-    goalsFor: goalsFor / games.length,
-    goalsAgainst: goalsAgainst / games.length,
+    goalsFor: Number((goalsFor / games.length).toFixed(2)),
+    goalsAgainst: Number((goalsAgainst / games.length).toFixed(2)),
   };
 }
 
@@ -66,121 +61,75 @@ serve(async (req) => {
     const isLive = body?.live || false;
     const date = body?.date || new Date().toISOString().split("T")[0];
 
-    const cacheKey = isLive ? ["live"] : ["date", date];
+    // Cache: 15s para Live, 1h para Pré-jogo
+    const cacheKey = isLive ? ["live_v2"] : ["date_v2", date];
     const cached = await kv.get(cacheKey);
+    const now = Date.now();
 
-    // CACHE INTELIGENTE
     if (cached.value) {
-      const age = Date.now() - (cached.value.timestamp || 0);
-
-      if (isLive && age < 15000) {
-        return new Response(JSON.stringify(cached.value.data), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (!isLive && age < 3600000) {
-        return new Response(JSON.stringify(cached.value.data), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const age = now - (cached.value.timestamp || 0);
+      const ttl = isLive ? 15000 : 3600000;
+      if (age < ttl) return new Response(JSON.stringify(cached.value.data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Busca Fixtures
     const endpoint = isLive ? "fixtures?live=all" : `fixtures?date=${date}`;
     const fixturesData = await fetchWithAuth(endpoint, apiKey);
-    const fixtures = fixturesData?.response || [];
+    let fixtures = fixturesData?.response || [];
+
+    // Filtro Profissional: Reduz o loop para não travar a memória
+    if (!isLive) {
+      fixtures = fixtures.filter((f: any) => LEAGUES_TO_ANALYZE.includes(f.league.id) || f.league.country === "Brazil").slice(0, 40);
+    }
 
     const matches = await Promise.all(
       fixtures.map(async (j: any) => {
         const fixtureId = j.fixture.id;
+        let stats = { home: null, away: null };
+        let hStats = null, aStats = null;
 
-        let statsHome = null;
-        let statsAway = null;
-
-        let homeStats = null;
-        let awayStats = null;
-
-        // =============================
-        // 🔥 LIVE STATS
-        // =============================
         if (isLive) {
           try {
-            const statsData = await fetchWithAuth(
-              `fixtures/statistics?fixture=${fixtureId}`,
-              apiKey
-            );
-
-            const stats = statsData?.response || [];
-
-            statsHome = extractStats(stats[0]?.statistics || []);
-            statsAway = extractStats(stats[1]?.statistics || []);
-          } catch {}
-        }
-
-        // =============================
-        // 🔥 PRÉ-JOGO (BASE REAL)
-        // =============================
-        if (!isLive) {
+            const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
+            const resS = sData?.response || [];
+            if (resS.length >= 2) {
+              stats.home = extractStats(resS[0].statistics);
+              stats.away = extractStats(resS[1].statistics);
+            }
+          } catch (e) { console.error(`Erro Stats Live ${fixtureId}`); }
+        } else {
           try {
-            const [homeGames, awayGames] = await Promise.all([
-              fetchWithAuth(
-                `fixtures?team=${j.teams.home.id}&last=5&status=FT`,
-                apiKey
-              ),
-              fetchWithAuth(
-                `fixtures?team=${j.teams.away.id}&last=5&status=FT`,
-                apiKey
-              ),
+            const [hG, aG] = await Promise.all([
+              fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=8&status=FT`, apiKey),
+              fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=8&status=FT`, apiKey),
             ]);
-
-            homeStats = calcTeamStats(
-              homeGames?.response || [],
-              j.teams.home.id
-            );
-
-            awayStats = calcTeamStats(
-              awayGames?.response || [],
-              j.teams.away.id
-            );
-          } catch {
-            // evita crash
-          }
+            hStats = calcTeamStats(hG?.response || [], j.teams.home.id);
+            aStats = calcTeamStats(aG?.response || [], j.teams.away.id);
+          } catch (e) {}
         }
 
         return {
           id: fixtureId,
-          isLive: isLive,
-
+          isLive,
           teams: j.teams,
           goals: j.goals,
           fixture: j.fixture,
-
-          // 🔥 BASE DO BINGO REAL
-          homeStats,
-          awayStats,
-
-          // 🔥 LIVE
-          stats: {
-            home: statsHome,
-            away: statsAway,
-          },
+          league: j.league.name,
+          homeStats: hStats,
+          awayStats: aStats,
+          stats: stats,
         };
       })
     );
 
-    const response = {
-      timestamp: Date.now(),
-      data: { matches },
-    };
+    const responseData = { matches };
+    await kv.set(cacheKey, { timestamp: now, data: responseData });
 
-    await kv.set(cacheKey, response);
-
-    return new Response(JSON.stringify(response.data), {
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err) {
-    console.error(err);
     return new Response(JSON.stringify({ matches: [] }), { headers: corsHeaders });
   }
 });

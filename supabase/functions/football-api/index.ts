@@ -6,7 +6,15 @@ const corsHeaders = {
 };
 
 const BASE_URL = "https://v3.football.api-sports.io";
-const kv = await Deno.openKv();
+// In-memory cache (replaces Deno KV which isn't available in edge runtime)
+const memCache = new Map<string, { timestamp: number; data: any }>();
+
+function cacheGet(key: string) {
+  return memCache.get(key) || null;
+}
+function cacheSet(key: string, value: { timestamp: number; data: any }) {
+  memCache.set(key, value);
+}
 
 const LEAGUES_TO_ANALYZE = [13, 71, 72, 39, 140, 78, 135, 94, 2, 3, 848];
 

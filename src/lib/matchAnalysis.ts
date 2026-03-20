@@ -1,7 +1,7 @@
 import { MatchData, MarketAnalysis, RiskProfile } from '@/types/match';
 
 // ─────────────────────────────────────────────
-// 🔢 FUNÇÃO FATORIAL
+// 🔢 FATORIAL
 // ─────────────────────────────────────────────
 function factorial(n: number): number {
   if (n <= 1) return 1;
@@ -9,14 +9,14 @@ function factorial(n: number): number {
 }
 
 // ─────────────────────────────────────────────
-// 📊 POISSON BASE
+// 📊 POISSON
 // ─────────────────────────────────────────────
 function poisson(lambda: number, k: number): number {
   return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
 }
 
 // ─────────────────────────────────────────────
-// 🎯 PROBABILIDADE OVER (GOLS)
+// 🎯 PROBABILIDADE OVER
 // ─────────────────────────────────────────────
 function probOver(lambdaH: number, lambdaA: number, line: number): number {
   let prob = 0;
@@ -33,7 +33,7 @@ function probOver(lambdaH: number, lambdaA: number, line: number): number {
 }
 
 // ─────────────────────────────────────────────
-// 🏆 PROBABILIDADE RESULTADO
+// 🏆 RESULTADO
 // ─────────────────────────────────────────────
 function resultProbabilities(lambdaH: number, lambdaA: number) {
   let home = 0, draw = 0, away = 0;
@@ -52,25 +52,33 @@ function resultProbabilities(lambdaH: number, lambdaA: number) {
 }
 
 // ─────────────────────────────────────────────
+// 💰 CONVERTER PROB → ODD
+// ─────────────────────────────────────────────
+function probToOdd(prob: number): number {
+  if (prob <= 0) return 0;
+  return parseFloat((1 / (prob / 100)).toFixed(2));
+}
+
+// ─────────────────────────────────────────────
 // 🧠 FUNÇÃO PRINCIPAL
 // ─────────────────────────────────────────────
 export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
   const markets: MarketAnalysis[] = [];
 
-  // 🔥 PEGAR XG OU MÉDIA
   let xgH = match.metrics?.xG?.[0];
   let xgA = match.metrics?.xG?.[1];
 
+  // fallback inteligente
   if (!xgH || !xgA) {
     xgH = match.modelData?.homeGoalsAvg || 1.2;
     xgA = match.modelData?.awayGoalsAvg || 1.0;
   }
 
-  // 🚫 LIMITADOR (ANTI 99%)
+  // anti valores absurdos
   xgH = Math.min(Math.max(xgH, 0.5), 3);
   xgA = Math.min(Math.max(xgA, 0.5), 3);
 
-  // ── MERCADOS DE GOLS ──
+  // ── GOLOS ──
   const over15 = probOver(xgH, xgA, 1.5);
   const over25 = probOver(xgH, xgA, 2.5);
 
@@ -80,6 +88,7 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     probability: Math.round(over15 * 100),
     statisticalBasis: `Poisson (λH=${xgH.toFixed(2)}, λA=${xgA.toFixed(2)})`,
     risk: over15 >= 0.75 ? 'Baixo' : over15 >= 0.60 ? 'Médio' : 'Alto',
+    odd: probToOdd(over15 * 100),
   });
 
   markets.push({
@@ -88,6 +97,7 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     probability: Math.round(over25 * 100),
     statisticalBasis: `Poisson (λH=${xgH.toFixed(2)}, λA=${xgA.toFixed(2)})`,
     risk: over25 >= 0.70 ? 'Baixo' : over25 >= 0.55 ? 'Médio' : 'Alto',
+    odd: probToOdd(over25 * 100),
   });
 
   // ── RESULTADO ──
@@ -99,6 +109,7 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     probability: Math.round(home * 100),
     statisticalBasis: 'Poisson',
     risk: home >= 0.60 ? 'Baixo' : home >= 0.45 ? 'Médio' : 'Alto',
+    odd: probToOdd(home * 100),
   });
 
   markets.push({
@@ -107,6 +118,7 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     probability: Math.round(away * 100),
     statisticalBasis: 'Poisson',
     risk: away >= 0.60 ? 'Baixo' : away >= 0.45 ? 'Médio' : 'Alto',
+    odd: probToOdd(away * 100),
   });
 
   markets.push({
@@ -115,6 +127,7 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     probability: Math.round((home + draw) * 100),
     statisticalBasis: 'Poisson',
     risk: (home + draw) >= 0.75 ? 'Baixo' : 'Médio',
+    odd: probToOdd((home + draw) * 100),
   });
 
   markets.push({
@@ -123,6 +136,7 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     probability: Math.round((away + draw) * 100),
     statisticalBasis: 'Poisson',
     risk: (away + draw) >= 0.75 ? 'Baixo' : 'Médio',
+    odd: probToOdd((away + draw) * 100),
   });
 
   return markets.sort((a, b) => b.probability - a.probability);
@@ -145,4 +159,4 @@ export function getBestMarketForProfile(
   const filtered = markets.filter(m => m.probability >= thresholds[profile]);
 
   return filtered.length ? filtered[0] : null;
-      }
+        }

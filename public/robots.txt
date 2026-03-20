@@ -1,14 +1,11 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
+# Impede que o Google indexe sua área de administração e login
+Disallow: /admin
+Disallow: /auth
+Disallow: /expired
+
+# Permite que o restante do site (Landing Page, se houver) seja indexado
 Allow: /
+
+# Indica onde está o seu mapa do site (se você tiver um)
+# Sitemap: https://seu-dominio.com/sitemap.xml

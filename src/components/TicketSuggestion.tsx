@@ -26,38 +26,6 @@ const riskColors: Record<string, string> = {
   'Alto': 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
-// 💰 Função EV e bilhete real
-function calculateEV(prob: number, odd: number) {
-  return prob / 100 * odd - 1;
-}
-
-// Estima odd justa com margem de casa (~8%) quando API não fornece odds
-function estimateOdd(probability: number): number {
-  const fairOdd = 100 / probability;
-  const margin = 1.08; // margem típica de casa de apostas
-  return parseFloat((fairOdd * margin).toFixed(2));
-}
-
-function generateEVTicket(markets: MarketAnalysis[], stakeBase: number = 10) {
-  const evMarkets = markets
-    .map(m => {
-      const odd = m.odd || estimateOdd(m.probability);
-      const ev = calculateEV(m.probability, odd);
-      return { ...m, odd, ev };
-    })
-    .filter(m => m.ev > 0)
-    .sort((a, b) => b.ev - a.ev)
-    .slice(0, 3);
-
-  return evMarkets.map(m => ({
-    market: m.market,
-    prob: m.probability,
-    odd: m.odd,
-    ev: parseFloat(m.ev.toFixed(2)),
-    suggestedStake: parseFloat((stakeBase * m.ev).toFixed(2)),
-  }));
-}
-
 const TicketSuggestionCard = ({ match }: Props) => {
   const [profile, setProfile] = useState<RiskProfile>('conservador');
   const [showAll, setShowAll] = useState(false);
@@ -67,13 +35,14 @@ const TicketSuggestionCard = ({ match }: Props) => {
   const bestMarket = getBestMarketForProfile(allMarkets, profile);
   const eligibleMarkets = allMarkets.filter(m => m.probability >= cfg.min);
 
-  const evTicket = generateEVTicket(eligibleMarkets, 10);
+  const whatsappText = `📊 *${match.homeTeam} vs ${match.awayTeam}*\n🏆 ${match.league}\n\n` +
+    eligibleMarkets.slice(0, 3).map(m => {
+      const emoji = m.probability >= 85 ? '🟢🔥' : m.probability >= 75 ? '🟢' : '🟡';
+      return `${emoji} ${m.market} → ${m.probability}% (Risco ${m.risk})`;
+    }).join('\n') +
+    `\n\n🧠 _Modelo Poisson • Últimos 5 jogos reais_`;
 
-  const whatsappLink = `https://wa.me/?text=${encodeURIComponent(
-    `📊 ${match.homeTeam} vs ${match.awayTeam}\n\n` +
-    evTicket.map(t => `✅ ${t.market} (${t.prob}%) - Odd: ${t.odd} - EV: ${t.ev} - Stake $${t.suggestedStake}`).join('\n') +
-    `\n📈 Análise modelada`
-  )}`;
+  const whatsappLink = `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
 
   return (
     <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 sm:p-5 mb-4">
@@ -82,7 +51,7 @@ const TicketSuggestionCard = ({ match }: Props) => {
       <div className="flex items-center gap-2 mb-4">
         <Ticket className="w-5 h-5 text-accent" />
         <h3 className="font-display text-base sm:text-lg text-accent tracking-wide">
-          SUGESTÃO DE BILHETE PROFISSIONAL
+          ANÁLISE DE MERCADOS
         </h3>
       </div>
 
@@ -118,7 +87,7 @@ const TicketSuggestionCard = ({ match }: Props) => {
           {eligibleMarkets.length > 1 && (
             <div className="mt-2 space-y-1">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Outras entradas válidas:
+                Outras entradas com valor:
               </span>
               {eligibleMarkets.slice(1, 4).map((m, i) => (
                 <MarketRow key={i} market={m} />
@@ -126,33 +95,22 @@ const TicketSuggestionCard = ({ match }: Props) => {
             </div>
           )}
 
-          {/* Bilhete profissional EV */}
-          <div className="mt-4 p-3 border rounded-lg bg-accent/10">
-            <h4 className="font-semibold text-sm mb-2">💹 Bilhete Profissional (EV+)</h4>
-            {evTicket.map((t, i) => (
-              <div key={i} className="flex justify-between text-xs py-1">
-                <span>{t.market}</span>
-                <span>{t.prob}%</span>
-                <span>Odd: {t.odd}</span>
-                <span>EV: {t.ev}</span>
-                <span>Stake: ${t.suggestedStake}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Botão WhatsApp */}
+          {/* WhatsApp */}
           <a
             href={whatsappLink}
             target="_blank"
             className="flex items-center justify-center mt-3 bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-semibold py-2 rounded-lg hover:bg-green-500/30 transition"
           >
-            📲 Enviar bilhete EV+ no WhatsApp
+            📲 Compartilhar análise
           </a>
         </>
       ) : (
         <div className="p-4 rounded-lg border border-border bg-muted/30 text-center">
           <p className="text-sm text-muted-foreground font-medium">
-            Sem entrada de valor estatístico para este perfil.
+            Nenhum mercado com valor para o perfil {cfg.label}.
+          </p>
+          <p className="text-[10px] text-muted-foreground/60 mt-1">
+            Tente um perfil mais agressivo ou aguarde mais dados.
           </p>
         </div>
       )}
@@ -163,7 +121,7 @@ const TicketSuggestionCard = ({ match }: Props) => {
         className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto"
       >
         {showAll ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        {showAll ? 'Ocultar análise completa' : 'Ver todos os mercados'}
+        {showAll ? 'Ocultar mercados' : 'Ver todos os mercados'}
       </button>
 
       {showAll && (
@@ -173,19 +131,32 @@ const TicketSuggestionCard = ({ match }: Props) => {
           ))}
         </div>
       )}
+
+      {/* Fonte */}
+      <div className="mt-3 pt-2 border-t border-border/30 text-center">
+        <span className="text-[9px] text-muted-foreground/50 uppercase tracking-widest">
+          Modelo Poisson · Dados reais API-Sports · Últimos 5 jogos
+        </span>
+      </div>
     </div>
   );
 };
 
 function BestMarketDisplay({ market }: { market: MarketAnalysis }) {
   const Icon = categoryIcons[market.category] || Ticket;
+  const riskStyle = riskColors[market.risk] || riskColors['Médio'];
 
   return (
     <div className="p-4 rounded-lg border border-accent/40 bg-accent/10">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className="w-5 h-5 text-accent" />
-          <span className="font-bold text-base text-foreground">{market.market}</span>
+          <div>
+            <span className="font-bold text-base text-foreground">{market.market}</span>
+            <span className={`ml-2 text-[9px] px-1.5 py-0.5 rounded border ${riskStyle}`}>
+              Risco {market.risk}
+            </span>
+          </div>
         </div>
         <span className="font-bold text-xl text-accent">{market.probability}%</span>
       </div>
@@ -194,10 +165,14 @@ function BestMarketDisplay({ market }: { market: MarketAnalysis }) {
 }
 
 function MarketRow({ market }: { market: MarketAnalysis }) {
+  const riskStyle = riskColors[market.risk] || riskColors['Médio'];
   return (
-    <div className="flex justify-between text-xs p-2 border rounded">
-      <span>{market.market}</span>
-      <span>{market.probability}%</span>
+    <div className="flex justify-between items-center text-xs p-2 border border-border/50 rounded-lg bg-secondary/20">
+      <span className="font-medium">{market.market}</span>
+      <div className="flex items-center gap-2">
+        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${riskStyle}`}>{market.risk}</span>
+        <span className="font-bold tabular-nums w-10 text-right">{market.probability}%</span>
+      </div>
     </div>
   );
 }

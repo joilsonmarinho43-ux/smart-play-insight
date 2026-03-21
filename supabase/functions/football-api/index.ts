@@ -145,12 +145,20 @@ async function fetchTeamStats(teamId: number, teamName: string, apiKey: string):
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       if (attempt > 0) await new Promise(r => setTimeout(r, 500));
-      // Fetch last 15 fixtures to ensure we get enough finished games
-      const data = await fetchWithAuth(`fixtures?team=${teamId}&last=15`, apiKey);
-      const games = (data?.response || []).filter((g: any) => {
-        const st = g.fixture?.status?.short;
-        return st === 'FT' || st === 'AET' || st === 'PEN';
-      }).slice(0, 5); // Keep only last 5 finished
+      // Use current season + status filter to get only finished games
+      const currentYear = new Date().getFullYear();
+      const season = currentYear; // API uses season start year (2026 for 2026 season)
+      const prevSeason = currentYear - 1; // Fallback for European leagues (2025-2026)
+      
+      // Try current season first, then previous if no results
+      let data = await fetchWithAuth(`fixtures?team=${teamId}&season=${season}&status=FT&last=5`, apiKey);
+      let games = data?.response || [];
+      
+      if (games.length === 0) {
+        data = await fetchWithAuth(`fixtures?team=${teamId}&season=${prevSeason}&status=FT&last=5`, apiKey);
+        games = data?.response || [];
+      }
+      
       console.log(`Team ${teamName} (${teamId}): got ${games.length} finished games`);
       if (games.length === 0) return null;
       const stats = await calcTeamStatsDetailed(games, teamId, apiKey);

@@ -20,14 +20,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!accessToken) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify the user
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    // Use service role to validate the caller token and update the single active device session
+    const admin = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: { user }, error: userError } = await admin.auth.getUser(accessToken);
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
@@ -36,9 +43,12 @@ Deno.serve(async (req) => {
     }
 
     const { session_token, device_info } = await req.json();
-
-    // Use service role to bypass RLS
-    const admin = createClient(supabaseUrl, serviceRoleKey);
+    if (!session_token || typeof session_token !== "string") {
+      return new Response(JSON.stringify({ error: "Missing session token" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Check existing session
     const { data: existing } = await admin

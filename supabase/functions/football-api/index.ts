@@ -257,7 +257,7 @@ serve(async (req) => {
         } catch (e) { console.error(`Stats error for ${fId}:`, e); }
         matches.push({
           id: fId, isLive: true, teams: j.teams, goals: j.goals,
-          fixture: j.fixture, league: j.league?.name || '',
+          fixture: j.fixture, league: getLeagueDisplayName(j.league?.id, j.league?.name || ''),
           homeStats: null, awayStats: null, stats,
         });
       }

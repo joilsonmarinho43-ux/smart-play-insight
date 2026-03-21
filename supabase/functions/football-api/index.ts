@@ -65,13 +65,11 @@ function calcTeamStats(games: any[], teamId: number) {
   };
 }
 
-// Fetch detailed stats for fixture IDs — only use first 3 to reduce API calls
+// Fetch detailed stats for fixture IDs — only use first 2 to reduce API calls
 async function fetchDetailedStats(fixtureIds: number[], teamId: number, apiKey: string) {
-  // Only fetch stats for 3 most recent fixtures to save API quota
-  const idsToFetch = fixtureIds.slice(0, 3);
+  const idsToFetch = fixtureIds.slice(0, 2);
   const allStats: any[] = [];
 
-  // Fetch one at a time with cache check
   for (const fId of idsToFetch) {
     const ck = `fstat_${fId}_${teamId}`;
     const cached = cacheGet(ck);
@@ -105,8 +103,7 @@ async function fetchDetailedStats(fixtureIds: number[], teamId: number, apiKey: 
     } catch (e) {
       console.error(`Stats fetch error for fixture ${fId}:`, e);
     }
-    // Small delay between calls
-    await new Promise(r => setTimeout(r, 350));
+    await new Promise(r => setTimeout(r, 250));
   }
 
   if (allStats.length === 0) return null;

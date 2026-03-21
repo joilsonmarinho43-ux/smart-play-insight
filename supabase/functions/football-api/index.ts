@@ -247,7 +247,7 @@ serve(async (req) => {
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';
       const isPreMatch = preMatchStatuses.includes(status);
-      const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id) || f.league?.country === "Brazil";
+      const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id);
       return isPreMatch && isTargetLeague;
     }).slice(0, 10);
     console.log(`Filtered to ${fixtures.length} upcoming fixtures`);

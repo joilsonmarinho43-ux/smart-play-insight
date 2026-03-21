@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MatchData } from '@/types/match';
 import TicketSuggestionCard from './TicketSuggestion';
-import { Clock, Trophy, BarChart3, TrendingUp, Target, Shield, Database, AlertTriangle } from 'lucide-react';
+import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle } from 'lucide-react';
 
 interface Props {
   match: MatchData;
@@ -9,7 +9,7 @@ interface Props {
 
 type TabKey = 'stats' | 'poisson' | 'ticket';
 
-// ─── Pill-style stat row (like screenshot) ───
+// ─── Pill-style stat row (exactly like the screenshot) ───
 function StatRow({ label, home, away, format = 'decimal' }: {
   label: string;
   home: number;
@@ -26,22 +26,32 @@ function StatRow({ label, home, away, format = 'decimal' }: {
   const awayWins = away > home;
 
   return (
-    <div className="flex items-center justify-between py-2.5 px-2">
-      <span
-        className={`inline-flex items-center justify-center min-w-[3rem] px-3 py-1.5 rounded-full text-sm font-bold tabular-nums ${
-          homeWins ? 'bg-primary/20 text-primary' : 'text-foreground'
-        }`}
-      >
-        {fmt(home)}
+    <div className="flex items-center justify-between py-3 px-1">
+      <div className="w-[72px] flex justify-start">
+        <span
+          className={`inline-flex items-center justify-center min-w-[52px] px-3.5 py-2 rounded-full text-sm font-bold tabular-nums ${
+            homeWins
+              ? 'bg-[hsl(170,55%,42%)] text-white shadow-[0_2px_8px_hsl(170,55%,42%,0.35)]'
+              : 'text-foreground'
+          }`}
+        >
+          {fmt(home)}
+        </span>
+      </div>
+      <span className="text-[13px] text-muted-foreground font-medium text-center flex-1 px-2">
+        {label}
       </span>
-      <span className="text-xs text-muted-foreground font-medium text-center flex-1">{label}</span>
-      <span
-        className={`inline-flex items-center justify-center min-w-[3rem] px-3 py-1.5 rounded-full text-sm font-bold tabular-nums ${
-          awayWins ? 'bg-accent/20 text-accent' : 'text-foreground'
-        }`}
-      >
-        {fmt(away)}
-      </span>
+      <div className="w-[72px] flex justify-end">
+        <span
+          className={`inline-flex items-center justify-center min-w-[52px] px-3.5 py-2 rounded-full text-sm font-bold tabular-nums ${
+            awayWins
+              ? 'bg-primary text-primary-foreground shadow-[0_2px_8px_hsl(var(--primary)/0.35)]'
+              : 'text-foreground'
+          }`}
+        >
+          {fmt(away)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -86,7 +96,7 @@ function poissonProb(lambda: number, k: number): number {
   return (Math.exp(-lambda) * Math.pow(lambda, k)) / f;
 }
 
-// ─── TAB: Estatísticas ───
+// ─── TAB: Estatísticas (pill format like screenshot) ───
 function StatsTab({ match }: { match: MatchData }) {
   const md = match.modelData as any;
   const hGF = md?.homeGoalsAvg || 0;
@@ -94,16 +104,15 @@ function StatsTab({ match }: { match: MatchData }) {
   const hGA = md?.homeGoalsAgainstAvg || 0;
   const aGA = md?.awayGoalsAgainstAvg || 0;
 
-  // Extended stats from edge function
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
 
   const stats = [
-    { label: 'Gols Marcados', home: hGF, away: aGF, format: 'decimal' as const },
-    { label: 'Gols Sofridos', home: hGA, away: aGA, format: 'decimal' as const },
+    { label: 'Gols', home: hGF, away: aGF, format: 'decimal' as const },
     { label: 'Posse de Bola', home: hs.possession || 0, away: as_.possession || 0, format: 'percent' as const },
     { label: 'Finalizações Totais', home: hs.totalShots || 0, away: as_.totalShots || 0, format: 'decimal' as const },
     { label: 'Chutes no Gol', home: hs.shotsOnGoal || 0, away: as_.shotsOnGoal || 0, format: 'decimal' as const },
+    { label: 'Grandes Chances', home: hs.bigChances || 0, away: as_.bigChances || 0, format: 'decimal' as const },
     { label: 'Escanteios', home: hs.corners || 0, away: as_.corners || 0, format: 'decimal' as const },
     { label: 'Impedimentos', home: hs.offsides || 0, away: as_.offsides || 0, format: 'decimal' as const },
     { label: 'Faltas Cometidas', home: hs.fouls || 0, away: as_.fouls || 0, format: 'decimal' as const },
@@ -113,22 +122,23 @@ function StatsTab({ match }: { match: MatchData }) {
   if (stats.length === 0) {
     return (
       <div className="text-center py-6 text-muted-foreground text-sm">
-        Estatísticas não disponíveis para este jogo
+        Estatísticas não disponíveis
       </div>
     );
   }
 
   return (
-    <div className="divide-y divide-border/30">
-      {/* Team headers */}
-      <div className="flex items-center justify-between px-2 pb-2">
-        <span className="text-xs font-bold text-primary uppercase">{match.homeTeam}</span>
-        <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Média últimos 5</span>
-        <span className="text-xs font-bold text-accent uppercase">{match.awayTeam}</span>
+    <div>
+      <div className="flex items-center justify-between px-2 pb-1 mb-1 border-b border-border/30">
+        <span className="text-[10px] font-bold text-[hsl(170,55%,42%)] uppercase tracking-wider">{match.homeTeam}</span>
+        <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">Média 5 jogos</span>
+        <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{match.awayTeam}</span>
       </div>
-      {stats.map((s) => (
-        <StatRow key={s.label} {...s} />
-      ))}
+      <div className="divide-y divide-border/20">
+        {stats.map((s) => (
+          <StatRow key={s.label} {...s} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -161,8 +171,7 @@ function PoissonTab({ match }: { match: MatchData }) {
   const scores: { score: string; prob: number }[] = [];
   for (let h = 0; h <= 5; h++) {
     for (let a = 0; a <= 5; a++) {
-      const p = poissonProb(homeLambda, h) * poissonProb(awayLambda, a);
-      scores.push({ score: `${h}-${a}`, prob: p });
+      scores.push({ score: `${h}-${a}`, prob: poissonProb(homeLambda, h) * poissonProb(awayLambda, a) });
     }
   }
   scores.sort((a, b) => b.prob - a.prob);
@@ -170,12 +179,11 @@ function PoissonTab({ match }: { match: MatchData }) {
 
   return (
     <div className="space-y-4">
-      {/* Força relativa */}
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-secondary/30 rounded-lg p-3 border border-border/30">
           <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Mandante</p>
           <div className="flex justify-between text-xs">
-            <span className="text-primary">⚔️ Ataque</span>
+            <span className="text-[hsl(170,55%,42%)]">⚔️ Ataque</span>
             <span className="font-bold tabular-nums">{homeAttack.toFixed(2)}x</span>
           </div>
           <div className="flex justify-between text-xs mt-1">
@@ -184,13 +192,13 @@ function PoissonTab({ match }: { match: MatchData }) {
           </div>
           <div className="flex justify-between text-xs mt-2 pt-2 border-t border-border/30">
             <span className="text-muted-foreground">λ Poisson</span>
-            <span className="font-bold text-primary tabular-nums">{homeLambda.toFixed(2)}</span>
+            <span className="font-bold text-[hsl(170,55%,42%)] tabular-nums">{homeLambda.toFixed(2)}</span>
           </div>
         </div>
         <div className="bg-secondary/30 rounded-lg p-3 border border-border/30">
           <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Visitante</p>
           <div className="flex justify-between text-xs">
-            <span className="text-accent">⚔️ Ataque</span>
+            <span className="text-primary">⚔️ Ataque</span>
             <span className="font-bold tabular-nums">{awayAttack.toFixed(2)}x</span>
           </div>
           <div className="flex justify-between text-xs mt-1">
@@ -199,12 +207,11 @@ function PoissonTab({ match }: { match: MatchData }) {
           </div>
           <div className="flex justify-between text-xs mt-2 pt-2 border-t border-border/30">
             <span className="text-muted-foreground">λ Poisson</span>
-            <span className="font-bold text-accent tabular-nums">{awayLambda.toFixed(2)}</span>
+            <span className="font-bold text-primary tabular-nums">{awayLambda.toFixed(2)}</span>
           </div>
         </div>
       </div>
 
-      {/* Top placares */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <Trophy className="w-3.5 h-3.5 text-primary" />
@@ -246,7 +253,6 @@ const MatchCard = ({ match }: Props) => {
 
   return (
     <div className="bg-card rounded-2xl border border-border overflow-hidden animate-slide-in">
-      
       {/* HEADER */}
       <div className="bg-secondary/50 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -267,20 +273,16 @@ const MatchCard = ({ match }: Props) => {
       {/* TIMES */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6 px-4 sm:px-8 py-5 sm:py-6">
         <div className="text-right">
-          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">
-            {match.homeTeam}
-          </h2>
-          <span className="text-xs text-primary font-semibold">{match.predictions?.homeWin}%</span>
+          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">{match.homeTeam}</h2>
+          <span className="text-xs text-[hsl(170,55%,42%)] font-semibold">{match.predictions?.homeWin}%</span>
         </div>
         <div className="flex flex-col items-center">
           <span className="font-display text-2xl sm:text-4xl text-muted-foreground">VS</span>
           <span className="text-[10px] text-muted-foreground mt-1">E {match.predictions?.draw}%</span>
         </div>
         <div className="text-left">
-          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">
-            {match.awayTeam}
-          </h2>
-          <span className="text-xs text-accent font-semibold">{match.predictions?.awayWin}%</span>
+          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">{match.awayTeam}</h2>
+          <span className="text-xs text-primary font-semibold">{match.predictions?.awayWin}%</span>
         </div>
       </div>
 

@@ -136,36 +136,36 @@ async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: strin
   };
 }
 
+/** Fetch team stats with cache, retry on failure */
+async function fetchTeamStats(teamId: number, teamName: string, apiKey: string): Promise<any> {
+  const ck = `team_detailed_${teamId}`;
+  const cached = cacheGet(ck, 7200000);
+  if (cached) return cached;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 500));
+      const data = await fetchWithAuth(`fixtures?team=${teamId}&last=5&status=FT`, apiKey);
+      const games = data?.response || [];
+      console.log(`Team ${teamName} (${teamId}): got ${games.length} recent games`);
+      if (games.length === 0) return null;
+      const stats = await calcTeamStatsDetailed(games, teamId, apiKey);
+      cacheSet(ck, stats);
+      return stats;
+    } catch (e) {
+      console.error(`Team ${teamName} attempt ${attempt + 1} error:`, e);
+    }
+  }
+  return null;
+}
+
 /** Process a single match — fetches team history + detailed stats */
 async function processMatch(j: any, apiKey: string) {
   const fId = j.fixture.id;
-  let hStats = null as any, aStats = null as any;
 
-  // Home team — check cache first (2h TTL for full detailed stats)
-  const hCk = `team_detailed_${j.teams.home.id}`;
-  const cachedHome = cacheGet(hCk, 7200000);
-  if (cachedHome) {
-    hStats = cachedHome;
-  } else {
-    try {
-      const hG = await fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=5&status=FT`, apiKey);
-      hStats = await calcTeamStatsDetailed(hG?.response || [], j.teams.home.id, apiKey);
-      cacheSet(hCk, hStats);
-    } catch (e) { console.error(`Home error ${j.teams.home.name}:`, e); }
-  }
-
-  // Away team — check cache first (2h TTL)
-  const aCk = `team_detailed_${j.teams.away.id}`;
-  const cachedAway = cacheGet(aCk, 7200000);
-  if (cachedAway) {
-    aStats = cachedAway;
-  } else {
-    try {
-      const aG = await fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey);
-      aStats = await calcTeamStatsDetailed(aG?.response || [], j.teams.away.id, apiKey);
-      cacheSet(aCk, aStats);
-    } catch (e) { console.error(`Away error ${j.teams.away.name}:`, e); }
-  }
+  // Fetch home first, then away sequentially to avoid rate limits
+  const hStats = await fetchTeamStats(j.teams.home.id, j.teams.home.name, apiKey);
+  const aStats = await fetchTeamStats(j.teams.away.id, j.teams.away.name, apiKey);
 
   return {
     id: fId, isLive: false, teams: j.teams, goals: j.goals,

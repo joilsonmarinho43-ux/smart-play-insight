@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
@@ -9,10 +9,26 @@ import { useProfile } from '@/hooks/useProfile';
 import { Brain, Loader2, Zap, RefreshCw, Shield, Crown, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+const LEAGUE_LABELS: Record<string, string> = {
+  'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier',
+  'La Liga': '🇪🇸 La Liga',
+  'Bundesliga': '🇩🇪 Bundes',
+  'Ligue 1': '🇫🇷 Ligue 1',
+};
+
+function getLeagueLabel(league: string): string {
+  if (league.includes('Serie A')) {
+    // Distinguish Brazilian vs Italian by checking known Brazilian team cities/ids
+    return league; // will be resolved per-match
+  }
+  return LEAGUE_LABELS[league] || league;
+}
+
 const Index = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedLeague, setSelectedLeague] = useState<string>('all');
 
   const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
@@ -78,6 +94,21 @@ const Index = () => {
     }),
   [rawMatches]);
 
+  // Extract unique leagues for filter
+  const availableLeagues = useMemo(() => {
+    const leagues = new Set<string>();
+    safeMatches.forEach((m: any) => {
+      if (m.league) leagues.add(m.league);
+    });
+    return Array.from(leagues).sort();
+  }, [safeMatches]);
+
+  // Filtered matches
+  const filteredMatches = useMemo(() => {
+    if (selectedLeague === 'all') return safeMatches;
+    return safeMatches.filter((m: any) => m.league === selectedLeague);
+  }, [safeMatches, selectedLeague]);
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32 font-sans">
       <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
@@ -128,6 +159,39 @@ const Index = () => {
           </Link>
         </div>
 
+        {/* League Filter */}
+        {availableLeagues.length > 1 && (
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <button
+              onClick={() => setSelectedLeague('all')}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                selectedLeague === 'all'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              Todas ({safeMatches.length})
+            </button>
+            {availableLeagues.map(league => {
+              const count = safeMatches.filter((m: any) => m.league === league).length;
+              const label = LEAGUE_LABELS[league] || (league === 'Serie A' ? '🇧🇷🇮🇹 Serie A' : league);
+              return (
+                <button
+                  key={league}
+                  onClick={() => setSelectedLeague(league)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    selectedLeague === league
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Loading */}
         {isFetching && safeMatches.length === 0 && (
           <div className="flex justify-center py-16">
@@ -151,7 +215,7 @@ const Index = () => {
 
         {/* Match Cards */}
         <div className="mt-6 space-y-4">
-          {safeMatches.map((match: any) => (
+          {filteredMatches.map((match: any) => (
             <MatchCard key={match.id} match={match} />
           ))}
         </div>

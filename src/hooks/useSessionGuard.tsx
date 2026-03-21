@@ -75,7 +75,8 @@ export const useSessionGuard = () => {
 
   // Register on first login
   useEffect(() => {
-    if (!session?.access_token || registeredRef.current) return;
+    // Admins skip session guard (they need access from multiple origins like Lovable preview + published app)
+    if (!session?.access_token || registeredRef.current || profile?.is_admin) return;
     registeredRef.current = true;
     registrationDoneRef.current = false;
     registerSession();

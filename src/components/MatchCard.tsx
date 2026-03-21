@@ -26,145 +26,40 @@ function StatRow({ label, home, away, format = 'decimal' }: {
   const awayWins = away > home;
 
   return (
-    <div className="flex items-center justify-between py-2.5 px-2">
-      <span
-        className={`inline-flex items-center justify-center min-w-[3rem] px-3 py-1.5 rounded-full text-sm font-bold tabular-nums ${
-          homeWins ? 'bg-primary/20 text-primary' : 'text-foreground'
-        }`}
-      >
-        {fmt(home)}
+    <div className="flex items-center justify-between py-3 px-1">
+      {/* Home pill */}
+      <div className="w-[72px] flex justify-start">
+        <span
+          className={`inline-flex items-center justify-center min-w-[52px] px-3.5 py-2 rounded-full text-sm font-bold tabular-nums transition-all ${
+            homeWins
+              ? 'bg-[hsl(170,55%,42%)] text-white shadow-[0_2px_8px_hsl(170,55%,42%,0.35)]'
+              : 'text-foreground'
+          }`}
+        >
+          {fmt(home)}
+        </span>
+      </div>
+
+      {/* Label */}
+      <span className="text-[13px] text-muted-foreground font-medium text-center flex-1 px-2">
+        {label}
       </span>
-      <span className="text-xs text-muted-foreground font-medium text-center flex-1">{label}</span>
-      <span
-        className={`inline-flex items-center justify-center min-w-[3rem] px-3 py-1.5 rounded-full text-sm font-bold tabular-nums ${
-          awayWins ? 'bg-accent/20 text-accent' : 'text-foreground'
-        }`}
-      >
-        {fmt(away)}
-      </span>
+
+      {/* Away pill */}
+      <div className="w-[72px] flex justify-end">
+        <span
+          className={`inline-flex items-center justify-center min-w-[52px] px-3.5 py-2 rounded-full text-sm font-bold tabular-nums transition-all ${
+            awayWins
+              ? 'bg-primary text-primary-foreground shadow-[0_2px_8px_hsl(var(--primary)/0.35)]'
+              : 'text-foreground'
+          }`}
+        >
+          {fmt(away)}
+        </span>
+      </div>
     </div>
   );
 }
-
-// ─── Confidence Badge ───
-function SampleSizeBadge({ match }: { match: MatchData }) {
-  const s = match.sampleSize;
-  if (!s) {
-    return (
-      <div className="px-3 py-1.5 rounded-lg border text-xs bg-destructive/10 text-destructive border-destructive/20">
-        Sem dados suficientes
-      </div>
-    );
-  }
-
-  const totalGames = (s.homeGames || 0) + (s.awayGames || 0);
-  const isHigh = totalGames >= 6;
-  const isMedium = totalGames >= 3;
-
-  const color = isHigh
-    ? 'bg-green-500/15 text-green-400 border-green-500/30'
-    : isMedium
-    ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
-    : 'bg-destructive/15 text-destructive border-destructive/30';
-
-  const Icon = isHigh || isMedium ? Database : AlertTriangle;
-  const label = isHigh ? 'Alta' : isMedium ? 'Média' : 'Baixa';
-
-  return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] sm:text-xs ${color}`}>
-      <Icon className="w-3 h-3 shrink-0" />
-      <span className="font-medium">Confiança {label}</span>
-      <span className="opacity-70">{s.homeGames}+{s.awayGames} jogos</span>
-    </div>
-  );
-}
-
-// ─── Poisson helper ───
-function poissonProb(lambda: number, k: number): number {
-  let f = 1;
-  for (let i = 2; i <= k; i++) f *= i;
-  return (Math.exp(-lambda) * Math.pow(lambda, k)) / f;
-}
-
-// ─── TAB: Estatísticas ───
-function StatsTab({ match }: { match: MatchData }) {
-  const md = match.modelData as any;
-  const hGF = md?.homeGoalsAvg || 0;
-  const aGF = md?.awayGoalsAvg || 0;
-  const hGA = md?.homeGoalsAgainstAvg || 0;
-  const aGA = md?.awayGoalsAgainstAvg || 0;
-
-  // Extended stats from edge function
-  const hs = (match as any).homeStats || {};
-  const as_ = (match as any).awayStats || {};
-
-  const stats = [
-    { label: 'Gols Marcados', home: hGF, away: aGF, format: 'decimal' as const },
-    { label: 'Gols Sofridos', home: hGA, away: aGA, format: 'decimal' as const },
-    { label: 'Posse de Bola', home: hs.possession || 0, away: as_.possession || 0, format: 'percent' as const },
-    { label: 'Finalizações Totais', home: hs.totalShots || 0, away: as_.totalShots || 0, format: 'decimal' as const },
-    { label: 'Chutes no Gol', home: hs.shotsOnGoal || 0, away: as_.shotsOnGoal || 0, format: 'decimal' as const },
-    { label: 'Escanteios', home: hs.corners || 0, away: as_.corners || 0, format: 'decimal' as const },
-    { label: 'Impedimentos', home: hs.offsides || 0, away: as_.offsides || 0, format: 'decimal' as const },
-    { label: 'Faltas Cometidas', home: hs.fouls || 0, away: as_.fouls || 0, format: 'decimal' as const },
-    { label: 'Cartões Amarelos', home: hs.yellowCards || 0, away: as_.yellowCards || 0, format: 'decimal' as const },
-  ].filter(s => s.home > 0 || s.away > 0);
-
-  if (stats.length === 0) {
-    return (
-      <div className="text-center py-6 text-muted-foreground text-sm">
-        Estatísticas não disponíveis para este jogo
-      </div>
-    );
-  }
-
-  return (
-    <div className="divide-y divide-border/30">
-      {/* Team headers */}
-      <div className="flex items-center justify-between px-2 pb-2">
-        <span className="text-xs font-bold text-primary uppercase">{match.homeTeam}</span>
-        <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Média últimos 5</span>
-        <span className="text-xs font-bold text-accent uppercase">{match.awayTeam}</span>
-      </div>
-      {stats.map((s) => (
-        <StatRow key={s.label} {...s} />
-      ))}
-    </div>
-  );
-}
-
-// ─── TAB: Poisson ───
-function PoissonTab({ match }: { match: MatchData }) {
-  const md = match.modelData as any;
-  const hGF = md?.homeGoalsAvg || 0;
-  const aGF = md?.awayGoalsAvg || 0;
-  const hGA = md?.homeGoalsAgainstAvg || 0;
-  const aGA = md?.awayGoalsAgainstAvg || 0;
-
-  if (!hGF && !aGF) {
-    return <div className="text-center py-6 text-muted-foreground text-sm">Dados insuficientes para Poisson</div>;
-  }
-
-  const leagueAvg = 1.35;
-  const homeLambda = hGF > 0 && aGA > 0
-    ? (hGF / leagueAvg) * (aGA / leagueAvg) * leagueAvg
-    : hGF || 1.2;
-  const awayLambda = aGF > 0 && hGA > 0
-    ? (aGF / leagueAvg) * (hGA / leagueAvg) * leagueAvg
-    : aGF || 0.9;
-
-  const homeAttack = hGF / leagueAvg;
-  const awayAttack = aGF / leagueAvg;
-  const homeDefense = hGA / leagueAvg;
-  const awayDefense = aGA / leagueAvg;
-
-  const scores: { score: string; prob: number }[] = [];
-  for (let h = 0; h <= 5; h++) {
-    for (let a = 0; a <= 5; a++) {
-      const p = poissonProb(homeLambda, h) * poissonProb(awayLambda, a);
-      scores.push({ score: `${h}-${a}`, prob: p });
-    }
-  }
   scores.sort((a, b) => b.prob - a.prob);
   const topScores = scores.slice(0, 5);
 

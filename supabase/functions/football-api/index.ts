@@ -22,6 +22,19 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 // Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
 
+const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
+  71: 'Brasileirão Série A',
+  39: 'Premier League',
+  140: 'La Liga',
+  78: 'Bundesliga',
+  135: 'Serie A (ITA)',
+  61: 'Ligue 1',
+};
+
+function getLeagueDisplayName(leagueId: number, fallbackName: string): string {
+  return LEAGUE_DISPLAY_NAMES[leagueId] || fallbackName;
+}
+
 async function fetchWithAuth(endpoint: string, apiKey: string): Promise<any> {
   console.log(`API call: ${endpoint}`);
   const res = await fetch(`${BASE_URL}/${endpoint}`, {
@@ -244,7 +257,7 @@ serve(async (req) => {
         } catch (e) { console.error(`Stats error for ${fId}:`, e); }
         matches.push({
           id: fId, isLive: true, teams: j.teams, goals: j.goals,
-          fixture: j.fixture, league: j.league?.name || '',
+          fixture: j.fixture, league: getLeagueDisplayName(j.league?.id, j.league?.name || ''),
           homeStats: null, awayStats: null, stats,
         });
       }
@@ -315,7 +328,7 @@ serve(async (req) => {
       teams: j.teams,
       goals: j.goals,
       fixture: j.fixture,
-      league: j.league?.name || '',
+      league: getLeagueDisplayName(j.league?.id, j.league?.name || ''),
       homeStats: teamStatsCache.get(j.teams.home.id) || null,
       awayStats: teamStatsCache.get(j.teams.away.id) || null,
       stats: { home: null, away: null },

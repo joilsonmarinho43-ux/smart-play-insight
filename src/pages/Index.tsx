@@ -14,15 +14,9 @@ const LEAGUE_LABELS: Record<string, string> = {
   'La Liga': '🇪🇸 La Liga',
   'Bundesliga': '🇩🇪 Bundes',
   'Ligue 1': '🇫🇷 Ligue 1',
+  'Brasileirão Série A': '🇧🇷 Brasileirão',
+  'Serie A (ITA)': '🇮🇹 Serie A',
 };
-
-function getLeagueLabel(league: string): string {
-  if (league.includes('Serie A')) {
-    // Distinguish Brazilian vs Italian by checking known Brazilian team cities/ids
-    return league; // will be resolved per-match
-  }
-  return LEAGUE_LABELS[league] || league;
-}
 
 const Index = () => {
   const { signOut } = useAuth();
@@ -174,7 +168,7 @@ const Index = () => {
             </button>
             {availableLeagues.map(league => {
               const count = safeMatches.filter((m: any) => m.league === league).length;
-              const label = LEAGUE_LABELS[league] || (league === 'Serie A' ? '🇧🇷🇮🇹 Serie A' : league);
+              const label = LEAGUE_LABELS[league] || league;
               return (
                 <button
                   key={league}

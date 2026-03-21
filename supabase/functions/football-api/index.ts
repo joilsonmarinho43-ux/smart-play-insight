@@ -182,7 +182,7 @@ async function prefetchAllTeams(fixtures: any[], apiKey: string): Promise<Map<nu
     }
     
     // Delay between uncached API calls to avoid rate limit
-    if (apiCalls > 0) await delay(150);
+    if (apiCalls > 0) await delay(350);
     const stats = await fetchTeamStats(teamId, teamName, apiKey);
     results.set(teamId, stats);
     apiCalls++;

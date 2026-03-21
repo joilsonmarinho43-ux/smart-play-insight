@@ -6,7 +6,7 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Brain, Loader2, Zap, RefreshCw, Shield, Crown } from 'lucide-react';
+import { Brain, Loader2, Zap, RefreshCw, Shield, Crown, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Index = () => {

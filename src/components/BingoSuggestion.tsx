@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { MatchData } from '@/types/match';
-import { analyzeMarkets } from '@/lib/matchAnalysis';
-import { formatBingoWhatsApp } from '@/lib/bingoEngine';
+import { generatePreGameBingo, formatBingoWhatsApp } from '@/lib/bingoEngine';
 import { Trophy, Copy, ChevronDown, ChevronUp, MessageCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -17,12 +16,11 @@ const BingoSuggestion = ({ matches }: Props) => {
 
     return matches
       .map(match => {
-        const allMarkets = analyzeMarkets(match);
-        // Confiança mínima 75%
-        const eliteMarkets = allMarkets.filter(m => m.probability >= 75);
-        return { ...match, selectedMarkets: eliteMarkets };
+        const result = generatePreGameBingo(match);
+        if (!result || !result.markets.length) return null;
+        return { ...match, selectedMarkets: result.markets };
       })
-      .filter(m => m.selectedMarkets.length > 0)
+      .filter((m): m is NonNullable<typeof m> => m !== null)
       .slice(0, 12);
   }, [matches]);
 
@@ -49,7 +47,7 @@ const BingoSuggestion = ({ matches }: Props) => {
           </div>
           <div className="text-left">
             <h2 className="text-base font-bold text-orange-400 tracking-tight">BINGO REAL PRO</h2>
-            <p className="text-[10px] text-gray-400 uppercase font-semibold">Confiança ≥ 75% • {bingoData.length} Jogos</p>
+            <p className="text-[10px] text-gray-400 uppercase font-semibold">Confiança ≥ 78% • {bingoData.length} Jogos</p>
           </div>
         </div>
         {expanded ? <ChevronUp className="text-orange-500" /> : <ChevronDown className="text-orange-500" />}
@@ -70,7 +68,7 @@ const BingoSuggestion = ({ matches }: Props) => {
               </div>
               <div className="space-y-1.5">
                 {bm.selectedMarkets.map((m: any, i: number) => {
-                  const emoji = m.probability >= 90 ? '🟢🔥' : m.probability >= 80 ? '🟢' : '🟡';
+                  const emoji = m.probability >= 90 ? '🟢🔥' : m.probability >= 85 ? '🟢' : '🟡';
                   return (
                     <div key={i} className="flex justify-between items-center bg-orange-500/5 px-2 py-1.5 rounded-lg border border-orange-500/10">
                       <span className="text-xs font-medium">{emoji} {m.market}</span>
@@ -86,7 +84,7 @@ const BingoSuggestion = ({ matches }: Props) => {
 
       {/* Actions */}
       <div className="px-4 py-3 bg-[#111827] flex items-center justify-between border-t border-white/5">
-        <span className="text-[10px] text-gray-500 italic">API Pro • Modelo Poisson</span>
+        <span className="text-[10px] text-gray-500 italic">Poisson + xG • APM ≥ 1.2</span>
         <div className="flex gap-2">
           <button
             onClick={handleCopy}

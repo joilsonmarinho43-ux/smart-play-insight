@@ -193,7 +193,7 @@ serve(async (req) => {
 
     if (cached2) {
       const age = Date.now() - (cached2.timestamp || 0);
-      const ttl = isLive ? 15000 : 3600000;
+      const ttl = isLive ? 15000 : 7200000; // 2h for pre-match
       if (age < ttl) {
         console.log(`Cache hit (${isLive ? 'live' : 'pre'})`);
         return new Response(JSON.stringify(cached2.data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

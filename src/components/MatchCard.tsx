@@ -89,6 +89,61 @@ function SampleSizeBadge({ match }: { match: MatchData }) {
   );
 }
 
+// ─── APM + xG Indicator ───
+function ApmXgIndicator({ match }: { match: MatchData }) {
+  const hs = (match as any).homeStats || {};
+  const as_ = (match as any).awayStats || {};
+
+  // APM calculation (same logic as matchAnalysis)
+  const hDA = hs.dangerousAttacks || 0;
+  const aDA = as_.dangerousAttacks || 0;
+  const hShots = hs.totalShots || 0;
+  const aShots = as_.totalShots || 0;
+  const hSoG = hs.shotsOnGoal || 0;
+  const aSoG = as_.shotsOnGoal || 0;
+
+  let apm: number;
+  if (hDA > 0 || aDA > 0) {
+    apm = (hDA + aDA) / 90;
+  } else {
+    apm = ((hShots + aShots) * 1.5 + (hSoG + aSoG) * 2) / 90;
+  }
+
+  // xG (bigChances or estimated)
+  const hXG = hs.bigChances || hs.expectedGoals || 0;
+  const aXG = as_.bigChances || as_.expectedGoals || 0;
+  let totalXG = hXG + aXG;
+  if (totalXG === 0 && (hSoG > 0 || aSoG > 0)) {
+    totalXG = (hSoG + aSoG) * 0.32;
+  }
+
+  const hasData = hShots > 0 || aShots > 0 || hSoG > 0 || aSoG > 0;
+  if (!hasData) return null;
+
+  const apmOk = apm >= 0.8;
+  const apmColor = apmOk
+    ? 'text-green-400 bg-green-500/10 border-green-500/20'
+    : 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
+  const xgColor = totalXG >= 2
+    ? 'text-green-400 bg-green-500/10 border-green-500/20'
+    : totalXG >= 1
+    ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20'
+    : 'text-gray-400 bg-gray-500/10 border-gray-500/20';
+
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${apmColor}`}>
+        <Flame className="w-3 h-3" />
+        <span>APM {apm.toFixed(2)}</span>
+        {apmOk && <span className="text-[8px] opacity-70">✓</span>}
+      </div>
+      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${xgColor}`}>
+        <Crosshair className="w-3 h-3" />
+        <span>xG {totalXG.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+
 // ─── Poisson helper ───
 function poissonProb(lambda: number, k: number): number {
   let f = 1;

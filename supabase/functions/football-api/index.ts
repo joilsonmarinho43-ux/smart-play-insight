@@ -140,49 +140,51 @@ serve(async (req) => {
         const isPreMatch = preMatchStatuses.includes(status);
         const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id) || f.league?.country === "Brazil";
         return isPreMatch && isTargetLeague;
-      }).slice(0, 40);
+      }).slice(0, 30);
       console.log(`Filtered to ${fixtures.length} upcoming fixtures (excluded finished/live)`);
     }
 
-    const matches = await Promise.all(
-      fixtures.map(async (j: any) => {
-        const fId = j.fixture.id;
-        let stats = { home: null as any, away: null as any };
-        let hStats = null, aStats = null;
+    // Process in batches of 3 fixtures (6 API calls) with 1s delay to avoid rate limits
+    const matches = await processInBatches(fixtures, 3, 1000, async (j: any) => {
+      const fId = j.fixture.id;
+      let stats = { home: null as any, away: null as any };
+      let hStats = null, aStats = null;
 
-        if (isLive) {
-          try {
-            const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
-            const resS = sData?.response || [];
-            if (resS.length >= 2) {
-              stats.home = extractStats(resS[0].statistics);
-              stats.away = extractStats(resS[1].statistics);
-            }
-          } catch (e) { console.error(`Stats error for ${fId}:`, e); }
-        } else {
-          try {
-            const [hG, aG] = await Promise.all([
-              fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=5&status=FT`, apiKey),
-              fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey),
-            ]);
-            hStats = calcTeamStats(hG?.response || [], j.teams.home.id);
-            aStats = calcTeamStats(aG?.response || [], j.teams.away.id);
-          } catch (e) {}
-        }
+      if (isLive) {
+        try {
+          const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
+          const resS = sData?.response || [];
+          if (resS.length >= 2) {
+            stats.home = extractStats(resS[0].statistics);
+            stats.away = extractStats(resS[1].statistics);
+          }
+        } catch (e) { console.error(`Stats error for ${fId}:`, e); }
+      } else {
+        try {
+          const hG = await fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=5&status=FT`, apiKey);
+          hStats = calcTeamStats(hG?.response || [], j.teams.home.id);
+          console.log(`Team ${j.teams.home.name}: GF=${hStats.goalsFor}, GA=${hStats.goalsAgainst}, games=${(hG?.response || []).length}`);
+        } catch (e) { console.error(`Home stats error for ${j.teams.home.name}:`, e); }
+        
+        try {
+          const aG = await fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey);
+          aStats = calcTeamStats(aG?.response || [], j.teams.away.id);
+          console.log(`Team ${j.teams.away.name}: GF=${aStats.goalsFor}, GA=${aStats.goalsAgainst}, games=${(aG?.response || []).length}`);
+        } catch (e) { console.error(`Away stats error for ${j.teams.away.name}:`, e); }
+      }
 
-        return {
-          id: fId,
-          isLive,
-          teams: j.teams,
-          goals: j.goals,
-          fixture: j.fixture,
-          league: j.league?.name || '',
-          homeStats: hStats,
-          awayStats: aStats,
-          stats,
-        };
-      })
-    );
+      return {
+        id: fId,
+        isLive,
+        teams: j.teams,
+        goals: j.goals,
+        fixture: j.fixture,
+        league: j.league?.name || '',
+        homeStats: hStats,
+        awayStats: aStats,
+        stats,
+      };
+    });
 
     console.log(`Returning ${matches.length} matches`);
     const responseData = { matches };

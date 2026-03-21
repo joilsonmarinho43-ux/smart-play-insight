@@ -18,18 +18,9 @@ const Index = () => {
   const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    enabled: false,
+    staleTime: 1000 * 60 * 10, // 10 min
+    gcTime: 1000 * 60 * 30,
   });
-
-  useEffect(() => {
-    if (!hasFetchedOnce) {
-      // Limpa cache antigo para forçar dados frescos
-      localStorage.removeItem('football_cache_pre');
-      localStorage.removeItem('football_cache_pre_time');
-      refetch();
-      setHasFetchedOnce(true);
-    }
-  }, [refetch, hasFetchedOnce]);
 
   const safeMatches = useMemo(() =>
     (rawMatches || []).map((m: any) => {

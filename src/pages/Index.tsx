@@ -68,11 +68,6 @@ const Index = () => {
         time: m.fixture?.date
           ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
           : m.time || '',
-        // SÓ DADOS REAIS — média de gols dos últimos 5 jogos
-        metrics: {
-          goalsForAvg: [hGF, aGF] as [number, number],
-          goalsAgainstAvg: [hGA, aGA] as [number, number],
-        },
         modelData: {
           homeGoalsAvg: hGF,
           awayGoalsAvg: aGF,

@@ -22,6 +22,7 @@ const getDeviceInfo = (): string => {
 
 export const useSessionGuard = () => {
   const { session, signOut } = useAuth();
+  const { profile } = useProfile();
   const registeredRef = useRef(false);
   const registrationDoneRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);

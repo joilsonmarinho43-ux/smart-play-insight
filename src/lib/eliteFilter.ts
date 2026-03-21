@@ -68,7 +68,7 @@ function evaluateCorners(match: MatchData): number {
   const apm = getCombinedAPM(match);
 
   // APM gate: precisa de intensidade mínima
-  if (apm < 1.2) return Math.max(0, (total / 9.5) * 30); // Score reduzido sem APM
+  if (apm < 0.8) return Math.max(0, (total / 9.5) * 30); // Score reduzido sem APM
 
   if (total >= 9.5) return Math.min(100, 50 + (total - 9.5) * 10);
   return Math.max(0, (total / 9.5) * 45);
@@ -83,7 +83,7 @@ function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
   const apm = getCombinedAPM(match);
 
   // APM gate
-  if (apm < 1.2) return Math.max(0, (p15 + p25) / 4);
+  if (apm < 0.8) return Math.max(0, (p15 + p25) / 4);
 
   if (p15 >= 78 && p25 >= 78) return Math.min(100, (p15 + p25) / 2);
   if (p15 >= 78) return Math.min(85, p15 * 0.8);
@@ -118,9 +118,9 @@ function evaluateIntensity(match: MatchData): number {
   const sogRatio = totalSoG > 0 ? totalSoG / Math.max(1, totalShots) : 0;
 
   let score = 0;
-  if (apm >= 1.2) score += 55;
-  else if (apm >= 0.9) score += 35;
-  else score += (apm / 0.9) * 25;
+  if (apm >= 0.8) score += 55;
+  else if (apm >= 0.5) score += 35;
+  else score += (apm / 0.5) * 25;
 
   score += sogRatio * 45;
   return Math.min(100, score);

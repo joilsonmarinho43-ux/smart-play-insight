@@ -168,7 +168,7 @@ const Index = () => {
             </button>
             {availableLeagues.map(league => {
               const count = safeMatches.filter((m: any) => m.league === league).length;
-              const label = LEAGUE_LABELS[league] || (league === 'Serie A' ? '🇧🇷🇮🇹 Serie A' : league);
+              const label = LEAGUE_LABELS[league] || league;
               return (
                 <button
                   key={league}

@@ -324,6 +324,7 @@ const MatchCard = ({ match }: Props) => {
       {/* CONFIANÇA */}
       <div className="px-4 sm:px-6 pt-3">
         <SampleSizeBadge match={match} />
+        <ApmXgIndicator match={match} />
       </div>
 
       {/* TIMES */}

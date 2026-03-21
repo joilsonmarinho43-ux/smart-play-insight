@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MatchData } from '@/types/match';
 import TicketSuggestionCard from './TicketSuggestion';
-import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle } from 'lucide-react';
+import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, Flame, Crosshair } from 'lucide-react';
 
 interface Props {
   match: MatchData;

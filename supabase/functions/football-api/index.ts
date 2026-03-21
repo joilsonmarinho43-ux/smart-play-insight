@@ -145,11 +145,12 @@ async function fetchTeamStats(teamId: number, teamName: string, apiKey: string):
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       if (attempt > 0) await new Promise(r => setTimeout(r, 500));
-      const data = await fetchWithAuth(`fixtures?team=${teamId}&last=5`, apiKey);
+      // Fetch last 15 fixtures to ensure we get enough finished games
+      const data = await fetchWithAuth(`fixtures?team=${teamId}&last=15`, apiKey);
       const games = (data?.response || []).filter((g: any) => {
         const st = g.fixture?.status?.short;
         return st === 'FT' || st === 'AET' || st === 'PEN';
-      });
+      }).slice(0, 5); // Keep only last 5 finished
       console.log(`Team ${teamName} (${teamId}): got ${games.length} finished games`);
       if (games.length === 0) return null;
       const stats = await calcTeamStatsDetailed(games, teamId, apiKey);

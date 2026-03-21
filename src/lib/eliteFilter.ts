@@ -60,34 +60,46 @@ function getCombinedAPM(match: MatchData): number {
 
 // ─── Critérios de filtragem ───
 
-/** 1. Escanteios: soma das médias ≥ 9.5 + APM gate */
+/** 1. Escanteios: soma das médias ≥ 7 já indica potencial */
 function evaluateCorners(match: MatchData): number {
   const hCorners = (match as any).homeStats?.corners || match.modelData?.homeCornersAvg || 0;
   const aCorners = (match as any).awayStats?.corners || match.modelData?.awayCornersAvg || 0;
   const total = hCorners + aCorners;
-  const apm = getCombinedAPM(match);
 
-  // APM gate: precisa de intensidade mínima
-  if (apm < 0.8) return Math.max(0, (total / 9.5) * 30); // Score reduzido sem APM
-
-  if (total >= 9.5) return Math.min(100, 50 + (total - 9.5) * 10);
-  return Math.max(0, (total / 9.5) * 45);
+  if (total <= 0) return 0;
+  if (total >= 10) return Math.min(100, 60 + (total - 10) * 8);
+  if (total >= 8) return Math.min(85, 45 + (total - 8) * 10);
+  if (total >= 6) return Math.min(60, 25 + (total - 6) * 10);
+  return Math.max(0, (total / 6) * 20);
 }
 
-/** 2. Gols: Over 1.5 e Over 2.5 com probabilidade > 78% + APM gate */
+/** 2. Gols: baseado em Lambda Poisson + dados de finalizações */
 function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
-  const o15 = markets.find(m => m.market === 'Over 1.5 Gols');
-  const o25 = markets.find(m => m.market === 'Over 2.5 Gols');
-  const p15 = o15?.probability || 0;
-  const p25 = o25?.probability || 0;
-  const apm = getCombinedAPM(match);
+  const md = (match as any).modelData || {};
+  const hs = (match as any).homeStats || {};
+  const as_ = (match as any).awayStats || {};
 
-  // APM gate
-  if (apm < 0.8) return Math.max(0, (p15 + p25) / 4);
+  const hGF = md.homeGoalsAvg || hs.goalsFor || 0;
+  const aGF = md.awayGoalsAvg || as_.goalsFor || 0;
+  const totalGoalsAvg = hGF + aGF;
 
-  if (p15 >= 78 && p25 >= 78) return Math.min(100, (p15 + p25) / 2);
-  if (p15 >= 78) return Math.min(85, p15 * 0.8);
-  return Math.max(0, (p15 + p25) / 3);
+  // Finalizações como indicador de potencial ofensivo
+  const totalShots = (hs.totalShots || 0) + (as_.totalShots || 0);
+  const totalSoG = (hs.shotsOnGoal || 0) + (as_.shotsOnGoal || 0);
+
+  // Score base via média de gols
+  let score = 0;
+  if (totalGoalsAvg >= 3.5) score += 55;
+  else if (totalGoalsAvg >= 2.5) score += 40;
+  else if (totalGoalsAvg >= 2.0) score += 25;
+
+  // Bonus por finalizações (indica jogos ofensivos)
+  if (totalShots >= 25) score += 25;
+  else if (totalShots >= 15) score += 15;
+  if (totalSoG >= 10) score += 20;
+  else if (totalSoG >= 5) score += 10;
+
+  return Math.min(100, score);
 }
 
 /** 3. Cartões: times com alta média de cartões + faltas */

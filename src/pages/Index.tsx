@@ -82,10 +82,10 @@ const Index = () => {
         homeStats: hStats,
         awayStats: aStats,
         sampleSize: {
-          homeGames: hasHome ? 5 : 0,
-          awayGames: hasAway ? 5 : 0,
-          homeWithStats: hasHome ? 5 : 0,
-          awayWithStats: hasAway ? 5 : 0,
+          homeGames: hStats.gamesCount || (hasHome ? 5 : 0),
+          awayGames: aStats.gamesCount || (hasAway ? 5 : 0),
+          homeWithStats: hStats.gamesCount || (hasHome ? 5 : 0),
+          awayWithStats: aStats.gamesCount || (hasAway ? 5 : 0),
         },
         predictions: { homeWin: String(homeWin), draw: String(draw), awayWin: String(awayWin) },
       };

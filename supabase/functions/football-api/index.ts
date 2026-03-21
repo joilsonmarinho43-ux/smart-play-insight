@@ -254,8 +254,8 @@ serve(async (req) => {
           homeStats: null, awayStats: null, stats: { home: null, away: null },
         });
       }
-      // Pause between matches
-      await new Promise(r => setTimeout(r, 300));
+      // Small pause
+      await new Promise(r => setTimeout(r, 150));
     }
 
     console.log(`Returning ${matches.length} matches`);

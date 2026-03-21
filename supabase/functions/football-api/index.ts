@@ -46,13 +46,22 @@ function calcTeamStats(games: any[], teamId: number) {
     goalsFor: 0, goalsAgainst: 0, gamesCount: 0,
     shotsOnGoal: 0, totalShots: 0, corners: 0, possession: 0,
     fouls: 0, yellowCards: 0, offsides: 0, bigChances: 0,
+    recentGoalsFor: [] as number[],
+    recentGoalsAgainst: [] as number[],
   };
 
   let goalsFor = 0, goalsAgainst = 0;
+  const recentGoalsFor: number[] = [];
+  const recentGoalsAgainst: number[] = [];
+
   games.forEach((g) => {
     const isHome = g.teams.home.id === teamId;
-    goalsFor += (isHome ? g.goals.home : g.goals.away) || 0;
-    goalsAgainst += (isHome ? g.goals.away : g.goals.home) || 0;
+    const gf = (isHome ? g.goals.home : g.goals.away) || 0;
+    const ga = (isHome ? g.goals.away : g.goals.home) || 0;
+    goalsFor += gf;
+    goalsAgainst += ga;
+    recentGoalsFor.push(gf);
+    recentGoalsAgainst.push(ga);
   });
 
   const count = games.length;
@@ -62,6 +71,8 @@ function calcTeamStats(games: any[], teamId: number) {
     gamesCount: count,
     shotsOnGoal: 0, totalShots: 0, corners: 0, possession: 0,
     fouls: 0, yellowCards: 0, offsides: 0, bigChances: 0,
+    recentGoalsFor,
+    recentGoalsAgainst,
   };
 }
 

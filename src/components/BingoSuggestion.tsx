@@ -84,7 +84,7 @@ const BingoSuggestion = ({ matches }: Props) => {
 
       {/* Actions */}
       <div className="px-4 py-3 bg-[#111827] flex items-center justify-between border-t border-white/5">
-        <span className="text-[10px] text-gray-500 italic">Poisson + xG • APM ≥ 1.2</span>
+        <span className="text-[10px] text-gray-500 italic">Poisson + xG • APM ≥ 0.8</span>
         <div className="flex gap-2">
           <button
             onClick={handleCopy}

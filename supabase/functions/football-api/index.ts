@@ -17,30 +17,23 @@ function cacheGet(key: string, ttlMs: number) {
 function cacheSet(key: string, data: any) {
   memCache.set(key, { timestamp: Date.now(), data });
 }
+function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 // Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
 
-async function fetchWithAuth(endpoint: string, apiKey: string, retries = 1): Promise<any> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    if (attempt > 0) await delay(300);
-    console.log(`API call: ${endpoint}${attempt > 0 ? ` (retry ${attempt})` : ''}`);
-    const res = await fetch(`${BASE_URL}/${endpoint}`, {
-      headers: { "x-apisports-key": apiKey },
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error(`API error ${res.status}: ${text}`);
-      if (attempt === retries) throw new Error(`API ${res.status}`);
-      continue;
-    }
-    const json = await res.json();
-    // Check for rate limit (API returns empty response array when limited)
-    return json;
+async function fetchWithAuth(endpoint: string, apiKey: string): Promise<any> {
+  console.log(`API call: ${endpoint}`);
+  const res = await fetch(`${BASE_URL}/${endpoint}`, {
+    headers: { "x-apisports-key": apiKey },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`API error ${res.status}: ${text}`);
+    throw new Error(`API ${res.status}`);
   }
+  return res.json();
 }
-
-function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 function extractStats(stats: any[]) {
   if (!stats || stats.length === 0) return null;
@@ -57,36 +50,27 @@ function extractStats(stats: any[]) {
   };
 }
 
-/** Fetch fixture stats with 24h cache (finished games never change) */
+/** Fetch fixture stats with 24h cache */
 async function getFixtureStats(fixtureId: number, apiKey: string): Promise<any[]> {
   const ck = `fstats_${fixtureId}`;
-  const cached = cacheGet(ck, 86400000); // 24h
+  const cached = cacheGet(ck, 86400000);
   if (cached) return cached;
   try {
     const data = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
     const result = data?.response || [];
     cacheSet(ck, result);
     return result;
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-/** Extract a stat value from a statistics array */
 function getStat(stats: any[], name: string): number {
   const val = stats.find((s: any) => s.type === name)?.value;
   return val === null || val === undefined ? 0 : Number(String(val).replace('%', ''));
 }
 
-/** Calculate detailed team stats from last N games with per-fixture statistics */
+/** Calculate detailed team stats from last N finished games */
 async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: string) {
-  const empty = {
-    goalsFor: 0, goalsAgainst: 0, gamesCount: 0,
-    shotsOnGoal: 0, totalShots: 0, corners: 0, possession: 0,
-    fouls: 0, yellowCards: 0, offsides: 0, bigChances: 0,
-    recentGoalsFor: [] as number[], recentGoalsAgainst: [] as number[],
-  };
-  if (!games || games.length === 0) return empty;
+  if (!games || games.length === 0) return null;
 
   let goalsFor = 0, goalsAgainst = 0;
   let totalShots = 0, shotsOnGoal = 0, corners = 0, possession = 0;
@@ -95,10 +79,13 @@ async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: strin
   const recentGoalsAgainst: number[] = [];
   let statsCount = 0;
 
-  // Fetch all fixture stats in parallel
-  const statsResults = await Promise.all(
-    games.map(g => getFixtureStats(g.fixture.id, apiKey))
-  );
+  // Fetch fixture stats sequentially with small delays to avoid rate limits
+  const statsResults: any[][] = [];
+  for (const g of games) {
+    const fStats = await getFixtureStats(g.fixture.id, apiKey);
+    statsResults.push(fStats);
+    await delay(50);
+  }
 
   games.forEach((g, idx) => {
     const isHome = g.teams.home.id === teamId;
@@ -120,7 +107,7 @@ async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: strin
       fouls += getStat(stats, "Fouls");
       yellowCards += getStat(stats, "Yellow Cards");
       offsides += getStat(stats, "Offsides");
-      bigChances += getStat(stats, "Expected Goals") || getStat(stats, "expected_goals") || 0;
+      bigChances += getStat(stats, "Expected Goals") || 0;
       statsCount++;
     }
   });
@@ -144,35 +131,32 @@ async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: strin
   };
 }
 
-/** Fetch team stats with cache — single API call using season + status */
+/** Fetch team stats — tries current season, falls back to previous */
 async function fetchTeamStats(teamId: number, teamName: string, apiKey: string): Promise<any> {
-  const ck = `team_detailed_v2_${teamId}`;
+  const ck = `team_v3_${teamId}`;
   const cached = cacheGet(ck, 7200000);
   if (cached) return cached;
 
   try {
-    const currentYear = new Date().getFullYear();
-    // European leagues use previous year as season (2025 for 2025-2026)
-    // Brazilian league uses current year (2026 for 2026 season)
-    // Try both: current year first, then previous
-    let games: any[] = [];
+    const year = new Date().getFullYear();
     
-    const data1 = await fetchWithAuth(`fixtures?team=${teamId}&season=${currentYear}&status=FT&last=5`, apiKey);
-    games = data1?.response || [];
+    // Try current year season first
+    let data = await fetchWithAuth(`fixtures?team=${teamId}&season=${year}&status=FT&last=5`, apiKey);
+    let games = data?.response || [];
     
+    // If not enough, try previous season (European leagues = 2025-2026)
     if (games.length < 3) {
-      await delay(100);
-      const data2 = await fetchWithAuth(`fixtures?team=${teamId}&season=${currentYear - 1}&status=FT&last=5`, apiKey);
-      const moreGames = data2?.response || [];
-      // Merge and keep most recent 5
-      games = [...games, ...moreGames].slice(0, 5);
+      await delay(80);
+      const data2 = await fetchWithAuth(`fixtures?team=${teamId}&season=${year - 1}&status=FT&last=5`, apiKey);
+      const more = data2?.response || [];
+      games = [...games, ...more].slice(0, 5);
     }
     
-    console.log(`Team ${teamName} (${teamId}): ${games.length} finished games`);
+    console.log(`Team ${teamName} (${teamId}): ${games.length} games`);
     if (games.length === 0) return null;
     
     const stats = await calcTeamStatsDetailed(games, teamId, apiKey);
-    cacheSet(ck, stats);
+    if (stats) cacheSet(ck, stats);
     return stats;
   } catch (e) {
     console.error(`Team ${teamName} error:`, e);
@@ -180,41 +164,136 @@ async function fetchTeamStats(teamId: number, teamName: string, apiKey: string):
   }
 }
 
-/** Pre-fetch all unique teams sequentially to avoid rate limits */
-async function prefetchAllTeams(fixtures: any[], apiKey: string) {
-  // Collect unique team IDs
+/** Pre-fetch all unique teams SEQUENTIALLY to respect API rate limits */
+async function prefetchAllTeams(fixtures: any[], apiKey: string): Promise<Map<number, any>> {
   const teamMap = new Map<number, string>();
   for (const f of fixtures) {
     teamMap.set(f.teams.home.id, f.teams.home.name);
     teamMap.set(f.teams.away.id, f.teams.away.name);
   }
   
-  console.log(`Pre-fetching stats for ${teamMap.size} unique teams`);
+  console.log(`Fetching stats for ${teamMap.size} unique teams`);
   const results = new Map<number, any>();
+  let apiCalls = 0;
   
-  // Process teams sequentially with small delay to respect rate limits
-  let count = 0;
   for (const [teamId, teamName] of teamMap) {
-    // Check cache first - no delay needed for cached teams
-    const ck = `team_detailed_v2_${teamId}`;
+    // Check cache first
+    const ck = `team_v3_${teamId}`;
     const cached = cacheGet(ck, 7200000);
     if (cached) {
       results.set(teamId, cached);
       continue;
     }
     
-    // Add delay between actual API calls (not cached)
-    if (count > 0) await delay(120);
+    // Delay between uncached API calls to avoid rate limit
+    if (apiCalls > 0) await delay(150);
     const stats = await fetchTeamStats(teamId, teamName, apiKey);
     results.set(teamId, stats);
-    count++;
+    apiCalls++;
   }
   
-  console.log(`Fetched ${count} teams from API, ${teamMap.size - count} from cache`);
+  console.log(`Done: ${apiCalls} from API, ${teamMap.size - apiCalls} from cache`);
   return results;
 }
 
-// ========== PRE-MATCH section updated in serve() below ==========
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    const apiKey = Deno.env.get("API_FUTEBOL_KEY");
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "API key missing", matches: [] }), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const isLive = body?.live === true;
+    const fixtureId = body?.fixture;
+    const date = body?.date || new Date().toISOString().split("T")[0];
+
+    // ========== STATS for a specific fixture ==========
+    if (fixtureId) {
+      const cached = cacheGet(`stats_${fixtureId}`, 20000);
+      if (cached) {
+        return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
+      const responseData = { response: sData?.response || [] };
+      cacheSet(`stats_${fixtureId}`, responseData);
+      return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ========== LIVE fixtures ==========
+    if (isLive) {
+      const cached = cacheGet("live_v3", 15000);
+      if (cached) {
+        console.log("Cache hit (live)");
+        return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const fixturesData = await fetchWithAuth("fixtures?live=all", apiKey);
+      const fixtures = fixturesData?.response || [];
+      console.log(`Got ${fixtures.length} live fixtures`);
+
+      const matches = [];
+      for (const j of fixtures) {
+        const fId = j.fixture.id;
+        let stats = { home: null as any, away: null as any };
+        try {
+          const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
+          const resS = sData?.response || [];
+          if (resS.length >= 2) {
+            stats.home = extractStats(resS[0].statistics);
+            stats.away = extractStats(resS[1].statistics);
+          }
+        } catch (e) { console.error(`Stats error for ${fId}:`, e); }
+        matches.push({
+          id: fId, isLive: true, teams: j.teams, goals: j.goals,
+          fixture: j.fixture, league: j.league?.name || '',
+          homeStats: null, awayStats: null, stats,
+        });
+      }
+      const responseData = { matches };
+      cacheSet("live_v3", responseData);
+      return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ========== PRE-MATCH fixtures ==========
+    const ck = `date_v12_${date}`;
+    const cached = cacheGet(ck, 7200000);
+    if (cached) {
+      console.log("Cache hit (pre)");
+      return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const fixturesData = await fetchWithAuth(`fixtures?date=${date}`, apiKey);
+    let fixtures = fixturesData?.response || [];
+    console.log(`Got ${fixtures.length} fixtures (pre)`);
+
+    const preMatchStatuses = ['NS', 'TBD', 'SUSP', 'PST', 'CANC'];
+    fixtures = fixtures.filter((f: any) => {
+      const status = f.fixture?.status?.short || '';
+      const isPreMatch = preMatchStatuses.includes(status);
+      const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id);
+      return isPreMatch && isTargetLeague;
+    });
+    console.log(`Filtered to ${fixtures.length} upcoming fixtures`);
+
+    // Pre-fetch ALL teams sequentially to avoid rate limits
+    const teamStatsMap = await prefetchAllTeams(fixtures, apiKey);
+
+    // Assemble matches with pre-fetched stats
+    const matches = fixtures.map((j: any) => ({
+      id: j.fixture.id,
+      isLive: false,
+      teams: j.teams,
+      goals: j.goals,
+      fixture: j.fixture,
+      league: j.league?.name || '',
+      homeStats: teamStatsMap.get(j.teams.home.id) || null,
+      awayStats: teamStatsMap.get(j.teams.away.id) || null,
+      stats: { home: null, away: null },
+    }));
 
     console.log(`Returning ${matches.length} matches`);
     const responseData = { matches };

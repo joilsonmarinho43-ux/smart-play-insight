@@ -18,6 +18,25 @@ function cacheSet(key: string, value: { timestamp: number; data: any }) {
 
 const LEAGUES_TO_ANALYZE = [13, 71, 72, 39, 140, 78, 135, 94, 2, 3, 848];
 
+// Process array in sequential batches to avoid API rate limits
+async function processInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  delayMs: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+    if (i + batchSize < items.length) {
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+  return results;
+}
+
 async function fetchWithAuth(endpoint: string, apiKey: string) {
   console.log(`API call: ${endpoint}`);
   const res = await fetch(`${BASE_URL}/${endpoint}`, {

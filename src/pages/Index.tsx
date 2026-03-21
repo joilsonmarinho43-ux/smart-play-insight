@@ -96,7 +96,7 @@ const Index = () => {
             <input
               type="date"
               value={date}
-              onChange={e => { setDate(e.target.value); setHasFetchedOnce(false); }}
+              onChange={e => setDate(e.target.value)}
               className="bg-[#334155] text-xs p-2 rounded-lg border border-white/10"
             />
             {profile?.is_admin && (

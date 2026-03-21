@@ -68,7 +68,7 @@ function getStat(stats: any[], name: string): number {
   return val === null || val === undefined ? 0 : Number(String(val).replace('%', ''));
 }
 
-/** Calculate detailed team stats from last N finished games */
+/** Calculate team stats — uses fixture stats if available in cache, otherwise goals only */
 async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: string) {
   if (!games || games.length === 0) return null;
 
@@ -79,15 +79,9 @@ async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: strin
   const recentGoalsAgainst: number[] = [];
   let statsCount = 0;
 
-  // Fetch fixture stats sequentially with small delays to avoid rate limits
-  const statsResults: any[][] = [];
+  // Try to get fixture stats from cache only (no new API calls for individual stats)
+  // This avoids rate limit issues — stats will be populated from cache on subsequent requests
   for (const g of games) {
-    const fStats = await getFixtureStats(g.fixture.id, apiKey);
-    statsResults.push(fStats);
-    await delay(50);
-  }
-
-  games.forEach((g, idx) => {
     const isHome = g.teams.home.id === teamId;
     const gf = (isHome ? g.goals.home : g.goals.away) || 0;
     const ga = (isHome ? g.goals.away : g.goals.home) || 0;
@@ -96,10 +90,12 @@ async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: strin
     recentGoalsFor.push(gf);
     recentGoalsAgainst.push(ga);
 
-    const fStats = statsResults[idx];
-    if (fStats && fStats.length >= 2) {
+    // Check cache for fixture stats (no API call)
+    const ck = `fstats_${g.fixture.id}`;
+    const cachedStats = cacheGet(ck, 86400000);
+    if (cachedStats && cachedStats.length >= 2) {
       const teamIdx = isHome ? 0 : 1;
-      const stats = fStats[teamIdx]?.statistics || [];
+      const stats = cachedStats[teamIdx]?.statistics || [];
       totalShots += getStat(stats, "Total Shots");
       shotsOnGoal += getStat(stats, "Shots on Goal");
       corners += getStat(stats, "Corner Kicks");
@@ -110,7 +106,7 @@ async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: strin
       bigChances += getStat(stats, "Expected Goals") || 0;
       statsCount++;
     }
-  });
+  }
 
   const count = games.length;
   const sc = statsCount || 1;

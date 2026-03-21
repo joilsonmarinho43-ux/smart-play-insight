@@ -66,7 +66,7 @@ function extractStats(stats: any[]) {
 }
 
 function calcTeamStats(games: any[], teamId: number) {
-  if (!games || games.length === 0) return { goalsFor: 0, goalsAgainst: 0 };
+  if (!games || games.length === 0) return { goalsFor: 0, goalsAgainst: 0, gamesCount: 0 };
   let goalsFor = 0, goalsAgainst = 0;
   games.forEach((g) => {
     const isHome = g.teams.home.id === teamId;
@@ -76,6 +76,7 @@ function calcTeamStats(games: any[], teamId: number) {
   return {
     goalsFor: Number((goalsFor / games.length).toFixed(2)),
     goalsAgainst: Number((goalsAgainst / games.length).toFixed(2)),
+    gamesCount: games.length,
   };
 }
 

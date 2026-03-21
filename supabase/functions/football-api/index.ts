@@ -241,7 +241,7 @@ serve(async (req) => {
     }
 
     // ========== PRE-MATCH fixtures ==========
-    const ck = `date_v9_${date}`;
+    const ck = `date_v10_${date}`;
     const cached = cacheGet(ck, 7200000); // 2h cache
     if (cached) {
       console.log("Cache hit (pre)");

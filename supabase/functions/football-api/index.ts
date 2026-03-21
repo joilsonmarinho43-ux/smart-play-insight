@@ -21,18 +21,26 @@ function cacheSet(key: string, data: any) {
 // Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
 
-async function fetchWithAuth(endpoint: string, apiKey: string) {
-  console.log(`API call: ${endpoint}`);
-  const res = await fetch(`${BASE_URL}/${endpoint}`, {
-    headers: { "x-apisports-key": apiKey },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`API error ${res.status}: ${text}`);
-    throw new Error(`API ${res.status}`);
+async function fetchWithAuth(endpoint: string, apiKey: string, retries = 1): Promise<any> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) await delay(300);
+    console.log(`API call: ${endpoint}${attempt > 0 ? ` (retry ${attempt})` : ''}`);
+    const res = await fetch(`${BASE_URL}/${endpoint}`, {
+      headers: { "x-apisports-key": apiKey },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`API error ${res.status}: ${text}`);
+      if (attempt === retries) throw new Error(`API ${res.status}`);
+      continue;
+    }
+    const json = await res.json();
+    // Check for rate limit (API returns empty response array when limited)
+    return json;
   }
-  return res.json();
 }
+
+function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 function extractStats(stats: any[]) {
   if (!stats || stats.length === 0) return null;

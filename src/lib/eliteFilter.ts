@@ -68,7 +68,7 @@ function evaluateCorners(match: MatchData): number {
   const apm = getCombinedAPM(match);
 
   // APM gate: precisa de intensidade mínima
-  if (apm < 1.2) return Math.max(0, (total / 9.5) * 30); // Score reduzido sem APM
+  if (apm < 0.8) return Math.max(0, (total / 9.5) * 30); // Score reduzido sem APM
 
   if (total >= 9.5) return Math.min(100, 50 + (total - 9.5) * 10);
   return Math.max(0, (total / 9.5) * 45);

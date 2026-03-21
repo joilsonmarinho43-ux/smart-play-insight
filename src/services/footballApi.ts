@@ -28,7 +28,10 @@ function getStorageCache(key: string, timeKey: string, cooldown: number) {
 // PRÉ-JOGO (Corrigido para economizar API)
 // =============================
 export async function fetchMatches(date: string): Promise<MatchData[]> {
-  const cached = getStorageCache(CACHE_KEYS.PRE, CACHE_KEYS.TIME_PRE, PRE_MATCH_COOLDOWN);
+  // Cache por data — cada dia tem seu próprio cache
+  const cacheKey = `${CACHE_KEYS.PRE}_${date}`;
+  const cacheTimeKey = `${CACHE_KEYS.TIME_PRE}_${date}`;
+  const cached = getStorageCache(cacheKey, cacheTimeKey, PRE_MATCH_COOLDOWN);
   if (cached) return cached;
 
   try {
@@ -44,8 +47,8 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
     const result = raw.filter((m: any) => (m.id || m.fixture?.id) && (m.homeTeam || m.teams?.home?.name));
 
     if (result.length > 0) {
-      localStorage.setItem(CACHE_KEYS.PRE, JSON.stringify(result));
-      localStorage.setItem(CACHE_KEYS.TIME_PRE, String(Date.now()));
+      localStorage.setItem(cacheKey, JSON.stringify(result));
+      localStorage.setItem(cacheTimeKey, String(Date.now()));
     }
 
     return result;

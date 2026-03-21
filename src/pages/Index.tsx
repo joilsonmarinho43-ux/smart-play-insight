@@ -9,10 +9,26 @@ import { useProfile } from '@/hooks/useProfile';
 import { Brain, Loader2, Zap, RefreshCw, Shield, Crown, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+const LEAGUE_LABELS: Record<string, string> = {
+  'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier',
+  'La Liga': '🇪🇸 La Liga',
+  'Bundesliga': '🇩🇪 Bundes',
+  'Ligue 1': '🇫🇷 Ligue 1',
+};
+
+function getLeagueLabel(league: string): string {
+  if (league.includes('Serie A')) {
+    // Distinguish Brazilian vs Italian by checking known Brazilian team cities/ids
+    return league; // will be resolved per-match
+  }
+  return LEAGUE_LABELS[league] || league;
+}
+
 const Index = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedLeague, setSelectedLeague] = useState<string>('all');
 
   const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],

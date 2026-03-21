@@ -143,6 +143,7 @@ function ApmXgIndicator({ match }: { match: MatchData }) {
       </div>
     </div>
   );
+}
 
 // ─── Poisson helper ───
 function poissonProb(lambda: number, k: number): number {

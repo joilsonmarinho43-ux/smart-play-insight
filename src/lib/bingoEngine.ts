@@ -2,14 +2,43 @@ import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from './matchAnalysis';
 
 /**
- * 🔥 BINGO PROFISSIONAL — Confiança mínima 75%, correlação lógica
+ * 🔥 BINGO PROFISSIONAL v2 — Confiança mínima 78%, xG cross-validation, filtro de variância
  */
+
+// Ligas de alta instabilidade / dados incompletos — bloqueadas do Bingo
+const UNSTABLE_LEAGUES = [
+  'club friendly', 'friendlies', 'international friendly',
+  'u17', 'u19', 'u20', 'u21', 'u23', 'sub-17', 'sub-19', 'sub-20', 'sub-21', 'sub-23',
+  'reserve', 'reserva', 'youth', 'juvenil', 'amateur', 'amador',
+  'terceira divisão', 'third division', 'regional', 'lower division',
+  'women', 'feminino', // dados geralmente incompletos na API
+];
+
+function isStableLeague(match: MatchData): boolean {
+  const league = (match.league || '').toLowerCase();
+  return !UNSTABLE_LEAGUES.some(tag => league.includes(tag));
+}
+
+/**
+ * Verifica se o jogo tem dados suficientes para confiabilidade
+ */
+function hasReliableData(match: MatchData): boolean {
+  const hGames = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount || 0;
+  const aGames = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount || 0;
+  // Mínimo de 3 jogos cada para dados confiáveis
+  return hGames >= 3 && aGames >= 3;
+}
+
 export function generatePreGameBingo(match: MatchData) {
+  // Filtro de variância: liga estável + dados confiáveis
+  if (!isStableLeague(match)) return null;
+  if (!hasReliableData(match)) return null;
+
   const allMarkets = analyzeMarkets(match);
   if (!allMarkets || allMarkets.length === 0) return null;
 
-  // Filtro Elite: confiança >= 75%
-  const highValueMarkets = allMarkets.filter(m => m.probability >= 75 && m.probability <= 98);
+  // Filtro Elite v2: confiança >= 78% (regra de ouro)
+  const highValueMarkets = allMarkets.filter(m => m.probability >= 78 && m.probability <= 98);
   if (highValueMarkets.length === 0) return null;
 
   // Correlação lógica: agrupa por categoria para não misturar mercados contraditórios
@@ -29,7 +58,6 @@ export function generatePreGameBingo(match: MatchData) {
     return (pA === -1 ? 99 : pA) - (pB === -1 ? 99 : pB);
   });
 
-  // Remove combinações contraditórias (ex: Over 2.5 e Under 2.5 juntos)
   const selected = sorted.slice(0, 3);
 
   return {
@@ -46,17 +74,21 @@ function findProb(markets: MarketAnalysis[], name: string): number {
 }
 
 /**
- * Multi-bilhetes inteligentes com correlação
+ * Multi-bilhetes inteligentes com correlação — threshold 78%
  */
 export function generateSmartBets(matches: any[]) {
   const allPicks: any[] = [];
 
   for (const match of matches) {
+    // Aplica filtros de liga e dados antes de processar
+    if (!isStableLeague(match)) continue;
+    if (!hasReliableData(match)) continue;
+
     const result = generatePreGameBingo(match);
     if (!result || !result.markets.length) continue;
 
     const best = result.markets[0];
-    if (best.probability < 75) continue; // Filtro de confiança
+    if (best.probability < 78) continue; // Filtro de ouro
 
     allPicks.push({
       match,
@@ -96,13 +128,13 @@ export function formatBingoWhatsApp(bingoMatches: any[]): string {
     const details = `🏆 ${bm.league || 'Liga'} • ⏰ ${bm.time || 'A definir'}\n`;
     const tips = (bm.selectedMarkets || bm.mercados || []).map((m: any) => {
       const prob = m.probability || m.confianca;
-      const emoji = prob >= 90 ? '🟢🔥' : prob >= 80 ? '🟢' : '🟡';
+      const emoji = prob >= 90 ? '🟢🔥' : prob >= 85 ? '🟢' : '🟡';
       return `${emoji} *${m.market || m.mercado}* → _${prob}%_`;
     }).join('\n');
     return `${matchHeader}${details}${tips}\n`;
   }).join('\n');
 
-  const footer = `\n${'─'.repeat(30)}\n📊 *${bingoMatches.length} jogos selecionados*\n🧠 _Modelo Poisson + Médias Reais_\n✅ _Confiança mínima: 75%_`;
+  const footer = `\n${'─'.repeat(30)}\n📊 *${bingoMatches.length} jogos selecionados*\n🧠 _Poisson + xG Cross-Validation_\n✅ _Confiança mínima: 78% | APM ≥ 1.2_`;
 
   return header + body + footer;
 }

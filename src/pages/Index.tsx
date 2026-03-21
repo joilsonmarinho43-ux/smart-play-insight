@@ -142,6 +142,13 @@ const Index = () => {
           </div>
         )}
 
+        {/* Elite Performance VIP */}
+        {safeMatches.length > 0 && (
+          <div className="mt-6">
+            <ElitePanel matches={safeMatches} />
+          </div>
+        )}
+
         {/* Bingo Section */}
         {safeMatches.length > 0 && (
           <div className="mt-6">

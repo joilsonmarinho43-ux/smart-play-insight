@@ -83,7 +83,7 @@ function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
   const apm = getCombinedAPM(match);
 
   // APM gate
-  if (apm < 1.2) return Math.max(0, (p15 + p25) / 4);
+  if (apm < 0.8) return Math.max(0, (p15 + p25) / 4);
 
   if (p15 >= 78 && p25 >= 78) return Math.min(100, (p15 + p25) / 2);
   if (p15 >= 78) return Math.min(85, p15 * 0.8);

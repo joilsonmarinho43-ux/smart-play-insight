@@ -160,8 +160,8 @@ export function filterEliteMatches(matches: MatchData[]): EliteMatch[] {
       const intensityScore = evaluateIntensity(match);
 
       const tags: EliteTag[] = [];
-      if (cornersScore >= 50) tags.push('corners');
-      if (goalsScore >= 60) tags.push('goals');
+      if (cornersScore >= 40) tags.push('corners');
+      if (goalsScore >= 40) tags.push('goals');
       if (cardsScore >= 50) tags.push('cards');
       if (intensityScore >= 50) tags.push('intense');
 

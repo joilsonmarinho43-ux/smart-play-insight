@@ -90,8 +90,11 @@ const Index = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => refetch()} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+            <button onClick={() => refetch()} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors" title="Atualizar">
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
+            </button>
+            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors" title="Limpar cache">
+              <Trash2 className="w-4 h-4 text-gray-400" />
             </button>
             <input
               type="date"

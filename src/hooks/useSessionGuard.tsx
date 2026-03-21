@@ -4,13 +4,19 @@ import { useAuth } from './useAuth';
 import { useProfile } from './useProfile';
 import { toast } from 'sonner';
 
-// Generate a unique token per browser tab/device and persist it
+// Persist session token in sessionStorage (per-tab) so HMR reloads don't generate new tokens
 const getSessionToken = (): string => {
-  let token = localStorage.getItem('device_session_token');
+  let token = sessionStorage.getItem('device_session_token');
   if (!token) {
-    token = crypto.randomUUID();
-    localStorage.setItem('device_session_token', token);
+    // Also check localStorage for backward compat, then migrate
+    token = localStorage.getItem('device_session_token');
+    if (!token) {
+      token = crypto.randomUUID();
+    }
+    sessionStorage.setItem('device_session_token', token);
   }
+  // Keep localStorage in sync for the register-session check
+  localStorage.setItem('device_session_token', token);
   return token;
 };
 
@@ -20,15 +26,22 @@ const getDeviceInfo = (): string => {
   return `${platform} | ${ua.slice(0, 100)}`;
 };
 
+// Module-level flags survive HMR better than refs
+let moduleRegistered = false;
+let moduleRegisteredForUser = '';
+
 export const useSessionGuard = () => {
   const { session, signOut } = useAuth();
-  const { profile } = useProfile();
-  const registeredRef = useRef(false);
-  const registrationDoneRef = useRef(false);
+  const { profile, loading: profileLoading } = useProfile();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const registrationDoneRef = useRef(false);
+
+  const userId = session?.user?.id;
+  const accessToken = session?.access_token;
+  const isAdmin = profile?.is_admin;
 
   const registerSession = useCallback(async () => {
-    if (!session?.access_token) return;
+    if (!accessToken) return;
 
     const sessionToken = getSessionToken();
     const deviceInfo = getDeviceInfo();
@@ -45,11 +58,10 @@ export const useSessionGuard = () => {
     } catch (err) {
       console.error('Failed to register session:', err);
     }
-  }, [session?.access_token]);
+  }, [accessToken]);
 
   const checkSession = useCallback(async () => {
-    if (!session?.user?.id) return;
-    // Don't check until we've successfully registered this device
+    if (!userId) return;
     if (!registrationDoneRef.current) return;
 
     const sessionToken = getSessionToken();
@@ -57,7 +69,7 @@ export const useSessionGuard = () => {
     const { data, error } = await supabase
       .from('active_sessions')
       .select('session_token')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (error) {
@@ -71,29 +83,34 @@ export const useSessionGuard = () => {
       });
       await signOut();
     }
-  }, [session?.user?.id, signOut]);
+  }, [userId, signOut]);
 
-  // Register on first login
+  // Register on first login — wait for profile to load first
   useEffect(() => {
-    // Admins skip session guard (they need access from multiple origins like Lovable preview + published app)
-    if (!session?.access_token || registeredRef.current || profile?.is_admin) return;
-    registeredRef.current = true;
+    if (!accessToken || profileLoading) return;
+    // Admins skip session guard
+    if (isAdmin) return;
+    // Already registered for this user (survives HMR)
+    if (moduleRegistered && moduleRegisteredForUser === userId) return;
+
+    moduleRegistered = true;
+    moduleRegisteredForUser = userId || '';
     registrationDoneRef.current = false;
     registerSession();
-  }, [session?.access_token, registerSession]);
+  }, [accessToken, profileLoading, isAdmin, userId, registerSession]);
 
-  // Reset refs when session changes (new login)
+  // Reset module flags when user changes (logout/login)
   useEffect(() => {
-    if (!session?.access_token) {
-      registeredRef.current = false;
+    if (!accessToken) {
+      moduleRegistered = false;
+      moduleRegisteredForUser = '';
       registrationDoneRef.current = false;
     }
-  }, [session?.access_token]);
+  }, [accessToken]);
 
   // Poll every 30s to check if this device is still the active one
   useEffect(() => {
-    // Admins skip session polling
-    if (!session?.user?.id || profile?.is_admin) {
+    if (!userId || profileLoading || isAdmin) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
@@ -102,11 +119,11 @@ export const useSessionGuard = () => {
     const timeout = setTimeout(() => {
       checkSession();
       intervalRef.current = setInterval(checkSession, 30000);
-    }, 5000);
+    }, 8000);
 
     return () => {
       clearTimeout(timeout);
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [session?.user?.id, checkSession]);
+  }, [userId, profileLoading, isAdmin, checkSession]);
 };

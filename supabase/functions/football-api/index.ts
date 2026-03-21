@@ -125,7 +125,7 @@ async function fetchDetailedStats(fixtureIds: number[], teamId: number, apiKey: 
   };
 }
 
-// Process a single match: fetch last 5 games + detailed stats for 3 most recent
+// Process a single match with reduced API calls
 async function processMatch(j: any, apiKey: string) {
   const fId = j.fixture.id;
   let hStats = null as any, aStats = null as any;
@@ -135,37 +135,27 @@ async function processMatch(j: any, apiKey: string) {
     const homeGames = hG?.response || [];
     hStats = calcTeamStats(homeGames, j.teams.home.id);
     const homeFixtureIds = homeGames.map((g: any) => g.fixture.id);
-    console.log(`${j.teams.home.name}: GF=${hStats.goalsFor}, GA=${hStats.goalsAgainst}, games=${homeGames.length}`);
 
-    // Fetch detailed stats for home team (3 fixtures max)
     const hDetailed = await fetchDetailedStats(homeFixtureIds, j.teams.home.id, apiKey);
     if (hDetailed) Object.assign(hStats, hDetailed);
   } catch (e) { console.error(`Home error ${j.teams.home.name}:`, e); }
 
-  // Small pause between teams
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise(r => setTimeout(r, 300));
 
   try {
     const aG = await fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey);
     const awayGames = aG?.response || [];
     aStats = calcTeamStats(awayGames, j.teams.away.id);
     const awayFixtureIds = awayGames.map((g: any) => g.fixture.id);
-    console.log(`${j.teams.away.name}: GF=${aStats.goalsFor}, GA=${aStats.goalsAgainst}, games=${awayGames.length}`);
 
-    // Fetch detailed stats for away team (3 fixtures max)
     const aDetailed = await fetchDetailedStats(awayFixtureIds, j.teams.away.id, apiKey);
     if (aDetailed) Object.assign(aStats, aDetailed);
   } catch (e) { console.error(`Away error ${j.teams.away.name}:`, e); }
 
   return {
-    id: fId,
-    isLive: false,
-    teams: j.teams,
-    goals: j.goals,
-    fixture: j.fixture,
-    league: j.league?.name || '',
-    homeStats: hStats,
-    awayStats: aStats,
+    id: fId, isLive: false, teams: j.teams, goals: j.goals,
+    fixture: j.fixture, league: j.league?.name || '',
+    homeStats: hStats, awayStats: aStats,
     stats: { home: null, away: null },
   };
 }

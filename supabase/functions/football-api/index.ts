@@ -11,7 +11,7 @@ const memCache = new Map<string, { timestamp: number; data: any }>();
 function cacheGet(key: string) { return memCache.get(key) || null; }
 function cacheSet(key: string, value: { timestamp: number; data: any }) { memCache.set(key, value); }
 
-const LEAGUES_TO_ANALYZE = [13, 71, 72, 39, 140, 78, 135, 94, 2, 3, 848];
+const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
 
 async function fetchWithAuth(endpoint: string, apiKey: string) {
   console.log(`API call: ${endpoint}`);

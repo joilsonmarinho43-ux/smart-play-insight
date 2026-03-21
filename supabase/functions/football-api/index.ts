@@ -49,21 +49,50 @@ function extractStats(stats: any[]) {
   };
 }
 
-/** Calculate team stats from last N games — no extra API calls needed */
-function calcTeamStats(games: any[], teamId: number) {
-  if (!games || games.length === 0) return {
+/** Fetch fixture stats with 24h cache (finished games never change) */
+async function getFixtureStats(fixtureId: number, apiKey: string): Promise<any[]> {
+  const ck = `fstats_${fixtureId}`;
+  const cached = cacheGet(ck, 86400000); // 24h
+  if (cached) return cached;
+  try {
+    const data = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
+    const result = data?.response || [];
+    cacheSet(ck, result);
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+/** Extract a stat value from a statistics array */
+function getStat(stats: any[], name: string): number {
+  const val = stats.find((s: any) => s.type === name)?.value;
+  return val === null || val === undefined ? 0 : Number(String(val).replace('%', ''));
+}
+
+/** Calculate detailed team stats from last N games with per-fixture statistics */
+async function calcTeamStatsDetailed(games: any[], teamId: number, apiKey: string) {
+  const empty = {
     goalsFor: 0, goalsAgainst: 0, gamesCount: 0,
     shotsOnGoal: 0, totalShots: 0, corners: 0, possession: 0,
     fouls: 0, yellowCards: 0, offsides: 0, bigChances: 0,
-    recentGoalsFor: [] as number[],
-    recentGoalsAgainst: [] as number[],
+    recentGoalsFor: [] as number[], recentGoalsAgainst: [] as number[],
   };
+  if (!games || games.length === 0) return empty;
 
   let goalsFor = 0, goalsAgainst = 0;
+  let totalShots = 0, shotsOnGoal = 0, corners = 0, possession = 0;
+  let fouls = 0, yellowCards = 0, offsides = 0, bigChances = 0;
   const recentGoalsFor: number[] = [];
   const recentGoalsAgainst: number[] = [];
+  let statsCount = 0;
 
-  games.forEach((g) => {
+  // Fetch all fixture stats in parallel
+  const statsResults = await Promise.all(
+    games.map(g => getFixtureStats(g.fixture.id, apiKey))
+  );
+
+  games.forEach((g, idx) => {
     const isHome = g.teams.home.id === teamId;
     const gf = (isHome ? g.goals.home : g.goals.away) || 0;
     const ga = (isHome ? g.goals.away : g.goals.home) || 0;
@@ -71,47 +100,69 @@ function calcTeamStats(games: any[], teamId: number) {
     goalsAgainst += ga;
     recentGoalsFor.push(gf);
     recentGoalsAgainst.push(ga);
+
+    const fStats = statsResults[idx];
+    if (fStats && fStats.length >= 2) {
+      const teamIdx = isHome ? 0 : 1;
+      const stats = fStats[teamIdx]?.statistics || [];
+      totalShots += getStat(stats, "Total Shots");
+      shotsOnGoal += getStat(stats, "Shots on Goal");
+      corners += getStat(stats, "Corner Kicks");
+      possession += getStat(stats, "Ball Possession");
+      fouls += getStat(stats, "Fouls");
+      yellowCards += getStat(stats, "Yellow Cards");
+      offsides += getStat(stats, "Offsides");
+      bigChances += getStat(stats, "Expected Goals") || getStat(stats, "expected_goals") || 0;
+      statsCount++;
+    }
   });
 
   const count = games.length;
+  const sc = statsCount || 1;
   return {
     goalsFor: Number((goalsFor / count).toFixed(2)),
     goalsAgainst: Number((goalsAgainst / count).toFixed(2)),
     gamesCount: count,
-    shotsOnGoal: 0, totalShots: 0, corners: 0, possession: 0,
-    fouls: 0, yellowCards: 0, offsides: 0, bigChances: 0,
+    totalShots: Number((totalShots / sc).toFixed(1)),
+    shotsOnGoal: Number((shotsOnGoal / sc).toFixed(1)),
+    corners: Number((corners / sc).toFixed(1)),
+    possession: Number((possession / sc).toFixed(1)),
+    fouls: Number((fouls / sc).toFixed(1)),
+    yellowCards: Number((yellowCards / sc).toFixed(1)),
+    offsides: Number((offsides / sc).toFixed(1)),
+    bigChances: Number((bigChances / sc).toFixed(1)),
     recentGoalsFor,
     recentGoalsAgainst,
   };
 }
 
-/** Process a single match — only 2 API calls (home history + away history) */
+/** Process a single match — fetches team history + detailed stats */
 async function processMatch(j: any, apiKey: string) {
   const fId = j.fixture.id;
   let hStats = null as any, aStats = null as any;
 
-  // Home team — check cache first (1h TTL)
-  const hCk = `team_${j.teams.home.id}`;
-  const cachedHome = cacheGet(hCk, 3600000);
+  // Home team — check cache first (2h TTL for full detailed stats)
+  const hCk = `team_detailed_${j.teams.home.id}`;
+  const cachedHome = cacheGet(hCk, 7200000);
   if (cachedHome) {
     hStats = cachedHome;
   } else {
     try {
       const hG = await fetchWithAuth(`fixtures?team=${j.teams.home.id}&last=5&status=FT`, apiKey);
-      hStats = calcTeamStats(hG?.response || [], j.teams.home.id);
+      hStats = await calcTeamStatsDetailed(hG?.response || [], j.teams.home.id, apiKey);
       cacheSet(hCk, hStats);
     } catch (e) { console.error(`Home error ${j.teams.home.name}:`, e); }
   }
 
-  // Away team — check cache first (1h TTL)
-  const aCk = `team_${j.teams.away.id}`;
-  const cachedAway = cacheGet(aCk, 3600000);
+  // Away team — check cache first (2h TTL)
+  const aCk = `team_detailed_${j.teams.away.id}`;
+  const cachedAway = cacheGet(aCk, 7200000);
   if (cachedAway) {
     aStats = cachedAway;
   } else {
     try {
       const aG = await fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey);
-      aStats = calcTeamStats(aG?.response || [], j.teams.away.id);
+      aStats = await calcTeamStatsDetailed(aG?.response || [], j.teams.away.id, apiKey);
       cacheSet(aCk, aStats);
     } catch (e) { console.error(`Away error ${j.teams.away.name}:`, e); }
   }
@@ -186,7 +237,7 @@ serve(async (req) => {
     }
 
     // ========== PRE-MATCH fixtures ==========
-    const ck = `date_v6_${date}`;
+    const ck = `date_v7_${date}`;
     const cached = cacheGet(ck, 7200000); // 2h cache
     if (cached) {
       console.log("Cache hit (pre)");
@@ -203,23 +254,27 @@ serve(async (req) => {
       const isPreMatch = preMatchStatuses.includes(status);
       const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id);
       return isPreMatch && isTargetLeague;
-    }).slice(0, 15);
+    }).slice(0, 30);
     console.log(`Filtered to ${fixtures.length} upcoming fixtures`);
 
     // Process matches — team caches shared across matches reduce actual API calls
+    // Process in batches of 5 to avoid overwhelming the API
     const matches = [];
-    for (const j of fixtures) {
-      try {
-        const match = await processMatch(j, apiKey);
-        matches.push(match);
-      } catch (e) {
-        console.error(`Match processing error:`, e);
-        matches.push({
-          id: j.fixture.id, isLive: false, teams: j.teams, goals: j.goals,
-          fixture: j.fixture, league: j.league?.name || '',
-          homeStats: null, awayStats: null, stats: { home: null, away: null },
-        });
-      }
+    for (let i = 0; i < fixtures.length; i += 5) {
+      const batch = fixtures.slice(i, i + 5);
+      const results = await Promise.all(
+        batch.map((j: any) =>
+          processMatch(j, apiKey).catch((e) => {
+            console.error(`Match processing error:`, e);
+            return {
+              id: j.fixture.id, isLive: false, teams: j.teams, goals: j.goals,
+              fixture: j.fixture, league: j.league?.name || '',
+              homeStats: null, awayStats: null, stats: { home: null, away: null },
+            };
+          })
+        )
+      );
+      matches.push(...results);
     }
 
     console.log(`Returning ${matches.length} matches`);

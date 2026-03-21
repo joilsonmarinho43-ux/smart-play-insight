@@ -11,6 +11,7 @@ const memCache = new Map<string, { timestamp: number; data: any }>();
 function cacheGet(key: string) { return memCache.get(key) || null; }
 function cacheSet(key: string, value: { timestamp: number; data: any }) { memCache.set(key, value); }
 
+// Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
 
 async function fetchWithAuth(endpoint: string, apiKey: string) {
@@ -246,7 +247,7 @@ serve(async (req) => {
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';
       const isPreMatch = preMatchStatuses.includes(status);
-      const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id) || f.league?.country === "Brazil";
+      const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id);
       return isPreMatch && isTargetLeague;
     }).slice(0, 10);
     console.log(`Filtered to ${fixtures.length} upcoming fixtures`);

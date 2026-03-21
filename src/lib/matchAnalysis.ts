@@ -129,7 +129,7 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
 
   // APM combinado para gate de mercados
   const combinedAPM = calculateCombinedAPM(match);
-  const passesAPMGate = combinedAPM >= 1.2;
+  const passesAPMGate = combinedAPM >= 0.8;
 
   // xG para cross-validation
   const { homeXG, awayXG } = getExpectedGoals(match);

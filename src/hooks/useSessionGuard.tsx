@@ -92,7 +92,8 @@ export const useSessionGuard = () => {
 
   // Poll every 30s to check if this device is still the active one
   useEffect(() => {
-    if (!session?.user?.id) {
+    // Admins skip session polling
+    if (!session?.user?.id || profile?.is_admin) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }

@@ -67,7 +67,6 @@ export const useSessionGuard = () => {
       toast.error('Sua conta foi acessada em outro dispositivo. Você foi desconectado.', {
         duration: 8000,
       });
-      localStorage.removeItem('device_session_token');
       await signOut();
     }
   }, [session?.user?.id, signOut]);
@@ -77,8 +76,6 @@ export const useSessionGuard = () => {
     if (!session?.access_token || registeredRef.current) return;
     registeredRef.current = true;
     registrationDoneRef.current = false;
-    // Generate a fresh token for this login
-    localStorage.removeItem('device_session_token');
     registerSession();
   }, [session?.access_token, registerSession]);
 

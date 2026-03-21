@@ -328,7 +328,7 @@ serve(async (req) => {
       teams: j.teams,
       goals: j.goals,
       fixture: j.fixture,
-      league: j.league?.name || '',
+      league: getLeagueDisplayName(j.league?.id, j.league?.name || ''),
       homeStats: teamStatsCache.get(j.teams.home.id) || null,
       awayStats: teamStatsCache.get(j.teams.away.id) || null,
       stats: { home: null, away: null },

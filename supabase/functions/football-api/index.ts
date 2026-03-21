@@ -266,10 +266,9 @@ serve(async (req) => {
     let fixtures = fixturesData?.response || [];
     console.log(`Got ${fixtures.length} total fixtures`);
 
-    const preMatchStatuses = ['NS', 'TBD', 'SUSP', 'PST', 'CANC'];
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';
-      return preMatchStatuses.includes(status) && LEAGUES_TO_ANALYZE.includes(f.league?.id);
+      return status === 'NS' && LEAGUES_TO_ANALYZE.includes(f.league?.id);
     });
     console.log(`Filtered to ${fixtures.length} target fixtures`);
 

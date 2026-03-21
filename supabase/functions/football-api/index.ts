@@ -254,14 +254,14 @@ serve(async (req) => {
       const isPreMatch = preMatchStatuses.includes(status);
       const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id);
       return isPreMatch && isTargetLeague;
-    }).slice(0, 30);
+    });
     console.log(`Filtered to ${fixtures.length} upcoming fixtures`);
 
-    // Process matches — team caches shared across matches reduce actual API calls
-    // Process in batches of 5 to avoid overwhelming the API
+    // Process matches sequentially in batches of 3 to respect API rate limits
+    // Each match needs 2 team fetches, so batch of 3 = max 6 concurrent team requests
     const matches = [];
-    for (let i = 0; i < fixtures.length; i += 5) {
-      const batch = fixtures.slice(i, i + 5);
+    for (let i = 0; i < fixtures.length; i += 3) {
+      const batch = fixtures.slice(i, i + 3);
       const results = await Promise.all(
         batch.map((j: any) =>
           processMatch(j, apiKey).catch((e) => {

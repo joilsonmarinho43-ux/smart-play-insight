@@ -184,6 +184,10 @@ function StatsTab({ match }: { match: MatchData }) {
     );
   }
 
+  const homeGoals = hs.recentGoalsFor || [];
+  const awayGoals = as_.recentGoalsFor || [];
+  const hasSparkline = homeGoals.length >= 2 || awayGoals.length >= 2;
+
   return (
     <div>
       <div className="flex items-center justify-between px-2 pb-1 mb-1 border-b border-border/30">
@@ -191,6 +195,19 @@ function StatsTab({ match }: { match: MatchData }) {
         <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">Média 5 jogos</span>
         <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{match.awayTeam}</span>
       </div>
+
+      {/* Sparkline de tendência de gols */}
+      {hasSparkline && (
+        <div className="flex items-center justify-around py-3 mb-2 bg-secondary/20 rounded-xl border border-border/20">
+          <GoalSparkline data={homeGoals} color="hsl(170, 55%, 42%)" label={match.homeTeam?.split(' ')[0] || 'Casa'} />
+          <div className="flex flex-col items-center gap-0.5">
+            <TrendingUp className="w-3.5 h-3.5 text-muted-foreground/50" />
+            <span className="text-[8px] text-muted-foreground/50 uppercase">Tendência</span>
+          </div>
+          <GoalSparkline data={awayGoals} color="hsl(24, 95%, 53%)" label={match.awayTeam?.split(' ')[0] || 'Fora'} />
+        </div>
+      )}
+
       <div className="divide-y divide-border/20">
         {stats.map((s) => (
           <StatRow key={s.label} {...s} />

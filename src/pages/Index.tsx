@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
+import ElitePanel from '@/components/ElitePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Brain, Loader2, Zap, RefreshCw, Shield } from 'lucide-react';
+import { Brain, Loader2, Zap, RefreshCw, Shield, Crown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Index = () => {

@@ -237,7 +237,7 @@ serve(async (req) => {
       const isPreMatch = preMatchStatuses.includes(status);
       const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id) || f.league?.country === "Brazil";
       return isPreMatch && isTargetLeague;
-    }).slice(0, 15);
+    }).slice(0, 10);
     console.log(`Filtered to ${fixtures.length} upcoming fixtures`);
 
     // Process matches ONE AT A TIME to avoid rate limits

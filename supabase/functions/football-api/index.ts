@@ -65,13 +65,11 @@ function calcTeamStats(games: any[], teamId: number) {
   };
 }
 
-// Fetch detailed stats for fixture IDs — only use first 3 to reduce API calls
+// Fetch detailed stats for fixture IDs — only use first 2 to reduce API calls
 async function fetchDetailedStats(fixtureIds: number[], teamId: number, apiKey: string) {
-  // Only fetch stats for 3 most recent fixtures to save API quota
-  const idsToFetch = fixtureIds.slice(0, 3);
+  const idsToFetch = fixtureIds.slice(0, 2);
   const allStats: any[] = [];
 
-  // Fetch one at a time with cache check
   for (const fId of idsToFetch) {
     const ck = `fstat_${fId}_${teamId}`;
     const cached = cacheGet(ck);
@@ -105,8 +103,7 @@ async function fetchDetailedStats(fixtureIds: number[], teamId: number, apiKey: 
     } catch (e) {
       console.error(`Stats fetch error for fixture ${fId}:`, e);
     }
-    // Small delay between calls
-    await new Promise(r => setTimeout(r, 350));
+    await new Promise(r => setTimeout(r, 250));
   }
 
   if (allStats.length === 0) return null;
@@ -128,7 +125,7 @@ async function fetchDetailedStats(fixtureIds: number[], teamId: number, apiKey: 
   };
 }
 
-// Process a single match: fetch last 5 games + detailed stats for 3 most recent
+// Process a single match with reduced API calls
 async function processMatch(j: any, apiKey: string) {
   const fId = j.fixture.id;
   let hStats = null as any, aStats = null as any;
@@ -138,37 +135,27 @@ async function processMatch(j: any, apiKey: string) {
     const homeGames = hG?.response || [];
     hStats = calcTeamStats(homeGames, j.teams.home.id);
     const homeFixtureIds = homeGames.map((g: any) => g.fixture.id);
-    console.log(`${j.teams.home.name}: GF=${hStats.goalsFor}, GA=${hStats.goalsAgainst}, games=${homeGames.length}`);
 
-    // Fetch detailed stats for home team (3 fixtures max)
     const hDetailed = await fetchDetailedStats(homeFixtureIds, j.teams.home.id, apiKey);
     if (hDetailed) Object.assign(hStats, hDetailed);
   } catch (e) { console.error(`Home error ${j.teams.home.name}:`, e); }
 
-  // Small pause between teams
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise(r => setTimeout(r, 300));
 
   try {
     const aG = await fetchWithAuth(`fixtures?team=${j.teams.away.id}&last=5&status=FT`, apiKey);
     const awayGames = aG?.response || [];
     aStats = calcTeamStats(awayGames, j.teams.away.id);
     const awayFixtureIds = awayGames.map((g: any) => g.fixture.id);
-    console.log(`${j.teams.away.name}: GF=${aStats.goalsFor}, GA=${aStats.goalsAgainst}, games=${awayGames.length}`);
 
-    // Fetch detailed stats for away team (3 fixtures max)
     const aDetailed = await fetchDetailedStats(awayFixtureIds, j.teams.away.id, apiKey);
     if (aDetailed) Object.assign(aStats, aDetailed);
   } catch (e) { console.error(`Away error ${j.teams.away.name}:`, e); }
 
   return {
-    id: fId,
-    isLive: false,
-    teams: j.teams,
-    goals: j.goals,
-    fixture: j.fixture,
-    league: j.league?.name || '',
-    homeStats: hStats,
-    awayStats: aStats,
+    id: fId, isLive: false, teams: j.teams, goals: j.goals,
+    fixture: j.fixture, league: j.league?.name || '',
+    homeStats: hStats, awayStats: aStats,
     stats: { home: null, away: null },
   };
 }
@@ -206,7 +193,7 @@ serve(async (req) => {
 
     if (cached2) {
       const age = Date.now() - (cached2.timestamp || 0);
-      const ttl = isLive ? 15000 : 3600000;
+      const ttl = isLive ? 15000 : 7200000; // 2h for pre-match
       if (age < ttl) {
         console.log(`Cache hit (${isLive ? 'live' : 'pre'})`);
         return new Response(JSON.stringify(cached2.data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -250,7 +237,7 @@ serve(async (req) => {
       const isPreMatch = preMatchStatuses.includes(status);
       const isTargetLeague = LEAGUES_TO_ANALYZE.includes(f.league?.id) || f.league?.country === "Brazil";
       return isPreMatch && isTargetLeague;
-    }).slice(0, 15);
+    }).slice(0, 10);
     console.log(`Filtered to ${fixtures.length} upcoming fixtures`);
 
     // Process matches ONE AT A TIME to avoid rate limits
@@ -267,8 +254,8 @@ serve(async (req) => {
           homeStats: null, awayStats: null, stats: { home: null, away: null },
         });
       }
-      // Pause between matches
-      await new Promise(r => setTimeout(r, 300));
+      // Small pause
+      await new Promise(r => setTimeout(r, 150));
     }
 
     console.log(`Returning ${matches.length} matches`);

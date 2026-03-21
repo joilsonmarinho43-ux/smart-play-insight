@@ -13,23 +13,13 @@ const Index = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
   const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches', date],
     queryFn: () => fetchMatches(date),
-    enabled: false,
+    staleTime: 1000 * 60 * 10, // 10 min
+    gcTime: 1000 * 60 * 30,
   });
-
-  useEffect(() => {
-    if (!hasFetchedOnce) {
-      // Limpa cache antigo para forçar dados frescos
-      localStorage.removeItem('football_cache_pre');
-      localStorage.removeItem('football_cache_pre_time');
-      refetch();
-      setHasFetchedOnce(true);
-    }
-  }, [refetch, hasFetchedOnce]);
 
   const safeMatches = useMemo(() =>
     (rawMatches || []).map((m: any) => {
@@ -106,7 +96,7 @@ const Index = () => {
             <input
               type="date"
               value={date}
-              onChange={e => { setDate(e.target.value); setHasFetchedOnce(false); }}
+              onChange={e => setDate(e.target.value)}
               className="bg-[#334155] text-xs p-2 rounded-lg border border-white/10"
             />
             {profile?.is_admin && (

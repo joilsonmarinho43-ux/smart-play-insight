@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { useProfile } from './useProfile';
 import { toast } from 'sonner';
 
 // Generate a unique token per browser tab/device and persist it
@@ -21,6 +22,7 @@ const getDeviceInfo = (): string => {
 
 export const useSessionGuard = () => {
   const { session, signOut } = useAuth();
+  const { profile } = useProfile();
   const registeredRef = useRef(false);
   const registrationDoneRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -73,7 +75,8 @@ export const useSessionGuard = () => {
 
   // Register on first login
   useEffect(() => {
-    if (!session?.access_token || registeredRef.current) return;
+    // Admins skip session guard (they need access from multiple origins like Lovable preview + published app)
+    if (!session?.access_token || registeredRef.current || profile?.is_admin) return;
     registeredRef.current = true;
     registrationDoneRef.current = false;
     registerSession();
@@ -89,7 +92,8 @@ export const useSessionGuard = () => {
 
   // Poll every 30s to check if this device is still the active one
   useEffect(() => {
-    if (!session?.user?.id) {
+    // Admins skip session polling
+    if (!session?.user?.id || profile?.is_admin) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }

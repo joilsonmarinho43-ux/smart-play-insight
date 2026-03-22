@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
-import { Loader2, RefreshCw, ArrowLeft, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck } from 'lucide-react';
+import { Loader2, RefreshCw, ArrowLeft, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck, Flame, BarChart3, Crosshair } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMatches } from '@/services/footballApi';
@@ -7,10 +7,26 @@ import {
   analyzeLivePressure,
   generateLiveStrategy,
   recordPISnapshot,
+  getPIHistory,
   type PressureData,
   type PISnapshot,
   type LiveStrategy,
 } from '@/lib/pressureEngine';
+import {
+  normalizePressure,
+  calculateAPWindows,
+  calculatePericulosity,
+  detectImminentGoal,
+  calculateLiveOddsDeviation,
+  projectCornersByPeriod,
+  detectFavoriteLosing,
+  type AttackPressureWindows,
+  type PericulosityData,
+  type ImminentGoalData,
+  type OddsDeviation,
+  type SmartFilterResult,
+} from '@/lib/eliteMetrics';
+import CornerTimeline from '@/components/CornerTimeline';
 import {
   ResponsiveContainer,
   LineChart,
@@ -21,7 +37,21 @@ import {
   CartesianGrid,
 } from 'recharts';
 
+interface MatchAnalysis {
+  pressure: PressureData;
+  history: PISnapshot[];
+  strategies: LiveStrategy[];
+  apWindows: AttackPressureWindows;
+  periculosity: PericulosityData;
+  imminentHome: ImminentGoalData;
+  imminentAway: ImminentGoalData;
+  oddsDeviation: OddsDeviation;
+  smartFilter: SmartFilterResult | null;
+}
+
 const Live = () => {
+  const [smartFilterOnly, setSmartFilterOnly] = useState(false);
+
   const {
     data: matches = [],
     isLoading,
@@ -30,8 +60,8 @@ const Live = () => {
   } = useQuery({
     queryKey: ['live-matches'],
     queryFn: () => fetchLiveMatches(),
-    refetchInterval: 25000,
-    staleTime: 20000,
+    refetchInterval: 60000, // 60s — padrão Pro
+    staleTime: 55000,
   });
 
   const statsMap = useMemo(() => {
@@ -47,7 +77,7 @@ const Live = () => {
   }, [matches]);
 
   const analysisMap = useMemo(() => {
-    const map: Record<string, { pressure: PressureData; history: PISnapshot[]; strategies: LiveStrategy[] }> = {};
+    const map: Record<string, MatchAnalysis> = {};
 
     for (const match of matches as any[]) {
       const id = match?.fixture?.id || match?.id;
@@ -59,34 +89,44 @@ const Live = () => {
       const homeName = match?.teams?.home?.name || 'Casa';
       const awayName = match?.teams?.away?.name || 'Fora';
 
-      const pressure = analyzeLivePressure(stats?.home || null, stats?.away || null, minute);
+      const homeStats = stats?.home || null;
+      const awayStats = stats?.away || null;
+
+      const pressure = analyzeLivePressure(homeStats, awayStats, minute);
       const history = recordPISnapshot(id, pressure.homePI, pressure.awayPI, minute);
-      const strategies = generateLiveStrategy(
-        stats?.home || null, stats?.away || null,
-        minute, homeGoals, awayGoals, homeName, awayName
-      );
-      map[id] = { pressure, history, strategies };
+      const strategies = generateLiveStrategy(homeStats, awayStats, minute, homeGoals, awayGoals, homeName, awayName);
+      const apWindows = calculateAPWindows(history, minute);
+      const periculosity = calculatePericulosity(homeStats, awayStats, minute);
+      const imminentHome = detectImminentGoal(homeStats, minute, apWindows.ap5Home);
+      const imminentAway = detectImminentGoal(awayStats, minute, apWindows.ap5Away);
+      const oddsDeviation = calculateLiveOddsDeviation(homeStats, awayStats, homeGoals, awayGoals, minute);
+
+      const homePoss = homeStats?.possession || 50;
+      const awayPoss = awayStats?.possession || 50;
+      const smartFilter = detectFavoriteLosing(id, homeName, awayName, homeGoals, awayGoals, apWindows.ap5Home, apWindows.ap5Away, homePoss, awayPoss);
+
+      map[id] = { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter };
     }
     return map;
   }, [matches, statsMap]);
 
-  // Sound alert for PI > 70
+  // Sound alert for Imminent Goal >= 80
   const [soundEnabled, setSoundEnabled] = useState(true);
   const alertedRef = useRef<Set<string>>(new Set());
 
-  const playAlertSound = useCallback(() => {
+  const playAlertSound = useCallback((freq: number = 880, duration: number = 0.5) => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.frequency.value = 880;
+      osc.frequency.value = freq;
       osc.type = 'sine';
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.5);
+      osc.stop(ctx.currentTime + duration);
     } catch (e) {
       console.warn('Audio not available');
     }
@@ -94,19 +134,34 @@ const Live = () => {
 
   useEffect(() => {
     if (!soundEnabled) return;
-    for (const [id, { pressure }] of Object.entries(analysisMap)) {
+    for (const [id, analysis] of Object.entries(analysisMap)) {
+      // Imminent Goal alert (threshold 80)
+      const homeImKey = `${id}_imminent_home`;
+      const awayImKey = `${id}_imminent_away`;
+      if (analysis.imminentHome.isTriggered && !alertedRef.current.has(homeImKey)) {
+        alertedRef.current.add(homeImKey);
+        playAlertSound(1047, 0.8); // C6 — urgent
+      }
+      if (analysis.imminentAway.isTriggered && !alertedRef.current.has(awayImKey)) {
+        alertedRef.current.add(awayImKey);
+        playAlertSound(1047, 0.8);
+      }
+      if (!analysis.imminentHome.isTriggered) alertedRef.current.delete(homeImKey);
+      if (!analysis.imminentAway.isTriggered) alertedRef.current.delete(awayImKey);
+
+      // PI alert (original)
       const homeKey = `${id}_home`;
       const awayKey = `${id}_away`;
-      if (pressure.homePI >= 70 && !alertedRef.current.has(homeKey)) {
+      if (analysis.pressure.homePI >= 70 && !alertedRef.current.has(homeKey)) {
         alertedRef.current.add(homeKey);
-        playAlertSound();
+        playAlertSound(880, 0.5);
       }
-      if (pressure.awayPI >= 70 && !alertedRef.current.has(awayKey)) {
+      if (analysis.pressure.awayPI >= 70 && !alertedRef.current.has(awayKey)) {
         alertedRef.current.add(awayKey);
-        playAlertSound();
+        playAlertSound(880, 0.5);
       }
-      if (pressure.homePI < 60) alertedRef.current.delete(homeKey);
-      if (pressure.awayPI < 60) alertedRef.current.delete(awayKey);
+      if (analysis.pressure.homePI < 60) alertedRef.current.delete(homeKey);
+      if (analysis.pressure.awayPI < 60) alertedRef.current.delete(awayKey);
     }
   }, [analysisMap, soundEnabled, playAlertSound]);
 
@@ -116,6 +171,21 @@ const Live = () => {
     caution: { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: '🔴' },
   };
 
+  // Smart filter count
+  const smartFilterCount = useMemo(() =>
+    Object.values(analysisMap).filter(a => a.smartFilter).length,
+  [analysisMap]);
+
+  // Filtered matches
+  const displayMatches = useMemo(() => {
+    const all = matches as any[];
+    if (!smartFilterOnly) return all;
+    return all.filter((match: any) => {
+      const id = match?.fixture?.id || match?.id;
+      return analysisMap[id]?.smartFilter;
+    });
+  }, [matches, smartFilterOnly, analysisMap]);
+
   return (
     <div className="min-h-screen bg-[#0a0f1c] text-white">
       <header className="border-b border-white/10 bg-[#111827]/90 backdrop-blur-md sticky top-0 z-50">
@@ -124,7 +194,10 @@ const Live = () => {
             <Link to="/" className="p-2 hover:bg-white/5 rounded-full"><ArrowLeft className="w-5 h-5" /></Link>
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-orange-500" />
-              <h1 className="font-bold text-lg tracking-tight">LIVE TRADER PRO</h1>
+              <div>
+                <h1 className="font-bold text-lg tracking-tight">LIVE TRADER PRO</h1>
+                <p className="text-[8px] text-orange-500/70 font-bold uppercase">ELITE METRICS ENGINE</p>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -139,13 +212,29 @@ const Live = () => {
               className="flex items-center gap-2 text-xs bg-white/5 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
-              Atualizar
             </button>
           </div>
         </div>
       </header>
 
-      <main className="container max-w-3xl mx-auto px-4 py-6 space-y-5">
+      {/* Smart Filter Toggle */}
+      {smartFilterCount > 0 && (
+        <div className="container max-w-3xl mx-auto px-4 pt-3">
+          <button
+            onClick={() => setSmartFilterOnly(!smartFilterOnly)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+              smartFilterOnly
+                ? 'bg-orange-500 text-white'
+                : 'bg-orange-500/10 text-orange-400 border border-orange-500/30'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5" />
+            🔥 Favoritos Perdendo ({smartFilterCount})
+          </button>
+        </div>
+      )}
+
+      <main className="container max-w-3xl mx-auto px-4 py-4 space-y-5">
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -161,21 +250,32 @@ const Live = () => {
           </div>
         )}
 
-        {(matches as any[]).map((match: any) => {
+        {displayMatches.map((match: any) => {
           const id = match?.fixture?.id || match?.id;
           const analysis = analysisMap[id];
           if (!analysis) return null;
 
-          const { pressure, history, strategies } = analysis;
+          const { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter } = analysis;
           const homeName = match?.teams?.home?.name || 'Casa';
           const awayName = match?.teams?.away?.name || 'Fora';
           const elapsed = match?.fixture?.status?.elapsed || 0;
           const homeGoals = match?.goals?.home ?? 0;
           const awayGoals = match?.goals?.away ?? 0;
           const stats = statsMap[id];
+          const homeCorners = stats?.home?.corners || 0;
+          const awayCorners = stats?.away?.corners || 0;
+          const cornerTimeline = projectCornersByPeriod(homeCorners, awayCorners, elapsed);
 
           return (
             <div key={id} className="bg-[#1e293b] border border-white/5 rounded-2xl overflow-hidden">
+              {/* Smart Filter Badge */}
+              {smartFilter && (
+                <div className="bg-orange-500/15 border-b border-orange-500/30 px-4 py-2 flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-orange-400" />
+                  <span className="text-[10px] font-bold text-orange-300">{smartFilter.reason}</span>
+                </div>
+              )}
+
               {/* Match Header */}
               <div className="bg-[#111827] px-4 py-3 flex items-center justify-between">
                 <span className="text-xs text-gray-400 font-medium">{match?.league?.name || match?.league || ''}</span>
@@ -199,8 +299,18 @@ const Live = () => {
                 </div>
               </div>
 
-              {/* PI Alert */}
-              {(pressure.homePI >= 70 || pressure.awayPI >= 70) && (
+              {/* ═══ IMMINENT GOAL ALERTS ═══ */}
+              {(imminentHome.isTriggered || imminentAway.isTriggered) && (
+                <div className="mx-4 mb-2 py-2 px-3 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center gap-2 animate-pulse">
+                  <Crosshair className="w-4 h-4 text-red-400" />
+                  <span className="text-xs font-bold text-red-300">
+                    ⚠️ GOL IMINENTE — {imminentHome.isTriggered ? `${homeName} (${imminentHome.score}%)` : ''}{imminentHome.isTriggered && imminentAway.isTriggered ? ' | ' : ''}{imminentAway.isTriggered ? `${awayName} (${imminentAway.score}%)` : ''}
+                  </span>
+                </div>
+              )}
+
+              {/* PI Alert (original) */}
+              {(pressure.homePI >= 70 || pressure.awayPI >= 70) && !(imminentHome.isTriggered || imminentAway.isTriggered) && (
                 <div className="mx-4 mb-2 py-2 px-3 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center gap-2 animate-pulse">
                   <Volume2 className="w-4 h-4 text-orange-400" />
                   <span className="text-xs font-bold text-orange-300">
@@ -209,29 +319,90 @@ const Live = () => {
                 </div>
               )}
 
+              {/* ═══ ELITE METRICS: AP5, AP10, Periculosidade ═══ */}
+              <div className="px-4 pb-3">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {/* AP5 */}
+                  <div className="bg-white/5 rounded-lg py-2">
+                    <p className="text-[9px] text-gray-500 font-bold uppercase">AP5 (5min)</p>
+                    <div className="flex justify-center gap-2 mt-1">
+                      <span className={`text-sm font-black tabular-nums ${apWindows.ap5Home >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap5Home.toFixed(0)}</span>
+                      <span className="text-[10px] text-gray-600">vs</span>
+                      <span className={`text-sm font-black tabular-nums ${apWindows.ap5Away >= 60 ? 'text-blue-400' : 'text-gray-300'}`}>{apWindows.ap5Away.toFixed(0)}</span>
+                    </div>
+                  </div>
+                  {/* AP10 */}
+                  <div className="bg-white/5 rounded-lg py-2">
+                    <p className="text-[9px] text-gray-500 font-bold uppercase">AP10 (10min)</p>
+                    <div className="flex justify-center gap-2 mt-1">
+                      <span className={`text-sm font-black tabular-nums ${apWindows.ap10Home >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap10Home.toFixed(0)}</span>
+                      <span className="text-[10px] text-gray-600">vs</span>
+                      <span className={`text-sm font-black tabular-nums ${apWindows.ap10Away >= 60 ? 'text-blue-400' : 'text-gray-300'}`}>{apWindows.ap10Away.toFixed(0)}</span>
+                    </div>
+                  </div>
+                  {/* Periculosidade */}
+                  <div className="bg-white/5 rounded-lg py-2">
+                    <p className="text-[9px] text-gray-500 font-bold uppercase">Periculosidade</p>
+                    <div className="flex justify-center gap-2 mt-1">
+                      <span className={`text-sm font-black tabular-nums ${periculosity.home >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{periculosity.home.toFixed(0)}</span>
+                      <span className="text-[10px] text-gray-600">vs</span>
+                      <span className={`text-sm font-black tabular-nums ${periculosity.away >= 60 ? 'text-blue-400' : 'text-gray-300'}`}>{periculosity.away.toFixed(0)}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Periculosity labels */}
+                <div className="flex justify-between mt-1 px-1">
+                  <span className="text-[8px] text-gray-500">{periculosity.homeLabel}</span>
+                  <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
+                </div>
+              </div>
+
+              {/* ═══ IMMINENT GOAL METERS ═══ */}
+              <div className="px-4 pb-3 grid grid-cols-2 gap-2">
+                {[{ label: homeName, data: imminentHome, color: 'red' }, { label: awayName, data: imminentAway, color: 'blue' }].map(({ label, data, color }) => (
+                  <div key={label} className="bg-white/5 rounded-lg p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
+                      <span className={`text-xs font-black tabular-nums ${data.score >= 80 ? `text-${color}-400` : 'text-gray-400'}`}>
+                        {data.score}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          data.score >= 80 ? `bg-${color}-500 animate-pulse` : data.score >= 50 ? `bg-${color}-500/60` : 'bg-white/10'
+                        }`}
+                        style={{ width: `${data.score}%` }}
+                      />
+                    </div>
+                    <p className="text-[8px] text-gray-600 mt-1 truncate">{data.reason}</p>
+                  </div>
+                ))}
+              </div>
+
               {/* Pressure Bars */}
               <div className="px-4 pb-3 space-y-2">
                 <div>
                   <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-red-400 font-bold">PI Casa: {pressure.homePI.toFixed(1)}</span>
+                    <span className="text-red-400 font-bold">PI Casa: {pressure.homePI.toFixed(1)} ({normalizePressure(pressure.homePI).toFixed(0)}/100)</span>
                     <span className="text-gray-500 font-medium">{pressure.homePressureShare}% da pressão</span>
                   </div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, pressure.homePI)}%` }}
+                      style={{ width: `${normalizePressure(pressure.homePI)}%` }}
                     />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-blue-400 font-bold">PI Fora: {pressure.awayPI.toFixed(1)}</span>
+                    <span className="text-blue-400 font-bold">PI Fora: {pressure.awayPI.toFixed(1)} ({normalizePressure(pressure.awayPI).toFixed(0)}/100)</span>
                     <span className="text-gray-500 font-medium">{pressure.awayPressureShare}% da pressão</span>
                   </div>
                   <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, pressure.awayPI)}%` }}
+                      style={{ width: `${normalizePressure(pressure.awayPI)}%` }}
                     />
                   </div>
                 </div>
@@ -249,6 +420,31 @@ const Live = () => {
                   {pressure.dominance === 'home' && `🔴 ${homeName} DOMINANDO`}
                   {pressure.dominance === 'away' && `🔵 ${awayName} DOMINANDO`}
                   {pressure.dominance === 'balanced' && '⚖️ JOGO EQUILIBRADO'}
+                </div>
+              </div>
+
+              {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}
+              <div className="px-4 pb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Odds Poisson Live</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-white/5 rounded-lg py-2">
+                    <p className="text-[9px] text-gray-500">{homeName}</p>
+                    <p className="text-sm font-black text-red-400 tabular-nums">{oddsDeviation.homeWinPoisson}%</p>
+                    <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.homeImpliedOdd}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg py-2">
+                    <p className="text-[9px] text-gray-500">Empate</p>
+                    <p className="text-sm font-black text-gray-300 tabular-nums">{oddsDeviation.drawPoisson}%</p>
+                    <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.drawImpliedOdd}</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg py-2">
+                    <p className="text-[9px] text-gray-500">{awayName}</p>
+                    <p className="text-sm font-black text-blue-400 tabular-nums">{oddsDeviation.awayWinPoisson}%</p>
+                    <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.awayImpliedOdd}</p>
+                  </div>
                 </div>
               </div>
 
@@ -319,7 +515,18 @@ const Live = () => {
                 </div>
               )}
 
-              {/* Live Stats Grid — TODOS os dados reais */}
+              {/* ═══ CORNER TIMELINE ═══ */}
+              {(homeCorners > 0 || awayCorners > 0) && (
+                <div className="px-4 pb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BarChart3 className="w-3.5 h-3.5 text-green-400" />
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Escanteios por Período</span>
+                  </div>
+                  <CornerTimeline data={cornerTimeline} currentMinute={elapsed} />
+                </div>
+              )}
+
+              {/* Live Stats Grid */}
               {stats && (
                 <div className="px-4 pb-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -345,7 +552,7 @@ const Live = () => {
                     </div>
                     <div className="bg-white/5 rounded-lg py-2.5">
                       <p className="text-gray-500 mb-0.5">Escanteios</p>
-                      <p className="font-bold text-sm tabular-nums">{stats?.home?.corners || 0} - {stats?.away?.corners || 0}</p>
+                      <p className="font-bold text-sm tabular-nums">{homeCorners} - {awayCorners}</p>
                     </div>
                     <div className="bg-white/5 rounded-lg py-2.5">
                       <p className="text-gray-500 mb-0.5">Ritmo Gols/90'</p>
@@ -360,7 +567,7 @@ const Live = () => {
               {/* Source */}
               <div className="px-4 pb-3">
                 <p className="text-[8px] text-gray-600 text-center uppercase tracking-widest">
-                  Dados reais · API-Sports · Atualizado a cada 25s
+                  Dados reais · API-Sports · Polling 60s · Elite Metrics v2
                 </p>
               </div>
             </div>

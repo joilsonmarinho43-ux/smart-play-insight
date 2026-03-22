@@ -7,7 +7,6 @@ import {
   analyzeLivePressure,
   generateLiveStrategy,
   recordPISnapshot,
-  getPIHistory,
   type PressureData,
   type PISnapshot,
   type LiveStrategy,
@@ -49,6 +48,56 @@ interface MatchAnalysis {
   smartFilter: SmartFilterResult | null;
 }
 
+const DEFAULT_PRESSURE: PressureData = {
+  homePI: 0, awayPI: 0, homeSignal: '🟢 Estável', awaySignal: '🟢 Estável',
+  homePressureShare: 50, awayPressureShare: 50, dominance: 'balanced',
+};
+const DEFAULT_AP: AttackPressureWindows = { ap5Home: 0, ap5Away: 0, ap10Home: 0, ap10Away: 0 };
+const DEFAULT_PERIC: PericulosityData = { home: 0, away: 0, homeLabel: '🟢 BAIXO', awayLabel: '🟢 BAIXO' };
+const DEFAULT_IMMINENT: ImminentGoalData = { score: 0, isTriggered: false, reason: 'Sem dados' };
+const DEFAULT_ODDS: OddsDeviation = {
+  homeWinPoisson: 33, drawPoisson: 34, awayWinPoisson: 33,
+  homeImpliedOdd: 3.0, drawImpliedOdd: 3.0, awayImpliedOdd: 3.0,
+};
+
+function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
+  const id = match?.fixture?.id || match?.id;
+  const stats = statsMap[id];
+  const minute = match?.fixture?.status?.elapsed || 1;
+  const homeGoals = match?.goals?.home ?? 0;
+  const awayGoals = match?.goals?.away ?? 0;
+  const homeName = match?.teams?.home?.name || 'Casa';
+  const awayName = match?.teams?.away?.name || 'Fora';
+  const homeStats = stats?.home || null;
+  const awayStats = stats?.away || null;
+
+  let pressure = DEFAULT_PRESSURE;
+  let history: PISnapshot[] = [];
+  let strategies: LiveStrategy[] = [];
+  let apWindows = DEFAULT_AP;
+  let periculosity = DEFAULT_PERIC;
+  let imminentHome = DEFAULT_IMMINENT;
+  let imminentAway = DEFAULT_IMMINENT;
+  let oddsDeviation = DEFAULT_ODDS;
+  let smartFilter: SmartFilterResult | null = null;
+
+  try { pressure = analyzeLivePressure(homeStats, awayStats, minute); } catch (e) { console.error('Pressure error:', e); }
+  try { history = recordPISnapshot(id, pressure.homePI, pressure.awayPI, minute); } catch (e) { console.error('PI history error:', e); }
+  try { strategies = generateLiveStrategy(homeStats, awayStats, minute, homeGoals, awayGoals, homeName, awayName); } catch (e) { console.error('Strategy error:', e); }
+  try { apWindows = calculateAPWindows(history, minute); } catch (e) { console.error('AP error:', e); }
+  try { periculosity = calculatePericulosity(homeStats, awayStats, minute); } catch (e) { console.error('Periculosity error:', e); }
+  try { imminentHome = detectImminentGoal(homeStats, minute, apWindows.ap5Home); } catch (e) { console.error('Imminent home error:', e); }
+  try { imminentAway = detectImminentGoal(awayStats, minute, apWindows.ap5Away); } catch (e) { console.error('Imminent away error:', e); }
+  try { oddsDeviation = calculateLiveOddsDeviation(homeStats, awayStats, homeGoals, awayGoals, minute); } catch (e) { console.error('Odds error:', e); }
+  try {
+    const homePoss = homeStats?.possession || 50;
+    const awayPoss = awayStats?.possession || 50;
+    smartFilter = detectFavoriteLosing(id, homeName, awayName, homeGoals, awayGoals, apWindows.ap5Home, apWindows.ap5Away, homePoss, awayPoss);
+  } catch (e) { console.error('Smart filter error:', e); }
+
+  return { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter };
+}
+
 const Live = () => {
   const [smartFilterOnly, setSmartFilterOnly] = useState(false);
 
@@ -60,7 +109,7 @@ const Live = () => {
   } = useQuery({
     queryKey: ['live-matches'],
     queryFn: () => fetchLiveMatches(),
-    refetchInterval: 60000, // 60s — padrão Pro
+    refetchInterval: 60000,
     staleTime: 55000,
   });
 
@@ -78,39 +127,15 @@ const Live = () => {
 
   const analysisMap = useMemo(() => {
     const map: Record<string, MatchAnalysis> = {};
-
     for (const match of matches as any[]) {
       const id = match?.fixture?.id || match?.id;
       if (!id) continue;
-      const stats = statsMap[id];
-      const minute = match?.fixture?.status?.elapsed || 1;
-      const homeGoals = match?.goals?.home ?? 0;
-      const awayGoals = match?.goals?.away ?? 0;
-      const homeName = match?.teams?.home?.name || 'Casa';
-      const awayName = match?.teams?.away?.name || 'Fora';
-
-      const homeStats = stats?.home || null;
-      const awayStats = stats?.away || null;
-
-      const pressure = analyzeLivePressure(homeStats, awayStats, minute);
-      const history = recordPISnapshot(id, pressure.homePI, pressure.awayPI, minute);
-      const strategies = generateLiveStrategy(homeStats, awayStats, minute, homeGoals, awayGoals, homeName, awayName);
-      const apWindows = calculateAPWindows(history, minute);
-      const periculosity = calculatePericulosity(homeStats, awayStats, minute);
-      const imminentHome = detectImminentGoal(homeStats, minute, apWindows.ap5Home);
-      const imminentAway = detectImminentGoal(awayStats, minute, apWindows.ap5Away);
-      const oddsDeviation = calculateLiveOddsDeviation(homeStats, awayStats, homeGoals, awayGoals, minute);
-
-      const homePoss = homeStats?.possession || 50;
-      const awayPoss = awayStats?.possession || 50;
-      const smartFilter = detectFavoriteLosing(id, homeName, awayName, homeGoals, awayGoals, apWindows.ap5Home, apWindows.ap5Away, homePoss, awayPoss);
-
-      map[id] = { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter };
+      map[id] = safeAnalyze(match, statsMap);
     }
     return map;
   }, [matches, statsMap]);
 
-  // Sound alert for Imminent Goal >= 80
+  // Sound alert
   const [soundEnabled, setSoundEnabled] = useState(true);
   const alertedRef = useRef<Set<string>>(new Set());
 
@@ -127,20 +152,17 @@ const Live = () => {
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + duration);
-    } catch (e) {
-      console.warn('Audio not available');
-    }
+    } catch (e) { /* audio unavailable */ }
   }, []);
 
   useEffect(() => {
     if (!soundEnabled) return;
     for (const [id, analysis] of Object.entries(analysisMap)) {
-      // Imminent Goal alert (threshold 80)
       const homeImKey = `${id}_imminent_home`;
       const awayImKey = `${id}_imminent_away`;
       if (analysis.imminentHome.isTriggered && !alertedRef.current.has(homeImKey)) {
         alertedRef.current.add(homeImKey);
-        playAlertSound(1047, 0.8); // C6 — urgent
+        playAlertSound(1047, 0.8);
       }
       if (analysis.imminentAway.isTriggered && !alertedRef.current.has(awayImKey)) {
         alertedRef.current.add(awayImKey);
@@ -149,7 +171,6 @@ const Live = () => {
       if (!analysis.imminentHome.isTriggered) alertedRef.current.delete(homeImKey);
       if (!analysis.imminentAway.isTriggered) alertedRef.current.delete(awayImKey);
 
-      // PI alert (original)
       const homeKey = `${id}_home`;
       const awayKey = `${id}_away`;
       if (analysis.pressure.homePI >= 70 && !alertedRef.current.has(homeKey)) {
@@ -171,12 +192,10 @@ const Live = () => {
     caution: { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: '🔴' },
   };
 
-  // Smart filter count
   const smartFilterCount = useMemo(() =>
     Object.values(analysisMap).filter(a => a.smartFilter).length,
   [analysisMap]);
 
-  // Filtered matches
   const displayMatches = useMemo(() => {
     const all = matches as any[];
     if (!smartFilterOnly) return all;
@@ -217,7 +236,6 @@ const Live = () => {
         </div>
       </header>
 
-      {/* Smart Filter Toggle */}
       {smartFilterCount > 0 && (
         <div className="container max-w-3xl mx-auto px-4 pt-3">
           <button
@@ -264,11 +282,12 @@ const Live = () => {
           const stats = statsMap[id];
           const homeCorners = stats?.home?.corners || 0;
           const awayCorners = stats?.away?.corners || 0;
-          const cornerTimeline = projectCornersByPeriod(homeCorners, awayCorners, elapsed);
+
+          let cornerTimeline: ReturnType<typeof projectCornersByPeriod> = [];
+          try { cornerTimeline = projectCornersByPeriod(homeCorners, awayCorners, elapsed); } catch (e) { /* safe */ }
 
           return (
             <div key={id} className="bg-[#1e293b] border border-white/5 rounded-2xl overflow-hidden">
-              {/* Smart Filter Badge */}
               {smartFilter && (
                 <div className="bg-orange-500/15 border-b border-orange-500/30 px-4 py-2 flex items-center gap-2">
                   <Flame className="w-4 h-4 text-orange-400" />
@@ -276,7 +295,6 @@ const Live = () => {
                 </div>
               )}
 
-              {/* Match Header */}
               <div className="bg-[#111827] px-4 py-3 flex items-center justify-between">
                 <span className="text-xs text-gray-400 font-medium">{match?.league?.name || match?.league || ''}</span>
                 <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse">
@@ -284,7 +302,6 @@ const Live = () => {
                 </span>
               </div>
 
-              {/* Score */}
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-4">
                 <div className="text-right">
                   <p className="font-bold text-base leading-tight">{homeName}</p>
@@ -299,7 +316,6 @@ const Live = () => {
                 </div>
               </div>
 
-              {/* ═══ IMMINENT GOAL ALERTS ═══ */}
               {(imminentHome.isTriggered || imminentAway.isTriggered) && (
                 <div className="mx-4 mb-2 py-2 px-3 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center gap-2 animate-pulse">
                   <Crosshair className="w-4 h-4 text-red-400" />
@@ -309,7 +325,6 @@ const Live = () => {
                 </div>
               )}
 
-              {/* PI Alert (original) */}
               {(pressure.homePI >= 70 || pressure.awayPI >= 70) && !(imminentHome.isTriggered || imminentAway.isTriggered) && (
                 <div className="mx-4 mb-2 py-2 px-3 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center gap-2 animate-pulse">
                   <Volume2 className="w-4 h-4 text-orange-400" />
@@ -322,7 +337,6 @@ const Live = () => {
               {/* ═══ ELITE METRICS: AP5, AP10, Periculosidade ═══ */}
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  {/* AP5 */}
                   <div className="bg-white/5 rounded-lg py-2">
                     <p className="text-[9px] text-gray-500 font-bold uppercase">AP5 (5min)</p>
                     <div className="flex justify-center gap-2 mt-1">
@@ -331,7 +345,6 @@ const Live = () => {
                       <span className={`text-sm font-black tabular-nums ${apWindows.ap5Away >= 60 ? 'text-blue-400' : 'text-gray-300'}`}>{apWindows.ap5Away.toFixed(0)}</span>
                     </div>
                   </div>
-                  {/* AP10 */}
                   <div className="bg-white/5 rounded-lg py-2">
                     <p className="text-[9px] text-gray-500 font-bold uppercase">AP10 (10min)</p>
                     <div className="flex justify-center gap-2 mt-1">
@@ -340,7 +353,6 @@ const Live = () => {
                       <span className={`text-sm font-black tabular-nums ${apWindows.ap10Away >= 60 ? 'text-blue-400' : 'text-gray-300'}`}>{apWindows.ap10Away.toFixed(0)}</span>
                     </div>
                   </div>
-                  {/* Periculosidade */}
                   <div className="bg-white/5 rounded-lg py-2">
                     <p className="text-[9px] text-gray-500 font-bold uppercase">Periculosidade</p>
                     <div className="flex justify-center gap-2 mt-1">
@@ -350,7 +362,6 @@ const Live = () => {
                     </div>
                   </div>
                 </div>
-                {/* Periculosity labels */}
                 <div className="flex justify-between mt-1 px-1">
                   <span className="text-[8px] text-gray-500">{periculosity.homeLabel}</span>
                   <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
@@ -359,25 +370,42 @@ const Live = () => {
 
               {/* ═══ IMMINENT GOAL METERS ═══ */}
               <div className="px-4 pb-3 grid grid-cols-2 gap-2">
-                {[{ label: homeName, data: imminentHome, color: 'red' }, { label: awayName, data: imminentAway, color: 'blue' }].map(({ label, data, color }) => (
-                  <div key={label} className="bg-white/5 rounded-lg p-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
-                      <span className={`text-xs font-black tabular-nums ${data.score >= 80 ? `text-${color}-400` : 'text-gray-400'}`}>
-                        {data.score}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${
-                          data.score >= 80 ? `bg-${color}-500 animate-pulse` : data.score >= 50 ? `bg-${color}-500/60` : 'bg-white/10'
-                        }`}
-                        style={{ width: `${data.score}%` }}
-                      />
-                    </div>
-                    <p className="text-[8px] text-gray-600 mt-1 truncate">{data.reason}</p>
+                {/* Home */}
+                <div className="bg-white/5 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
+                    <span className={`text-xs font-black tabular-nums ${imminentHome.score >= 80 ? 'text-red-400' : 'text-gray-400'}`}>
+                      {imminentHome.score}%
+                    </span>
                   </div>
-                ))}
+                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        imminentHome.score >= 80 ? 'bg-red-500 animate-pulse' : imminentHome.score >= 50 ? 'bg-red-500/60' : 'bg-white/10'
+                      }`}
+                      style={{ width: `${imminentHome.score}%` }}
+                    />
+                  </div>
+                  <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentHome.reason}</p>
+                </div>
+                {/* Away */}
+                <div className="bg-white/5 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
+                    <span className={`text-xs font-black tabular-nums ${imminentAway.score >= 80 ? 'text-blue-400' : 'text-gray-400'}`}>
+                      {imminentAway.score}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-700 ${
+                        imminentAway.score >= 80 ? 'bg-blue-500 animate-pulse' : imminentAway.score >= 50 ? 'bg-blue-500/60' : 'bg-white/10'
+                      }`}
+                      style={{ width: `${imminentAway.score}%` }}
+                    />
+                  </div>
+                  <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentAway.reason}</p>
+                </div>
               </div>
 
               {/* Pressure Bars */}
@@ -459,7 +487,7 @@ const Live = () => {
                   </div>
                   <div className="space-y-2">
                     {strategies.map((s, i) => {
-                      const style = signalStyles[s.signal];
+                      const style = signalStyles[s.signal] || signalStyles.wait;
                       return (
                         <div key={i} className={`${style.bg} border ${style.border} rounded-lg p-3`}>
                           <div className="flex items-center justify-between mb-1">
@@ -516,7 +544,7 @@ const Live = () => {
               )}
 
               {/* ═══ CORNER TIMELINE ═══ */}
-              {(homeCorners > 0 || awayCorners > 0) && (
+              {(homeCorners > 0 || awayCorners > 0) && cornerTimeline.length > 0 && (
                 <div className="px-4 pb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <BarChart3 className="w-3.5 h-3.5 text-green-400" />
@@ -564,7 +592,6 @@ const Live = () => {
                 </div>
               )}
 
-              {/* Source */}
               <div className="px-4 pb-3">
                 <p className="text-[8px] text-gray-600 text-center uppercase tracking-widest">
                   Dados reais · API-Sports · Polling 60s · Elite Metrics v2

@@ -12,7 +12,7 @@ const CACHE_KEYS = {
 };
 
 const PRE_MATCH_COOLDOWN = 1000 * 60 * 10; // 10 minutos para Pré-Jogo
-const LIVE_MATCH_COOLDOWN = 1000 * 20;     // 20 segundos para Live
+const LIVE_MATCH_COOLDOWN = 1000 * 55;     // 55 segundos para Live (polling 60s)
 
 function getStorageCache(key: string, timeKey: string, cooldown: number) {
   const data = localStorage.getItem(key);

@@ -19,26 +19,16 @@ function cacheSet(key: string, data: any) {
 }
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-// Ligas com nomes customizados
+// Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
+const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
+
 const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   71: 'Brasileirão Série A',
-  72: 'Brasileirão Série B',
-  73: 'Copa do Brasil',
   39: 'Premier League',
   140: 'La Liga',
   78: 'Bundesliga',
   135: 'Serie A (ITA)',
   61: 'Ligue 1',
-  2: 'Champions League',
-  3: 'Europa League',
-  848: 'Conference League',
-  13: 'Libertadores',
-  11: 'Sul-Americana',
-  88: 'Eredivisie',
-  94: 'Primeira Liga',
-  203: 'Süper Lig',
-  128: 'Liga Argentina',
-  262: 'Liga MX',
 };
 
 function getLeagueDisplayName(leagueId: number, fallbackName: string): string {
@@ -291,18 +281,14 @@ serve(async (req) => {
 
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';
-      return status === 'NS';
+      return status === 'NS' && LEAGUES_TO_ANALYZE.includes(f.league?.id);
     });
-    console.log(`Filtered to ${fixtures.length} NS fixtures (leagues: ${[...new Set(fixtures.map((f:any) => f.league?.id))].join(',')})`);
+    console.log(`Filtered to ${fixtures.length} target fixtures`);
 
-    // Ligas prioritárias para enriquecimento detalhado
-    const PRIORITY_LEAGUES = new Set(Object.keys(LEAGUE_DISPLAY_NAMES).map(Number));
+    // Step 2: Identify which leagues we need data for
+    const neededLeagues = new Set(fixtures.map((f: any) => f.league?.id).filter(Boolean));
 
-    // Step 2: Only fetch historical data for priority leagues
-    const priorityFixtures = fixtures.filter((f: any) => PRIORITY_LEAGUES.has(f.league?.id));
-    const neededLeagues = new Set(priorityFixtures.map((f: any) => f.league?.id).filter(Boolean));
-
-    // Step 3: Fetch recent finished fixtures PER LEAGUE (only priority)
+    // Step 3: Fetch recent finished fixtures PER LEAGUE (max 6 API calls!)
     const leaguePools = new Map<number, any[]>();
     for (const leagueId of neededLeagues) {
       const pool = await fetchLeagueRecentFixtures(leagueId, apiKey);
@@ -310,11 +296,12 @@ serve(async (req) => {
       await delay(200);
     }
 
-    // Step 4: Calculate basic team stats from league pools
+    // Step 4: Calculate basic team stats from league pools (NO extra API calls)
     const teamStatsCache = new Map<number, any>();
-    for (const f of priorityFixtures) {
+    for (const f of fixtures) {
       const leagueId = f.league?.id;
       const pool = leaguePools.get(leagueId) || [];
+
       for (const teamId of [f.teams.home.id, f.teams.away.id]) {
         if (!teamStatsCache.has(teamId)) {
           teamStatsCache.set(teamId, calcTeamStatsFromPool(pool, teamId));
@@ -322,18 +309,16 @@ serve(async (req) => {
       }
     }
 
-    // Step 5: Enrich only priority league teams, with hard limit
-    let enrichCount = 0;
-    const MAX_ENRICH = 40;
+    // Step 5: Enrich with detailed fixture stats (uses cache, fetches only if needed)
+    // Process sequentially with delays to respect rate limits
     for (const [teamId, stats] of teamStatsCache) {
-      if (!stats || enrichCount >= MAX_ENRICH) continue;
+      if (!stats) continue;
       const leagueId = fixtures.find(
         (f: any) => f.teams.home.id === teamId || f.teams.away.id === teamId
       )?.league?.id;
       const pool = leaguePools.get(leagueId) || [];
       const enriched = await enrichWithDetailedStats(stats, teamId, pool, apiKey);
       teamStatsCache.set(teamId, enriched);
-      enrichCount++;
     }
 
     // Step 6: Assemble matches

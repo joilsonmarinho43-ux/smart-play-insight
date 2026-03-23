@@ -19,16 +19,26 @@ function cacheSet(key: string, data: any) {
 }
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-// Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
-const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
-
+// Ligas com nomes customizados
 const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   71: 'Brasileirão Série A',
+  72: 'Brasileirão Série B',
+  73: 'Copa do Brasil',
   39: 'Premier League',
   140: 'La Liga',
   78: 'Bundesliga',
   135: 'Serie A (ITA)',
   61: 'Ligue 1',
+  2: 'Champions League',
+  3: 'Europa League',
+  848: 'Conference League',
+  13: 'Libertadores',
+  11: 'Sul-Americana',
+  88: 'Eredivisie',
+  94: 'Primeira Liga',
+  203: 'Süper Lig',
+  128: 'Liga Argentina',
+  262: 'Liga MX',
 };
 
 function getLeagueDisplayName(leagueId: number, fallbackName: string): string {
@@ -281,9 +291,9 @@ serve(async (req) => {
 
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';
-      return status === 'NS' && LEAGUES_TO_ANALYZE.includes(f.league?.id);
+      return status === 'NS';
     });
-    console.log(`Filtered to ${fixtures.length} target fixtures`);
+    console.log(`Filtered to ${fixtures.length} NS fixtures (leagues: ${[...new Set(fixtures.map((f:any) => f.league?.id))].join(',')})`);
 
     // Step 2: Identify which leagues we need data for
     const neededLeagues = new Set(fixtures.map((f: any) => f.league?.id).filter(Boolean));

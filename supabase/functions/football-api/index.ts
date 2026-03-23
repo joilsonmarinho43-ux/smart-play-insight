@@ -295,10 +295,14 @@ serve(async (req) => {
     });
     console.log(`Filtered to ${fixtures.length} NS fixtures (leagues: ${[...new Set(fixtures.map((f:any) => f.league?.id))].join(',')})`);
 
-    // Step 2: Identify which leagues we need data for
-    const neededLeagues = new Set(fixtures.map((f: any) => f.league?.id).filter(Boolean));
+    // Ligas prioritárias para enriquecimento detalhado
+    const PRIORITY_LEAGUES = new Set(Object.keys(LEAGUE_DISPLAY_NAMES).map(Number));
 
-    // Step 3: Fetch recent finished fixtures PER LEAGUE (max 6 API calls!)
+    // Step 2: Only fetch historical data for priority leagues
+    const priorityFixtures = fixtures.filter((f: any) => PRIORITY_LEAGUES.has(f.league?.id));
+    const neededLeagues = new Set(priorityFixtures.map((f: any) => f.league?.id).filter(Boolean));
+
+    // Step 3: Fetch recent finished fixtures PER LEAGUE (only priority)
     const leaguePools = new Map<number, any[]>();
     for (const leagueId of neededLeagues) {
       const pool = await fetchLeagueRecentFixtures(leagueId, apiKey);
@@ -306,12 +310,11 @@ serve(async (req) => {
       await delay(200);
     }
 
-    // Step 4: Calculate basic team stats from league pools (NO extra API calls)
+    // Step 4: Calculate basic team stats from league pools
     const teamStatsCache = new Map<number, any>();
-    for (const f of fixtures) {
+    for (const f of priorityFixtures) {
       const leagueId = f.league?.id;
       const pool = leaguePools.get(leagueId) || [];
-
       for (const teamId of [f.teams.home.id, f.teams.away.id]) {
         if (!teamStatsCache.has(teamId)) {
           teamStatsCache.set(teamId, calcTeamStatsFromPool(pool, teamId));
@@ -319,16 +322,18 @@ serve(async (req) => {
       }
     }
 
-    // Step 5: Enrich with detailed fixture stats (uses cache, fetches only if needed)
-    // Process sequentially with delays to respect rate limits
+    // Step 5: Enrich only priority league teams, with hard limit
+    let enrichCount = 0;
+    const MAX_ENRICH = 40;
     for (const [teamId, stats] of teamStatsCache) {
-      if (!stats) continue;
+      if (!stats || enrichCount >= MAX_ENRICH) continue;
       const leagueId = fixtures.find(
         (f: any) => f.teams.home.id === teamId || f.teams.away.id === teamId
       )?.league?.id;
       const pool = leaguePools.get(leagueId) || [];
       const enriched = await enrichWithDetailedStats(stats, teamId, pool, apiKey);
       teamStatsCache.set(teamId, enriched);
+      enrichCount++;
     }
 
     // Step 6: Assemble matches

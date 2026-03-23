@@ -30,14 +30,12 @@ const Auth = () => {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        setMessage('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+        navigate('/');
       }
     } catch (err: any) {
       let msg = err.message || 'Erro inesperado';
       if (err.message === 'Invalid login credentials') {
         msg = 'E-mail ou senha incorretos.';
-      } else if (err.message === 'Email not confirmed') {
-        msg = 'E-mail ainda não confirmado. Verifique sua caixa de entrada (e spam) para confirmar seu cadastro.';
       }
       setError(msg);
     } finally {

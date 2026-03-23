@@ -291,9 +291,9 @@ serve(async (req) => {
 
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';
-      return status === 'NS' && LEAGUES_TO_ANALYZE.includes(f.league?.id);
+      return status === 'NS';
     });
-    console.log(`Filtered to ${fixtures.length} target fixtures`);
+    console.log(`Filtered to ${fixtures.length} NS fixtures (leagues: ${[...new Set(fixtures.map((f:any) => f.league?.id))].join(',')})`);
 
     // Step 2: Identify which leagues we need data for
     const neededLeagues = new Set(fixtures.map((f: any) => f.league?.id).filter(Boolean));

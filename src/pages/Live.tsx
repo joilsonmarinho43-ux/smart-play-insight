@@ -26,15 +26,8 @@ import {
   type SmartFilterResult,
 } from '@/lib/eliteMetrics';
 import CornerTimeline from '@/components/CornerTimeline';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from 'recharts';
+import MomentumChart from '@/components/MomentumChart';
+import { calculateHtFtStrategy, type HtFtPrediction } from '@/lib/htftEngine';
 
 interface MatchAnalysis {
   pressure: PressureData;
@@ -46,6 +39,7 @@ interface MatchAnalysis {
   imminentAway: ImminentGoalData;
   oddsDeviation: OddsDeviation;
   smartFilter: SmartFilterResult | null;
+  htft: HtFtPrediction[];
 }
 
 const DEFAULT_PRESSURE: PressureData = {
@@ -95,7 +89,12 @@ function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
     smartFilter = detectFavoriteLosing(id, homeName, awayName, homeGoals, awayGoals, apWindows.ap5Home, apWindows.ap5Away, homePoss, awayPoss);
   } catch (e) { console.error('Smart filter error:', e); }
 
-  return { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter };
+  let htft: HtFtPrediction[] = [];
+  try {
+    htft = calculateHtFtStrategy(homeStats, awayStats, homeGoals, awayGoals, minute, homeName, awayName, apWindows.ap5Home, apWindows.ap5Away);
+  } catch (e) { console.error('HT/FT error:', e); }
+
+  return { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter, htft };
 }
 
 const Live = () => {
@@ -273,7 +272,7 @@ const Live = () => {
           const analysis = analysisMap[id];
           if (!analysis) return null;
 
-          const { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter } = analysis;
+          const { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter, htft } = analysis;
           const homeName = match?.teams?.home?.name || 'Casa';
           const awayName = match?.teams?.away?.name || 'Fora';
           const elapsed = match?.fixture?.status?.elapsed || 0;
@@ -508,37 +507,48 @@ const Live = () => {
                 </div>
               )}
 
-              {/* PI Chart */}
+              {/* ═══ MOMENTUM CHART (Estilo SofaScore) ═══ */}
               {history.length >= 2 && (
                 <div className="px-4 pb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Oscilação de Pressão</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Momentum de Pressão</span>
                   </div>
-                  <div className="bg-[#111827] rounded-xl p-3 border border-white/5">
-                    <ResponsiveContainer width="100%" height={120}>
-                      <LineChart data={history}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                        <XAxis dataKey="minute" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => `${v}'`} />
-                        <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} width={30} />
-                        <Tooltip
-                          contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px' }}
-                          labelFormatter={(v) => `Minuto ${v}`}
-                        />
-                        <Line type="monotone" dataKey="homePI" stroke="#ef4444" strokeWidth={2} dot={false} name="Casa PI" />
-                        <Line type="monotone" dataKey="awayPI" stroke="#3b82f6" strokeWidth={2} dot={false} name="Fora PI" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <div className="flex justify-center gap-6 mt-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                        <span className="text-[10px] text-gray-400">Casa</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                        <span className="text-[10px] text-gray-400">Fora</span>
-                      </div>
-                    </div>
+                  <MomentumChart
+                    history={history}
+                    homeName={homeName}
+                    awayName={awayName}
+                    currentMinute={elapsed}
+                  />
+                </div>
+              )}
+
+              {/* ═══ HT/FT STRATEGY ═══ */}
+              {htft.length > 0 && (
+                <div className="px-4 pb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                      Estratégia HT/FT
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {htft.map((pred, i) => {
+                      const style = signalStyles[pred.signal] || signalStyles.wait;
+                      return (
+                        <div key={i} className={`${style.bg} border ${style.border} rounded-lg p-3`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-bold">
+                              {style.icon} HT/FT: {pred.label}
+                            </span>
+                            <span className="text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded bg-white/5">
+                              {pred.probability}%
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-gray-400 leading-relaxed">{pred.reason}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

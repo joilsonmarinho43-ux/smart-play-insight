@@ -39,6 +39,7 @@ interface MatchAnalysis {
   imminentAway: ImminentGoalData;
   oddsDeviation: OddsDeviation;
   smartFilter: SmartFilterResult | null;
+  htft: HtFtPrediction[];
 }
 
 const DEFAULT_PRESSURE: PressureData = {
@@ -88,7 +89,12 @@ function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
     smartFilter = detectFavoriteLosing(id, homeName, awayName, homeGoals, awayGoals, apWindows.ap5Home, apWindows.ap5Away, homePoss, awayPoss);
   } catch (e) { console.error('Smart filter error:', e); }
 
-  return { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter };
+  let htft: HtFtPrediction[] = [];
+  try {
+    htft = calculateHtFtStrategy(homeStats, awayStats, homeGoals, awayGoals, minute, homeName, awayName, apWindows.ap5Home, apWindows.ap5Away);
+  } catch (e) { console.error('HT/FT error:', e); }
+
+  return { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter, htft };
 }
 
 const Live = () => {

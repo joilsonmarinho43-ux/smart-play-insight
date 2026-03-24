@@ -26,15 +26,8 @@ import {
   type SmartFilterResult,
 } from '@/lib/eliteMetrics';
 import CornerTimeline from '@/components/CornerTimeline';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from 'recharts';
+import MomentumChart from '@/components/MomentumChart';
+import { calculateHtFtStrategy, type HtFtPrediction } from '@/lib/htftEngine';
 
 interface MatchAnalysis {
   pressure: PressureData;

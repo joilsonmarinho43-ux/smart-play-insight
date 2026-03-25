@@ -418,6 +418,7 @@ const Live = () => {
               )}
 
               {/* Pressure Bars */}
+              {stats && (
               <div className="px-4 pb-3 space-y-2">
                 <div>
                   <div className="flex justify-between text-[10px] mb-1">
@@ -444,8 +445,10 @@ const Live = () => {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Dominance */}
+              {stats && (
               <div className="px-4 pb-3">
                 <div className={`text-center py-2 rounded-lg text-xs font-bold ${
                   pressure.dominance === 'home'
@@ -459,6 +462,7 @@ const Live = () => {
                   {pressure.dominance === 'balanced' && '⚖️ JOGO EQUILIBRADO'}
                 </div>
               </div>
+              )}
 
               {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}
               <div className="px-4 pb-3">

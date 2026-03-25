@@ -465,6 +465,7 @@ const Live = () => {
               )}
 
               {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}
+              {stats && (
               <div className="px-4 pb-3">
                 <div className="flex items-center gap-2 mb-2">
                   <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
@@ -488,6 +489,7 @@ const Live = () => {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* ═══ ESTRATÉGIA DE TRADE LIVE ═══ */}
               {strategies.length > 0 && (

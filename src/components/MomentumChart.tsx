@@ -43,15 +43,12 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute, events = []
     return points;
   }, [history]);
 
-  if (chartData.length < 2) return null;
-
   const maxAbs = Math.max(
     ...chartData.map((d) => Math.abs(d.momentum)),
     10
   );
   const domainMax = Math.ceil(maxAbs * 1.3);
 
-  // Generate event markers
   const eventIcons = useMemo(() => {
     if (!events || events.length === 0) return [];
     return events.map((evt, i) => ({
@@ -60,7 +57,6 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute, events = []
     }));
   }, [events]);
 
-  // Generate dotted timeline ticks
   const timelineTicks = useMemo(() => {
     const ticks: number[] = [];
     for (let i = 0; i <= 90; i += 3) {
@@ -68,6 +64,8 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute, events = []
     }
     return ticks;
   }, []);
+
+  if (chartData.length < 2) return null;
 
   return (
     <div className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">

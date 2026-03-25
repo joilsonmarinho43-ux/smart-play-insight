@@ -9,7 +9,7 @@ export interface PressureData {
   awayPI: number;
   homeSignal: string;
   awaySignal: string;
-  homePressureShare: number;  // % de participação na pressão (NÃO probabilidade de gol)
+  homePressureShare: number;
   awayPressureShare: number;
   dominance: 'home' | 'away' | 'balanced';
 }
@@ -41,13 +41,9 @@ export interface LiveStrategy {
   signal: 'entry' | 'wait' | 'caution';
   market: string;
   reason: string;
-  confidence: number; // 0-100 baseado em dados reais
+  confidence: number;
 }
 
-/**
- * Gera sugestões de trade LIVE baseadas no estado REAL do jogo
- * Usa: minuto, placar, stats em tempo real
- */
 export function generateLiveStrategy(
   homeStats: LiveStats | null,
   awayStats: LiveStats | null,
@@ -156,7 +152,7 @@ export function generateLiveStrategy(
     }
   }
 
-  // ═══ CARTÕES (baseado em faltas implícitas pelo ritmo) ═══
+  // ═══ CARTÕES ═══
   if (minute >= 30 && totalShotsAll >= 5) {
     const possessionDiff = Math.abs(h.possession - a.possession);
     if (possessionDiff >= 15 && totalGoals <= 1) {
@@ -168,7 +164,6 @@ export function generateLiveStrategy(
 
   // ═══ HANDICAP ═══
   if (minute >= 30 && minute <= 75 && Math.abs(homeGoals - awayGoals) >= 2) {
-    const leading = homeGoals > awayGoals ? homeName : awayName;
     const trailing = homeGoals > awayGoals ? awayName : homeName;
     const diff = Math.abs(homeGoals - awayGoals);
     const trailingStats = homeGoals < awayGoals ? h : a;
@@ -189,7 +184,6 @@ export function generateLiveStrategy(
     strategies.push({ signal: 'wait', market: 'Aguardar', reason: `Dados insuficientes para entrada segura em ${minute}'.`, confidence: 0 });
   }
 
-  // Ordena por confiança e pega top 4
   return strategies.sort((a, b) => b.confidence - a.confidence).slice(0, 4);
 }
 
@@ -204,7 +198,6 @@ export function analyzeLivePressure(
   const homePI = calculatePressureIndex(h, minute);
   const awayPI = calculatePressureIndex(a, minute);
 
-  // Participação na pressão (NÃO é probabilidade de gol)
   const total = homePI + awayPI + 0.01;
   const homePressureShare = Math.min(99, Math.round((homePI / total) * 100));
   const awayPressureShare = 100 - homePressureShare;
@@ -220,7 +213,8 @@ export function analyzeLivePressure(
 }
 
 /**
- * Histórico de PI para o gráfico sparkline (últimos 10 snapshots)
+ * Histórico de PI para o gráfico sparkline
+ * Aumentado para 30 snapshots para melhor visualização do momentum
  */
 export interface PISnapshot {
   minute: number;
@@ -229,13 +223,20 @@ export interface PISnapshot {
 }
 
 const PI_HISTORY_KEY = 'pi_history_';
-const MAX_SNAPSHOTS = 10;
+const MAX_SNAPSHOTS = 30;
 
-export function recordPISnapshot(matchId: string | number, homePI: number, awayPI: number, minute: number) {
+export function recordPISnapshot(matchId: string | number, homePI: number, awayPI: number, minute: number): PISnapshot[] {
   const key = PI_HISTORY_KEY + matchId;
-  const raw = localStorage.getItem(key);
-  const history: PISnapshot[] = raw ? JSON.parse(raw) : [];
+  let history: PISnapshot[] = [];
+  
+  try {
+    const raw = localStorage.getItem(key);
+    history = raw ? JSON.parse(raw) : [];
+  } catch {
+    history = [];
+  }
 
+  // Avoid duplicate entries for the same minute
   if (history.length > 0 && history[history.length - 1].minute === minute) {
     history[history.length - 1] = { minute, homePI, awayPI };
   } else {
@@ -243,11 +244,26 @@ export function recordPISnapshot(matchId: string | number, homePI: number, awayP
   }
 
   const trimmed = history.slice(-MAX_SNAPSHOTS);
-  localStorage.setItem(key, JSON.stringify(trimmed));
+  
+  try {
+    localStorage.setItem(key, JSON.stringify(trimmed));
+  } catch {
+    // localStorage full — clear old entries
+    try {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith(PI_HISTORY_KEY));
+      keys.slice(0, Math.max(1, keys.length - 5)).forEach(k => localStorage.removeItem(k));
+      localStorage.setItem(key, JSON.stringify(trimmed));
+    } catch { /* give up silently */ }
+  }
+  
   return trimmed;
 }
 
 export function getPIHistory(matchId: string | number): PISnapshot[] {
-  const raw = localStorage.getItem(PI_HISTORY_KEY + matchId);
-  return raw ? JSON.parse(raw) : [];
+  try {
+    const raw = localStorage.getItem(PI_HISTORY_KEY + matchId);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 }

@@ -1,10 +1,18 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import type { CornerPeriod } from '@/lib/eliteMetrics';
+import React from 'react';
 
 interface Props {
   data: CornerPeriod[];
   currentMinute: number;
 }
+
+// Custom cell shape to avoid ref warning on Cell in recharts v3
+const CustomBar = (props: any) => {
+  const { x, y, width, height, fill } = props;
+  if (!height || height <= 0) return null;
+  return <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} ry={2} />;
+};
 
 const CornerTimeline = ({ data, currentMinute }: Props) => {
   if (!data || data.length === 0) return null;
@@ -30,12 +38,12 @@ const CornerTimeline = ({ data, currentMinute }: Props) => {
               fontSize: '11px',
             }}
           />
-          <Bar dataKey="Casa" radius={[2, 2, 0, 0]}>
+          <Bar dataKey="Casa" shape={<CustomBar />}>
             {chartData.map((entry, idx) => (
               <Cell key={idx} fill={entry.isFuture ? 'rgba(239,68,68,0.3)' : '#ef4444'} />
             ))}
           </Bar>
-          <Bar dataKey="Fora" radius={[2, 2, 0, 0]}>
+          <Bar dataKey="Fora" shape={<CustomBar />}>
             {chartData.map((entry, idx) => (
               <Cell key={idx} fill={entry.isFuture ? 'rgba(59,130,246,0.3)' : '#3b82f6'} />
             ))}

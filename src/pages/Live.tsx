@@ -334,6 +334,7 @@ const Live = () => {
               )}
 
               {/* ═══ ELITE METRICS: AP5, AP10, Periculosidade ═══ */}
+              {stats ? (
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="bg-white/5 rounded-lg py-2">
@@ -366,8 +367,16 @@ const Live = () => {
                   <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
                 </div>
               </div>
+              ) : (
+              <div className="px-4 pb-3">
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 text-center">
+                  <span className="text-[10px] text-yellow-400 font-medium">⏳ Aguardando dados estatísticos da API...</span>
+                </div>
+              </div>
+              )}
 
               {/* ═══ IMMINENT GOAL METERS ═══ */}
+              {stats && (
               <div className="px-4 pb-3 grid grid-cols-2 gap-2">
                 {/* Home */}
                 <div className="bg-white/5 rounded-lg p-2">
@@ -406,8 +415,10 @@ const Live = () => {
                   <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentAway.reason}</p>
                 </div>
               </div>
+              )}
 
               {/* Pressure Bars */}
+              {stats && (
               <div className="px-4 pb-3 space-y-2">
                 <div>
                   <div className="flex justify-between text-[10px] mb-1">
@@ -434,8 +445,10 @@ const Live = () => {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Dominance */}
+              {stats && (
               <div className="px-4 pb-3">
                 <div className={`text-center py-2 rounded-lg text-xs font-bold ${
                   pressure.dominance === 'home'
@@ -449,8 +462,10 @@ const Live = () => {
                   {pressure.dominance === 'balanced' && '⚖️ JOGO EQUILIBRADO'}
                 </div>
               </div>
+              )}
 
               {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}
+              {stats && (
               <div className="px-4 pb-3">
                 <div className="flex items-center gap-2 mb-2">
                   <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
@@ -474,6 +489,7 @@ const Live = () => {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* ═══ ESTRATÉGIA DE TRADE LIVE ═══ */}
               {strategies.length > 0 && (

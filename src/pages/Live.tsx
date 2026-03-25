@@ -334,6 +334,7 @@ const Live = () => {
               )}
 
               {/* ═══ ELITE METRICS: AP5, AP10, Periculosidade ═══ */}
+              {stats ? (
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="bg-white/5 rounded-lg py-2">
@@ -366,6 +367,13 @@ const Live = () => {
                   <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
                 </div>
               </div>
+              ) : (
+              <div className="px-4 pb-3">
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 text-center">
+                  <span className="text-[10px] text-yellow-400 font-medium">⏳ Aguardando dados estatísticos da API...</span>
+                </div>
+              </div>
+              )}
 
               {/* ═══ IMMINENT GOAL METERS ═══ */}
               <div className="px-4 pb-3 grid grid-cols-2 gap-2">

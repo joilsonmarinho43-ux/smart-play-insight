@@ -587,7 +587,6 @@ const Live = () => {
               )}
 
               {/* Live Stats Grid */}
-              {stats && (
                 <div className="px-4 pb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
@@ -622,7 +621,6 @@ const Live = () => {
                     </div>
                   </div>
                 </div>
-              )}
 
               <div className="px-4 pb-3">
                 <p className="text-[8px] text-gray-600 text-center uppercase tracking-widest">

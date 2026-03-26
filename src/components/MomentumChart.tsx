@@ -15,9 +15,13 @@ interface Props {
   homeName: string;
   awayName: string;
   currentMinute: number;
+  /** Optional goal probability for HT */
+  htGoalProb?: number;
+  /** Optional goal probability for FT */
+  ftGoalProb?: number;
 }
 
-const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) => {
+const MomentumChart = ({ history, homeName, awayName, currentMinute, htGoalProb, ftGoalProb }: Props) => {
   const chartData = useMemo(() => {
     if (history.length === 0) return [];
     return history.map((snap) => ({
@@ -88,7 +92,10 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
               <ReferenceLine y={0} stroke="rgba(0,0,0,0.08)" strokeWidth={1} />
               <ReferenceLine x={45} stroke="rgba(0,0,0,0.12)" strokeDasharray="3 3" />
 
+              {/* Tooltip: hover-only, never fixed */}
               <Tooltip
+                isAnimationActive={false}
+                cursor={{ stroke: 'rgba(0,0,0,0.15)', strokeWidth: 1 }}
                 contentStyle={{
                   background: '#ffffff',
                   border: '1px solid #e5e7eb',
@@ -96,9 +103,11 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
                   fontSize: '11px',
                   color: '#374151',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                  pointerEvents: 'none',
                 }}
                 labelFormatter={(v) => `${v}'`}
-                formatter={(value: number) => {
+                formatter={(value: number, _name: string) => {
+                  if (Math.abs(value) < 0.1) return ['Equilibrado', 'Pressão'];
                   const label = value > 0 ? homeName : awayName;
                   return [`${label} +${Math.abs(value).toFixed(1)}`, 'Pressão'];
                 }}
@@ -113,7 +122,7 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
       </div>
 
       {/* Dotted timeline footer */}
-      <div className="px-3 pb-3 pt-1">
+      <div className="px-3 pb-2 pt-1">
         <div className="relative h-4 flex items-center">
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-between">
             {timelineTicks.map((tick) => (
@@ -132,6 +141,28 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
           </div>
         </div>
       </div>
+
+      {/* HT/FT Goal Probability Indicators */}
+      {(htGoalProb !== undefined || ftGoalProb !== undefined) && (
+        <div className="flex gap-2 px-3 pb-3">
+          {htGoalProb !== undefined && (
+            <div className="flex-1 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-center">
+              <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">% Gol HT</p>
+              <p className={`text-lg font-black tabular-nums ${htGoalProb >= 65 ? 'text-blue-700' : 'text-blue-500'}`}>
+                {htGoalProb.toFixed(1)}%
+              </p>
+            </div>
+          )}
+          {ftGoalProb !== undefined && (
+            <div className="flex-1 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
+              <p className="text-[9px] font-bold text-green-600 uppercase tracking-wider">% Gol FT</p>
+              <p className={`text-lg font-black tabular-nums ${ftGoalProb >= 65 ? 'text-green-700' : 'text-green-500'}`}>
+                {ftGoalProb.toFixed(1)}%
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

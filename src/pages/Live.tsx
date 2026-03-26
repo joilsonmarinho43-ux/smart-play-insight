@@ -441,7 +441,7 @@ const Live = () => {
               </div>
 
               {/* Dominance */}
-              {stats && (
+              {/* Dominance */}
               <div className="px-4 pb-3">
                 <div className={`text-center py-2 rounded-lg text-xs font-bold ${
                   pressure.dominance === 'home'
@@ -455,7 +455,6 @@ const Live = () => {
                   {pressure.dominance === 'balanced' && '⚖️ JOGO EQUILIBRADO'}
                 </div>
               </div>
-              )}
 
               {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}
               {stats && (

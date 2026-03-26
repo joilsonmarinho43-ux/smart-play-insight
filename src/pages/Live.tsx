@@ -521,16 +521,15 @@ const Live = () => {
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Momentum de Pressão</span>
                   </div>
                   {(() => {
-                    // Calculate HT/FT goal probabilities from pressure intensity
                     const totalPI = pressure.homePI + pressure.awayPI;
                     const totalShots = (stats?.home?.totalShots || 0) + (stats?.away?.totalShots || 0);
                     const totalShotsOnGoal = (stats?.home?.shotsOnGoal || 0) + (stats?.away?.shotsOnGoal || 0);
-                    const htProb = stats ? Math.min(95, Math.max(5,
+                    const htProb = Math.min(95, Math.max(5,
                       25 + totalShotsOnGoal * 4 + totalShots * 1.5 + totalPI * 0.15 + (elapsed < 45 ? elapsed * 0.4 : 30)
-                    )) : undefined;
-                    const ftProb = stats ? Math.min(98, Math.max(10,
+                    ));
+                    const ftProb = Math.min(98, Math.max(10,
                       40 + totalShotsOnGoal * 3.5 + totalShots * 1.2 + totalPI * 0.2 + elapsed * 0.3
-                    )) : undefined;
+                    ));
                     return (
                       <MomentumChart
                         history={history}

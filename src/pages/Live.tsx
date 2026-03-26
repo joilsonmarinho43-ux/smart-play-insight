@@ -117,8 +117,17 @@ const Live = () => {
     for (const match of matches as any[]) {
       const id = match?.fixture?.id || match?.id;
       if (!id) continue;
-      if (match?.stats?.home || match?.stats?.away) {
-        result[id] = match.stats;
+      const s = match?.stats;
+      if (!s) continue;
+      // Only consider stats valid if at least one meaningful value is non-zero
+      const h = s.home;
+      const a = s.away;
+      const hasRealData = h && a && (
+        (h.possession > 0 || h.totalShots > 0 || h.dangerousAttacks > 0 || h.shotsOnGoal > 0) ||
+        (a.possession > 0 || a.totalShots > 0 || a.dangerousAttacks > 0 || a.shotsOnGoal > 0)
+      );
+      if (hasRealData) {
+        result[id] = s;
       }
     }
     return result;
@@ -523,19 +532,35 @@ const Live = () => {
                 </div>
               )}
 
-              {/* ═══ MOMENTUM CHART (Estilo SofaScore) ═══ */}
+              {/* ═══ MOMENTUM CHART (Estilo SofaScore) + HT/FT Prob ═══ */}
               {history.length >= 2 && (
                 <div className="px-4 pb-4">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Momentum de Pressão</span>
                   </div>
-                  <MomentumChart
-                    history={history}
-                    homeName={homeName}
-                    awayName={awayName}
-                    currentMinute={elapsed}
-                  />
+                  {(() => {
+                    // Calculate HT/FT goal probabilities from pressure intensity
+                    const totalPI = pressure.homePI + pressure.awayPI;
+                    const totalShots = (stats?.home?.totalShots || 0) + (stats?.away?.totalShots || 0);
+                    const totalShotsOnGoal = (stats?.home?.shotsOnGoal || 0) + (stats?.away?.shotsOnGoal || 0);
+                    const htProb = stats ? Math.min(95, Math.max(5,
+                      25 + totalShotsOnGoal * 4 + totalShots * 1.5 + totalPI * 0.15 + (elapsed < 45 ? elapsed * 0.4 : 30)
+                    )) : undefined;
+                    const ftProb = stats ? Math.min(98, Math.max(10,
+                      40 + totalShotsOnGoal * 3.5 + totalShots * 1.2 + totalPI * 0.2 + elapsed * 0.3
+                    )) : undefined;
+                    return (
+                      <MomentumChart
+                        history={history}
+                        homeName={homeName}
+                        awayName={awayName}
+                        currentMinute={elapsed}
+                        htGoalProb={htProb}
+                        ftGoalProb={ftProb}
+                      />
+                    );
+                  })()}
                 </div>
               )}
 

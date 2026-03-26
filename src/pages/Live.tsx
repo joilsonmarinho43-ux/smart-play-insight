@@ -117,8 +117,17 @@ const Live = () => {
     for (const match of matches as any[]) {
       const id = match?.fixture?.id || match?.id;
       if (!id) continue;
-      if (match?.stats?.home || match?.stats?.away) {
-        result[id] = match.stats;
+      const s = match?.stats;
+      if (!s) continue;
+      // Only consider stats valid if at least one meaningful value is non-zero
+      const h = s.home;
+      const a = s.away;
+      const hasRealData = h && a && (
+        (h.possession > 0 || h.totalShots > 0 || h.dangerousAttacks > 0 || h.shotsOnGoal > 0) ||
+        (a.possession > 0 || a.totalShots > 0 || a.dangerousAttacks > 0 || a.shotsOnGoal > 0)
+      );
+      if (hasRealData) {
+        result[id] = s;
       }
     }
     return result;

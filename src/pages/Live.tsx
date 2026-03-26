@@ -373,7 +373,6 @@ const Live = () => {
               </div>
 
               {/* ═══ IMMINENT GOAL METERS ═══ */}
-              {stats && (
               <div className="px-4 pb-3 grid grid-cols-2 gap-2">
                 {/* Home */}
                 <div className="bg-white/5 rounded-lg p-2">
@@ -412,10 +411,8 @@ const Live = () => {
                   <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentAway.reason}</p>
                 </div>
               </div>
-              )}
 
               {/* Pressure Bars */}
-              {stats && (
               <div className="px-4 pb-3 space-y-2">
                 <div>
                   <div className="flex justify-between text-[10px] mb-1">
@@ -442,7 +439,6 @@ const Live = () => {
                   </div>
                 </div>
               </div>
-              )}
 
               {/* Dominance */}
               {stats && (

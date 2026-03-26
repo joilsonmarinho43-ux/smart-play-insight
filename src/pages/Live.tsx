@@ -112,23 +112,19 @@ const Live = () => {
     staleTime: 55000,
   });
 
+  const DEFAULT_TEAM_STATS = { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
+
   const statsMap = useMemo(() => {
     const result: Record<string, any> = {};
     for (const match of matches as any[]) {
       const id = match?.fixture?.id || match?.id;
       if (!id) continue;
       const s = match?.stats;
-      if (!s) continue;
-      // Only consider stats valid if at least one meaningful value is non-zero
-      const h = s.home;
-      const a = s.away;
-      const hasRealData = h && a && (
-        (h.possession > 0 || h.totalShots > 0 || h.dangerousAttacks > 0 || h.shotsOnGoal > 0) ||
-        (a.possession > 0 || a.totalShots > 0 || a.dangerousAttacks > 0 || a.shotsOnGoal > 0)
-      );
-      if (hasRealData) {
-        result[id] = s;
-      }
+      // Always provide stats — use real data if available, defaults otherwise
+      result[id] = {
+        home: s?.home || { ...DEFAULT_TEAM_STATS },
+        away: s?.away || { ...DEFAULT_TEAM_STATS },
+      };
     }
     return result;
   }, [matches]);
@@ -343,7 +339,6 @@ const Live = () => {
               )}
 
               {/* ═══ ELITE METRICS: AP5, AP10, Periculosidade ═══ */}
-              {stats ? (
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="bg-white/5 rounded-lg py-2">
@@ -376,13 +371,6 @@ const Live = () => {
                   <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
                 </div>
               </div>
-              ) : (
-              <div className="px-4 pb-3">
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 text-center">
-                  <span className="text-[10px] text-yellow-400 font-medium">⏳ Aguardando dados estatísticos da API...</span>
-                </div>
-              </div>
-              )}
 
               {/* ═══ IMMINENT GOAL METERS ═══ */}
               {stats && (

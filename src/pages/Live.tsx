@@ -27,6 +27,7 @@ import {
 } from '@/lib/eliteMetrics';
 import CornerTimeline from '@/components/CornerTimeline';
 import MomentumChart from '@/components/MomentumChart';
+import OverGoalsPanel from '@/components/OverGoalsPanel';
 import { calculateHtFtStrategy, type HtFtPrediction } from '@/lib/htftEngine';
 
 interface MatchAnalysis {

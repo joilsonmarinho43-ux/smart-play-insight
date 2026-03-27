@@ -27,6 +27,7 @@ import {
 } from '@/lib/eliteMetrics';
 import CornerTimeline from '@/components/CornerTimeline';
 import MomentumChart from '@/components/MomentumChart';
+import OverGoalsPanel from '@/components/OverGoalsPanel';
 import { calculateHtFtStrategy, type HtFtPrediction } from '@/lib/htftEngine';
 
 interface MatchAnalysis {
@@ -513,36 +514,36 @@ const Live = () => {
                 </div>
               )}
 
-              {/* ═══ MOMENTUM CHART (Estilo SofaScore) + HT/FT Prob ═══ */}
+              {/* ═══ MOMENTUM CHART (Estilo Trading Financeiro) ═══ */}
               {history.length >= 2 && (
                 <div className="px-4 pb-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Momentum de Pressão</span>
                   </div>
-                  {(() => {
-                    const totalPI = pressure.homePI + pressure.awayPI;
-                    const totalShots = (stats?.home?.totalShots || 0) + (stats?.away?.totalShots || 0);
-                    const totalShotsOnGoal = (stats?.home?.shotsOnGoal || 0) + (stats?.away?.shotsOnGoal || 0);
-                    const htProb = Math.min(95, Math.max(5,
-                      25 + totalShotsOnGoal * 4 + totalShots * 1.5 + totalPI * 0.15 + (elapsed < 45 ? elapsed * 0.4 : 30)
-                    ));
-                    const ftProb = Math.min(98, Math.max(10,
-                      40 + totalShotsOnGoal * 3.5 + totalShots * 1.2 + totalPI * 0.2 + elapsed * 0.3
-                    ));
-                    return (
-                      <MomentumChart
-                        history={history}
-                        homeName={homeName}
-                        awayName={awayName}
-                        currentMinute={elapsed}
-                        htGoalProb={htProb}
-                        ftGoalProb={ftProb}
-                      />
-                    );
-                  })()}
+                  <MomentumChart
+                    history={history}
+                    homeName={homeName}
+                    awayName={awayName}
+                    currentMinute={elapsed}
+                  />
                 </div>
               )}
+
+              {/* ═══ OVER GOALS HT / FT ═══ */}
+              <div className="px-4 pb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Probabilidade Over Gols (Poisson)</span>
+                </div>
+                <OverGoalsPanel
+                  homeStats={stats?.home || null}
+                  awayStats={stats?.away || null}
+                  homeGoals={homeGoals}
+                  awayGoals={awayGoals}
+                  minute={elapsed}
+                />
+              </div>
 
               {/* ═══ HT/FT STRATEGY ═══ */}
               {htft.length > 0 && (

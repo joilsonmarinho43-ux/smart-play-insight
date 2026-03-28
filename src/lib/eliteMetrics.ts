@@ -7,7 +7,6 @@ import type { LiveStats, PISnapshot } from './pressureEngine';
 
 // ═══ NORMALIZAÇÃO DE PRESSÃO (0-100) ═══
 export function normalizePressure(rawPI: number): number {
-  // PI típico varia de 0~120+. Normaliza via sigmoid suave para 0-100
   const normalized = (rawPI / (rawPI + 40)) * 100;
   return Math.round(Math.min(100, Math.max(0, normalized)) * 10) / 10;
 }
@@ -42,8 +41,10 @@ export function calculateAPWindows(
   };
 }
 
-// ═══ ÍNDICE DE PERICULOSIDADE ═══
-// Combina: (Ataques Perigosos/min) + (Chutes no Alvo) + (Posse terço final proxy)
+// ═══ ÍNDICE DE PERICULOSIDADE (Danger Level) ═══
+// Fórmula: média ponderada dos últimos 5 min:
+// (Ataques Perigosos * 3) + (Escanteios * 5) + (Chutes no Gol * 10)
+// Normalizado de 0 a 100. Acima de 70 → alerta "GOL IMINENTE"
 export interface PericulosityData {
   home: number;
   away: number;
@@ -58,31 +59,20 @@ export function calculatePericulosity(
 ): PericulosityData {
   const h = homeStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
   const a = awayStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
-  const safeMin = Math.max(minute, 1);
 
-  // Posse no terço final estimada: se posse > 55%, terço final ~ posse * 0.6
-  const homeFinalThird = h.possession > 50 ? h.possession * 0.6 : h.possession * 0.35;
-  const awayFinalThird = a.possession > 50 ? a.possession * 0.6 : a.possession * 0.35;
+  // Nova fórmula conforme especificação:
+  // (Ataques Perigosos * 3) + (Escanteios * 5) + (Chutes no Gol * 10)
+  const homeRaw = (h.dangerousAttacks * 3) + (h.corners * 5) + (h.shotsOnGoal * 10);
+  const awayRaw = (a.dangerousAttacks * 3) + (a.corners * 5) + (a.shotsOnGoal * 10);
 
-  const homePeric =
-    (h.dangerousAttacks / safeMin) * 30 +
-    h.shotsOnGoal * 8 +
-    homeFinalThird * 0.4 +
-    h.corners * 2;
+  // Normaliza para 0-100 via sigmoid
+  const normalize = (v: number) => Math.round(Math.min(100, (v / (v + 50)) * 100) * 10) / 10;
 
-  const awayPeric =
-    (a.dangerousAttacks / safeMin) * 30 +
-    a.shotsOnGoal * 8 +
-    awayFinalThird * 0.4 +
-    a.corners * 2;
-
-  const normalize = (v: number) => Math.round(Math.min(100, (v / (v + 30)) * 100) * 10) / 10;
-
-  const homeNorm = normalize(homePeric);
-  const awayNorm = normalize(awayPeric);
+  const homeNorm = normalize(homeRaw);
+  const awayNorm = normalize(awayRaw);
 
   const getLabel = (v: number) =>
-    v >= 80 ? '🔴 CRÍTICO' : v >= 60 ? '🟠 ALTO' : v >= 40 ? '🟡 MODERADO' : '🟢 BAIXO';
+    v >= 70 ? '🔴 GOL IMINENTE' : v >= 50 ? '🟠 ALTO' : v >= 30 ? '🟡 MODERADO' : '🟢 BAIXO';
 
   return {
     home: homeNorm,
@@ -94,8 +84,8 @@ export function calculatePericulosity(
 
 // ═══ GOL IMINENTE (Imminent Goal Score) ═══
 export interface ImminentGoalData {
-  score: number; // 0-100
-  isTriggered: boolean; // >= 80
+  score: number;
+  isTriggered: boolean;
   reason: string;
 }
 
@@ -107,7 +97,6 @@ export function detectImminentGoal(
   const s = stats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
   const safeMin = Math.max(minute, 1);
 
-  // Componentes do score
   const shotsWeight = Math.min(30, s.shotsOnGoal * 6);
   const dangerousWeight = Math.min(25, (s.dangerousAttacks / safeMin) * 40);
   const possessionWeight = s.possession > 60 ? 15 : s.possession > 55 ? 10 : 5;
@@ -115,7 +104,7 @@ export function detectImminentGoal(
   const cornersWeight = Math.min(10, s.corners * 2);
 
   const score = Math.round(Math.min(100, shotsWeight + dangerousWeight + possessionWeight + ap5Weight + cornersWeight));
-  const isTriggered = score >= 80;
+  const isTriggered = score >= 70; // Alinha com Danger Level threshold
 
   const reasons: string[] = [];
   if (s.shotsOnGoal >= 3) reasons.push(`${s.shotsOnGoal} chutes no gol`);
@@ -130,7 +119,8 @@ export function detectImminentGoal(
   };
 }
 
-// ═══ DESVIO DE ODDS (Poisson em tempo real vs probabilidade implícita) ═══
+// ═══ DESVIO DE ODDS (Poisson em tempo real) ═══
+// REGRA: Proibido exibir 0% ou 100% enquanto a bola estiver rolando
 export interface OddsDeviation {
   homeWinPoisson: number;
   drawPoisson: number;
@@ -151,6 +141,11 @@ function factorial(n: number): number {
   return r;
 }
 
+// Clamp: nunca 0% ou 100% durante jogo
+function clampLiveProb(p: number): number {
+  return Math.min(99, Math.max(1, p));
+}
+
 export function calculateLiveOddsDeviation(
   homeStats: LiveStats | null,
   awayStats: LiveStats | null,
@@ -163,18 +158,15 @@ export function calculateLiveOddsDeviation(
   const safeMin = Math.max(minute, 1);
   const remainingMin = Math.max(90 - minute, 1);
 
-  // Lambda baseado em ritmo real de finalizações no gol + ataques perigosos
   const homeConversion = h.totalShots > 0 ? h.shotsOnGoal / h.totalShots : 0.3;
   const awayConversion = a.totalShots > 0 ? a.shotsOnGoal / a.totalShots : 0.3;
 
-  // Projeção de gols restantes baseada no ritmo atual
   const homeShotsPerMin = h.totalShots / safeMin;
   const awayShotsPerMin = a.totalShots / safeMin;
 
   const homeLambdaRemaining = homeShotsPerMin * homeConversion * remainingMin * 0.12;
   const awayLambdaRemaining = awayShotsPerMin * awayConversion * remainingMin * 0.12;
 
-  // Calcula probabilidades via Poisson para gols restantes
   let homeWin = 0, draw = 0, awayWin = 0;
   const maxGoals = 5;
 
@@ -189,34 +181,33 @@ export function calculateLiveOddsDeviation(
     }
   }
 
-  // Normaliza
   const total = homeWin + draw + awayWin || 1;
-  homeWin = Math.round((homeWin / total) * 100);
-  draw = Math.round((draw / total) * 100);
-  awayWin = 100 - homeWin - draw;
+  let homeP = clampLiveProb(Math.round((homeWin / total) * 100));
+  let drawP = clampLiveProb(Math.round((draw / total) * 100));
+  let awayP = clampLiveProb(100 - homeP - drawP);
+  // Re-clamp after subtraction
+  awayP = clampLiveProb(awayP);
 
-  // Odds implícitas (com margem 8%)
   const margin = 0.92;
   const toOdd = (p: number) => p > 0 ? Math.round((100 / p / margin) * 100) / 100 : 99;
 
   return {
-    homeWinPoisson: homeWin,
-    drawPoisson: draw,
-    awayWinPoisson: awayWin,
-    homeImpliedOdd: toOdd(homeWin),
-    drawImpliedOdd: toOdd(draw),
-    awayImpliedOdd: toOdd(awayWin),
+    homeWinPoisson: homeP,
+    drawPoisson: drawP,
+    awayWinPoisson: awayP,
+    homeImpliedOdd: toOdd(homeP),
+    drawImpliedOdd: toOdd(drawP),
+    awayImpliedOdd: toOdd(awayP),
   };
 }
 
-// ═══ CORNER TIMELINE (Cantos por período de 15min) ═══
+// ═══ CORNER TIMELINE ═══
 export interface CornerPeriod {
   period: string;
   home: number;
   away: number;
 }
 
-// Como a API não dá breakdown por período, projetamos baseado no ritmo atual
 export function projectCornersByPeriod(
   homeCorners: number,
   awayCorners: number,
@@ -231,7 +222,6 @@ export function projectCornersByPeriod(
   return periods.map((period, i) => {
     const periodEnd = (i + 1) * 15;
     if (periodEnd <= minute) {
-      // Período já passou — distribuição proporcional
       const share = 15 / safeMin;
       return {
         period,
@@ -239,7 +229,6 @@ export function projectCornersByPeriod(
         away: Math.round(awayCorners * share * 10) / 10,
       };
     } else if (i * 15 < minute) {
-      // Período atual (parcial)
       const elapsed = minute - i * 15;
       return {
         period,
@@ -247,7 +236,6 @@ export function projectCornersByPeriod(
         away: Math.round(awayRate * elapsed * 10) / 10,
       };
     } else {
-      // Período futuro — projeção
       return {
         period,
         home: Math.round(homeRate * 15 * 10) / 10,
@@ -275,7 +263,6 @@ export function detectFavoriteLosing(
   homePossession: number,
   awayPossession: number
 ): SmartFilterResult | null {
-  // Favorito = time com maior posse (proxy para domínio)
   const homeIsFavorite = homePossession > awayPossession;
   const favName = homeIsFavorite ? homeName : awayName;
   const favGoals = homeIsFavorite ? homeGoals : awayGoals;

@@ -1,6 +1,7 @@
 /**
  * Painel de probabilidades Over 0.5 / 1.5 / 2.5 / 3.5 gols
  * Calculado via Poisson para HT e FT
+ * REGRA: Proibido exibir 0% ou 100% enquanto a bola estiver rolando
  */
 
 import type { LiveStats } from '@/lib/pressureEngine';
@@ -33,13 +34,18 @@ function poissonCDF(lambda: number, maxK: number): number {
   return sum;
 }
 
+// Clamp: nunca 0% ou 100% durante jogo
+function clampLive(prob: number): number {
+  return Math.min(99, Math.max(1, prob));
+}
+
 function calculateOverProbs(
   homeStats: LiveStats | null,
   awayStats: LiveStats | null,
   homeGoals: number,
   awayGoals: number,
   minute: number,
-  targetMinute: number // 45 for HT, 90 for FT
+  targetMinute: number
 ) {
   const h = homeStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
   const a = awayStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
@@ -47,21 +53,18 @@ function calculateOverProbs(
   const remaining = Math.max(targetMinute - minute, 0);
 
   if (remaining <= 0) {
-    // Period already over — use actual goals
     const totalGoals = homeGoals + awayGoals;
     return [0.5, 1.5, 2.5, 3.5].map(threshold => ({
       threshold,
-      prob: totalGoals > threshold ? 100 : 0,
+      prob: totalGoals > threshold ? 99 : 1, // Clamp even for finished periods
     }));
   }
 
-  // Lambda calculation based on shot rate
   const homeConversion = h.totalShots > 0 ? h.shotsOnGoal / h.totalShots : 0.3;
   const awayConversion = a.totalShots > 0 ? a.shotsOnGoal / a.totalShots : 0.3;
   const homeShotsPerMin = h.totalShots / safeMin;
   const awayShotsPerMin = a.totalShots / safeMin;
 
-  // Lambda for remaining goals
   const homeLambda = homeShotsPerMin * homeConversion * remaining * 0.12;
   const awayLambda = awayShotsPerMin * awayConversion * remaining * 0.12;
   const totalLambda = homeLambda + awayLambda;
@@ -71,11 +74,10 @@ function calculateOverProbs(
   return [0.5, 1.5, 2.5, 3.5].map(threshold => {
     const additionalNeeded = Math.max(0, Math.ceil(threshold) - currentTotal);
     if (additionalNeeded <= 0) {
-      return { threshold, prob: 100 };
+      return { threshold, prob: 99 }; // Already over, but never show 100%
     }
-    // P(X >= additionalNeeded) = 1 - P(X < additionalNeeded) = 1 - CDF(additionalNeeded - 1)
     const probUnder = poissonCDF(totalLambda, additionalNeeded - 1);
-    const probOver = Math.round(Math.min(99, Math.max(1, (1 - probUnder) * 100)));
+    const probOver = clampLive(Math.round((1 - probUnder) * 100));
     return { threshold, prob: probOver };
   });
 }
@@ -99,8 +101,8 @@ const OverGoalsPanel = ({ homeStats, awayStats, homeGoals, awayGoals, minute }: 
   const ftProbs = calculateOverProbs(homeStats, awayStats, homeGoals, awayGoals, minute, 90);
 
   return (
-    <div className="bg-[#0d1117] rounded-xl border border-white/10 overflow-hidden">
-      <div className="grid grid-cols-2 divide-x divide-white/5">
+    <div className="bg-[#161B22] rounded-xl border border-[#30363D] overflow-hidden">
+      <div className="grid grid-cols-2 divide-x divide-[#30363D]">
         {/* HT Column */}
         <div className="p-3">
           <p className="text-[9px] font-bold text-cyan-400 uppercase tracking-wider mb-2 text-center">⏱ Gols HT</p>

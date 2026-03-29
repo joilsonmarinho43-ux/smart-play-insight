@@ -367,11 +367,8 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
               barSize={8}
               isAnimationActive={false}
               shape={<CandlestickShape />}
-            >
-              {chartData.map((entry, index) => (
-                <Cell key={index} fill={entry.isBullish ? '#10b981' : '#ef4444'} />
-              ))}
-            </Bar>
+              fill="#10b981"
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

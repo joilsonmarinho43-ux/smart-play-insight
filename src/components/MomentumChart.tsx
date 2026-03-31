@@ -206,7 +206,7 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
 
   const domainMax = Math.ceil(maxAbs * 1.3);
 
-  if (chartData.length < 2) return null;
+  if (chartData.length === 0) return null;
 
   const lastMomentum = ohlcData.length > 0
     ? ohlcData[ohlcData.length - 1].close

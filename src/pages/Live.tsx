@@ -468,19 +468,12 @@ const Live = () => {
                   <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
                   <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Momentum de Pressão (PI Diff)</span>
                 </div>
-                {history.length >= 2 ? (
-                  <MomentumChart
-                    history={history}
-                    homeName={homeName}
-                    awayName={awayName}
-                    currentMinute={elapsed}
-                  />
-                ) : (
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-xl p-6 text-center">
-                    <p className="text-[10px] text-gray-500">Aguardando snapshots de pressão...</p>
-                    <p className="text-[8px] text-gray-600 mt-1">O gráfico aparecerá após 2 ciclos de polling (≈2 min)</p>
-                  </div>
-                )}
+                <MomentumChart
+                  history={history.length >= 1 ? (history.length === 1 ? [...history, { ...history[0], minute: history[0].minute + 1 }] : history) : [{ minute: elapsed, homePI: pressure.homePI, awayPI: pressure.awayPI }]}
+                  homeName={homeName}
+                  awayName={awayName}
+                  currentMinute={elapsed}
+                />
               </div>
 
               {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}

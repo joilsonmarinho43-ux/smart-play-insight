@@ -235,32 +235,89 @@ serve(async (req) => {
 
     // ========== LIVE fixtures ==========
     if (isLive) {
-      const cached = cacheGet("live_v3", 15000);
+      // Only use cache if ALL matches have stats populated
+      const cached = cacheGet("live_v3", 30000);
       if (cached) {
-        return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const allHaveStats = cached.matches.every((m: any) => m.stats?.home !== null || m.stats?.away !== null);
+        if (allHaveStats) {
+          return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        // If some matches lack stats, clear cache and re-fetch
+        memCache.delete("live_v3");
       }
 
       const fixturesData = await fetchWithAuth("fixtures?live=all", apiKey);
       const fixtures = fixturesData?.response || [];
+      console.log(`Live: ${fixtures.length} fixtures found`);
 
       const matches = [];
-      for (const j of fixtures) {
+
+      // Process in batches of 3 with delays to avoid rate limiting
+      for (let i = 0; i < fixtures.length; i++) {
+        const j = fixtures[i];
         const fId = j.fixture.id;
+        const elapsed = j.fixture?.status?.elapsed || 0;
         let stats = { home: null as any, away: null as any };
-        try {
-          const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
-          const resS = sData?.response || [];
-          if (resS.length >= 2) {
-            stats.home = extractStats(resS[0].statistics);
-            stats.away = extractStats(resS[1].statistics);
+
+        // Per-fixture stats cache (30s TTL — short for live data freshness)
+        const fStatsCk = `live_fstats_${fId}`;
+        const cachedFStats = cacheGet(fStatsCk, 30000);
+
+        if (cachedFStats) {
+          stats = cachedFStats;
+        } else {
+          // Fetch fixture statistics
+          try {
+            const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
+            const resS = sData?.response || [];
+            if (resS.length >= 2) {
+              stats.home = extractStats(resS[0].statistics);
+              stats.away = extractStats(resS[1].statistics);
+            }
+          } catch (e) { console.error(`Stats error for ${fId}:`, e); }
+
+          // If stats are still null AND match has been running for 5+ mins, try events endpoint for corners/cards
+          if (stats.home === null && stats.away === null && elapsed >= 5) {
+            try {
+              await delay(100);
+              const evData = await fetchWithAuth(`fixtures/events?fixture=${fId}`, apiKey);
+              const events = evData?.response || [];
+              if (events.length > 0) {
+                let homeCorners = 0, awayCorners = 0;
+                let homeFouls = 0, awayFouls = 0;
+                const homeTeamId = j.teams?.home?.id;
+                for (const ev of events) {
+                  const isHome = ev.team?.id === homeTeamId;
+                  if (ev.type === 'Corner' || ev.detail === 'Corner') {
+                    if (isHome) homeCorners++; else awayCorners++;
+                  }
+                }
+                // Build minimal stats from events
+                stats.home = { shotsOnGoal: 0, possession: 50, corners: homeCorners, totalShots: 0, dangerousAttacks: 0 };
+                stats.away = { shotsOnGoal: 0, possession: 50, corners: awayCorners, totalShots: 0, dangerousAttacks: 0 };
+              }
+            } catch (e) { console.error(`Events error for ${fId}:`, e); }
           }
-        } catch (e) { console.error(`Stats error for ${fId}:`, e); }
+
+          // Only cache if we got real data
+          if (stats.home !== null || stats.away !== null) {
+            cacheSet(fStatsCk, stats);
+          }
+        }
+
         matches.push({
           id: fId, isLive: true, teams: j.teams, goals: j.goals,
           fixture: j.fixture, league: getLeagueDisplayName(j.league?.id, j.league?.name || ''),
           homeStats: null, awayStats: null, stats,
         });
+
+        // Rate limit: delay every 3 requests
+        if ((i + 1) % 3 === 0 && i < fixtures.length - 1) {
+          await delay(150);
+        }
       }
+
+      console.log(`Live: returning ${matches.length} matches, ${matches.filter((m: any) => m.stats?.home !== null).length} with stats`);
       const responseData = { matches };
       cacheSet("live_v3", responseData);
       return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

@@ -100,6 +100,7 @@ function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
 
 const Live = () => {
   const [smartFilterOnly, setSmartFilterOnly] = useState(false);
+  const [fullStatsOnly, setFullStatsOnly] = useState(false);
 
   const {
     data: matches = [],

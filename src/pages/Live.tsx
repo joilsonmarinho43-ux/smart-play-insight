@@ -345,8 +345,10 @@ const Live = () => {
           let cornerTimeline: ReturnType<typeof projectCornersByPeriod> = [];
           try { cornerTimeline = projectCornersByPeriod(homeCorners, awayCorners, elapsed); } catch (e) { /* safe */ }
 
+          const isFav = favorites.includes(id);
+
           return (
-            <div key={id} className="bg-[#161B22] border border-[#30363D] rounded-2xl overflow-hidden shadow-lg shadow-black/20">
+            <div key={id} className={`bg-[#161B22] border rounded-2xl overflow-hidden shadow-lg shadow-black/20 ${isFav ? 'border-yellow-500/50' : 'border-[#30363D]'}`}>
               {/* Smart Filter Banner */}
               {smartFilter && (
                 <div className="bg-orange-500/15 border-b border-orange-500/30 px-4 py-2 flex items-center gap-2">

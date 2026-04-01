@@ -266,8 +266,20 @@ const Live = () => {
         </div>
       </header>
 
-      {smartFilterCount > 0 && (
-        <div className="container max-w-3xl mx-auto px-4 pt-3">
+      <div className="container max-w-3xl mx-auto px-4 pt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => setFullStatsOnly(!fullStatsOnly)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${
+            fullStatsOnly
+              ? 'bg-cyan-500 text-white border-cyan-600'
+              : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          📊 Dados Completos ({fullStatsCount}/{(matches as any[]).length})
+        </button>
+
+        {smartFilterCount > 0 && (
           <button
             onClick={() => setSmartFilterOnly(!smartFilterOnly)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${
@@ -279,8 +291,8 @@ const Live = () => {
             <Flame className="w-3.5 h-3.5" />
             🔥 Favoritos Perdendo ({smartFilterCount})
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <main className="container max-w-3xl mx-auto px-4 py-4 space-y-5">
         {isLoading && (

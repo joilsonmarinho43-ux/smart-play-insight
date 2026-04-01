@@ -360,9 +360,18 @@ const Live = () => {
               {/* League & Status */}
               <div className="bg-[#0D1117] px-4 py-3 flex items-center justify-between border-b border-[#30363D]">
                 <span className="text-xs text-gray-400 font-medium">{match?.league?.name || match?.league || ''}</span>
-                <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse">
-                  🔴 {elapsed}'
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleFavorite(id)}
+                    className="p-1 rounded-md hover:bg-white/5 transition-colors"
+                    title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                  >
+                    <Star className={`w-4 h-4 ${isFav ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}`} />
+                  </button>
+                  <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider animate-pulse">
+                    🔴 {elapsed}'
+                  </span>
+                </div>
               </div>
 
               {/* Score */}

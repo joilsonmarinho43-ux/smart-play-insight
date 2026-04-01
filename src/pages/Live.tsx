@@ -241,8 +241,15 @@ const Live = () => {
         return analysisMap[id]?.smartFilter;
       });
     }
-    return all;
-  }, [matches, smartFilterOnly, fullStatsOnly, analysisMap, hasFullStats]);
+    // Sort favorites first
+    return [...all].sort((a, b) => {
+      const aId = a?.fixture?.id || a?.id;
+      const bId = b?.fixture?.id || b?.id;
+      const aFav = favorites.includes(aId) ? 1 : 0;
+      const bFav = favorites.includes(bId) ? 1 : 0;
+      return bFav - aFav;
+    });
+  }, [matches, smartFilterOnly, fullStatsOnly, analysisMap, hasFullStats, favorites]);
 
   return (
     <div className="min-h-screen bg-[#0D1117] text-[#e6edf3]">

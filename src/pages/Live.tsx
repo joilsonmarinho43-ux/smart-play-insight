@@ -125,17 +125,16 @@ const Live = () => {
     staleTime: 55000,
   });
 
-  const DEFAULT_TEAM_STATS = { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
-
   const statsMap = useMemo(() => {
     const result: Record<string, any> = {};
     for (const match of matches as any[]) {
       const id = match?.fixture?.id || match?.id;
       if (!id) continue;
       const s = match?.stats;
+      // Only use real API data - no fabricated defaults
       result[id] = {
-        home: s?.home || { ...DEFAULT_TEAM_STATS },
-        away: s?.away || { ...DEFAULT_TEAM_STATS },
+        home: s?.home || null,
+        away: s?.away || null,
       };
     }
     return result;

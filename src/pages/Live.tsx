@@ -100,6 +100,7 @@ function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
 
 const Live = () => {
   const [smartFilterOnly, setSmartFilterOnly] = useState(false);
+  const [fullStatsOnly, setFullStatsOnly] = useState(false);
 
   const {
     data: matches = [],
@@ -200,14 +201,38 @@ const Live = () => {
     Object.values(analysisMap).filter(a => a.smartFilter).length,
   [analysisMap]);
 
+  const hasFullStats = useCallback((match: any) => {
+    const id = match?.fixture?.id || match?.id;
+    const s = statsMap[id];
+    if (!s) return false;
+    const h = s.home;
+    const a = s.away;
+    return (
+      (h?.shotsOnGoal > 0 || a?.shotsOnGoal > 0) ||
+      (h?.dangerousAttacks > 0 || a?.dangerousAttacks > 0) ||
+      (h?.totalShots > 0 || a?.totalShots > 0) ||
+      (h?.corners > 0 || a?.corners > 0) ||
+      (h?.possession !== 50 || a?.possession !== 50)
+    );
+  }, [statsMap]);
+
+  const fullStatsCount = useMemo(() =>
+    (matches as any[]).filter(hasFullStats).length,
+  [matches, hasFullStats]);
+
   const displayMatches = useMemo(() => {
-    const all = matches as any[];
-    if (!smartFilterOnly) return all;
-    return all.filter((match: any) => {
-      const id = match?.fixture?.id || match?.id;
-      return analysisMap[id]?.smartFilter;
-    });
-  }, [matches, smartFilterOnly, analysisMap]);
+    let all = matches as any[];
+    if (fullStatsOnly) {
+      all = all.filter(hasFullStats);
+    }
+    if (smartFilterOnly) {
+      all = all.filter((match: any) => {
+        const id = match?.fixture?.id || match?.id;
+        return analysisMap[id]?.smartFilter;
+      });
+    }
+    return all;
+  }, [matches, smartFilterOnly, fullStatsOnly, analysisMap, hasFullStats]);
 
   return (
     <div className="min-h-screen bg-[#0D1117] text-[#e6edf3]">
@@ -241,8 +266,20 @@ const Live = () => {
         </div>
       </header>
 
-      {smartFilterCount > 0 && (
-        <div className="container max-w-3xl mx-auto px-4 pt-3">
+      <div className="container max-w-3xl mx-auto px-4 pt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => setFullStatsOnly(!fullStatsOnly)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${
+            fullStatsOnly
+              ? 'bg-cyan-500 text-white border-cyan-600'
+              : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          📊 Dados Completos ({fullStatsCount}/{(matches as any[]).length})
+        </button>
+
+        {smartFilterCount > 0 && (
           <button
             onClick={() => setSmartFilterOnly(!smartFilterOnly)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all border ${
@@ -254,8 +291,8 @@ const Live = () => {
             <Flame className="w-3.5 h-3.5" />
             🔥 Favoritos Perdendo ({smartFilterCount})
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <main className="container max-w-3xl mx-auto px-4 py-4 space-y-5">
         {isLoading && (

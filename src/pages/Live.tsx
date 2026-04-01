@@ -101,6 +101,17 @@ function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
 const Live = () => {
   const [smartFilterOnly, setSmartFilterOnly] = useState(false);
   const [fullStatsOnly, setFullStatsOnly] = useState(false);
+  const [favorites, setFavorites] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem('liveMatchFavorites') || '[]'); } catch { return []; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('liveMatchFavorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = useCallback((id: number) => {
+    setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }, []);
 
   const {
     data: matches = [],

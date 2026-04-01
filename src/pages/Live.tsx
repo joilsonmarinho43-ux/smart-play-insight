@@ -201,14 +201,38 @@ const Live = () => {
     Object.values(analysisMap).filter(a => a.smartFilter).length,
   [analysisMap]);
 
+  const hasFullStats = useCallback((match: any) => {
+    const id = match?.fixture?.id || match?.id;
+    const s = statsMap[id];
+    if (!s) return false;
+    const h = s.home;
+    const a = s.away;
+    return (
+      (h?.shotsOnGoal > 0 || a?.shotsOnGoal > 0) ||
+      (h?.dangerousAttacks > 0 || a?.dangerousAttacks > 0) ||
+      (h?.totalShots > 0 || a?.totalShots > 0) ||
+      (h?.corners > 0 || a?.corners > 0) ||
+      (h?.possession !== 50 || a?.possession !== 50)
+    );
+  }, [statsMap]);
+
+  const fullStatsCount = useMemo(() =>
+    (matches as any[]).filter(hasFullStats).length,
+  [matches, hasFullStats]);
+
   const displayMatches = useMemo(() => {
-    const all = matches as any[];
-    if (!smartFilterOnly) return all;
-    return all.filter((match: any) => {
-      const id = match?.fixture?.id || match?.id;
-      return analysisMap[id]?.smartFilter;
-    });
-  }, [matches, smartFilterOnly, analysisMap]);
+    let all = matches as any[];
+    if (fullStatsOnly) {
+      all = all.filter(hasFullStats);
+    }
+    if (smartFilterOnly) {
+      all = all.filter((match: any) => {
+        const id = match?.fixture?.id || match?.id;
+        return analysisMap[id]?.smartFilter;
+      });
+    }
+    return all;
+  }, [matches, smartFilterOnly, fullStatsOnly, analysisMap, hasFullStats]);
 
   return (
     <div className="min-h-screen bg-[#0D1117] text-[#e6edf3]">

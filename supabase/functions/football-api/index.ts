@@ -276,7 +276,7 @@ serve(async (req) => {
             }
           } catch (e) { console.error(`Stats error for ${fId}:`, e); }
 
-          // If stats are still null AND match has been running for 5+ mins, try events endpoint for corners/cards
+          // If stats are still null AND match has been running for 5+ mins, try events endpoint for corners only
           if (stats.home === null && stats.away === null && elapsed >= 5) {
             try {
               await delay(100);
@@ -284,7 +284,6 @@ serve(async (req) => {
               const events = evData?.response || [];
               if (events.length > 0) {
                 let homeCorners = 0, awayCorners = 0;
-                let homeFouls = 0, awayFouls = 0;
                 const homeTeamId = j.teams?.home?.id;
                 for (const ev of events) {
                   const isHome = ev.team?.id === homeTeamId;
@@ -292,9 +291,11 @@ serve(async (req) => {
                     if (isHome) homeCorners++; else awayCorners++;
                   }
                 }
-                // Build minimal stats from events
-                stats.home = { shotsOnGoal: 0, possession: 50, corners: homeCorners, totalShots: 0, dangerousAttacks: 0 };
-                stats.away = { shotsOnGoal: 0, possession: 50, corners: awayCorners, totalShots: 0, dangerousAttacks: 0 };
+                // Only set corners from events - DO NOT fabricate other stats
+                if (homeCorners > 0 || awayCorners > 0) {
+                  stats.home = { shotsOnGoal: null, possession: null, corners: homeCorners, totalShots: null, dangerousAttacks: null };
+                  stats.away = { shotsOnGoal: null, possession: null, corners: awayCorners, totalShots: null, dangerousAttacks: null };
+                }
               }
             } catch (e) { console.error(`Events error for ${fId}:`, e); }
           }

@@ -5,17 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMatches } from '@/services/footballApi';
 import {
   analyzeLivePressure,
-  recordPISnapshot,
   type PressureData,
 } from '@/lib/pressureEngine';
 import {
-  normalizePressure,
-  calculateAPWindows,
   calculatePericulosity,
-  detectImminentGoal,
-  type AttackPressureWindows,
   type PericulosityData,
-  type ImminentGoalData,
 } from '@/lib/eliteMetrics';
 
 const DEFAULT_PRESSURE: PressureData = {

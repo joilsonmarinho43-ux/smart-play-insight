@@ -181,14 +181,6 @@ const Favorites = () => {
                     </div>
                   </div>
                   <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500 font-bold uppercase">PI</p>
-                    <div className="flex justify-center gap-2 mt-1">
-                      <span className={`text-sm font-black tabular-nums ${pressure.homePI >= 70 ? 'text-emerald-400' : 'text-gray-300'}`}>{pressure.homePI.toFixed(0)}</span>
-                      <span className="text-[10px] text-[#30363D]">vs</span>
-                      <span className={`text-sm font-black tabular-nums ${pressure.awayPI >= 70 ? 'text-red-400' : 'text-gray-300'}`}>{pressure.awayPI.toFixed(0)}</span>
-                    </div>
-                  </div>
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
                     <p className="text-[9px] text-gray-500 font-bold uppercase">Periculosidade</p>
                     <div className="flex justify-center gap-2 mt-1">
                       <span className={`text-sm font-black tabular-nums ${periculosity.home >= 70 ? 'text-red-400' : 'text-gray-300'}`}>{periculosity.home.toFixed(0)}</span>

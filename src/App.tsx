@@ -74,6 +74,7 @@ const App = () => {
             {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/live" element={<ProtectedRoute><Live /></ProtectedRoute>} />
+            <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />

@@ -21,6 +21,8 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 // Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
+// Leagues worth fetching per-fixture stats for (live)
+const LEAGUES_WITH_STATS = new Set([71, 39, 140, 78, 135, 61]);
 
 const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   71: 'Brasileirão Série A',

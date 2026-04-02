@@ -16,9 +16,7 @@ const DEFAULT_PRESSURE: PressureData = {
   homePI: 0, awayPI: 0, homeSignal: '🟢 Estável', awaySignal: '🟢 Estável',
   homePressureShare: 50, awayPressureShare: 50, dominance: 'balanced',
 };
-const DEFAULT_AP: AttackPressureWindows = { ap5Home: 0, ap5Away: 0, ap10Home: 0, ap10Away: 0 };
 const DEFAULT_PERIC: PericulosityData = { home: 0, away: 0, homeLabel: '🟢 BAIXO', awayLabel: '🟢 BAIXO' };
-const DEFAULT_IMMINENT: ImminentGoalData = { score: 0, isTriggered: false, reason: 'Sem dados' };
 
 const Favorites = () => {
   const [favorites, setFavorites] = useState<number[]>(() => {

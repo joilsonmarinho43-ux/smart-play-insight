@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Live from "./pages/Live";
+import Favorites from "./pages/Favorites";
 import Paywall from "./pages/Paywall";
 import NotFound from "./pages/NotFound";
 

@@ -280,6 +280,13 @@ const Live = () => {
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
             </button>
+            <Link
+              to="/favorites"
+              className="flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 px-3 py-2 rounded-lg hover:bg-yellow-500/20 transition-colors"
+            >
+              <Star className="w-4 h-4 fill-yellow-400" />
+              {favorites.length > 0 && <span className="font-bold">{favorites.length}</span>}
+            </Link>
           </div>
         </div>
       </header>

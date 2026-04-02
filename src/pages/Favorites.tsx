@@ -171,13 +171,13 @@ const Favorites = () => {
 
               {/* Quick Stats */}
               <div className="px-4 py-3">
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-2 gap-2 text-center">
                   <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500 font-bold uppercase">AP5</p>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase">PI</p>
                     <div className="flex justify-center gap-2 mt-1">
-                      <span className={`text-sm font-black tabular-nums ${apWindows.ap5Home >= 60 ? 'text-emerald-400' : 'text-gray-300'}`}>{apWindows.ap5Home.toFixed(0)}</span>
+                      <span className={`text-sm font-black tabular-nums ${pressure.homePI >= 70 ? 'text-emerald-400' : 'text-gray-300'}`}>{pressure.homePI.toFixed(0)}</span>
                       <span className="text-[10px] text-[#30363D]">vs</span>
-                      <span className={`text-sm font-black tabular-nums ${apWindows.ap5Away >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap5Away.toFixed(0)}</span>
+                      <span className={`text-sm font-black tabular-nums ${pressure.awayPI >= 70 ? 'text-red-400' : 'text-gray-300'}`}>{pressure.awayPI.toFixed(0)}</span>
                     </div>
                   </div>
                   <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">

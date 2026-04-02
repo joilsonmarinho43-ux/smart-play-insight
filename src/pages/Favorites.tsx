@@ -138,11 +138,9 @@ const Favorites = () => {
           const awayStats = s?.away || null;
 
           let pressure = DEFAULT_PRESSURE;
-          let apWindows = DEFAULT_AP;
           let periculosity = DEFAULT_PERIC;
 
           try { pressure = analyzeLivePressure(homeStats, awayStats, elapsed); } catch {}
-          try { apWindows = calculateAPWindows(homeStats, awayStats, elapsed); } catch {}
           try { periculosity = calculatePericulosity(homeStats, awayStats, elapsed); } catch {}
 
           return (

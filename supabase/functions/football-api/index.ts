@@ -21,6 +21,8 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 // Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
+// Leagues worth fetching per-fixture stats for (live)
+const LEAGUES_WITH_STATS = new Set([71, 39, 140, 78, 135, 61]);
 
 const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   71: 'Brasileirão Série A',
@@ -257,52 +259,34 @@ serve(async (req) => {
         const j = fixtures[i];
         const fId = j.fixture.id;
         const elapsed = j.fixture?.status?.elapsed || 0;
+        const leagueId = j.league?.id;
         let stats = { home: null as any, away: null as any };
 
-        // Per-fixture stats cache (30s TTL — short for live data freshness)
-        const fStatsCk = `live_fstats_${fId}`;
-        const cachedFStats = cacheGet(fStatsCk, 30000);
+        // Only fetch stats for leagues with real statistical coverage
+        const shouldFetchStats = LEAGUES_WITH_STATS.has(leagueId);
 
-        if (cachedFStats) {
-          stats = cachedFStats;
-        } else {
-          // Fetch fixture statistics
-          try {
-            const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
-            const resS = sData?.response || [];
-            if (resS.length >= 2) {
-              stats.home = extractStats(resS[0].statistics);
-              stats.away = extractStats(resS[1].statistics);
-            }
-          } catch (e) { console.error(`Stats error for ${fId}:`, e); }
+        if (shouldFetchStats) {
+          // Per-fixture stats cache (30s TTL — short for live data freshness)
+          const fStatsCk = `live_fstats_${fId}`;
+          const cachedFStats = cacheGet(fStatsCk, 30000);
 
-          // If stats are still null AND match has been running for 5+ mins, try events endpoint for corners only
-          if (stats.home === null && stats.away === null && elapsed >= 5) {
+          if (cachedFStats) {
+            stats = cachedFStats;
+          } else {
+            // Fetch fixture statistics
             try {
-              await delay(100);
-              const evData = await fetchWithAuth(`fixtures/events?fixture=${fId}`, apiKey);
-              const events = evData?.response || [];
-              if (events.length > 0) {
-                let homeCorners = 0, awayCorners = 0;
-                const homeTeamId = j.teams?.home?.id;
-                for (const ev of events) {
-                  const isHome = ev.team?.id === homeTeamId;
-                  if (ev.type === 'Corner' || ev.detail === 'Corner') {
-                    if (isHome) homeCorners++; else awayCorners++;
-                  }
-                }
-                // Only set corners from events - DO NOT fabricate other stats
-                if (homeCorners > 0 || awayCorners > 0) {
-                  stats.home = { shotsOnGoal: null, possession: null, corners: homeCorners, totalShots: null, dangerousAttacks: null };
-                  stats.away = { shotsOnGoal: null, possession: null, corners: awayCorners, totalShots: null, dangerousAttacks: null };
-                }
+              const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
+              const resS = sData?.response || [];
+              if (resS.length >= 2) {
+                stats.home = extractStats(resS[0].statistics);
+                stats.away = extractStats(resS[1].statistics);
               }
-            } catch (e) { console.error(`Events error for ${fId}:`, e); }
-          }
+            } catch (e) { console.error(`Stats error for ${fId}:`, e); }
 
-          // Only cache if we got real data
-          if (stats.home !== null || stats.away !== null) {
-            cacheSet(fStatsCk, stats);
+            // Only cache if we got real data
+            if (stats.home !== null || stats.away !== null) {
+              cacheSet(fStatsCk, stats);
+            }
           }
         }
 

@@ -131,10 +131,18 @@ const Live = () => {
       const id = match?.fixture?.id || match?.id;
       if (!id) continue;
       const s = match?.stats;
-      // Only use real API data - no fabricated defaults
+      // Detect and discard fabricated stats (all zeros + possession 50)
+      const isFake = (st: any) => {
+        if (!st) return true;
+        const p = Number(st.possession);
+        return (st.shotsOnGoal === 0 || st.shotsOnGoal === null) &&
+               (st.totalShots === 0 || st.totalShots === null) &&
+               (st.dangerousAttacks === 0 || st.dangerousAttacks === null) &&
+               (p === 50 || p === 0 || st.possession === null);
+      };
       result[id] = {
-        home: s?.home || null,
-        away: s?.away || null,
+        home: isFake(s?.home) ? null : s.home,
+        away: isFake(s?.away) ? null : s.away,
       };
     }
     return result;

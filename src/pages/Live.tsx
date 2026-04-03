@@ -472,239 +472,359 @@ const Live = () => {
                 </div>
               </div>
 
-              {/* ═══ ALERTS ═══ */}
-              {(imminentHome.isTriggered || imminentAway.isTriggered) && (
-                <div className="mx-4 mb-2 mt-2 py-2 px-3 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center gap-2 animate-pulse">
-                  <Crosshair className="w-4 h-4 text-red-400" />
-                  <span className="text-xs font-bold text-red-300">
-                    ⚠️ GOL IMINENTE — {imminentHome.isTriggered ? `${homeName} (${imminentHome.score}%)` : ''}{imminentHome.isTriggered && imminentAway.isTriggered ? ' | ' : ''}{imminentAway.isTriggered ? `${awayName} (${imminentAway.score}%)` : ''}
-                  </span>
+              {/* ═══ DATA VALIDATION STATUS ═══ */}
+              {analysis.dataStatus !== 'valid' && (
+                <div className="mx-4 my-3">
+                  <div className={`text-center py-6 px-4 rounded-xl border ${
+                    analysis.dataStatus === 'awaiting_data' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                    analysis.dataStatus === 'awaiting_api' ? 'bg-blue-500/10 border-blue-500/30' :
+                    analysis.dataStatus === 'error' ? 'bg-red-500/10 border-red-500/30' :
+                    'bg-gray-500/10 border-[#30363D]'
+                  }`}>
+                    <div className={`text-2xl mb-2 ${
+                      analysis.dataStatus === 'awaiting_data' ? '' :
+                      analysis.dataStatus === 'awaiting_api' ? '' :
+                      analysis.dataStatus === 'error' ? '' : ''
+                    }`}>
+                      {analysis.dataStatus === 'awaiting_data' && '⏳'}
+                      {analysis.dataStatus === 'awaiting_api' && '📡'}
+                      {analysis.dataStatus === 'error' && '⚠️'}
+                      {analysis.dataStatus === 'blocked' && '🚫'}
+                    </div>
+                    <p className={`text-sm font-black tracking-wide ${
+                      analysis.dataStatus === 'awaiting_data' ? 'text-yellow-400' :
+                      analysis.dataStatus === 'awaiting_api' ? 'text-blue-400' :
+                      analysis.dataStatus === 'error' ? 'text-red-400' :
+                      'text-gray-400'
+                    }`}>
+                      {analysis.statusMessage}
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-2">
+                      {analysis.dataStatus === 'awaiting_data' && 'Análise bloqueada até que dados reais estejam disponíveis.'}
+                      {analysis.dataStatus === 'awaiting_api' && 'Sem resposta da API. Tentaremos novamente em breve.'}
+                      {analysis.dataStatus === 'error' && 'Sistema detectou inconsistência nos dados. Análise suspensa.'}
+                      {analysis.dataStatus === 'blocked' && 'Estatísticas insuficientes para análise confiável.'}
+                    </p>
+                  </div>
                 </div>
               )}
 
-              {(pressure.homePI >= 70 || pressure.awayPI >= 70) && !(imminentHome.isTriggered || imminentAway.isTriggered) && (
-                <div className="mx-4 mb-2 mt-2 py-2 px-3 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center gap-2 animate-pulse">
-                  <Volume2 className="w-4 h-4 text-orange-400" />
-                  <span className="text-xs font-bold text-orange-300">
-                    🔥 PRESSÃO EXTREMA — {pressure.homePI >= 70 ? `${homeName} (PI ${pressure.homePI.toFixed(1)})` : `${awayName} (PI ${pressure.awayPI.toFixed(1)})`}
-                  </span>
-                </div>
-              )}
-
-              {/* ═══ LIVE PERFORMANCE & PI ═══ */}
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Live Performance & PI</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500 font-bold uppercase">AP5 (5min)</p>
-                    <div className="flex justify-center gap-2 mt-1">
-                      <span className={`text-sm font-black tabular-nums ${apWindows.ap5Home >= 60 ? 'text-emerald-400' : 'text-gray-300'}`}>{apWindows.ap5Home.toFixed(0)}</span>
-                      <span className="text-[10px] text-[#30363D]">vs</span>
-                      <span className={`text-sm font-black tabular-nums ${apWindows.ap5Away >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap5Away.toFixed(0)}</span>
+              {/* ═══ FULL ANALYSIS (only when data is valid) ═══ */}
+              {analysis.dataStatus === 'valid' && (
+                <>
+                  {/* ═══ ALERTS ═══ */}
+                  {(imminentHome.isTriggered || imminentAway.isTriggered) && (
+                    <div className="mx-4 mb-2 mt-2 py-2 px-3 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center gap-2 animate-pulse">
+                      <Crosshair className="w-4 h-4 text-red-400" />
+                      <span className="text-xs font-bold text-red-300">
+                        ⚠️ GOL IMINENTE — {imminentHome.isTriggered ? `${homeName} (${imminentHome.score}%)` : ''}{imminentHome.isTriggered && imminentAway.isTriggered ? ' | ' : ''}{imminentAway.isTriggered ? `${awayName} (${imminentAway.score}%)` : ''}
+                      </span>
                     </div>
-                  </div>
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500 font-bold uppercase">AP10 (10min)</p>
-                    <div className="flex justify-center gap-2 mt-1">
-                      <span className={`text-sm font-black tabular-nums ${apWindows.ap10Home >= 60 ? 'text-emerald-400' : 'text-gray-300'}`}>{apWindows.ap10Home.toFixed(0)}</span>
-                      <span className="text-[10px] text-[#30363D]">vs</span>
-                      <span className={`text-sm font-black tabular-nums ${apWindows.ap10Away >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap10Away.toFixed(0)}</span>
+                  )}
+
+                  {(pressure.homePI >= 70 || pressure.awayPI >= 70) && !(imminentHome.isTriggered || imminentAway.isTriggered) && (
+                    <div className="mx-4 mb-2 mt-2 py-2 px-3 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center gap-2 animate-pulse">
+                      <Volume2 className="w-4 h-4 text-orange-400" />
+                      <span className="text-xs font-bold text-orange-300">
+                        🔥 PRESSÃO EXTREMA — {pressure.homePI >= 70 ? `${homeName} (PI ${pressure.homePI.toFixed(1)})` : `${awayName} (PI ${pressure.awayPI.toFixed(1)})`}
+                      </span>
                     </div>
-                  </div>
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500 font-bold uppercase">Periculosidade</p>
-                    <div className="flex justify-center gap-2 mt-1">
-                      <span className={`text-sm font-black tabular-nums ${periculosity.home >= 70 ? 'text-red-400' : periculosity.home >= 50 ? 'text-orange-400' : 'text-gray-300'}`}>{periculosity.home.toFixed(0)}</span>
-                      <span className="text-[10px] text-[#30363D]">vs</span>
-                      <span className={`text-sm font-black tabular-nums ${periculosity.away >= 70 ? 'text-red-400' : periculosity.away >= 50 ? 'text-orange-400' : 'text-gray-300'}`}>{periculosity.away.toFixed(0)}</span>
+                  )}
+
+                  {/* ═══ LIVE PERFORMANCE & PI ═══ */}
+                  <div className="px-4 py-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Live Performance & PI</span>
                     </div>
-                  </div>
-                </div>
-                <div className="flex justify-between mt-1 px-1">
-                  <span className="text-[8px] text-gray-500">{periculosity.homeLabel}</span>
-                  <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
-                </div>
-              </div>
-
-              {/* ═══ IMMINENT GOAL METERS ═══ */}
-              <div className="px-4 pb-3 grid grid-cols-2 gap-2">
-                <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
-                    <span className={`text-xs font-black tabular-nums ${imminentHome.score >= 70 ? 'text-red-400' : 'text-gray-400'}`}>
-                      {imminentHome.score}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-[#30363D]/50 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        imminentHome.score >= 70 ? 'bg-red-500 animate-pulse' : imminentHome.score >= 50 ? 'bg-red-500/60' : 'bg-[#30363D]'
-                      }`}
-                      style={{ width: `${imminentHome.score}%` }}
-                    />
-                  </div>
-                  <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentHome.reason}</p>
-                </div>
-                <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
-                    <span className={`text-xs font-black tabular-nums ${imminentAway.score >= 70 ? 'text-red-400' : 'text-gray-400'}`}>
-                      {imminentAway.score}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-[#30363D]/50 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        imminentAway.score >= 70 ? 'bg-blue-500 animate-pulse' : imminentAway.score >= 50 ? 'bg-blue-500/60' : 'bg-[#30363D]'
-                      }`}
-                      style={{ width: `${imminentAway.score}%` }}
-                    />
-                  </div>
-                  <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentAway.reason}</p>
-                </div>
-              </div>
-
-              {/* ═══ PRESSURE BARS ═══ */}
-              <div className="px-4 pb-3 space-y-2">
-                <div>
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-emerald-400 font-bold">PI Casa: {pressure.homePI.toFixed(1)} ({normalizePressure(pressure.homePI).toFixed(0)}/100)</span>
-                    <span className="text-gray-500 font-medium">{pressure.homePressureShare}% da pressão</span>
-                  </div>
-                  <div className="h-2 bg-[#30363D]/50 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
-                      style={{ width: `${normalizePressure(pressure.homePI)}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-red-400 font-bold">PI Fora: {pressure.awayPI.toFixed(1)} ({normalizePressure(pressure.awayPI).toFixed(0)}/100)</span>
-                    <span className="text-gray-500 font-medium">{pressure.awayPressureShare}% da pressão</span>
-                  </div>
-                  <div className="h-2 bg-[#30363D]/50 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-500"
-                      style={{ width: `${normalizePressure(pressure.awayPI)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Dominance */}
-              <div className="px-4 pb-3">
-                <div className={`text-center py-2 rounded-lg text-xs font-bold border ${
-                  pressure.dominance === 'home'
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    : pressure.dominance === 'away'
-                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                    : 'bg-[#0D1117] text-gray-400 border-[#30363D]'
-                }`}>
-                  {pressure.dominance === 'home' && `🟢 ${homeName} DOMINANDO`}
-                  {pressure.dominance === 'away' && `🔴 ${awayName} DOMINANDO`}
-                  {pressure.dominance === 'balanced' && '⚖️ JOGO EQUILIBRADO'}
-                </div>
-              </div>
-
-              {/* ═══ MOMENTUM CHART (PI DIFF) ═══ */}
-              <div className="px-4 pb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Momentum de Pressão (PI Diff)</span>
-                </div>
-                <MomentumChart
-                  history={history.length >= 1 ? (history.length === 1 ? [...history, { ...history[0], minute: history[0].minute + 1 }] : history) : [{ minute: elapsed, homePI: pressure.homePI, awayPI: pressure.awayPI }]}
-                  homeName={homeName}
-                  awayName={awayName}
-                  currentMinute={elapsed}
-                />
-              </div>
-
-              {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}
-              <div className="px-4 pb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Odds Poisson Live</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500">{homeName}</p>
-                    <p className="text-sm font-black text-emerald-400 tabular-nums">{oddsDeviation.homeWinPoisson}%</p>
-                    <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.homeImpliedOdd}</p>
-                  </div>
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500">Empate</p>
-                    <p className="text-sm font-black text-gray-300 tabular-nums">{oddsDeviation.drawPoisson}%</p>
-                    <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.drawImpliedOdd}</p>
-                  </div>
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
-                    <p className="text-[9px] text-gray-500">{awayName}</p>
-                    <p className="text-sm font-black text-red-400 tabular-nums">{oddsDeviation.awayWinPoisson}%</p>
-                    <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.awayImpliedOdd}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* ═══ OVER GOALS HT / FT (Poisson) ═══ */}
-              <div className="px-4 pb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Probabilidade Over Gols (Poisson)</span>
-                </div>
-                <OverGoalsPanel
-                  homeStats={stats?.home || null}
-                  awayStats={stats?.away || null}
-                  homeGoals={homeGoals}
-                  awayGoals={awayGoals}
-                  minute={elapsed}
-                />
-              </div>
-
-              {/* ═══ ESTRATÉGIA DE TRADE LIVE ═══ */}
-              {strategies.length > 0 && (
-                <div className="px-4 pb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-3.5 h-3.5 text-orange-500" />
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                      Estratégia Live
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {strategies.map((s, i) => {
-                      const style = signalStyles[s.signal] || signalStyles.wait;
-                      return (
-                        <div key={i} className={`${style.bg} border ${style.border} rounded-lg p-3`}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-bold">
-                              {style.icon} {s.market}
-                            </span>
-                            {s.confidence > 0 && (
-                              <span className="text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded bg-[#0D1117] border border-[#30363D]">
-                                {s.confidence}%
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-gray-400 leading-relaxed">{s.reason}</p>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
+                        <p className="text-[9px] text-gray-500 font-bold uppercase">AP5 (5min)</p>
+                        <div className="flex justify-center gap-2 mt-1">
+                          <span className={`text-sm font-black tabular-nums ${apWindows.ap5Home >= 60 ? 'text-emerald-400' : 'text-gray-300'}`}>{apWindows.ap5Home.toFixed(0)}</span>
+                          <span className="text-[10px] text-[#30363D]">vs</span>
+                          <span className={`text-sm font-black tabular-nums ${apWindows.ap5Away >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap5Away.toFixed(0)}</span>
                         </div>
-                      );
-                    })}
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
+                        <p className="text-[9px] text-gray-500 font-bold uppercase">AP10 (10min)</p>
+                        <div className="flex justify-center gap-2 mt-1">
+                          <span className={`text-sm font-black tabular-nums ${apWindows.ap10Home >= 60 ? 'text-emerald-400' : 'text-gray-300'}`}>{apWindows.ap10Home.toFixed(0)}</span>
+                          <span className="text-[10px] text-[#30363D]">vs</span>
+                          <span className={`text-sm font-black tabular-nums ${apWindows.ap10Away >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap10Away.toFixed(0)}</span>
+                        </div>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
+                        <p className="text-[9px] text-gray-500 font-bold uppercase">Periculosidade</p>
+                        <div className="flex justify-center gap-2 mt-1">
+                          <span className={`text-sm font-black tabular-nums ${periculosity.home >= 70 ? 'text-red-400' : periculosity.home >= 50 ? 'text-orange-400' : 'text-gray-300'}`}>{periculosity.home.toFixed(0)}</span>
+                          <span className="text-[10px] text-[#30363D]">vs</span>
+                          <span className={`text-sm font-black tabular-nums ${periculosity.away >= 70 ? 'text-red-400' : periculosity.away >= 50 ? 'text-orange-400' : 'text-gray-300'}`}>{periculosity.away.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between mt-1 px-1">
+                      <span className="text-[8px] text-gray-500">{periculosity.homeLabel}</span>
+                      <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
+                    </div>
                   </div>
-                </div>
+
+                  {/* ═══ IMMINENT GOAL METERS ═══ */}
+                  <div className="px-4 pb-3 grid grid-cols-2 gap-2">
+                    <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
+                        <span className={`text-xs font-black tabular-nums ${imminentHome.score >= 70 ? 'text-red-400' : 'text-gray-400'}`}>
+                          {imminentHome.score}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-[#30363D]/50 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${
+                            imminentHome.score >= 70 ? 'bg-red-500 animate-pulse' : imminentHome.score >= 50 ? 'bg-red-500/60' : 'bg-[#30363D]'
+                          }`}
+                          style={{ width: `${imminentHome.score}%` }}
+                        />
+                      </div>
+                      <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentHome.reason}</p>
+                    </div>
+                    <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase">Gol Iminente</span>
+                        <span className={`text-xs font-black tabular-nums ${imminentAway.score >= 70 ? 'text-red-400' : 'text-gray-400'}`}>
+                          {imminentAway.score}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-[#30363D]/50 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${
+                            imminentAway.score >= 70 ? 'bg-blue-500 animate-pulse' : imminentAway.score >= 50 ? 'bg-blue-500/60' : 'bg-[#30363D]'
+                          }`}
+                          style={{ width: `${imminentAway.score}%` }}
+                        />
+                      </div>
+                      <p className="text-[8px] text-gray-600 mt-1 truncate">{imminentAway.reason}</p>
+                    </div>
+                  </div>
+
+                  {/* ═══ PRESSURE BARS ═══ */}
+                  <div className="px-4 pb-3 space-y-2">
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-emerald-400 font-bold">PI Casa: {pressure.homePI.toFixed(1)} ({normalizePressure(pressure.homePI).toFixed(0)}/100)</span>
+                        <span className="text-gray-500 font-medium">{pressure.homePressureShare}% da pressão</span>
+                      </div>
+                      <div className="h-2 bg-[#30363D]/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
+                          style={{ width: `${normalizePressure(pressure.homePI)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-red-400 font-bold">PI Fora: {pressure.awayPI.toFixed(1)} ({normalizePressure(pressure.awayPI).toFixed(0)}/100)</span>
+                        <span className="text-gray-500 font-medium">{pressure.awayPressureShare}% da pressão</span>
+                      </div>
+                      <div className="h-2 bg-[#30363D]/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-500"
+                          style={{ width: `${normalizePressure(pressure.awayPI)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dominance */}
+                  <div className="px-4 pb-3">
+                    <div className={`text-center py-2 rounded-lg text-xs font-bold border ${
+                      pressure.dominance === 'home'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : pressure.dominance === 'away'
+                        ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                        : 'bg-[#0D1117] text-gray-400 border-[#30363D]'
+                    }`}>
+                      {pressure.dominance === 'home' && `🟢 ${homeName} DOMINANDO`}
+                      {pressure.dominance === 'away' && `🔴 ${awayName} DOMINANDO`}
+                      {pressure.dominance === 'balanced' && '⚖️ JOGO EQUILIBRADO'}
+                    </div>
+                  </div>
+
+                  {/* ═══ MOMENTUM CHART (PI DIFF) ═══ */}
+                  <div className="px-4 pb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Momentum de Pressão (PI Diff)</span>
+                    </div>
+                    <MomentumChart
+                      history={history.length >= 1 ? (history.length === 1 ? [...history, { ...history[0], minute: history[0].minute + 1 }] : history) : [{ minute: elapsed, homePI: pressure.homePI, awayPI: pressure.awayPI }]}
+                      homeName={homeName}
+                      awayName={awayName}
+                      currentMinute={elapsed}
+                    />
+                  </div>
+
+                  {/* ═══ ODDS DEVIATION (Poisson Live) ═══ */}
+                  <div className="px-4 pb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Odds Poisson Live</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
+                        <p className="text-[9px] text-gray-500">{homeName}</p>
+                        <p className="text-sm font-black text-emerald-400 tabular-nums">{oddsDeviation.homeWinPoisson}%</p>
+                        <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.homeImpliedOdd}</p>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
+                        <p className="text-[9px] text-gray-500">Empate</p>
+                        <p className="text-sm font-black text-gray-300 tabular-nums">{oddsDeviation.drawPoisson}%</p>
+                        <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.drawImpliedOdd}</p>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
+                        <p className="text-[9px] text-gray-500">{awayName}</p>
+                        <p className="text-sm font-black text-red-400 tabular-nums">{oddsDeviation.awayWinPoisson}%</p>
+                        <p className="text-[9px] text-gray-600 tabular-nums">@{oddsDeviation.awayImpliedOdd}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ═══ OVER GOALS HT / FT (Poisson) ═══ */}
+                  <div className="px-4 pb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Probabilidade Over Gols (Poisson)</span>
+                    </div>
+                    <OverGoalsPanel
+                      homeStats={stats?.home || null}
+                      awayStats={stats?.away || null}
+                      homeGoals={homeGoals}
+                      awayGoals={awayGoals}
+                      minute={elapsed}
+                    />
+                  </div>
+
+                  {/* ═══ ESTRATÉGIA DE TRADE LIVE ═══ */}
+                  {strategies.length > 0 && (
+                    <div className="px-4 pb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target className="w-3.5 h-3.5 text-orange-500" />
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                          Estratégia Live
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {strategies.map((s, i) => {
+                          const style = signalStyles[s.signal] || signalStyles.wait;
+                          return (
+                            <div key={i} className={`${style.bg} border ${style.border} rounded-lg p-3`}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-bold">
+                                  {style.icon} {s.market}
+                                </span>
+                                {s.confidence > 0 && (
+                                  <span className="text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded bg-[#0D1117] border border-[#30363D]">
+                                    {s.confidence}%
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-400 leading-relaxed">{s.reason}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ═══ HT/FT STRATEGY ═══ */}
+                  {htft.length > 0 && (
+                    <div className="px-4 pb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                          Estratégia HT/FT
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {htft.map((pred, i) => {
+                          const style = signalStyles[pred.signal] || signalStyles.wait;
+                          return (
+                            <div key={i} className={`${style.bg} border ${style.border} rounded-lg p-3`}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-bold">
+                                  {style.icon} HT/FT: {pred.label}
+                                </span>
+                                <span className="text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded bg-[#0D1117] border border-[#30363D]">
+                                  {pred.probability}%
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-gray-400 leading-relaxed">{pred.reason}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ═══ CORNER TIMELINE ═══ */}
+                  {(homeCorners > 0 || awayCorners > 0) && cornerTimeline.length > 0 && (
+                    <div className="px-4 pb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="w-3.5 h-3.5 text-green-400" />
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Escanteios por Período</span>
+                      </div>
+                      <CornerTimeline data={cornerTimeline} currentMinute={elapsed} />
+                    </div>
+                  )}
+
+                  {/* ═══ LIVE STATS GRID ═══ */}
+                  <div className="px-4 pb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Stats em Tempo Real</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2.5">
+                        <p className="text-gray-500 mb-0.5">Posse de Bola</p>
+                        <p className="font-bold text-sm tabular-nums text-white">{stats?.home?.possession || 0}% - {stats?.away?.possession || 0}%</p>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2.5">
+                        <p className="text-gray-500 mb-0.5">Chutes no Gol</p>
+                        <p className="font-bold text-sm tabular-nums text-white">{stats?.home?.shotsOnGoal || 0} - {stats?.away?.shotsOnGoal || 0}</p>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2.5">
+                        <p className="text-gray-500 mb-0.5">Finalizações</p>
+                        <p className="font-bold text-sm tabular-nums text-white">{stats?.home?.totalShots || 0} - {stats?.away?.totalShots || 0}</p>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2.5">
+                        <p className="text-gray-500 mb-0.5">At. Perigosos</p>
+                        <p className="font-bold text-sm tabular-nums text-white">{stats?.home?.dangerousAttacks || 0} - {stats?.away?.dangerousAttacks || 0}</p>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2.5">
+                        <p className="text-gray-500 mb-0.5">Escanteios</p>
+                        <p className="font-bold text-sm tabular-nums text-white">{homeCorners} - {awayCorners}</p>
+                      </div>
+                      <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2.5">
+                        <p className="text-gray-500 mb-0.5">Ritmo Gols/90'</p>
+                        <p className="font-bold text-sm tabular-nums text-white">
+                          {elapsed > 0 ? ((homeGoals + awayGoals) / elapsed * 90).toFixed(1) : '0.0'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
-              {/* ═══ HT/FT STRATEGY ═══ */}
-              {htft.length > 0 && (
-                <div className="px-4 pb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                      Estratégia HT/FT
-                    </span>
-                  </div>
+              {/* Footer */}
+              <div className="px-4 pb-3 border-t border-[#30363D] pt-2">
+                <p className="text-[8px] text-[#484F58] text-center uppercase tracking-widest font-mono">
+                  {analysis.dataStatus === 'valid'
+                    ? 'Elite Metrics v2 · Poisson Live · PI Diff · Polling 60s'
+                    : `Status: ${analysis.statusMessage}`
+                  }
+                </p>
+              </div>
+            </div>
                   <div className="space-y-2">
                     {htft.map((pred, i) => {
                       const style = signalStyles[pred.signal] || signalStyles.wait;

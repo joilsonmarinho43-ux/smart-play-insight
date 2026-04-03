@@ -94,6 +94,12 @@ function validateLiveData(
     return { status: 'awaiting_data', message: 'AGUARDANDO DADOS REAIS' };
   }
 
+  // Rule 2b: Pressure detection — need at least one real signal
+  const hasPressure = totalDA >= 5 || totalShotsOnGoal >= 2 || totalCorners >= 2;
+  if (!hasPressure) {
+    return { status: 'blocked', message: 'SEM VALOR — Pressão insuficiente para análise' };
+  }
+
   // Rule 5: Insufficient intensity (very low activity for the elapsed time)
   const activityPerMin = (totalShots + totalDA) / Math.max(minute, 1);
   if (minute >= 15 && activityPerMin < 0.15) {
@@ -102,7 +108,6 @@ function validateLiveData(
 
   // Rule 3: Detect inconsistent data (e.g., frozen possession at exactly 50/50 with real shots)
   if (homePoss === 50 && awayPoss === 50 && totalShots > 3) {
-    // Possession stuck at 50/50 despite shots → suspicious
     return { status: 'error', message: 'ERRO NO SISTEMA LIVE — Dados inconsistentes' };
   }
 
@@ -513,14 +518,45 @@ const Live = () => {
               {analysis.dataStatus === 'valid' && (
                 <>
                   {/* ═══ ALERTS ═══ */}
-                  {(imminentHome.isTriggered || imminentAway.isTriggered) && (
-                    <div className="mx-4 mb-2 mt-2 py-2 px-3 rounded-lg bg-red-500/20 border border-red-500/40 flex items-center gap-2 animate-pulse">
-                      <Crosshair className="w-4 h-4 text-red-400" />
-                      <span className="text-xs font-bold text-red-300">
-                        ⚠️ GOL IMINENTE — {imminentHome.isTriggered ? `${homeName} (${imminentHome.score}%)` : ''}{imminentHome.isTriggered && imminentAway.isTriggered ? ' | ' : ''}{imminentAway.isTriggered ? `${awayName} (${imminentAway.score}%)` : ''}
-                      </span>
-                    </div>
-                  )}
+                  {(imminentHome.isTriggered || imminentAway.isTriggered) && (() => {
+                    const dominant = imminentHome.score >= imminentAway.score ? 'home' : 'away';
+                    const dominantName = dominant === 'home' ? homeName : awayName;
+                    const dominantStats = dominant === 'home' ? stats?.home : stats?.away;
+                    const dominantScore = dominant === 'home' ? imminentHome.score : imminentAway.score;
+                    const dominantDA = dominantStats?.dangerousAttacks || 0;
+                    const opponentDA = (dominant === 'home' ? stats?.away : stats?.home)?.dangerousAttacks || 0;
+                    const diffPct = (dominantDA + opponentDA) > 0 ? Math.round((dominantDA / (dominantDA + opponentDA)) * 100) : 50;
+                    const totalGoalsNow = homeGoals + awayGoals;
+                    const recommendation = totalGoalsNow === 0 ? 'OVER 0.5 Gols' : `Próximo Gol: ${dominantName}`;
+                    return (
+                      <div className="mx-4 mb-2 mt-2 rounded-xl bg-red-500/15 border border-red-500/40 overflow-hidden">
+                        <div className="bg-red-500/20 px-4 py-2 flex items-center gap-2 animate-pulse">
+                          <Crosshair className="w-4 h-4 text-red-400" />
+                          <span className="text-xs font-black text-red-300 uppercase tracking-wider">
+                            🚨 GOL IMINENTE — {dominantName}
+                          </span>
+                        </div>
+                        <div className="px-4 py-3 space-y-1.5">
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-gray-400">Time Dominante</span>
+                            <span className="text-red-300 font-bold">{dominantName} ({dominant === 'home' ? 'CASA' : 'FORA'})</span>
+                          </div>
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-gray-400">Pressão</span>
+                            <span className="text-red-300 font-bold">ALTA — {dominantDA} at. perigosos ({diffPct}%)</span>
+                          </div>
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-gray-400">Confiança</span>
+                            <span className="text-red-300 font-bold">{dominantScore}%</span>
+                          </div>
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-gray-400">Recomendação</span>
+                            <span className="text-emerald-400 font-bold">{recommendation}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {(pressure.homePI >= 70 || pressure.awayPI >= 70) && !(imminentHome.isTriggered || imminentAway.isTriggered) && (
                     <div className="mx-4 mb-2 mt-2 py-2 px-3 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center gap-2 animate-pulse">

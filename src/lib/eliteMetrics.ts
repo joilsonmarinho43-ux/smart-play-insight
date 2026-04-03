@@ -94,23 +94,44 @@ export function detectImminentGoal(
   minute: number,
   ap5: number
 ): ImminentGoalData {
-  const s = stats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
+  if (!stats) return { score: 0, isTriggered: false, reason: 'Sem dados' };
+  const s = stats;
   const safeMin = Math.max(minute, 1);
 
-  const shotsWeight = Math.min(30, s.shotsOnGoal * 6);
-  const dangerousWeight = Math.min(25, (s.dangerousAttacks / safeMin) * 40);
-  const possessionWeight = s.possession > 60 ? 15 : s.possession > 55 ? 10 : 5;
-  const ap5Weight = Math.min(20, ap5 * 0.25);
-  const cornersWeight = Math.min(10, s.corners * 2);
+  // ═══ STRICT RULES — Only trigger with REAL pressure ═══
+  // Rule: DA ≥ 8 is mandatory for trigger
+  if (s.dangerousAttacks < 8) {
+    // Calculate score but never trigger
+    const rawScore = Math.round(Math.min(60,
+      (s.shotsOnGoal * 5) + (s.dangerousAttacks * 2) + (s.corners * 2) + (ap5 * 0.1)
+    ));
+    const reasons: string[] = [];
+    if (s.shotsOnGoal >= 2) reasons.push(`${s.shotsOnGoal} chutes no gol`);
+    if (s.dangerousAttacks >= 3) reasons.push(`${s.dangerousAttacks} at. perigosos`);
+    return { score: rawScore, isTriggered: false, reason: reasons.length > 0 ? reasons.join(', ') : 'Sem pressão significativa' };
+  }
 
-  const score = Math.round(Math.min(100, shotsWeight + dangerousWeight + possessionWeight + ap5Weight + cornersWeight));
-  const isTriggered = score >= 70; // Alinha com Danger Level threshold
+  // Calculate pressure differential
+  const shotsWeight = Math.min(25, s.shotsOnGoal * 5);
+  const dangerousWeight = Math.min(30, (s.dangerousAttacks / safeMin) * 35);
+  const possessionWeight = s.possession > 60 ? 15 : s.possession > 55 ? 8 : 0;
+  const ap5Weight = Math.min(15, ap5 * 0.2);
+  const cornersWeight = Math.min(10, s.corners * 2);
+  const rhythmBonus = (s.dangerousAttacks / safeMin) > 1.0 ? 10 : 0; // Growing offensive rhythm
+
+  const score = Math.round(Math.min(100, shotsWeight + dangerousWeight + possessionWeight + ap5Weight + cornersWeight + rhythmBonus));
+
+  // Strict trigger: score ≥ 70 AND continuous pressure (AP5 > 40) AND growing rhythm
+  const hasContinuousPressure = ap5 > 40;
+  const hasGrowingRhythm = (s.dangerousAttacks / safeMin) > 0.6;
+  const isTriggered = score >= 70 && hasContinuousPressure && hasGrowingRhythm;
 
   const reasons: string[] = [];
+  if (s.dangerousAttacks >= 8) reasons.push(`${s.dangerousAttacks} at. perigosos`);
   if (s.shotsOnGoal >= 3) reasons.push(`${s.shotsOnGoal} chutes no gol`);
-  if (s.dangerousAttacks / safeMin > 0.8) reasons.push(`ritmo alto de ataques perigosos`);
+  if ((s.dangerousAttacks / safeMin) > 0.8) reasons.push(`ritmo ofensivo crescente`);
   if (s.possession > 60) reasons.push(`${s.possession}% posse`);
-  if (ap5 > 60) reasons.push(`AP5 em ${ap5}`);
+  if (ap5 > 60) reasons.push(`AP5 em ${ap5.toFixed(0)}`);
 
   return {
     score,

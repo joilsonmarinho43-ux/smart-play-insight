@@ -94,6 +94,12 @@ function validateLiveData(
     return { status: 'awaiting_data', message: 'AGUARDANDO DADOS REAIS' };
   }
 
+  // Rule 2b: Pressure detection — need at least one real signal
+  const hasPressure = totalDA >= 5 || totalShotsOnGoal >= 2 || totalCorners >= 2;
+  if (!hasPressure) {
+    return { status: 'blocked', message: 'SEM VALOR — Pressão insuficiente para análise' };
+  }
+
   // Rule 5: Insufficient intensity (very low activity for the elapsed time)
   const activityPerMin = (totalShots + totalDA) / Math.max(minute, 1);
   if (minute >= 15 && activityPerMin < 0.15) {
@@ -102,7 +108,6 @@ function validateLiveData(
 
   // Rule 3: Detect inconsistent data (e.g., frozen possession at exactly 50/50 with real shots)
   if (homePoss === 50 && awayPoss === 50 && totalShots > 3) {
-    // Possession stuck at 50/50 despite shots → suspicious
     return { status: 'error', message: 'ERRO NO SISTEMA LIVE — Dados inconsistentes' };
   }
 

@@ -30,7 +30,11 @@ import MomentumChart from '@/components/MomentumChart';
 import OverGoalsPanel from '@/components/OverGoalsPanel';
 import { calculateHtFtStrategy, type HtFtPrediction } from '@/lib/htftEngine';
 
+type DataStatus = 'valid' | 'awaiting_data' | 'awaiting_api' | 'blocked' | 'error';
+
 interface MatchAnalysis {
+  dataStatus: DataStatus;
+  statusMessage: string;
   pressure: PressureData;
   history: PISnapshot[];
   strategies: LiveStrategy[];
@@ -55,16 +59,72 @@ const DEFAULT_ODDS: OddsDeviation = {
   homeImpliedOdd: 3.0, drawImpliedOdd: 3.0, awayImpliedOdd: 3.0,
 };
 
+const BLOCKED_RESULT: MatchAnalysis = {
+  dataStatus: 'blocked', statusMessage: '',
+  pressure: DEFAULT_PRESSURE, history: [], strategies: [],
+  apWindows: DEFAULT_AP, periculosity: DEFAULT_PERIC,
+  imminentHome: DEFAULT_IMMINENT, imminentAway: DEFAULT_IMMINENT,
+  oddsDeviation: DEFAULT_ODDS, smartFilter: null, htft: [],
+};
+
+/** Validate live data integrity before running any analysis */
+function validateLiveData(
+  homeStats: any, awayStats: any, minute: number
+): { status: DataStatus; message: string } {
+  // Rule 4: API returned null/undefined stats
+  if (!homeStats && !awayStats) {
+    return { status: 'awaiting_api', message: 'AGUARDANDO DADOS DA API' };
+  }
+
+  const h = homeStats || {};
+  const a = awayStats || {};
+
+  const totalDA = (h.dangerousAttacks || 0) + (a.dangerousAttacks || 0);
+  const totalShots = (h.totalShots || 0) + (a.totalShots || 0);
+  const totalShotsOnGoal = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
+  const totalCorners = (h.corners || 0) + (a.corners || 0);
+  const homePoss = Number(h.possession || 0);
+  const awayPoss = Number(a.possession || 0);
+
+  // Rule 1: All critical metrics are zero → block
+  const allZero = totalDA === 0 && totalShots === 0 && totalShotsOnGoal === 0 && totalCorners === 0;
+
+  // Rule 2: minute < 5 OR all zero → awaiting
+  if (minute < 5 || allZero) {
+    return { status: 'awaiting_data', message: 'AGUARDANDO DADOS REAIS' };
+  }
+
+  // Rule 5: Insufficient intensity (very low activity for the elapsed time)
+  const activityPerMin = (totalShots + totalDA) / Math.max(minute, 1);
+  if (minute >= 15 && activityPerMin < 0.15) {
+    return { status: 'blocked', message: 'SEM VALOR — Jogo sem intensidade' };
+  }
+
+  // Rule 3: Detect inconsistent data (e.g., frozen possession at exactly 50/50 with real shots)
+  if (homePoss === 50 && awayPoss === 50 && totalShots > 3) {
+    // Possession stuck at 50/50 despite shots → suspicious
+    return { status: 'error', message: 'ERRO NO SISTEMA LIVE — Dados inconsistentes' };
+  }
+
+  return { status: 'valid', message: '' };
+}
+
 function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
   const id = match?.fixture?.id || match?.id;
   const stats = statsMap[id];
-  const minute = match?.fixture?.status?.elapsed || 1;
+  const minute = match?.fixture?.status?.elapsed || 0;
   const homeGoals = match?.goals?.home ?? 0;
   const awayGoals = match?.goals?.away ?? 0;
   const homeName = match?.teams?.home?.name || 'Casa';
   const awayName = match?.teams?.away?.name || 'Fora';
   const homeStats = stats?.home || null;
   const awayStats = stats?.away || null;
+
+  // ═══ VALIDATION GATE ═══
+  const validation = validateLiveData(homeStats, awayStats, minute);
+  if (validation.status !== 'valid') {
+    return { ...BLOCKED_RESULT, dataStatus: validation.status, statusMessage: validation.message };
+  }
 
   let pressure = DEFAULT_PRESSURE;
   let history: PISnapshot[] = [];
@@ -95,7 +155,22 @@ function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
     htft = calculateHtFtStrategy(homeStats, awayStats, homeGoals, awayGoals, minute, homeName, awayName, apWindows.ap5Home, apWindows.ap5Away);
   } catch (e) { console.error('HT/FT error:', e); }
 
-  return { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter, htft };
+  // Rule 3: Post-analysis sanity checks
+  // Detect unrealistic probabilities (e.g., 99% draw at minute 10)
+  if (minute <= 20) {
+    if (oddsDeviation.drawPoisson >= 90 || oddsDeviation.homeWinPoisson >= 95 || oddsDeviation.awayWinPoisson >= 95) {
+      return { ...BLOCKED_RESULT, dataStatus: 'error', statusMessage: 'ERRO NO SISTEMA LIVE — Percentuais irreais detectados' };
+    }
+  }
+
+  // Detect stuck imminent goal (triggered with very low actual shots)
+  const totalRealShots = (homeStats?.shotsOnGoal || 0) + (awayStats?.shotsOnGoal || 0);
+  if ((imminentHome.isTriggered || imminentAway.isTriggered) && totalRealShots === 0) {
+    imminentHome = DEFAULT_IMMINENT;
+    imminentAway = DEFAULT_IMMINENT;
+  }
+
+  return { dataStatus: 'valid', statusMessage: '', pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter, htft };
 }
 
 const Live = () => {

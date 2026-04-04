@@ -21,8 +21,25 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 // Brasileirão A (71), Premier League (39), La Liga (140), Bundesliga (78), Serie A Italia (135), Ligue 1 (61)
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
-// Leagues worth fetching per-fixture stats for (live)
-const LEAGUES_WITH_STATS = new Set([71, 39, 140, 78, 135, 61]);
+// Leagues worth fetching per-fixture stats for (live) — expanded coverage
+const LEAGUES_WITH_STATS = new Set([
+  71, 39, 140, 78, 135, 61,       // Top 6 original
+  253,                              // MLS
+  128,                              // Liga Profesional Argentina
+  262,                              // Liga MX
+  13, 11,                           // Copa Libertadores, Copa Sudamericana
+  2, 3,                             // Champions League, Europa League
+  88,                               // Eredivisie
+  94,                               // Primeira Liga (Portugal)
+  40,                               // Championship (England)
+  239,                              // Serie B (Brazil)
+  345,                              // Copa Argentina
+  299,                              // Paraguay Primera
+  268,                              // Bolivia Primera
+  242,                              // Ecuador Liga Pro
+  307,                              // Saudi Pro League
+  332,                              // UAE Pro League
+]);
 
 const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   71: 'Brasileirão Série A',
@@ -31,6 +48,20 @@ const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   78: 'Bundesliga',
   135: 'Serie A (ITA)',
   61: 'Ligue 1',
+  253: 'MLS',
+  128: 'Liga Argentina',
+  262: 'Liga MX',
+  13: 'Copa Libertadores',
+  11: 'Copa Sudamericana',
+  2: 'Champions League',
+  3: 'Europa League',
+  88: 'Eredivisie',
+  94: 'Liga Portugal',
+  40: 'Championship',
+  239: 'Brasileirão Série B',
+  299: 'Division Profesional',
+  268: 'Primera División (BOL)',
+  242: 'Liga Pro (ECU)',
 };
 
 function getLeagueDisplayName(leagueId: number, fallbackName: string): string {

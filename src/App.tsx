@@ -14,6 +14,7 @@ import Live from "./pages/Live";
 import Favorites from "./pages/Favorites";
 import Paywall from "./pages/Paywall";
 import NotFound from "./pages/NotFound";
+import { AppLayout } from "./components/AppLayout";
 
 import { Loader2 } from "lucide-react";
 

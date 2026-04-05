@@ -14,6 +14,7 @@ import Live from "./pages/Live";
 import Favorites from "./pages/Favorites";
 import Paywall from "./pages/Paywall";
 import NotFound from "./pages/NotFound";
+import { AppLayout } from "./components/AppLayout";
 
 import { Loader2 } from "lucide-react";
 
@@ -72,12 +73,12 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/live" element={<ProtectedRoute><Live /></ProtectedRoute>} />
-            <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
+            <Route path="/live" element={<ProtectedRoute><AppLayout><Live /></AppLayout></ProtectedRoute>} />
+            <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
-            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+            <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />
             
             {/* Rotas de Fluxo de Usuário */}
             <Route path="/expired" element={<Paywall />} />

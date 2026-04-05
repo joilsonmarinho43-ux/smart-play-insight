@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, RefreshCw, ArrowLeft, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck, Flame, BarChart3, Crosshair, Star, Eye } from 'lucide-react';
+import globeIcon from '@/assets/icon-globe.png';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMatches } from '@/services/footballApi';
@@ -385,7 +386,7 @@ const Live = () => {
           <div className="flex items-center gap-3">
             <Link to="/" className="p-2 hover:bg-white/5 rounded-full transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
             <div className="flex items-center gap-2">
-              <Eye className="w-5 h-5 text-orange-500" />
+              <img src={globeIcon} alt="" className="w-5 h-5 object-contain" />
               <div>
                 <h1 className="font-bold text-lg tracking-tight text-white">SCANNER PRO</h1>
                 <p className="text-[8px] text-orange-500/70 font-bold uppercase tracking-widest">OLHO QUE TUDO VÊ · LIVE</p>

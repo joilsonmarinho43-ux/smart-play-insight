@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Menu } from "lucide-react";
+import globeIcon from "@/assets/icon-globe.png";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,7 +15,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <SidebarTrigger className="text-gray-400 hover:text-white">
               <Menu className="w-6 h-6" />
             </SidebarTrigger>
-            <span className="ml-3 text-sm font-bold text-white">ANALISTA JOILSON</span>
+            <img src={globeIcon} alt="" className="ml-3 w-5 h-5 object-contain mr-2" />
+            <span className="text-sm font-bold text-white">ANALISTA JOILSON</span>
           </header>
           <main className="flex-1">{children}</main>
         </div>

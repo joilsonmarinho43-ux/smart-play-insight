@@ -40,7 +40,7 @@ export function AppSidebar() {
             src={logoImg}
             alt="Analista Joilson"
             className={`object-contain transition-all duration-300 ${
-              collapsed ? "w-10" : "w-[180px]"
+              collapsed ? "w-10" : "w-[240px]"
             }`}
           />
         </div>

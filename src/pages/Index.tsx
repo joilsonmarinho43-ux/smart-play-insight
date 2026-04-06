@@ -6,8 +6,7 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, Zap, RefreshCw, Shield, Crown, Trash2 } from 'lucide-react';
-import globeIcon from '@/assets/icon-globe.png';
+import { Loader2, Zap, RefreshCw, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const LEAGUE_LABELS: Record<string, string> = {
@@ -106,15 +105,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white pb-32 font-sans">
-      <header className="border-b border-white/10 bg-[#1e293b]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={globeIcon} alt="" className="w-5 h-5 object-contain mr-2" />
-            <div>
-              <h1 className="text-xl font-bold">ANALISTA JOILSON</h1>
-              <p className="text-[10px] text-orange-500 font-bold uppercase">MODELO REAL PRO</p>
-            </div>
-          </div>
+      <main className="container max-w-3xl mx-auto px-4">
+        {/* Controls Bar */}
+        <div className="flex items-center justify-between pt-4 pb-2">
+          <h1 className="text-lg font-bold">PRÉ-JOGO</h1>
           <div className="flex items-center gap-2">
             <button onClick={() => refetch()} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors" title="Atualizar">
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
@@ -128,19 +122,8 @@ const Index = () => {
               onChange={e => setDate(e.target.value)}
               className="bg-[#334155] text-xs p-2 rounded-lg border border-white/10"
             />
-            {profile?.is_admin && (
-              <Link to="/admin" className="p-2 bg-orange-500/10 rounded-lg hover:bg-orange-500/20 transition-colors">
-                <Shield className="w-4 h-4 text-orange-500" />
-              </Link>
-            )}
-            <button onClick={signOut} className="bg-red-500/10 text-red-500 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-500/20 transition-colors">
-              SAIR
-            </button>
           </div>
         </div>
-      </header>
-
-      <main className="container max-w-3xl mx-auto px-4">
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mt-6">
           <div className="bg-[#1e293b] rounded-xl p-4 text-center border border-white/5">

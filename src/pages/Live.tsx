@@ -380,42 +380,31 @@ const Live = () => {
 
   return (
     <div className="min-h-screen bg-[#0D1117] text-[#e6edf3]">
-      {/* ═══ HEADER ═══ */}
-      <header className="border-b border-[#30363D] bg-[#161B22]/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="container max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="p-2 hover:bg-white/5 rounded-full transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
-            <div className="flex items-center gap-2">
-              <img src={globeIcon} alt="" className="w-5 h-5 object-contain" />
-              <div>
-                <h1 className="font-bold text-lg tracking-tight text-white">SCANNER PRO</h1>
-                <p className="text-[8px] text-orange-500/70 font-bold uppercase tracking-widest">OLHO QUE TUDO VÊ · LIVE</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-lg transition-colors border ${soundEnabled ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-[#161B22] text-gray-500 border-[#30363D]'}`}
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={() => refetch()}
-              className="flex items-center gap-2 text-xs bg-[#161B22] border border-[#30363D] px-3 py-2 rounded-lg hover:bg-[#1c2333] transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
-            </button>
-            <Link
-              to="/favorites"
-              className="flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 px-3 py-2 rounded-lg hover:bg-yellow-500/20 transition-colors"
-            >
-              <Star className="w-4 h-4 fill-yellow-400" />
-              {favorites.length > 0 && <span className="font-bold">{favorites.length}</span>}
-            </Link>
-          </div>
+      {/* ═══ CONTROLS BAR ═══ */}
+      <div className="container max-w-3xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
+        <h1 className="font-bold text-lg tracking-tight text-white">SCANNER PRO</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`p-2 rounded-lg transition-colors border ${soundEnabled ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-[#161B22] text-gray-500 border-[#30363D]'}`}
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-2 text-xs bg-[#161B22] border border-[#30363D] px-3 py-2 rounded-lg hover:bg-[#1c2333] transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
+          </button>
+          <Link
+            to="/favorites"
+            className="flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 px-3 py-2 rounded-lg hover:bg-yellow-500/20 transition-colors"
+          >
+            <Star className="w-4 h-4 fill-yellow-400" />
+            {favorites.length > 0 && <span className="font-bold">{favorites.length}</span>}
+          </Link>
         </div>
-      </header>
+      </div>
 
       {/* ═══ SCANNER STATUS BAR ═══ */}
       <div className="container max-w-3xl mx-auto px-4 pt-3">

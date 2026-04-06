@@ -6,8 +6,7 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, Zap, RefreshCw, Shield, Crown, Trash2 } from 'lucide-react';
-import globeIcon from '@/assets/icon-globe.png';
+import { Loader2, Zap, RefreshCw, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const LEAGUE_LABELS: Record<string, string> = {

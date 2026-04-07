@@ -39,7 +39,7 @@ export function AppSidebar() {
           <img
             src={logoImg}
             alt="Analista Joilson"
-            className={`object-contain transition-all duration-300 ${
+            className={`object-contain transition-all duration-300 hover:drop-shadow-[0_0_20px_hsl(30,95%,55%,0.6)] hover:scale-105 ${
               collapsed ? "w-10" : "w-[240px]"
             }`}
           />

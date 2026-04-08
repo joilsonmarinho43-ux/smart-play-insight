@@ -6,8 +6,8 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, Zap, RefreshCw, Trash2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import logoImg from "@/assets/logo-analista-joilson.png";
 
 const LEAGUE_LABELS: Record<string, string> = {
   'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier',

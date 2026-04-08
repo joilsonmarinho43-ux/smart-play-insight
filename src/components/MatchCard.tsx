@@ -27,13 +27,13 @@ function StatRow({ label, home, away, format = 'decimal' }: {
   const awayWins = away > home;
 
   return (
-    <div className="flex items-center justify-between py-3 px-1">
-      <div className="w-[72px] flex justify-start">
+    <div className="flex items-center justify-between py-3.5 px-1">
+      <div className="w-[76px] flex justify-start">
         <span
-          className={`inline-flex items-center justify-center min-w-[52px] px-3.5 py-2 rounded-full text-sm font-bold tabular-nums ${
+          className={`inline-flex items-center justify-center min-w-[54px] px-3.5 py-2 rounded-full text-sm font-black tabular-nums ${
             homeWins
-              ? 'bg-[hsl(170,55%,42%)] text-white shadow-[0_2px_8px_hsl(170,55%,42%,0.35)]'
-              : 'text-foreground'
+              ? 'bg-[hsl(170,55%,38%)] text-white shadow-[0_2px_10px_hsl(170,55%,38%,0.45)]'
+              : 'bg-muted/60 text-foreground'
           }`}
         >
           {fmt(home)}
@@ -42,12 +42,12 @@ function StatRow({ label, home, away, format = 'decimal' }: {
       <span className="text-[13px] text-muted-foreground font-medium text-center flex-1 px-2">
         {label}
       </span>
-      <div className="w-[72px] flex justify-end">
+      <div className="w-[76px] flex justify-end">
         <span
-          className={`inline-flex items-center justify-center min-w-[52px] px-3.5 py-2 rounded-full text-sm font-bold tabular-nums ${
+          className={`inline-flex items-center justify-center min-w-[54px] px-3.5 py-2 rounded-full text-sm font-black tabular-nums ${
             awayWins
-              ? 'bg-primary text-primary-foreground shadow-[0_2px_8px_hsl(var(--primary)/0.35)]'
-              : 'text-foreground'
+              ? 'bg-primary text-primary-foreground shadow-[0_2px_10px_hsl(var(--primary)/0.45)]'
+              : 'bg-muted/60 text-foreground'
           }`}
         >
           {fmt(away)}
@@ -328,7 +328,7 @@ const MatchCard = ({ match }: Props) => {
   return (
     <div className="bg-card rounded-2xl border border-border overflow-hidden animate-slide-in">
       {/* HEADER */}
-      <div className="bg-secondary/50 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-border">
+      <div className="bg-secondary/50 px-5 sm:px-7 py-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Trophy className="w-4 h-4 text-primary" />
           <span className="text-xs sm:text-sm font-medium">{match.league}</span>
@@ -340,29 +340,29 @@ const MatchCard = ({ match }: Props) => {
       </div>
 
       {/* CONFIANÇA */}
-      <div className="px-4 sm:px-6 pt-3">
+      <div className="px-5 sm:px-7 pt-4">
         <SampleSizeBadge match={match} />
         <ApmXgIndicator match={match} />
       </div>
 
       {/* TIMES */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6 px-4 sm:px-8 py-5 sm:py-6">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-8 px-5 sm:px-10 py-6 sm:py-8">
         <div className="text-right">
-          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">{match.homeTeam}</h2>
-          <span className="text-xs text-[hsl(170,55%,42%)] font-semibold">{match.predictions?.homeWin}%</span>
+          <h2 className="font-display text-2xl sm:text-4xl text-foreground leading-tight font-black">{match.homeTeam}</h2>
+          <span className="text-sm text-[hsl(170,55%,42%)] font-bold mt-1 inline-block">{match.predictions?.homeWin}%</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="font-display text-2xl sm:text-4xl text-muted-foreground">VS</span>
-          <span className="text-[10px] text-muted-foreground mt-1">E {match.predictions?.draw}%</span>
+          <span className="font-display text-3xl sm:text-5xl text-muted-foreground">VS</span>
+          <span className="text-[11px] text-muted-foreground mt-1">E {match.predictions?.draw}%</span>
         </div>
         <div className="text-left">
-          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">{match.awayTeam}</h2>
-          <span className="text-xs text-primary font-semibold">{match.predictions?.awayWin}%</span>
+          <h2 className="font-display text-2xl sm:text-4xl text-foreground leading-tight font-black">{match.awayTeam}</h2>
+          <span className="text-sm text-primary font-bold mt-1 inline-block">{match.predictions?.awayWin}%</span>
         </div>
       </div>
 
       {/* TAB BUTTONS */}
-      <div className="px-4 sm:px-6 flex gap-2">
+      <div className="px-5 sm:px-7 flex gap-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -384,7 +384,7 @@ const MatchCard = ({ match }: Props) => {
       </div>
 
       {/* TAB CONTENT */}
-      <div className="px-4 sm:px-6 py-4">
+      <div className="px-5 sm:px-7 py-5">
         {activeTab === 'stats' && <StatsTab match={match} />}
         {activeTab === 'poisson' && <PoissonTab match={match} />}
         {activeTab === 'ticket' && <TicketSuggestionCard match={match} />}

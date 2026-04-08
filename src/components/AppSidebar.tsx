@@ -3,7 +3,6 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import logoImg from "@/assets/logo-analista-joilson.png";
 
 import {
   Sidebar,
@@ -34,15 +33,83 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-white/10 bg-[#0f172a]">
       <SidebarContent className="bg-[#0f172a]">
-        {/* Logo */}
-        <div className={`flex items-center justify-center px-4 pt-6 ${collapsed ? "pb-2" : "pb-6"}`}>
-          <img
-            src={logoImg}
-            alt="Analista Joilson"
-            className={`object-contain transition-all duration-300 hover:drop-shadow-[0_0_20px_hsl(30,95%,55%,0.6)] hover:scale-105 ${
-              collapsed ? "w-10" : "w-[240px]"
-            }`}
-          />
+        {/* Banner Header — geometric gradient background edge-to-edge */}
+        <div
+          className={`relative w-full overflow-hidden ${collapsed ? "py-3" : "py-8"}`}
+          style={{
+            background: "linear-gradient(135deg, #0a0a0a 0%, #1a1000 30%, #2a1800 50%, #1a1000 70%, #0a0a0a 100%)",
+          }}
+        >
+          {/* Geometric mesh overlay */}
+          <div className="absolute inset-0 opacity-30" style={{
+            backgroundImage: `
+              linear-gradient(30deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
+              linear-gradient(150deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
+              linear-gradient(30deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
+              linear-gradient(150deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
+              linear-gradient(60deg, hsl(35 70% 30% / 0.25) 25%, transparent 25.5%, transparent 75%, hsl(35 70% 30% / 0.25) 75%, hsl(35 70% 30% / 0.25)),
+              linear-gradient(60deg, hsl(35 70% 30% / 0.25) 25%, transparent 25.5%, transparent 75%, hsl(35 70% 30% / 0.25) 75%, hsl(35 70% 30% / 0.25))
+            `,
+            backgroundSize: '40px 70px',
+            backgroundPosition: '0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px',
+          }} />
+          {/* Radial glow */}
+          <div className="absolute inset-0" style={{
+            background: "radial-gradient(ellipse at center, hsl(30 90% 50% / 0.12) 0%, transparent 70%)",
+          }} />
+          {/* Horizontal gold lines */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.4)] to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.4)] to-transparent" />
+
+          {/* Brand text */}
+          {!collapsed ? (
+            <div className="relative z-10 flex flex-col items-center justify-center px-4 text-center">
+              <span
+                className="font-display text-[2.2rem] leading-[1] tracking-[0.08em] uppercase"
+                style={{
+                  background: "linear-gradient(180deg, #f5c842 0%, #e8a020 40%, #c97b18 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  filter: "drop-shadow(0 2px 8px hsl(30 90% 45% / 0.4))",
+                }}
+              >
+                Analista
+              </span>
+              <span
+                className="font-display text-[2.8rem] leading-[1] tracking-[0.1em] uppercase -mt-1"
+                style={{
+                  background: "linear-gradient(180deg, #ffd970 0%, #f5c842 30%, #d4960a 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  filter: "drop-shadow(0 2px 12px hsl(35 95% 50% / 0.5))",
+                }}
+              >
+                Joilson
+              </span>
+              <span
+                className="mt-2 text-[0.85rem] font-bold tracking-[0.25em] uppercase"
+                style={{
+                  color: "hsl(35, 60%, 55%)",
+                  textShadow: "0 0 10px hsl(30 80% 50% / 0.3)",
+                }}
+              >
+                Modelo Real Pro
+              </span>
+            </div>
+          ) : (
+            <div className="relative z-10 flex items-center justify-center">
+              <span
+                className="font-display text-2xl font-black"
+                style={{
+                  background: "linear-gradient(180deg, #f5c842 0%, #d4960a 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                AJ
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}

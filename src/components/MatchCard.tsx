@@ -328,7 +328,7 @@ const MatchCard = ({ match }: Props) => {
   return (
     <div className="bg-card rounded-2xl border border-border overflow-hidden animate-slide-in">
       {/* HEADER */}
-      <div className="bg-secondary/50 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-border">
+      <div className="bg-secondary/50 px-5 sm:px-7 py-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Trophy className="w-4 h-4 text-primary" />
           <span className="text-xs sm:text-sm font-medium">{match.league}</span>
@@ -340,24 +340,24 @@ const MatchCard = ({ match }: Props) => {
       </div>
 
       {/* CONFIANÇA */}
-      <div className="px-4 sm:px-6 pt-3">
+      <div className="px-5 sm:px-7 pt-4">
         <SampleSizeBadge match={match} />
         <ApmXgIndicator match={match} />
       </div>
 
       {/* TIMES */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6 px-4 sm:px-8 py-5 sm:py-6">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-8 px-5 sm:px-10 py-6 sm:py-8">
         <div className="text-right">
-          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">{match.homeTeam}</h2>
-          <span className="text-xs text-[hsl(170,55%,42%)] font-semibold">{match.predictions?.homeWin}%</span>
+          <h2 className="font-display text-2xl sm:text-4xl text-foreground leading-tight font-black">{match.homeTeam}</h2>
+          <span className="text-sm text-[hsl(170,55%,42%)] font-bold mt-1 inline-block">{match.predictions?.homeWin}%</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="font-display text-2xl sm:text-4xl text-muted-foreground">VS</span>
-          <span className="text-[10px] text-muted-foreground mt-1">E {match.predictions?.draw}%</span>
+          <span className="font-display text-3xl sm:text-5xl text-muted-foreground">VS</span>
+          <span className="text-[11px] text-muted-foreground mt-1">E {match.predictions?.draw}%</span>
         </div>
         <div className="text-left">
-          <h2 className="font-display text-xl sm:text-3xl text-foreground leading-tight">{match.awayTeam}</h2>
-          <span className="text-xs text-primary font-semibold">{match.predictions?.awayWin}%</span>
+          <h2 className="font-display text-2xl sm:text-4xl text-foreground leading-tight font-black">{match.awayTeam}</h2>
+          <span className="text-sm text-primary font-bold mt-1 inline-block">{match.predictions?.awayWin}%</span>
         </div>
       </div>
 

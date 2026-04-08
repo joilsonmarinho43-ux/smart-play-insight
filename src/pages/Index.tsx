@@ -125,16 +125,11 @@ const Index = () => {
           </div>
         </div>
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mt-6">
+        <div className="mt-6">
           <div className="bg-[#1e293b] rounded-xl p-4 text-center border border-white/5">
             <p className="text-xs text-gray-400">Jogos Carregados</p>
             <p className="text-3xl font-black text-orange-500 tabular-nums">{safeMatches.length}</p>
           </div>
-          <Link to="/live" className="bg-gradient-to-br from-orange-600 to-red-600 rounded-xl flex flex-col items-center justify-center hover:from-orange-500 hover:to-red-500 transition-all active:scale-[0.97]">
-            <Zap className="w-6 h-6 mb-1" />
-            <span className="font-black text-sm">LIVE TRADER</span>
-            <span className="text-[10px] opacity-80">Pressão em tempo real</span>
-          </Link>
         </div>
 
         {/* League Filter */}

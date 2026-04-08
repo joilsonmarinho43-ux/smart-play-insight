@@ -362,7 +362,7 @@ const MatchCard = ({ match }: Props) => {
       </div>
 
       {/* TAB BUTTONS */}
-      <div className="px-4 sm:px-6 flex gap-2">
+      <div className="px-5 sm:px-7 flex gap-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -384,7 +384,7 @@ const MatchCard = ({ match }: Props) => {
       </div>
 
       {/* TAB CONTENT */}
-      <div className="px-4 sm:px-6 py-4">
+      <div className="px-5 sm:px-7 py-5">
         {activeTab === 'stats' && <StatsTab match={match} />}
         {activeTab === 'poisson' && <PoissonTab match={match} />}
         {activeTab === 'ticket' && <TicketSuggestionCard match={match} />}

@@ -206,7 +206,7 @@ const Index = () => {
         )}
 
         {/* Match Cards */}
-        <div className="mt-6 space-y-4">
+        <div className="mt-8 space-y-6">
           {filteredMatches.map((match: any) => (
             <MatchCard key={match.id} match={match} />
           ))}

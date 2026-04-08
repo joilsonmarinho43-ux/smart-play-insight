@@ -125,29 +125,17 @@ const Index = () => {
           </div>
         </div>
         {/* Stats */}
-        {/* Identity Banner */}
-        <div className="mt-6 relative overflow-hidden rounded-2xl border border-[hsl(30,60%,30%,0.4)] shadow-2xl"
-          style={{
-            background: "linear-gradient(135deg, hsl(220,20%,12%) 0%, hsl(25,30%,14%) 50%, hsl(220,20%,12%) 100%)",
-          }}
-        >
-          <div className="absolute inset-0 opacity-20" style={{
-            backgroundImage: `
-              linear-gradient(30deg, hsl(30 80% 40% / 0.12) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.12) 87.5%),
-              linear-gradient(150deg, hsl(30 80% 40% / 0.12) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.12) 87.5%),
-              linear-gradient(60deg, hsl(35 70% 30% / 0.2) 25%, transparent 25.5%, transparent 75%, hsl(35 70% 30% / 0.2) 75%)
-            `,
-            backgroundSize: '40px 70px',
-          }} />
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.5)] to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.3)] to-transparent" />
-          <div className="relative z-10 flex items-center gap-5 px-5 py-5">
-            <img src={logoImg} alt="Analista Joilson" className="w-24 h-24 object-contain shrink-0 drop-shadow-[0_0_15px_hsl(30,90%,50%,0.3)]" />
-            <div className="flex flex-col items-start">
-              <span className="text-xs text-muted-foreground uppercase tracking-widest">Análise Pré-Jogo</span>
-              <span className="text-4xl font-black text-primary tabular-nums leading-none mt-1">{safeMatches.length}</span>
-              <span className="text-sm text-muted-foreground font-medium mt-0.5">jogos carregados</span>
-            </div>
+        {/* Identity Banner — Logo as full background */}
+        <div className="mt-6 relative overflow-hidden rounded-2xl border border-[hsl(30,60%,30%,0.4)] shadow-2xl">
+          <img
+            src={logoImg}
+            alt="Analista Joilson"
+            className="w-full h-auto block rounded-2xl"
+          />
+          {/* Floating match count badge */}
+          <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-primary/30">
+            <span className="text-2xl font-black text-primary tabular-nums leading-none">{safeMatches.length}</span>
+            <span className="text-[10px] text-muted-foreground ml-1.5">jogos</span>
           </div>
         </div>
 

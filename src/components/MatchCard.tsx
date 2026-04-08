@@ -326,7 +326,7 @@ const MatchCard = ({ match }: Props) => {
   ];
 
   return (
-    <div className="bg-card rounded-2xl border border-border overflow-hidden animate-slide-in">
+    <div className="bg-card rounded-3xl border border-border overflow-hidden animate-slide-in shadow-2xl shadow-black/20">
       {/* HEADER */}
       <div className="bg-secondary/50 px-5 sm:px-7 py-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-2 text-muted-foreground">

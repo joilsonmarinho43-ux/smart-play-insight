@@ -20,8 +20,8 @@ const GoalSparkline = ({ data, color, label }: Props) => {
           <AreaChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: 2 }}>
             <defs>
               <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.4} />
-                <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+                <stop offset="0%" stopColor={color} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={color} stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <ReferenceLine y={avg} stroke={color} strokeOpacity={0.3} strokeDasharray="2 2" />

@@ -6,8 +6,8 @@ import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, Zap, RefreshCw, Trash2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import logoImg from "@/assets/logo-analista-joilson.png";
 
 const LEAGUE_LABELS: Record<string, string> = {
   'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier',
@@ -125,16 +125,35 @@ const Index = () => {
           </div>
         </div>
         {/* Stats */}
-        <div className="mt-6">
-          <div className="bg-[#1e293b] rounded-xl p-4 text-center border border-white/5">
-            <p className="text-xs text-gray-400">Jogos Carregados</p>
-            <p className="text-3xl font-black text-orange-500 tabular-nums">{safeMatches.length}</p>
+        {/* Identity Banner */}
+        <div className="mt-6 relative overflow-hidden rounded-2xl border border-[hsl(30,60%,30%,0.4)] shadow-2xl"
+          style={{
+            background: "linear-gradient(135deg, hsl(220,20%,12%) 0%, hsl(25,30%,14%) 50%, hsl(220,20%,12%) 100%)",
+          }}
+        >
+          <div className="absolute inset-0 opacity-20" style={{
+            backgroundImage: `
+              linear-gradient(30deg, hsl(30 80% 40% / 0.12) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.12) 87.5%),
+              linear-gradient(150deg, hsl(30 80% 40% / 0.12) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.12) 87.5%),
+              linear-gradient(60deg, hsl(35 70% 30% / 0.2) 25%, transparent 25.5%, transparent 75%, hsl(35 70% 30% / 0.2) 75%)
+            `,
+            backgroundSize: '40px 70px',
+          }} />
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.5)] to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.3)] to-transparent" />
+          <div className="relative z-10 flex items-center gap-5 px-5 py-5">
+            <img src={logoImg} alt="Analista Joilson" className="w-24 h-24 object-contain shrink-0 drop-shadow-[0_0_15px_hsl(30,90%,50%,0.3)]" />
+            <div className="flex flex-col items-start">
+              <span className="text-xs text-muted-foreground uppercase tracking-widest">Análise Pré-Jogo</span>
+              <span className="text-4xl font-black text-primary tabular-nums leading-none mt-1">{safeMatches.length}</span>
+              <span className="text-sm text-muted-foreground font-medium mt-0.5">jogos carregados</span>
+            </div>
           </div>
         </div>
 
         {/* League Filter */}
         {availableLeagues.length > 1 && (
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="mt-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             <button
               onClick={() => setSelectedLeague('all')}
               className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
@@ -187,7 +206,7 @@ const Index = () => {
         )}
 
         {/* Match Cards */}
-        <div className="mt-6 space-y-4">
+        <div className="mt-8 space-y-6">
           {filteredMatches.map((match: any) => (
             <MatchCard key={match.id} match={match} />
           ))}

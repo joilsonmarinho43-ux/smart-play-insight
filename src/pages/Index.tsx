@@ -7,7 +7,7 @@ import ElitePanel from '@/components/ElitePanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
-import logoImg from "@/assets/logo-analista-joilson.png";
+import bannerImg from "@/assets/banner-hero.jpg";
 
 const LEAGUE_LABELS: Record<string, string> = {
   'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier',
@@ -128,7 +128,7 @@ const Index = () => {
         {/* Identity Banner — Logo as full background */}
         <div className="mt-6 relative overflow-hidden rounded-2xl border border-[hsl(30,60%,30%,0.4)] shadow-2xl">
           <img
-            src={logoImg}
+            src={bannerImg}
             alt="Analista Joilson"
             className="w-full h-auto block rounded-2xl"
           />

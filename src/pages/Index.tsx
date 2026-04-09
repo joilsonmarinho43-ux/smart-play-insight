@@ -105,7 +105,7 @@ const Index = () => {
   }, [safeMatches, selectedLeague]);
 
   return (
-    <div className="min-h-screen text-white pb-32 font-sans relative">
+    <div className="min-h-screen text-white pb-8 font-sans relative">
       {/* Full-screen circuit background */}
       <div
         className="fixed inset-0 z-0"

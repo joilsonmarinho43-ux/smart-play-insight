@@ -105,36 +105,46 @@ const Index = () => {
   }, [safeMatches, selectedLeague]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white pb-32 font-sans">
-      <main className="container max-w-3xl mx-auto px-4">
+    <div className="min-h-screen text-white pb-32 font-sans relative">
+      {/* Full-screen circuit background */}
+      <div
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundImage: `url(${bgPattern})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+      <div className="fixed inset-0 z-0 bg-black/40" />
+
+      <main className="container max-w-3xl mx-auto px-4 relative z-10">
         {/* Controls Bar */}
         <div className="flex items-center justify-between pt-4 pb-2">
           <h1 className="text-lg font-bold">PRÉ-JOGO</h1>
           <div className="flex items-center gap-2">
-            <button onClick={() => refetch()} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors" title="Atualizar">
+            <button onClick={() => refetch()} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
             </button>
-            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors" title="Limpar cache">
+            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
               <Trash2 className="w-4 h-4 text-gray-400" />
             </button>
             <input
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="bg-[#334155] text-xs p-2 rounded-lg border border-white/10"
+              className="bg-black/40 backdrop-blur-sm text-xs p-2 rounded-lg border border-orange-500/20"
             />
           </div>
         </div>
-        {/* Stats */}
-        {/* Identity Banner — Logo as full background */}
-        <div className="mt-6 relative overflow-hidden rounded-2xl border border-[hsl(30,60%,30%,0.4)] shadow-2xl">
+        {/* Identity Banner — seamlessly integrated */}
+        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-orange-500/10">
           <img
             src={bannerImg}
             alt="Analista Joilson"
             className="w-full h-auto block rounded-2xl"
           />
-          {/* Floating match count badge */}
-          <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-primary/30">
+          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-orange-500/30">
             <span className="text-2xl font-black text-primary tabular-nums leading-none">{safeMatches.length}</span>
             <span className="text-[10px] text-muted-foreground ml-1.5">jogos</span>
           </div>

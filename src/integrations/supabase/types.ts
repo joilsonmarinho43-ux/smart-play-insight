@@ -41,6 +41,27 @@ export type Database = {
         }
         Relationships: []
       }
+      cache_api: {
+        Row: {
+          cache_key: string
+          dados_json: Json
+          status_jogo: string
+          ultima_atualizacao: string
+        }
+        Insert: {
+          cache_key: string
+          dados_json?: Json
+          status_jogo?: string
+          ultima_atualizacao?: string
+        }
+        Update: {
+          cache_key?: string
+          dados_json?: Json
+          status_jogo?: string
+          ultima_atualizacao?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

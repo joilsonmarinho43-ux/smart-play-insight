@@ -127,6 +127,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_cache_api: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {

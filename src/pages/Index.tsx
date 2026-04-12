@@ -43,14 +43,23 @@ const Index = () => {
       const hasHome = hGF > 0 || hGA > 0;
       const hasAway = aGF > 0 || aGA > 0;
 
-      // Poisson real para predictions
-      const leagueAvg = 1.35;
-      const homeLambda = hGF > 0 && aGA > 0
-        ? (hGF / leagueAvg) * (aGA / leagueAvg) * leagueAvg
-        : hGF || 1.2;
-      const awayLambda = aGF > 0 && hGA > 0
-        ? (aGF / leagueAvg) * (hGA / leagueAvg) * leagueAvg
-        : aGF || 0.9;
+      // Dynamic league avg from backend (Bayesian regression already applied server-side)
+      const leagueAvg = hStats.leagueAvg || aStats.leagueAvg || 1.30;
+      const homeN = hStats.gamesCount || (hasHome ? 5 : 0);
+      const awayN = aStats.gamesCount || (hasAway ? 5 : 0);
+      const k = 3;
+      // Bayesian regression for frontend predictions
+      const adjHGF = homeN > 0 ? (homeN * hGF + k * leagueAvg) / (homeN + k) : leagueAvg;
+      const adjAGF = awayN > 0 ? (awayN * aGF + k * leagueAvg) / (awayN + k) : leagueAvg;
+      const adjHGA = homeN > 0 ? (homeN * hGA + k * leagueAvg) / (homeN + k) : leagueAvg;
+      const adjAGA = awayN > 0 ? (awayN * aGA + k * leagueAvg) / (awayN + k) : leagueAvg;
+
+      const homeLambda = adjHGF > 0 && adjAGA > 0
+        ? (adjHGF / leagueAvg) * (adjAGA / leagueAvg) * leagueAvg
+        : adjHGF;
+      const awayLambda = adjAGF > 0 && adjHGA > 0
+        ? (adjAGF / leagueAvg) * (adjHGA / leagueAvg) * leagueAvg
+        : adjAGF;
       const totalLambda = homeLambda + awayLambda;
 
       // Probabilidades via força relativa (não inventada)

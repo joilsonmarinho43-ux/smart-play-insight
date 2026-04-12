@@ -8,6 +8,16 @@ const corsHeaders = {
 
 const BASE_URL = "https://v3.football.api-sports.io";
 
+// ========================
+// GLOBAL API CALL COUNTER (per invocation)
+// ========================
+let apiCallCount = 0;
+const API_CALL_LIMIT = 120;
+
+function canCallAPI(): boolean {
+  return apiCallCount < API_CALL_LIMIT;
+}
+
 // In-memory cache (fast, per-instance, complements DB cache)
 const memCache = new Map<string, { timestamp: number; data: any }>();
 
@@ -25,7 +35,6 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 // ========================
 // SUPABASE DB CACHE LAYER
 // ========================
-// TTLs in milliseconds
 const CACHE_TTL = {
   LIVE: 2 * 60 * 1000,        // 2 minutes
   PRE: 12 * 60 * 60 * 1000,   // 12 hours
@@ -51,10 +60,10 @@ async function dbCacheGet(cacheKey: string, statusJogo: string): Promise<any | n
     if (error || !data) return null;
 
     const ttl = CACHE_TTL[data.status_jogo as keyof typeof CACHE_TTL] ?? CACHE_TTL.PRE;
-    if (ttl === Infinity) return data.dados_json; // FINISHED never expires
+    if (ttl === Infinity) return data.dados_json;
 
     const age = Date.now() - new Date(data.ultima_atualizacao).getTime();
-    if (age > ttl) return null; // Expired
+    if (age > ttl) return null;
 
     return data.dados_json;
   } catch (e) {
@@ -103,7 +112,12 @@ function getLeagueDisplayName(leagueId: number, fallbackName: string): string {
 }
 
 async function fetchWithAuth(endpoint: string, apiKey: string): Promise<any> {
-  console.log(`API call: ${endpoint}`);
+  if (!canCallAPI()) {
+    console.warn(`API LIMIT REACHED (${apiCallCount}/${API_CALL_LIMIT}). Blocking: ${endpoint}`);
+    return { response: [] };
+  }
+  apiCallCount++;
+  console.log(`API call #${apiCallCount}: ${endpoint}`);
   const res = await fetch(`${BASE_URL}/${endpoint}`, {
     headers: { "x-apisports-key": apiKey },
   });
@@ -135,18 +149,43 @@ function getStat(stats: any[], name: string): number {
   return val === null || val === undefined ? 0 : Number(String(val).replace('%', ''));
 }
 
+// ========================
+// shouldFetchStats — Smart filter for LIVE stats
+// ========================
+function shouldFetchLiveStats(
+  match: any,
+  leagueId: number
+): boolean {
+  if (!LEAGUES_WITH_STATS.has(leagueId)) return false;
+
+  const minute = match?.fixture?.status?.elapsed || 0;
+  if (minute < 10) return false; // Too early, no useful data
+
+  const homeGoals = match?.goals?.home ?? 0;
+  const awayGoals = match?.goals?.away ?? 0;
+  const isCloseScore = Math.abs(homeGoals - awayGoals) <= 1;
+  const hasGoals = homeGoals + awayGoals > 0;
+
+  // Always fetch if close score or has goals (interesting game)
+  if (isCloseScore || hasGoals) return true;
+
+  // For 0-0 games, only fetch after 15 min
+  if (minute >= 15) return true;
+
+  return false;
+}
+
 async function fetchLeagueRecentFixtures(leagueId: number, apiKey: string): Promise<any[]> {
   const ck = `league_recent_${leagueId}`;
   
-  // 1) Memory cache (1h)
   const memCached = memGet(ck, 3600000);
   if (memCached) return memCached;
 
-  // 2) DB cache (12h — PRE type)
   const dbCached = await dbCacheGet(ck, "PRE");
   if (dbCached) { memSet(ck, dbCached); return dbCached; }
 
-  // 3) API call
+  if (!canCallAPI()) return [];
+
   const year = new Date().getFullYear();
   let games: any[] = [];
 
@@ -156,7 +195,7 @@ async function fetchLeagueRecentFixtures(leagueId: number, apiKey: string): Prom
     );
     games = data?.response || [];
 
-    if (games.length < 20) {
+    if (games.length < 20 && canCallAPI()) {
       await delay(200);
       const data2 = await fetchWithAuth(
         `fixtures?league=${leagueId}&season=${year - 1}&status=FT&last=50`, apiKey
@@ -171,6 +210,29 @@ async function fetchLeagueRecentFixtures(leagueId: number, apiKey: string): Prom
   memSet(ck, games);
   await dbCacheSet(ck, games, "PRE");
   return games;
+}
+
+// ========================
+// DYNAMIC LEAGUE AVERAGE (replaces fixed 1.35)
+// ========================
+function calculateLeagueAvgGoals(pool: any[]): number {
+  if (pool.length === 0) return 1.30; // Conservative fallback only when no data at all
+  
+  let totalGoals = 0;
+  let count = 0;
+  for (const g of pool) {
+    const hg = g.goals?.home ?? 0;
+    const ag = g.goals?.away ?? 0;
+    if (hg + ag >= 0) {
+      totalGoals += hg + ag;
+      count++;
+    }
+  }
+  
+  if (count === 0) return 1.30;
+  const avgPerTeam = (totalGoals / count) / 2;
+  // Clamp between 0.8 and 2.0 to prevent outliers
+  return Math.max(0.8, Math.min(2.0, Number(avgPerTeam.toFixed(3))));
 }
 
 function calcTeamStatsFromPool(pool: any[], teamId: number): any {
@@ -195,10 +257,22 @@ function calcTeamStatsFromPool(pool: any[], teamId: number): any {
   }
 
   const count = teamGames.length;
+
+  // Bayesian regression: lambda_adj = (n * team_avg + k * league_avg) / (n + k)
+  const leagueAvg = calculateLeagueAvgGoals(pool);
+  const k = 3; // regression weight
+  const rawGF = goalsFor / count;
+  const rawGA = goalsAgainst / count;
+  const adjGF = Number(((count * rawGF + k * leagueAvg) / (count + k)).toFixed(3));
+  const adjGA = Number(((count * rawGA + k * leagueAvg) / (count + k)).toFixed(3));
+
   return {
-    goalsFor: Number((goalsFor / count).toFixed(2)),
-    goalsAgainst: Number((goalsAgainst / count).toFixed(2)),
+    goalsFor: adjGF,
+    goalsAgainst: adjGA,
+    rawGoalsFor: Number(rawGF.toFixed(2)),
+    rawGoalsAgainst: Number(rawGA.toFixed(2)),
     gamesCount: count,
+    leagueAvg,
     totalShots: 0, shotsOnGoal: 0, corners: 0, possession: 0,
     fouls: 0, yellowCards: 0, offsides: 0, bigChances: 0,
     recentGoalsFor, recentGoalsAgainst,
@@ -213,32 +287,31 @@ async function enrichWithDetailedStats(
 
   const teamGames = pool
     .filter((g: any) => g.teams.home.id === teamId || g.teams.away.id === teamId)
-    .slice(0, 5);
+    .slice(0, 3); // LIMIT: only 3 recent games for stats (saves API credits)
 
   let totalShots = 0, shotsOnGoal = 0, corners = 0, possession = 0;
   let fouls = 0, yellowCards = 0, offsides = 0, bigChances = 0;
   let statsCount = 0;
 
   for (const g of teamGames) {
+    if (!canCallAPI()) break; // Respect global limit
+
     const fId = g.fixture.id;
     const ck = `fstats_${fId}`;
 
-    // 1) Memory cache
     let fStats = memGet(ck, 86400000);
 
-    // 2) DB cache (FINISHED — never expires for past fixtures)
     if (!fStats) {
       const dbData = await dbCacheGet(ck, "FINISHED");
       if (dbData) { fStats = dbData; memSet(ck, dbData); }
     }
 
-    // 3) API call
     if (!fStats) {
       try {
         const data = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
         fStats = data?.response || [];
         memSet(ck, fStats);
-        await dbCacheSet(ck, fStats, "FINISHED"); // Past fixture stats never change
+        await dbCacheSet(ck, fStats, "FINISHED");
         await delay(80);
       } catch { continue; }
     }
@@ -275,6 +348,9 @@ async function enrichWithDetailedStats(
 }
 
 serve(async (req) => {
+  // Reset counter per invocation
+  apiCallCount = 0;
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -293,20 +369,17 @@ serve(async (req) => {
     if (fixtureId) {
       const dbCk = `stats_${fixtureId}`;
 
-      // 1) Memory (20s)
       const memCached = memGet(dbCk, 20000);
       if (memCached) {
         return new Response(JSON.stringify(memCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // 2) DB cache (STATS — 24h)
       const dbCached = await dbCacheGet(dbCk, "STATS");
       if (dbCached) {
         memSet(dbCk, dbCached);
         return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // 3) API
       const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
       const responseData = { response: sData?.response || [] };
       memSet(dbCk, responseData);
@@ -318,7 +391,6 @@ serve(async (req) => {
     if (isLive) {
       const liveCk = "live_all";
 
-      // 1) Memory (30s)
       const memCached = memGet("live_v3", 30000);
       if (memCached) {
         const allHaveStats = memCached.matches.every((m: any) => m.stats?.home !== null || m.stats?.away !== null);
@@ -328,14 +400,12 @@ serve(async (req) => {
         memCache.delete("live_v3");
       }
 
-      // 2) DB cache (LIVE — 2 min)
       const dbCached = await dbCacheGet(liveCk, "LIVE");
       if (dbCached) {
         memSet("live_v3", dbCached);
         return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // 3) API
       const fixturesData = await fetchWithAuth("fixtures?live=all", apiKey);
       const fixtures = fixturesData?.response || [];
       console.log(`Live: ${fixtures.length} fixtures found`);
@@ -348,16 +418,15 @@ serve(async (req) => {
         const leagueId = j.league?.id;
         let stats = { home: null as any, away: null as any };
 
-        const shouldFetchStats = LEAGUES_WITH_STATS.has(leagueId);
-
-        if (shouldFetchStats) {
+        // Smart filter: only fetch stats for relevant games
+        if (shouldFetchLiveStats(j, leagueId)) {
           const fStatsCk = `live_fstats_${fId}`;
           const cachedFStats = memGet(fStatsCk, 30000) || await dbCacheGet(fStatsCk, "LIVE");
 
           if (cachedFStats) {
             stats = cachedFStats;
             memSet(fStatsCk, cachedFStats);
-          } else {
+          } else if (canCallAPI()) {
             try {
               const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
               const resS = sData?.response || [];
@@ -385,7 +454,7 @@ serve(async (req) => {
         }
       }
 
-      console.log(`Live: returning ${matches.length} matches, ${matches.filter((m: any) => m.stats?.home !== null).length} with stats`);
+      console.log(`Live: returning ${matches.length} matches, ${matches.filter((m: any) => m.stats?.home !== null).length} with stats. API calls: ${apiCallCount}`);
       const responseData = { matches };
       memSet("live_v3", responseData);
       await dbCacheSet(liveCk, responseData, "LIVE");
@@ -395,14 +464,12 @@ serve(async (req) => {
     // ========== PRE-MATCH fixtures ==========
     const preCk = `date_${date}`;
 
-    // 1) Memory (2h)
     const memCached = memGet(`date_v14_${date}`, 7200000);
     if (memCached) {
       console.log("Memory cache hit (pre)");
       return new Response(JSON.stringify(memCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 2) DB cache (PRE — 12h)
     const dbCached = await dbCacheGet(preCk, "PRE");
     if (dbCached) {
       console.log("DB cache hit (pre)");
@@ -410,7 +477,6 @@ serve(async (req) => {
       return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 3) API
     const fixturesData = await fetchWithAuth(`fixtures?date=${date}`, apiKey);
     let fixtures = fixturesData?.response || [];
     console.log(`Got ${fixtures.length} total fixtures`);
@@ -425,6 +491,7 @@ serve(async (req) => {
 
     const leaguePools = new Map<number, any[]>();
     for (const leagueId of neededLeagues) {
+      if (!canCallAPI()) break;
       const pool = await fetchLeagueRecentFixtures(leagueId, apiKey);
       leaguePools.set(leagueId, pool);
       await delay(200);
@@ -443,6 +510,7 @@ serve(async (req) => {
 
     for (const [teamId, stats] of teamStatsCache) {
       if (!stats) continue;
+      if (!canCallAPI()) break;
       const leagueId = fixtures.find(
         (f: any) => f.teams.home.id === teamId || f.teams.away.id === teamId
       )?.league?.id;
@@ -463,7 +531,7 @@ serve(async (req) => {
       stats: { home: null, away: null },
     }));
 
-    console.log(`Returning ${matches.length} matches with stats`);
+    console.log(`Returning ${matches.length} matches. API calls used: ${apiCallCount}`);
     const responseData = { matches };
     memSet(`date_v14_${date}`, responseData);
     await dbCacheSet(preCk, responseData, "PRE");

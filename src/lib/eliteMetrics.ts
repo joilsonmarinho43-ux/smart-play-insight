@@ -1,9 +1,18 @@
 /**
  * ELITE METRICS ENGINE — Métricas de Analista Profissional
  * AP5/AP10, Periculosidade, Gol Iminente, Desvio de Odds
+ * COM: Proxy para DA=0, Goal Signal upgrade, conversão corrigida
  */
 
 import type { LiveStats, PISnapshot } from './pressureEngine';
+
+// ═══ DA PROXY: When dangerousAttacks is 0, use shots+corners as proxy ═══
+function getEffectiveDA(stats: LiveStats | null): number {
+  if (!stats) return 0;
+  if (stats.dangerousAttacks > 0) return stats.dangerousAttacks;
+  // Fallback proxy: shots * 1.5 + corners * 2
+  return (stats.totalShots || 0) * 1.5 + (stats.corners || 0) * 2;
+}
 
 // ═══ NORMALIZAÇÃO DE PRESSÃO (0-100) ═══
 export function normalizePressure(rawPI: number): number {
@@ -41,10 +50,7 @@ export function calculateAPWindows(
   };
 }
 
-// ═══ ÍNDICE DE PERICULOSIDADE (Danger Level) ═══
-// Fórmula: média ponderada dos últimos 5 min:
-// (Ataques Perigosos * 3) + (Escanteios * 5) + (Chutes no Gol * 10)
-// Normalizado de 0 a 100. Acima de 70 → alerta "GOL IMINENTE"
+// ═══ ÍNDICE DE PERICULOSIDADE (with DA proxy fallback) ═══
 export interface PericulosityData {
   home: number;
   away: number;
@@ -60,12 +66,13 @@ export function calculatePericulosity(
   const h = homeStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
   const a = awayStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
 
-  // Nova fórmula conforme especificação:
-  // (Ataques Perigosos * 3) + (Escanteios * 5) + (Chutes no Gol * 10)
-  const homeRaw = (h.dangerousAttacks * 3) + (h.corners * 5) + (h.shotsOnGoal * 10);
-  const awayRaw = (a.dangerousAttacks * 3) + (a.corners * 5) + (a.shotsOnGoal * 10);
+  // Use effective DA (with proxy fallback)
+  const hDA = getEffectiveDA(homeStats);
+  const aDA = getEffectiveDA(awayStats);
 
-  // Normaliza para 0-100 via sigmoid
+  const homeRaw = (hDA * 3) + (h.corners * 5) + (h.shotsOnGoal * 10);
+  const awayRaw = (aDA * 3) + (a.corners * 5) + (a.shotsOnGoal * 10);
+
   const normalize = (v: number) => Math.round(Math.min(100, (v / (v + 50)) * 100) * 10) / 10;
 
   const homeNorm = normalize(homeRaw);
@@ -82,13 +89,16 @@ export function calculatePericulosity(
   };
 }
 
-// ═══ GOL IMINENTE (Imminent Goal Score) ═══
+// ═══ GOL IMINENTE UPGRADE ═══
 export interface ImminentGoalData {
   score: number;
   isTriggered: boolean;
   reason: string;
 }
 
+/**
+ * Enhanced goalSignal: triggers if pressure > 70 AND shotsOnGoal >= 4 AND minute >= 20
+ */
 export function detectImminentGoal(
   stats: LiveStats | null,
   minute: number,
@@ -97,39 +107,30 @@ export function detectImminentGoal(
   if (!stats) return { score: 0, isTriggered: false, reason: 'Sem dados' };
   const s = stats;
   const safeMin = Math.max(minute, 1);
+  const effectiveDA = getEffectiveDA(stats);
 
-  // ═══ STRICT RULES — Only trigger with REAL pressure ═══
-  // Rule: DA ≥ 8 is mandatory for trigger
-  if (s.dangerousAttacks < 8) {
-    // Calculate score but never trigger
-    const rawScore = Math.round(Math.min(60,
-      (s.shotsOnGoal * 5) + (s.dangerousAttacks * 2) + (s.corners * 2) + (ap5 * 0.1)
-    ));
-    const reasons: string[] = [];
-    if (s.shotsOnGoal >= 2) reasons.push(`${s.shotsOnGoal} chutes no gol`);
-    if (s.dangerousAttacks >= 3) reasons.push(`${s.dangerousAttacks} at. perigosos`);
-    return { score: rawScore, isTriggered: false, reason: reasons.length > 0 ? reasons.join(', ') : 'Sem pressão significativa' };
-  }
-
-  // Calculate pressure differential
+  // Calculate score with proxy DA
   const shotsWeight = Math.min(25, s.shotsOnGoal * 5);
-  const dangerousWeight = Math.min(30, (s.dangerousAttacks / safeMin) * 35);
+  const dangerousWeight = Math.min(30, (effectiveDA / safeMin) * 35);
   const possessionWeight = s.possession > 60 ? 15 : s.possession > 55 ? 8 : 0;
   const ap5Weight = Math.min(15, ap5 * 0.2);
   const cornersWeight = Math.min(10, s.corners * 2);
-  const rhythmBonus = (s.dangerousAttacks / safeMin) > 1.0 ? 10 : 0; // Growing offensive rhythm
+  const rhythmBonus = (effectiveDA / safeMin) > 1.0 ? 10 : 0;
 
   const score = Math.round(Math.min(100, shotsWeight + dangerousWeight + possessionWeight + ap5Weight + cornersWeight + rhythmBonus));
 
-  // Strict trigger: score ≥ 70 AND continuous pressure (AP5 > 40) AND growing rhythm
+  // Enhanced goal signal: pressure > 70 AND shotsOnGoal >= 4 AND minute >= 20
+  const pressureHigh = score > 70;
+  const enoughShots = s.shotsOnGoal >= 4;
+  const gameInProgress = minute >= 20;
   const hasContinuousPressure = ap5 > 40;
-  const hasGrowingRhythm = (s.dangerousAttacks / safeMin) > 0.6;
-  const isTriggered = score >= 70 && hasContinuousPressure && hasGrowingRhythm;
+  
+  const isTriggered = pressureHigh && enoughShots && gameInProgress && hasContinuousPressure;
 
   const reasons: string[] = [];
-  if (s.dangerousAttacks >= 8) reasons.push(`${s.dangerousAttacks} at. perigosos`);
+  if (effectiveDA >= 8) reasons.push(`${Math.round(effectiveDA)} at. perigosos`);
   if (s.shotsOnGoal >= 3) reasons.push(`${s.shotsOnGoal} chutes no gol`);
-  if ((s.dangerousAttacks / safeMin) > 0.8) reasons.push(`ritmo ofensivo crescente`);
+  if ((effectiveDA / safeMin) > 0.8) reasons.push(`ritmo ofensivo crescente`);
   if (s.possession > 60) reasons.push(`${s.possession}% posse`);
   if (ap5 > 60) reasons.push(`AP5 em ${ap5.toFixed(0)}`);
 
@@ -141,7 +142,6 @@ export function detectImminentGoal(
 }
 
 // ═══ DESVIO DE ODDS (Poisson em tempo real) ═══
-// REGRA: Proibido exibir 0% ou 100% enquanto a bola estiver rolando
 export interface OddsDeviation {
   homeWinPoisson: number;
   drawPoisson: number;
@@ -162,7 +162,6 @@ function factorial(n: number): number {
   return r;
 }
 
-// Clamp: nunca 0% ou 100% durante jogo
 function clampLiveProb(p: number): number {
   return Math.min(99, Math.max(1, p));
 }
@@ -185,8 +184,9 @@ export function calculateLiveOddsDeviation(
   const homeShotsPerMin = h.totalShots / safeMin;
   const awayShotsPerMin = a.totalShots / safeMin;
 
-  const homeLambdaRemaining = homeShotsPerMin * homeConversion * remainingMin * 0.12;
-  const awayLambdaRemaining = awayShotsPerMin * awayConversion * remainingMin * 0.12;
+  // Corrected conversion factor: 0.10 instead of 0.12
+  const homeLambdaRemaining = homeShotsPerMin * homeConversion * remainingMin * 0.10;
+  const awayLambdaRemaining = awayShotsPerMin * awayConversion * remainingMin * 0.10;
 
   let homeWin = 0, draw = 0, awayWin = 0;
   const maxGoals = 5;
@@ -206,7 +206,6 @@ export function calculateLiveOddsDeviation(
   let homeP = clampLiveProb(Math.round((homeWin / total) * 100));
   let drawP = clampLiveProb(Math.round((draw / total) * 100));
   let awayP = clampLiveProb(100 - homeP - drawP);
-  // Re-clamp after subtraction
   awayP = clampLiveProb(awayP);
 
   const margin = 0.92;

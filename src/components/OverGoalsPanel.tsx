@@ -2,6 +2,7 @@
  * Painel de probabilidades Over 0.5 / 1.5 / 2.5 / 3.5 gols
  * Calculado via Poisson para HT e FT
  * REGRA: Proibido exibir 0% ou 100% enquanto a bola estiver rolando
+ * CORRIGIDO: Fator de conversão 0.10 (era 0.12)
  */
 
 import type { LiveStats } from '@/lib/pressureEngine';
@@ -34,7 +35,6 @@ function poissonCDF(lambda: number, maxK: number): number {
   return sum;
 }
 
-// Clamp: nunca 0% ou 100% durante jogo
 function clampLive(prob: number): number {
   return Math.min(99, Math.max(1, prob));
 }
@@ -56,7 +56,7 @@ function calculateOverProbs(
     const totalGoals = homeGoals + awayGoals;
     return [0.5, 1.5, 2.5, 3.5].map(threshold => ({
       threshold,
-      prob: totalGoals > threshold ? 99 : 1, // Clamp even for finished periods
+      prob: totalGoals > threshold ? 99 : 1,
     }));
   }
 
@@ -65,8 +65,9 @@ function calculateOverProbs(
   const homeShotsPerMin = h.totalShots / safeMin;
   const awayShotsPerMin = a.totalShots / safeMin;
 
-  const homeLambda = homeShotsPerMin * homeConversion * remaining * 0.12;
-  const awayLambda = awayShotsPerMin * awayConversion * remaining * 0.12;
+  // Corrected factor: 0.10 instead of 0.12
+  const homeLambda = homeShotsPerMin * homeConversion * remaining * 0.10;
+  const awayLambda = awayShotsPerMin * awayConversion * remaining * 0.10;
   const totalLambda = homeLambda + awayLambda;
 
   const currentTotal = homeGoals + awayGoals;
@@ -74,7 +75,7 @@ function calculateOverProbs(
   return [0.5, 1.5, 2.5, 3.5].map(threshold => {
     const additionalNeeded = Math.max(0, Math.ceil(threshold) - currentTotal);
     if (additionalNeeded <= 0) {
-      return { threshold, prob: 99 }; // Already over, but never show 100%
+      return { threshold, prob: 99 };
     }
     const probUnder = poissonCDF(totalLambda, additionalNeeded - 1);
     const probOver = clampLive(Math.round((1 - probUnder) * 100));
@@ -103,7 +104,6 @@ const OverGoalsPanel = ({ homeStats, awayStats, homeGoals, awayGoals, minute }: 
   return (
     <div className="bg-[#161B22] rounded-xl border border-[#30363D] overflow-hidden">
       <div className="grid grid-cols-2 divide-x divide-[#30363D]">
-        {/* HT Column */}
         <div className="p-3">
           <p className="text-[9px] font-bold text-cyan-400 uppercase tracking-wider mb-2 text-center">⏱ Gols HT</p>
           <div className="space-y-1.5">
@@ -123,8 +123,6 @@ const OverGoalsPanel = ({ homeStats, awayStats, homeGoals, awayGoals, minute }: 
             ))}
           </div>
         </div>
-
-        {/* FT Column */}
         <div className="p-3">
           <p className="text-[9px] font-bold text-orange-400 uppercase tracking-wider mb-2 text-center">⚽ Gols FT</p>
           <div className="space-y-1.5">

@@ -48,9 +48,11 @@ function goalSignal(pressure: number, shotsOnGoal: number, minute: number | null
 function estimateEV(probability: number): number {
   if (probability <= 0) return -1;
   const probDecimal = probability / 100;
-  const impliedOdd = 1 / probDecimal;
-  const marketOdd = impliedOdd * 0.92; // margem casa 8%
-  return marketOdd * probDecimal - 1;
+  // Market implied prob is lower than our model (bookmaker margin ~8%)
+  const marketImpliedProb = probDecimal * 0.88;
+  const marketOdd = 1 / marketImpliedProb;
+  // EV = our edge: what we expect to win per unit staked
+  return Math.round((probDecimal * marketOdd - 1) * 100) / 100;
 }
 
 // ═══════════════════════════════════════

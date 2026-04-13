@@ -137,10 +137,10 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     }
   }
 
-  // Sort by score descending, deduplicate (keep best per match)
+  // Sort by score descending
   opportunities.sort((a, b) => b.score - a.score);
 
-  // Keep top opportunity per match, max 5
+  // Allow multiple markets per match, deduplicate only same market+match, max 10
   const seen = new Set<string>();
   const top: ScannerOpportunity[] = [];
   for (const opp of opportunities) {
@@ -148,7 +148,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     if (seen.has(key)) continue;
     seen.add(key);
     top.push(opp);
-    if (top.length >= 5) break;
+    if (top.length >= 10) break;
   }
 
   return top;

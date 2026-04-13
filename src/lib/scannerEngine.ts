@@ -89,15 +89,15 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     const minute = match.minute || null;
     const hasGoalSignal = isLive && goalSignal(pressure, totalSoG, minute);
 
-    // Filter valid markets
-    const targetCategories = ['goals', 'btts'];
-    const targetMarkets = ['Over 1.5 Gols', 'Over 2.5 Gols', 'Over 3.5 Gols', 'Ambas Marcam'];
+    // Filter valid markets — include more market types for coverage
+    const targetMarkets = ['Over 0.5 Gols', 'Over 1.5 Gols', 'Over 2.5 Gols', 'Over 3.5 Gols', 'Ambas Marcam', '1X (Casa ou Empate)', 'X2 (Empate ou Fora)', 'Vitória Casa', 'Vitória Fora'];
 
     for (const market of markets) {
       if (!targetMarkets.includes(market.market)) continue;
 
       const ev = estimateEV(market.probability);
-      if (!isValidBet(market.probability, ev)) continue;
+      // Only show opportunities with real edge
+      if (market.probability < 60 || ev <= 0) continue;
 
       const score = calculateOpportunityScore(market.probability, ev, pressure);
 

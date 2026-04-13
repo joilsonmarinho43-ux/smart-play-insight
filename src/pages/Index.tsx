@@ -4,6 +4,7 @@ import { fetchMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';
+import ScannerProPanel from '@/components/ScannerProPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
@@ -196,6 +197,13 @@ const Index = () => {
         {isFetching && safeMatches.length === 0 && (
           <div className="flex justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+          </div>
+        )}
+
+        {/* Scanner PRO */}
+        {safeMatches.length > 0 && (
+          <div className="mt-6">
+            <ScannerProPanel matches={safeMatches} cacheKey={date} />
           </div>
         )}
 

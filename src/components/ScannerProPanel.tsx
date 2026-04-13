@@ -30,7 +30,7 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
           Scanner PRO
         </h2>
         <Badge className="ml-auto bg-orange-500/20 text-orange-300 border-orange-500/30 text-[10px]">
-          TOP {opportunities.length}
+          {opportunities.length} OPORTUNIDADES
         </Badge>
       </div>
 

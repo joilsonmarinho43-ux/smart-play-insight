@@ -13,6 +13,25 @@ export interface ScannerOpportunity {
   score: number;
   signal: string | null;
   isLive: boolean;
+  dataQuality: 'high' | 'medium' | 'low';
+}
+
+export interface ScannerLog {
+  type: 'info' | 'warn' | 'error';
+  message: string;
+  matchId?: string;
+  timestamp: number;
+}
+
+const scannerLogs: ScannerLog[] = [];
+
+function addLog(type: ScannerLog['type'], message: string, matchId?: string) {
+  scannerLogs.push({ type, message, matchId, timestamp: Date.now() });
+  if (scannerLogs.length > 100) scannerLogs.shift();
+}
+
+export function getScannerLogs(): ScannerLog[] {
+  return [...scannerLogs];
 }
 
 // ═══════════════════════════════════════
@@ -48,10 +67,8 @@ function goalSignal(pressure: number, shotsOnGoal: number, minute: number | null
 function estimateEV(probability: number): number {
   if (probability <= 0) return -1;
   const probDecimal = probability / 100;
-  // Market implied prob is lower than our model (bookmaker margin ~8%)
   const marketImpliedProb = probDecimal * 0.88;
   const marketOdd = 1 / marketImpliedProb;
-  // EV = our edge: what we expect to win per unit staked
   return Math.round((probDecimal * marketOdd - 1) * 100) / 100;
 }
 
@@ -60,9 +77,91 @@ function estimateEV(probability: number): number {
 // ═══════════════════════════════════════
 function calculateOpportunityScore(probability: number, ev: number, pressure: number): number {
   const normProb = probability / 100;
-  const normEV = Math.max(0, Math.min(1, (ev + 0.1) / 0.2)); // EV typically -0.1 to 0.1
+  const normEV = Math.max(0, Math.min(1, (ev + 0.1) / 0.2));
   const normPressure = pressure / 100;
   return normProb * 0.5 + normEV * 0.3 + normPressure * 0.2;
+}
+
+// ═══════════════════════════════════════
+// Filtro Inteligente LIVE
+// ═══════════════════════════════════════
+function passesLiveSmartFilter(match: MatchData, homeStats: any, awayStats: any): boolean {
+  const minute = match.minute || (match as any).fixture?.status?.elapsed || 0;
+  
+  // Ignorar jogos sem estatísticas
+  if (!homeStats && !awayStats) {
+    addLog('warn', 'Sem estatísticas disponíveis', match.id);
+    return false;
+  }
+
+  const h = homeStats || {};
+  const a = awayStats || {};
+
+  // Regra: até 15 minutos do 1° tempo — alta seletividade
+  if (minute <= 15) {
+    const totalSoG = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
+    const totalCorners = (h.corners || 0) + (a.corners || 0);
+    
+    // Mínimo 3 chutes no alvo total
+    if (totalSoG < 3) {
+      addLog('info', `Filtrado: SoG insuficiente (${totalSoG} < 3) no min ${minute}`, match.id);
+      return false;
+    }
+    
+    // Escanteios entre 2 e 3 no total
+    if (totalCorners < 2 || totalCorners > 3) {
+      addLog('info', `Filtrado: Escanteios fora do range (${totalCorners}) no min ${minute}`, match.id);
+      return false;
+    }
+    
+    return true;
+  }
+
+  // Após 15 min: filtro mais permissivo
+  const totalSoG = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
+  const totalDA = safeDangerousAttacks(h) + safeDangerousAttacks(a);
+  
+  // Mínimo de atividade ofensiva
+  if (totalSoG < 2 && totalDA < 5) {
+    addLog('info', `Filtrado: Baixa atividade ofensiva no min ${minute}`, match.id);
+    return false;
+  }
+
+  return true;
+}
+
+// ═══════════════════════════════════════
+// Qualidade dos dados
+// ═══════════════════════════════════════
+function assessDataQuality(homeStats: any, awayStats: any, isLive: boolean): 'high' | 'medium' | 'low' {
+  if (!isLive) {
+    const h = homeStats || {};
+    const hasGF = (h.goalsFor || 0) > 0 || (h.goalsAgainst || 0) > 0;
+    const hasGames = (h.gamesCount || 0) >= 3;
+    if (hasGF && hasGames) return 'high';
+    if (hasGF || hasGames) return 'medium';
+    return 'low';
+  }
+  
+  const h = homeStats || {};
+  const a = awayStats || {};
+  const hasDA = (h.dangerousAttacks || 0) > 0 || (a.dangerousAttacks || 0) > 0;
+  const hasSoG = (h.shotsOnGoal || 0) > 0 || (a.shotsOnGoal || 0) > 0;
+  const hasPoss = (h.possession || 0) > 0;
+  
+  if (hasDA && hasSoG && hasPoss) return 'high';
+  if (hasSoG || hasDA) return 'medium';
+  return 'low';
+}
+
+// ═══════════════════════════════════════
+// Validação de mercados
+// ═══════════════════════════════════════
+function validateMarket(market: MarketAnalysis): boolean {
+  if (!market.market || market.market.trim() === '') return false;
+  if (market.probability < 0 || market.probability > 100) return false;
+  if (isNaN(market.probability)) return false;
+  return true;
 }
 
 // ═══════════════════════════════════════
@@ -70,9 +169,9 @@ function calculateOpportunityScore(probability: number, ev: number, pressure: nu
 // ═══════════════════════════════════════
 export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
   const opportunities: ScannerOpportunity[] = [];
+  addLog('info', `Scanner iniciado: ${matches.length} jogos para análise`);
 
   for (const match of matches) {
-    const markets = analyzeMarkets(match);
     const isLive = !!match.isLive;
 
     // Live stats
@@ -81,31 +180,59 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     const hStats = (match as any).homeStats || lH;
     const aStats = (match as any).awayStats || lA;
 
+    // Filtro Inteligente LIVE
+    if (isLive && !passesLiveSmartFilter(match, lH.shotsOnGoal !== undefined ? lH : null, lA.shotsOnGoal !== undefined ? lA : null)) {
+      continue;
+    }
+
+    let markets: MarketAnalysis[];
+    try {
+      markets = analyzeMarkets(match);
+    } catch (e) {
+      addLog('error', `Falha ao analisar mercados: ${e}`, match.id);
+      continue;
+    }
+
+    // Validar mercados
+    markets = markets.filter(validateMarket);
+    if (markets.length === 0) {
+      addLog('warn', 'Nenhum mercado válido encontrado', match.id);
+      continue;
+    }
+
     const pressure = isLive
       ? calculatePressure(lH, lA)
       : calculatePressure(hStats, aStats);
 
     const totalSoG = (lH.shotsOnGoal || hStats.shotsOnGoal || 0) + (lA.shotsOnGoal || aStats.shotsOnGoal || 0);
-    const minute = match.minute || null;
+    const minute = match.minute || (match as any).fixture?.status?.elapsed || null;
     const hasGoalSignal = isLive && goalSignal(pressure, totalSoG, minute);
+    const dataQuality = assessDataQuality(hStats, aStats, isLive);
 
-    // Filter valid markets — include more market types for coverage
-    const targetMarkets = ['Over 0.5 Gols', 'Over 1.5 Gols', 'Over 2.5 Gols', 'Over 3.5 Gols', 'Ambas Marcam', '1X (Casa ou Empate)', 'X2 (Empate ou Fora)', 'Vitória Casa', 'Vitória Fora'];
+    // Filter valid markets
+    const targetMarkets = [
+      'Over 0.5 Gols', 'Over 1.5 Gols', 'Over 2.5 Gols', 'Over 3.5 Gols',
+      'Ambas Marcam',
+      '1X (Casa ou Empate)', 'X2 (Empate ou Fora)',
+      'Vitória Casa', 'Vitória Fora',
+    ];
 
     for (const market of markets) {
       if (!targetMarkets.includes(market.market)) continue;
 
       const ev = estimateEV(market.probability);
-      // Only show opportunities with real edge
       if (market.probability < 60 || ev <= 0) continue;
 
       const score = calculateOpportunityScore(market.probability, ev, pressure);
 
+      const homeTeam = (match as any).teams?.home?.name || match.homeTeam || 'Casa';
+      const awayTeam = (match as any).teams?.away?.name || match.awayTeam || 'Fora';
+
       opportunities.push({
         matchId: match.id,
-        match: `${match.homeTeam} vs ${match.awayTeam}`,
+        match: `${homeTeam} vs ${awayTeam}`,
         minute,
-        league: match.league,
+        league: (match as any).league?.name || match.league || '',
         opportunity: market.market,
         probability: market.probability,
         ev: Math.round(ev * 100) / 100,
@@ -113,18 +240,21 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         score: Math.round(score * 100) / 100,
         signal: hasGoalSignal ? '🔥 GOL IMINENTE' : null,
         isLive,
+        dataQuality,
       });
     }
 
-    // Add imminent goal as standalone opportunity for live
+    // Standalone imminent goal
     if (hasGoalSignal) {
       const existingGoalOpp = opportunities.find(o => o.matchId === match.id && o.signal);
       if (!existingGoalOpp) {
+        const homeTeam = (match as any).teams?.home?.name || match.homeTeam || 'Casa';
+        const awayTeam = (match as any).teams?.away?.name || match.awayTeam || 'Fora';
         opportunities.push({
           matchId: match.id,
-          match: `${match.homeTeam} vs ${match.awayTeam}`,
+          match: `${homeTeam} vs ${awayTeam}`,
           minute,
-          league: match.league,
+          league: (match as any).league?.name || match.league || '',
           opportunity: 'Próximo Gol',
           probability: Math.min(85, 60 + Math.round(pressure * 0.25)),
           ev: 0.05,
@@ -132,6 +262,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
           score: 0.80,
           signal: '🔥 GOL IMINENTE',
           isLive: true,
+          dataQuality: 'high',
         });
       }
     }
@@ -140,7 +271,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
   // Sort by score descending
   opportunities.sort((a, b) => b.score - a.score);
 
-  // Allow multiple markets per match, deduplicate only same market+match, max 10
+  // Deduplicate same market+match, max 10
   const seen = new Set<string>();
   const top: ScannerOpportunity[] = [];
   for (const opp of opportunities) {
@@ -151,5 +282,6 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     if (top.length >= 10) break;
   }
 
+  addLog('info', `Scanner finalizado: ${top.length} oportunidades encontradas de ${matches.length} jogos`);
   return top;
 }

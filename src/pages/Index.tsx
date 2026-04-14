@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchMatches } from '@/services/footballApi';
+import { fetchMatches, fetchMultiDayMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';

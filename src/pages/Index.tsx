@@ -158,22 +158,36 @@ const Index = () => {
           <h1 className="text-lg font-bold">PRÉ-JOGO</h1>
           <div className="flex items-center gap-2">
             <button onClick={() => refetch()} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
-              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
             </button>
             <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
-              <Trash2 className="w-4 h-4 text-gray-400" />
+              <Trash2 className="w-4 h-4 text-muted-foreground" />
             </button>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="bg-black/40 backdrop-blur-sm text-xs p-2 rounded-lg border border-orange-500/20"
-            />
           </div>
         </div>
-        {/* Identity Banner — seamlessly integrated */}
-        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-orange-500/10">
-          <img
+
+        {/* Day Selector */}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {dayOptions.map(day => {
+            const count = safeMatches.filter((m: any) => {
+              const md = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+              return md === day.date;
+            }).length;
+            return (
+              <button
+                key={day.index}
+                onClick={() => { setSelectedDay(day.index); setSelectedLeague('all'); }}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  selectedDay === day.index
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-white/5 text-muted-foreground hover:bg-white/10'
+                }`}
+              >
+                {day.label} {count > 0 && `(${count})`}
+              </button>
+            );
+          })}
+        </div>
             src={bannerImg}
             alt="Analista Joilson"
             className="w-full h-auto block rounded-2xl"

@@ -116,11 +116,11 @@ const Index = () => {
   // Extract unique leagues for filter
   const availableLeagues = useMemo(() => {
     const leagues = new Set<string>();
-    safeMatches.forEach((m: any) => {
+    dayMatches.forEach((m: any) => {
       if (m.league) leagues.add(m.league);
     });
     return Array.from(leagues).sort();
-  }, [safeMatches]);
+  }, [dayMatches]);
 
   // Filter by selected day
   const selectedDate = dayOptions[selectedDay]?.date || '';

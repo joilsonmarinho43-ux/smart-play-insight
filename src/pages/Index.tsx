@@ -209,14 +209,14 @@ const Index = () => {
               onClick={() => setSelectedLeague('all')}
               className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
                 selectedLeague === 'all'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-white/5 text-muted-foreground hover:bg-white/10'
               }`}
             >
-              Todas ({safeMatches.length})
+              Todas ({dayMatches.length})
             </button>
             {availableLeagues.map(league => {
-              const count = safeMatches.filter((m: any) => m.league === league).length;
+              const count = dayMatches.filter((m: any) => m.league === league).length;
               const label = LEAGUE_LABELS[league] || league;
               return (
                 <button
@@ -224,8 +224,8 @@ const Index = () => {
                   onClick={() => setSelectedLeague(league)}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
                     selectedLeague === league
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-white/5 text-muted-foreground hover:bg-white/10'
                   }`}
                 >
                   {label} ({count})
@@ -238,14 +238,14 @@ const Index = () => {
         {/* Loading */}
         {isFetching && safeMatches.length === 0 && (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         )}
 
         {/* Scanner PRO */}
-        {safeMatches.length > 0 && (
+        {dayMatches.length > 0 && (
           <div className="mt-6">
-            <ScannerProPanel matches={safeMatches} cacheKey={date} />
+            <ScannerProPanel matches={dayMatches} cacheKey={selectedDate} />
           </div>
         )}
 

@@ -122,11 +122,21 @@ const Index = () => {
     return Array.from(leagues).sort();
   }, [safeMatches]);
 
-  // Filtered matches
+  // Filter by selected day
+  const selectedDate = dayOptions[selectedDay]?.date || '';
+  const dayMatches = useMemo(() => {
+    if (!selectedDate) return safeMatches;
+    return safeMatches.filter((m: any) => {
+      const matchDate = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+      return matchDate === selectedDate;
+    });
+  }, [safeMatches, selectedDate]);
+
+  // Filtered by league
   const filteredMatches = useMemo(() => {
-    if (selectedLeague === 'all') return safeMatches;
-    return safeMatches.filter((m: any) => m.league === selectedLeague);
-  }, [safeMatches, selectedLeague]);
+    if (selectedLeague === 'all') return dayMatches;
+    return dayMatches.filter((m: any) => m.league === selectedLeague);
+  }, [dayMatches, selectedLeague]);
 
   return (
     <div className="min-h-screen text-white pb-8 font-sans relative">

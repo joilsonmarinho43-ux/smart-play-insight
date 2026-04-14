@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchMatches, fetchMultiDayMatches } from '@/services/footballApi';
+import { fetchMultiDayMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
 import ElitePanel from '@/components/ElitePanel';
@@ -23,15 +23,29 @@ const LEAGUE_LABELS: Record<string, string> = {
 const Index = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
+  const [selectedDay, setSelectedDay] = useState<number>(0);
 
+  // Fetch 6 days (today + 5)
   const { data: rawMatches, isFetching, refetch } = useQuery({
-    queryKey: ['matches', date],
-    queryFn: () => fetchMatches(date),
-    staleTime: 1000 * 60 * 10, // 10 min
+    queryKey: ['matches-multiday'],
+    queryFn: () => fetchMultiDayMatches(6),
+    staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
   });
+
+  // Generate day labels
+  const dayOptions = useMemo(() => {
+    const days = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' });
+      days.push({ index: i, date: dateStr, label });
+    }
+    return days;
+  }, []);
 
   const safeMatches = useMemo(() =>
     (rawMatches || []).map((m: any) => {
@@ -99,20 +113,30 @@ const Index = () => {
     }),
   [rawMatches]);
 
+  // Filter by selected day
+  const selectedDate = dayOptions[selectedDay]?.date || '';
+  const dayMatches = useMemo(() => {
+    if (!selectedDate) return safeMatches;
+    return safeMatches.filter((m: any) => {
+      const matchDate = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+      return matchDate === selectedDate;
+    });
+  }, [safeMatches, selectedDate]);
+
   // Extract unique leagues for filter
   const availableLeagues = useMemo(() => {
     const leagues = new Set<string>();
-    safeMatches.forEach((m: any) => {
+    dayMatches.forEach((m: any) => {
       if (m.league) leagues.add(m.league);
     });
     return Array.from(leagues).sort();
-  }, [safeMatches]);
+  }, [dayMatches]);
 
-  // Filtered matches
+  // Filtered by league
   const filteredMatches = useMemo(() => {
-    if (selectedLeague === 'all') return safeMatches;
-    return safeMatches.filter((m: any) => m.league === selectedLeague);
-  }, [safeMatches, selectedLeague]);
+    if (selectedLeague === 'all') return dayMatches;
+    return dayMatches.filter((m: any) => m.league === selectedLeague);
+  }, [dayMatches, selectedLeague]);
 
   return (
     <div className="min-h-screen text-white pb-8 font-sans relative">
@@ -134,28 +158,46 @@ const Index = () => {
           <h1 className="text-lg font-bold">PRÉ-JOGO</h1>
           <div className="flex items-center gap-2">
             <button onClick={() => refetch()} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
-              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
             </button>
             <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
-              <Trash2 className="w-4 h-4 text-gray-400" />
+              <Trash2 className="w-4 h-4 text-muted-foreground" />
             </button>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="bg-black/40 backdrop-blur-sm text-xs p-2 rounded-lg border border-orange-500/20"
-            />
           </div>
         </div>
-        {/* Identity Banner — seamlessly integrated */}
-        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-orange-500/10">
+
+        {/* Day Selector */}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {dayOptions.map(day => {
+            const count = safeMatches.filter((m: any) => {
+              const md = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+              return md === day.date;
+            }).length;
+            return (
+              <button
+                key={day.index}
+                onClick={() => { setSelectedDay(day.index); setSelectedLeague('all'); }}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  selectedDay === day.index
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-white/5 text-muted-foreground hover:bg-white/10'
+                }`}
+              >
+                {day.label} {count > 0 && `(${count})`}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Identity Banner */}
+        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-primary/10">
           <img
             src={bannerImg}
             alt="Analista Joilson"
             className="w-full h-auto block rounded-2xl"
           />
-          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-orange-500/30">
-            <span className="text-2xl font-black text-primary tabular-nums leading-none">{safeMatches.length}</span>
+          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-primary/30">
+            <span className="text-2xl font-black text-primary tabular-nums leading-none">{dayMatches.length}</span>
             <span className="text-[10px] text-muted-foreground ml-1.5">jogos</span>
           </div>
         </div>
@@ -167,14 +209,14 @@ const Index = () => {
               onClick={() => setSelectedLeague('all')}
               className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
                 selectedLeague === 'all'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-white/5 text-muted-foreground hover:bg-white/10'
               }`}
             >
-              Todas ({safeMatches.length})
+              Todas ({dayMatches.length})
             </button>
             {availableLeagues.map(league => {
-              const count = safeMatches.filter((m: any) => m.league === league).length;
+              const count = dayMatches.filter((m: any) => m.league === league).length;
               const label = LEAGUE_LABELS[league] || league;
               return (
                 <button
@@ -182,8 +224,8 @@ const Index = () => {
                   onClick={() => setSelectedLeague(league)}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
                     selectedLeague === league
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-white/5 text-muted-foreground hover:bg-white/10'
                   }`}
                 >
                   {label} ({count})
@@ -196,28 +238,28 @@ const Index = () => {
         {/* Loading */}
         {isFetching && safeMatches.length === 0 && (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         )}
 
         {/* Scanner PRO */}
-        {safeMatches.length > 0 && (
+        {dayMatches.length > 0 && (
           <div className="mt-6">
-            <ScannerProPanel matches={safeMatches} cacheKey={date} />
+            <ScannerProPanel matches={dayMatches} cacheKey={selectedDate} />
           </div>
         )}
 
         {/* Elite Performance VIP */}
-        {safeMatches.length > 0 && (
+        {dayMatches.length > 0 && (
           <div className="mt-6">
-            <ElitePanel matches={safeMatches} />
+            <ElitePanel matches={dayMatches} />
           </div>
         )}
 
         {/* Bingo Section */}
-        {safeMatches.length > 0 && (
+        {dayMatches.length > 0 && (
           <div className="mt-6">
-            <BingoSuggestion matches={safeMatches} />
+            <BingoSuggestion matches={dayMatches} />
           </div>
         )}
 

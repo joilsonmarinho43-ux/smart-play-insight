@@ -113,15 +113,6 @@ const Index = () => {
     }),
   [rawMatches]);
 
-  // Extract unique leagues for filter
-  const availableLeagues = useMemo(() => {
-    const leagues = new Set<string>();
-    dayMatches.forEach((m: any) => {
-      if (m.league) leagues.add(m.league);
-    });
-    return Array.from(leagues).sort();
-  }, [dayMatches]);
-
   // Filter by selected day
   const selectedDate = dayOptions[selectedDay]?.date || '';
   const dayMatches = useMemo(() => {
@@ -131,6 +122,15 @@ const Index = () => {
       return matchDate === selectedDate;
     });
   }, [safeMatches, selectedDate]);
+
+  // Extract unique leagues for filter
+  const availableLeagues = useMemo(() => {
+    const leagues = new Set<string>();
+    dayMatches.forEach((m: any) => {
+      if (m.league) leagues.add(m.league);
+    });
+    return Array.from(leagues).sort();
+  }, [dayMatches]);
 
   // Filtered by league
   const filteredMatches = useMemo(() => {

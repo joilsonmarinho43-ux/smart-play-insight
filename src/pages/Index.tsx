@@ -188,12 +188,16 @@ const Index = () => {
             );
           })}
         </div>
+
+        {/* Identity Banner */}
+        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-primary/10">
+          <img
             src={bannerImg}
             alt="Analista Joilson"
             className="w-full h-auto block rounded-2xl"
           />
-          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-orange-500/30">
-            <span className="text-2xl font-black text-primary tabular-nums leading-none">{safeMatches.length}</span>
+          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-primary/30">
+            <span className="text-2xl font-black text-primary tabular-nums leading-none">{dayMatches.length}</span>
             <span className="text-[10px] text-muted-foreground ml-1.5">jogos</span>
           </div>
         </div>

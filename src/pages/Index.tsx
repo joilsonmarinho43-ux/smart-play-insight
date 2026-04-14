@@ -250,16 +250,16 @@ const Index = () => {
         )}
 
         {/* Elite Performance VIP */}
-        {safeMatches.length > 0 && (
+        {dayMatches.length > 0 && (
           <div className="mt-6">
-            <ElitePanel matches={safeMatches} />
+            <ElitePanel matches={dayMatches} />
           </div>
         )}
 
         {/* Bingo Section */}
-        {safeMatches.length > 0 && (
+        {dayMatches.length > 0 && (
           <div className="mt-6">
-            <BingoSuggestion matches={safeMatches} />
+            <BingoSuggestion matches={dayMatches} />
           </div>
         )}
 

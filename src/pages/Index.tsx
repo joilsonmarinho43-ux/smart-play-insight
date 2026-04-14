@@ -23,15 +23,29 @@ const LEAGUE_LABELS: Record<string, string> = {
 const Index = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
+  const [selectedDay, setSelectedDay] = useState<number>(0);
 
+  // Fetch 6 days (today + 5)
   const { data: rawMatches, isFetching, refetch } = useQuery({
-    queryKey: ['matches', date],
-    queryFn: () => fetchMatches(date),
-    staleTime: 1000 * 60 * 10, // 10 min
+    queryKey: ['matches-multiday'],
+    queryFn: () => fetchMultiDayMatches(6),
+    staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
   });
+
+  // Generate day labels
+  const dayOptions = useMemo(() => {
+    const days = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' });
+      days.push({ index: i, date: dateStr, label });
+    }
+    return days;
+  }, []);
 
   const safeMatches = useMemo(() =>
     (rawMatches || []).map((m: any) => {

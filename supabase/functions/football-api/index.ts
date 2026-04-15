@@ -91,7 +91,7 @@ async function dbCacheSet(cacheKey: string, dados: any, statusJogo: string): Pro
 // ========================
 // LEAGUE CONFIG
 // ========================
-const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61];
+const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61, 13, 2];
 const LEAGUES_WITH_STATS = new Set([
   71, 39, 140, 78, 135, 61, 253, 128, 262, 13, 11, 2, 3, 88, 94, 40, 239,
   345, 299, 268, 242, 307, 332,

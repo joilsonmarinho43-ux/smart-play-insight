@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { Loader2, RefreshCw, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck, Flame, BarChart3, Crosshair, Star, Eye } from 'lucide-react';
+import SniperPanel from '@/components/SniperPanel';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMatches } from '@/services/footballApi';
@@ -439,6 +440,13 @@ const Live = () => {
             <AlertTriangle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
             <p className="text-gray-400 text-sm">Nenhum jogo ao vivo no momento.</p>
             <p className="text-gray-500 text-xs mt-1">O scanner detectará jogos automaticamente.</p>
+          </div>
+        )}
+
+        {/* SNIPER MODE PANEL */}
+        {!isLoading && matches.length > 0 && (
+          <div className="mt-4">
+            <SniperPanel matches={matches as any} />
           </div>
         )}
 

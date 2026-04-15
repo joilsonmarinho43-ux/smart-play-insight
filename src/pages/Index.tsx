@@ -18,6 +18,8 @@ const LEAGUE_LABELS: Record<string, string> = {
   'Ligue 1': '🇫🇷 Ligue 1',
   'Brasileirão Série A': '🇧🇷 Brasileirão',
   'Serie A (ITA)': '🇮🇹 Serie A',
+  'Copa Libertadores': '🏆 Libertadores',
+  'Champions League': '🏆 Champions',
 };
 
 const Index = () => {

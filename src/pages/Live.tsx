@@ -444,9 +444,9 @@ const Live = () => {
         )}
 
         {/* SNIPER MODE PANEL */}
-        {!isLoading && liveMatches.length > 0 && (
+        {!isLoading && matches.length > 0 && (
           <div className="mt-4">
-            <SniperPanel matches={liveMatches as any} />
+            <SniperPanel matches={matches as any} />
           </div>
         )}
 

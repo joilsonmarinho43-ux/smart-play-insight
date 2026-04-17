@@ -26,6 +26,8 @@ export interface HybridSignal {
   totalShots: number;
   corners: number;
   dangerousAttacks: number;
+  /** True quando dangerousAttacks foi estimado via fallback (API retornou 0). */
+  daEstimated: boolean;
   possession: number;      // dominant team possession
   pressure: number;
   homeGoals: number;
@@ -189,6 +191,39 @@ export function getHybridPerformance(): HybridPerformance {
 // CLASSIFICATION ENGINE
 // ═══════════════════════════════════════
 
+/**
+ * Snapshot history per match — guarda chutes/escanteios por minuto
+ * para a Trava de Segurança (precisa de evento real nos últimos 10 min).
+ */
+interface MatchSnapshot { minute: number; totalShots: number; corners: number; }
+const SNAPSHOT_HISTORY: Record<string, MatchSnapshot[]> = {};
+
+function recordSnapshot(matchId: string, minute: number, totalShots: number, corners: number) {
+  if (!SNAPSHOT_HISTORY[matchId]) SNAPSHOT_HISTORY[matchId] = [];
+  const hist = SNAPSHOT_HISTORY[matchId];
+  const last = hist[hist.length - 1];
+  if (!last || last.minute !== minute) {
+    hist.push({ minute, totalShots, corners });
+    if (hist.length > 30) hist.shift();
+  } else {
+    last.totalShots = totalShots;
+    last.corners = corners;
+  }
+}
+
+/** Retorna true se houve ao menos 1 chute OU escanteio NOVO nos últimos 10 min. */
+function hasRecentEvent(matchId: string, minute: number): boolean {
+  const hist = SNAPSHOT_HISTORY[matchId];
+  if (!hist || hist.length === 0) return false;
+  const cutoff = minute - 10;
+  // baseline = snapshot mais antigo dentro da janela (≤ cutoff)
+  const baseline = [...hist].reverse().find(h => h.minute <= cutoff) || hist[0];
+  const current = hist[hist.length - 1];
+  const shotsDelta = current.totalShots - baseline.totalShots;
+  const cornersDelta = current.corners - baseline.corners;
+  return shotsDelta >= 1 || cornersDelta >= 1;
+}
+
 function extractStats(match: any) {
   const minute = match.minute || match.fixture?.status?.elapsed || 0;
   const homeGoals = match.goals?.home ?? match.liveScore?.home ?? 0;
@@ -198,19 +233,29 @@ function extractStats(match: any) {
   const sog = (lH.shotsOnGoal || 0) + (lA.shotsOnGoal || 0);
   const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0) + sog;
   const corners = (lH.corners || 0) + (lA.corners || 0);
-  const da = (lH.dangerousAttacks || 0) + (lA.dangerousAttacks || 0);
+
+  // Fallback DA: quando API retorna 0, estima a partir de chutes e escanteios.
+  let da = (lH.dangerousAttacks || 0) + (lA.dangerousAttacks || 0);
+  let daEstimated = false;
+  if (da === 0 && (totalShots > 0 || corners > 0)) {
+    da = Math.round(totalShots * 1.5 + corners * 2);
+    daEstimated = true;
+  }
+
   const homePoss = Number(lH.possession || 0);
   const awayPoss = Number(lA.possession || 0);
   const dominantPoss = Math.max(homePoss, awayPoss);
-  // Pressure composite
   const pressure = Math.min(100, Math.max(0, (da * 3 + corners * 5 + sog * 10) / 5));
   const homeTeam = match.teams?.home?.name || match.homeTeam || 'Casa';
   const awayTeam = match.teams?.away?.name || match.awayTeam || 'Fora';
   const matchId = String(match.id || match.fixture?.id);
   const league = match.league?.name || match.league || '';
-  const hasStats = !!(lH.shotsOnGoal || lA.shotsOnGoal || lH.dangerousAttacks || lA.dangerousAttacks);
+  const hasStats = !!(lH.shotsOnGoal || lA.shotsOnGoal || lH.dangerousAttacks || lA.dangerousAttacks || totalShots || corners);
 
-  return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats };
+  // Atualiza histórico p/ trava de 10 min
+  if (matchId && hasStats && minute > 0) recordSnapshot(matchId, minute, totalShots, corners);
+
+  return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats };
 }
 
 function trySniper(s: ReturnType<typeof extractStats>): boolean {

@@ -62,6 +62,84 @@ export type Database = {
         }
         Relationships: []
       }
+      hybrid_entries: {
+        Row: {
+          away_goals: number
+          corners: number
+          created_at: string
+          da_estimated: boolean
+          dangerous_attacks: number
+          entry_at: string
+          exit_minute: number | null
+          home_goals: number
+          id: string
+          league: string | null
+          market: string
+          match_id: string
+          match_name: string
+          minute: number
+          possession: number
+          pressure: number
+          resolved_at: string | null
+          result: string
+          shots_on_goal: number
+          tier: string
+          total_shots: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          away_goals?: number
+          corners?: number
+          created_at?: string
+          da_estimated?: boolean
+          dangerous_attacks?: number
+          entry_at?: string
+          exit_minute?: number | null
+          home_goals?: number
+          id?: string
+          league?: string | null
+          market: string
+          match_id: string
+          match_name: string
+          minute?: number
+          possession?: number
+          pressure?: number
+          resolved_at?: string | null
+          result?: string
+          shots_on_goal?: number
+          tier: string
+          total_shots?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          away_goals?: number
+          corners?: number
+          created_at?: string
+          da_estimated?: boolean
+          dangerous_attacks?: number
+          entry_at?: string
+          exit_minute?: number | null
+          home_goals?: number
+          id?: string
+          league?: string | null
+          market?: string
+          match_id?: string
+          match_name?: string
+          minute?: number
+          possession?: number
+          pressure?: number
+          resolved_at?: string | null
+          result?: string
+          shots_on_goal?: number
+          tier?: string
+          total_shots?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

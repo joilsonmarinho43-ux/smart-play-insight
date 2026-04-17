@@ -301,6 +301,9 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
   const ops = loadOps();
   const alreadyEntered = ops.some(o => o.matchId === s.matchId && o.result === 'PENDING');
 
+  // 🛡️ TRAVA DE SEGURANÇA: precisa de ≥1 chute OU escanteio NOVO nos últimos 10 min.
+  const recentEvent = hasRecentEvent(s.matchId, s.minute);
+
   let tier: HybridTier;
   let label: string;
   let confidence: HybridSignal['confidence'];
@@ -309,6 +312,7 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
   let executionReason: string;
 
   if (trySniper(s)) {
+    if (!recentEvent && s.minute >= 15) return null;
     tier = 'SNIPER';
     label = 'SNIPER 🔥';
     confidence = 'alta';
@@ -316,6 +320,7 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     canExecute = !blocked && !alreadyEntered;
     executionReason = blocked ? isHybridBlocked().reason : alreadyEntered ? 'Já entrou neste jogo' : '✅ Pronto para entrada';
   } else if (trySemi(s)) {
+    if (!recentEvent && s.minute >= 15) return null;
     tier = 'SEMI';
     label = 'SEMI ⚡';
     confidence = 'média';
@@ -351,6 +356,7 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     totalShots: s.totalShots,
     corners: s.corners,
     dangerousAttacks: s.da,
+    daEstimated: s.daEstimated,
     possession: s.dominantPoss,
     pressure: Math.round(s.pressure),
     homeGoals: s.homeGoals,

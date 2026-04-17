@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import BingoSuggestion from '@/components/BingoSuggestion';
-import ElitePanel from '@/components/ElitePanel';
-import ScannerProPanel from '@/components/ScannerProPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
@@ -244,19 +242,8 @@ const Index = () => {
           </div>
         )}
 
-        {/* Scanner PRO */}
-        {dayMatches.length > 0 && (
-          <div className="mt-6">
-            <ScannerProPanel matches={dayMatches} cacheKey={selectedDate} />
-          </div>
-        )}
-
-        {/* Elite Performance VIP */}
-        {dayMatches.length > 0 && (
-          <div className="mt-6">
-            <ElitePanel matches={dayMatches} />
-          </div>
-        )}
+        {/* Scanner PRO e Elite Performance migrados para páginas dedicadas:
+            /scanner e /elite — acessíveis pela barra lateral. */}
 
         {/* Bingo Section */}
         {dayMatches.length > 0 && (

@@ -12,6 +12,8 @@ import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Live from "./pages/Live";
 import Favorites from "./pages/Favorites";
+import Scanner from "./pages/Scanner";
+import Elite from "./pages/Elite";
 import Paywall from "./pages/Paywall";
 import NotFound from "./pages/NotFound";
 import { AppLayout } from "./components/AppLayout";
@@ -75,6 +77,8 @@ const App = () => {
             {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}
             <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
             <Route path="/live" element={<ProtectedRoute><AppLayout><Live /></AppLayout></ProtectedRoute>} />
+            <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
+            <Route path="/elite" element={<ProtectedRoute><AppLayout><Elite /></AppLayout></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}

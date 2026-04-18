@@ -292,7 +292,11 @@ function tryNormal(s: ReturnType<typeof extractStats>): boolean {
 }
 
 export function classifyHybridSignal(match: any): HybridSignal | null {
-  if (!match.isLive) return null;
+  // Aceita tanto MatchData (com isLive) quanto JSON cru da API-Sports (com fixture.status.short)
+  const liveStatuses = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE'];
+  const status = String(match?.fixture?.status?.short || '').toUpperCase();
+  const isLive = match?.isLive === true || liveStatuses.includes(status);
+  if (!isLive) return null;
 
   const s = extractStats(match);
   if (!s.hasStats) return null;

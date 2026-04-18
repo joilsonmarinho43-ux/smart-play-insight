@@ -32,7 +32,7 @@ function getProbColor(prob: number): string {
 }
 
 const BingoSuggestion = ({ matches }: Props) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const bingoData = useMemo(() => {
     if (!matches || matches.length === 0) return [];

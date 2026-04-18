@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
-import BingoSuggestion from '@/components/BingoSuggestion';
+
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, RefreshCw, Trash2 } from 'lucide-react';

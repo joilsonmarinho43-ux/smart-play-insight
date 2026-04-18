@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
-import BingoSuggestion from '@/components/BingoSuggestion';
+
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
@@ -242,15 +242,9 @@ const Index = () => {
           </div>
         )}
 
-        {/* Scanner PRO e Elite Performance migrados para páginas dedicadas:
-            /scanner e /elite — acessíveis pela barra lateral. */}
-
-        {/* Bingo Section */}
-        {dayMatches.length > 0 && (
-          <div className="mt-6">
-            <BingoSuggestion matches={dayMatches} />
-          </div>
-        )}
+        {/* Scanner PRO, Elite Performance e Bingo VIP migrados para páginas dedicadas:
+            /scanner, /elite e /bingo — acessíveis pela barra lateral.
+            A Home é dedicada exclusivamente às análises de Pré-Jogo. */}
 
         {/* Match Cards */}
         <div className="mt-8 space-y-6">

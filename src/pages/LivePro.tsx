@@ -570,7 +570,7 @@ function EntrySuggestion({ analysis, bankroll }: { analysis: any; bankroll: numb
   const stakeValue = (bankroll * stakePct) / 100;
   const minOdd = decision.market.toLowerCase().includes('over 0.5') ? 1.20 : decision.market.toLowerCase().includes('over 1.5') ? 1.40 : 1.60;
   const stars = Math.round(decision.confidence / 20);
-  const evEstimated = decision.action === 'ENTRAR' ? +(((decision.confidence / 100) * minOdd * 1.08 - 1) * 100).toFixed(1) : 0;
+  const evEstimated = decision.action === 'ENTRAR' ? +(((decision.confidence / 100) * minOdd - 1) * 100).toFixed(1) : 0;
 
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">

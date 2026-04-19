@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { fetchLiveMatches } from '@/services/footballApi';
 import { analyzeLivePressure, generateLiveStrategy, recordPISnapshot, type PressureData, type PISnapshot, type LiveStrategy } from '@/lib/pressureEngine';
-import { calculateAPWindows, calculateLiveOddsDeviation, type AttackPressureWindows, type OddsDeviation } from '@/lib/eliteMetrics';
+import { calculateAPWindows, calculateLiveOddsDeviation, projectCornersByPeriod, type AttackPressureWindows, type OddsDeviation, type CornerPeriod } from '@/lib/eliteMetrics';
 import { classifyHybridSignal, type HybridSignal } from '@/lib/hybridEngine';
 import { analyzeSniperSignal, type SniperSignal } from '@/lib/sniperEngine';
 import { useHybridPerformance } from '@/hooks/useHybridPerformance';
@@ -168,6 +168,7 @@ const LivePro = () => {
     let oddsDev: OddsDeviation | null = null;
     let hybrid: HybridSignal | null = null;
     let sniper: SniperSignal | null = null;
+    let cornerData: CornerPeriod[] = [];
 
     try { pressure = analyzeLivePressure(homeStats, awayStats, minute); } catch {}
     try { if (pressure) history = recordPISnapshot(id, pressure.homePI, pressure.awayPI, minute); } catch {}
@@ -176,6 +177,7 @@ const LivePro = () => {
     try { oddsDev = calculateLiveOddsDeviation(homeStats, awayStats, homeGoals, awayGoals, minute); } catch {}
     try { hybrid = classifyHybridSignal(selectedMatch); } catch {}
     try { sniper = analyzeSniperSignal({ ...selectedMatch, isLive: true, id }); } catch {}
+    try { cornerData = projectCornersByPeriod((homeStats?.corners || 0) + (awayStats?.corners || 0), minute); } catch {}
 
     const totalGoals = homeGoals + awayGoals;
     const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);

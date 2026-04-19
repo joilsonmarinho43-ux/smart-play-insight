@@ -177,7 +177,7 @@ const LivePro = () => {
     try { oddsDev = calculateLiveOddsDeviation(homeStats, awayStats, homeGoals, awayGoals, minute); } catch {}
     try { hybrid = classifyHybridSignal(selectedMatch); } catch {}
     try { sniper = analyzeSniperSignal({ ...selectedMatch, isLive: true, id }); } catch {}
-    try { cornerData = projectCornersByPeriod((homeStats?.corners || 0) + (awayStats?.corners || 0), minute); } catch {}
+    try { cornerData = projectCornersByPeriod(homeStats?.corners || 0, awayStats?.corners || 0, minute); } catch {}
 
     const totalGoals = homeGoals + awayGoals;
     const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
@@ -185,7 +185,7 @@ const LivePro = () => {
 
     return {
       id, minute, homeGoals, awayGoals, homeName, awayName, homeStats, awayStats,
-      pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals,
+      pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
     };
   }, [selectedMatch]);
 
@@ -636,8 +636,8 @@ function ChartsBlock({ analysis }: { analysis: any }) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
-            <MomentumChart history={analysis.history} />
-            <CornerTimeline matchId={analysis.id} homeCorners={analysis.homeStats?.corners || 0} awayCorners={analysis.awayStats?.corners || 0} minute={analysis.minute} />
+            <MomentumChart history={analysis.history} homeName={analysis.homeName} awayName={analysis.awayName} currentMinute={analysis.minute} />
+            <CornerTimeline data={analysis.cornerData} currentMinute={analysis.minute} />
             <OverGoalsPanel
               homeStats={analysis.homeStats} awayStats={analysis.awayStats}
               homeGoals={analysis.homeGoals} awayGoals={analysis.awayGoals} minute={analysis.minute}

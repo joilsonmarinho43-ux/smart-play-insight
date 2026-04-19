@@ -498,19 +498,28 @@ function OddsValueBlock({ analysis }: { analysis: any }) {
   const { oddsDev, poisson } = analysis;
   if (!oddsDev) return null;
 
-  // Estimativa de odds justas para Over (usa probabilidades Poisson já calculadas)
-  const fairOdd = (p: number) => p > 0 ? +(100 / p).toFixed(2) : 99;
-  // Odd "atual" simulada com 8% de margem (sem API de odds)
-  const marketOdd = (p: number) => +(fairOdd(p) * 1.08).toFixed(2);
+  // Estimativa de odds justas: odd = 1 / probabilidade
+  const fairOdd = (p: number) => {
+    if (p <= 0) return 50;
+    const o = 100 / p; // p está em percentual (0-100)
+    return Math.min(50, +o.toFixed(2));
+  };
+  // Odd "atual" simulada com 8% de margem da casa
+  const marketOdd = (p: number) => {
+    const o = fairOdd(p) / 1.08;
+    return Math.max(1.01, +o.toFixed(2));
+  };
   const ev = (p: number, odd: number) => +(((p / 100) * odd - 1) * 100).toFixed(1);
 
-  const rows = [
+  const allRows = [
     { market: 'Over 1.5', prob: poisson.over15 },
     { market: 'Over 2.5', prob: poisson.over25 },
     { market: 'Casa', prob: oddsDev.homeWinPoisson },
     { market: 'Empate', prob: oddsDev.drawPoisson },
     { market: 'Fora', prob: oddsDev.awayWinPoisson },
   ];
+  // Filtra mercados com probabilidade relevante (≥ 5%) — evita exibir odds de 50+
+  const rows = allRows.filter(r => r.prob >= 5);
 
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
@@ -523,12 +532,16 @@ function OddsValueBlock({ analysis }: { analysis: any }) {
           <thead>
             <tr className="text-[9px] text-gray-500 uppercase border-b border-[#30363D]">
               <th className="text-left px-3 py-1.5">Mercado</th>
-              <th className="text-right px-2 py-1.5">Odd</th>
+              <th className="text-right px-2 py-1.5">Prob</th>
+              <th className="text-right px-2 py-1.5">Odd Mín</th>
               <th className="text-right px-2 py-1.5">Justa</th>
               <th className="text-right px-3 py-1.5">EV</th>
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="text-center text-gray-500 italic py-3 text-[11px]">Sem mercado com probabilidade relevante</td></tr>
+            )}
             {rows.map(r => {
               const odd = marketOdd(r.prob);
               const fair = fairOdd(r.prob);
@@ -537,8 +550,9 @@ function OddsValueBlock({ analysis }: { analysis: any }) {
               return (
                 <tr key={r.market} className="border-b border-[#30363D]/50 last:border-0">
                   <td className="px-3 py-1.5 font-medium text-white">{r.market}</td>
-                  <td className="text-right px-2 py-1.5 tabular-nums text-gray-300">{odd}</td>
-                  <td className="text-right px-2 py-1.5 tabular-nums text-gray-400">{fair}</td>
+                  <td className="text-right px-2 py-1.5 tabular-nums text-cyan-300">{r.prob}%</td>
+                  <td className="text-right px-2 py-1.5 tabular-nums text-gray-300">{odd.toFixed(2)}</td>
+                  <td className="text-right px-2 py-1.5 tabular-nums text-gray-400">{fair.toFixed(2)}</td>
                   <td className={`text-right px-3 py-1.5 tabular-nums font-bold ${evColor}`}>{evVal > 0 ? '+' : ''}{evVal}%</td>
                 </tr>
               );

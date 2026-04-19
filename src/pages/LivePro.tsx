@@ -675,14 +675,12 @@ function PerformanceBlock({ performance }: { performance: any }) {
   );
 }
 
-function Stat({ label, value, accent }: any) {
-  return (
-    <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-2 text-center">
-      <p className="text-[9px] text-gray-500 uppercase">{label}</p>
-      <p className={`text-base font-bold tabular-nums ${accent}`}>{value}</p>
-    </div>
-  );
-}
+const Stat = ({ label, value, accent }: any) => (
+  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-2 text-center">
+    <p className="text-[9px] text-gray-500 uppercase">{label}</p>
+    <p className={`text-base font-bold tabular-nums ${accent}`}>{value}</p>
+  </div>
+);
 
 function AutoModeBlock({ autoMode, setAutoMode, bankroll, setBankroll, exposure, setExposure }: any) {
   const exposureValue = (bankroll * exposure) / 100;

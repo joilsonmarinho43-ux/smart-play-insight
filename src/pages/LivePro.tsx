@@ -564,8 +564,8 @@ function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: (
         <div className={`text-3xl sm:text-4xl font-black ${actionStyles.text} tracking-tight`}>
           {actionStyles.icon} {actionStyles.label}
         </div>
-        <div className={`mt-1 text-[10px] font-bold ${filtersValidated >= 3 ? 'text-emerald-400' : 'text-gray-500'}`}>
-          FILTROS {filtersValidated}/5 {filtersValidated >= 3 ? '✓' : ''}
+        <div className={`mt-1 text-[10px] font-bold ${filtersValidated >= 4 ? 'text-emerald-400' : 'text-gray-500'}`}>
+          FILTROS {filtersValidated}/5 {filtersValidated >= 4 ? '✓' : ''}
         </div>
       </div>
       <div className="space-y-2 mb-4">

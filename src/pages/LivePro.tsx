@@ -38,7 +38,11 @@ function factorial(n: number): number { if (n <= 1) return 1; let r = 1; for (le
 function poissonPMF(l: number, k: number) { if (l <= 0) return k === 0 ? 1 : 0; return (Math.pow(l, k) * Math.exp(-l)) / factorial(k); }
 function poissonOver(lambda: number, threshold: number, currentTotal: number) {
   const need = Math.max(0, Math.ceil(threshold) - currentTotal);
-  if (need <= 0) return 99;
+  // Mercados já batidos: prob de mais 1 gol no tempo restante (nunca 100%)
+  if (need <= 0) {
+    const pNoMore = poissonPMF(lambda, 0);
+    return Math.max(50, Math.min(99, Math.round((1 - pNoMore * 0.5) * 100)));
+  }
   let cdf = 0;
   for (let k = 0; k <= need - 1; k++) cdf += poissonPMF(lambda, k);
   return Math.max(1, Math.min(99, Math.round((1 - cdf) * 100)));
@@ -64,7 +68,7 @@ function calculatePoisson(homeStats: any, awayStats: any, minute: number, totalG
 }
 
 interface SignalDecision {
-  action: 'ENTRAR' | 'AGUARDAR' | 'BLOQUEADO';
+  action: 'ENTRAR' | 'AGUARDAR' | 'AGUARDANDO' | 'BLOQUEADO';
   market: string;
   confidence: number;
   windowText: string;
@@ -195,35 +199,43 @@ const LivePro = () => {
 
     const totalGoals = homeGoals + awayGoals;
     const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
-    // Mercados já batidos → 100%
-    if (totalGoals >= 1) poisson.over05 = 100;
-    if (totalGoals >= 2) poisson.over15 = 100;
-    if (totalGoals >= 3) poisson.over25 = 100;
-    if (totalGoals >= 4) poisson.over35 = 100;
-    const homePI = pressure?.homePI || 0;
-    const awayPI = pressure?.awayPI || 0;
-    const narrative = buildPressureNarrative(homePI, awayPI, homeName, awayName);
-    const decision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
+    // Verifica integridade dos dados de pressão (DA + posse válidos)
+    const totalDA_check = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
+    const possessionValid = (homeStats?.possession || 0) > 0 || (awayStats?.possession || 0) > 0;
+    const pressureDataValid = totalDA_check > 0 || possessionValid;
+    const homePI = pressureDataValid ? (pressure?.homePI || 0) : 0;
+    const awayPI = pressureDataValid ? (pressure?.awayPI || 0) : 0;
+    const narrative = pressureDataValid
+      ? buildPressureNarrative(homePI, awayPI, homeName, awayName)
+      : 'Sem scouts disponíveis para esta partida';
+    const rawDecision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
 
-    // Filtros inteligentes (gatilhos reativos)
+    // Filtros inteligentes (gatilhos reativos) — só com dados válidos
     const maxPI = Math.max(homePI, awayPI);
-    const totalDA = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
+    const totalDA = totalDA_check;
     const daPerMin = totalDA / Math.max(minute, 1);
     const noGoalRecent = totalGoals === 0 && minute >= 20;
     const filters = [
-      { label: 'Pressão alta', ok: maxPI >= 60 },
-      { label: 'PI alto', ok: maxPI >= 50 },
-      { label: 'Ataques acima da média', ok: daPerMin >= 1.5 },
+      { label: 'Pressão alta', ok: pressureDataValid && maxPI >= 60 },
+      { label: 'PI alto', ok: pressureDataValid && maxPI >= 50 },
+      { label: 'Ataques acima da média', ok: pressureDataValid && daPerMin >= 1.5 },
       { label: 'Sem gol recente', ok: noGoalRecent },
-      { label: 'Odd com valor', ok: decision.action === 'ENTRAR' },
+      { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
-    const filtersOk = filtersValidated >= 3 && decision.action === 'ENTRAR';
+    const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';
+
+    // Gate final: ENTRAR só se ≥ 3/5 filtros validados; senão AGUARDANDO neutro
+    const decision: SignalDecision = filtersOk
+      ? rawDecision
+      : { ...rawDecision, action: 'AGUARDANDO', reason: rawDecision.action === 'ENTRAR'
+          ? `Sinal detectado mas só ${filtersValidated}/5 filtros validados • ${narrative}`
+          : rawDecision.reason };
 
     return {
       id, minute, homeGoals, awayGoals, homeName, awayName, homeStats, awayStats,
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
-      filters, filtersValidated, filtersOk,
+      filters, filtersValidated, filtersOk, pressureDataValid,
     };
   }, [selectedMatch]);
 
@@ -439,13 +451,15 @@ function ScoreHeader({ analysis, match }: { analysis: any; match: any }) {
 }
 
 function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: () => void }) {
-  const { decision } = analysis;
+  const { decision, filtersValidated } = analysis;
   const actionStyles = {
-    ENTRAR: { bg: 'bg-emerald-500/15', border: 'border-emerald-500', text: 'text-emerald-400', btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', icon: '🟢' },
-    AGUARDAR: { bg: 'bg-yellow-500/15', border: 'border-yellow-500', text: 'text-yellow-400', btn: 'bg-yellow-600 hover:bg-yellow-700 text-white', icon: '🟡' },
-    BLOQUEADO: { bg: 'bg-red-500/15', border: 'border-red-500', text: 'text-red-400', btn: 'bg-gray-600 cursor-not-allowed text-gray-300', icon: '🔴' },
-  }[decision.action];
+    ENTRAR: { bg: 'bg-emerald-500/15', border: 'border-emerald-500', text: 'text-emerald-400', btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', icon: '🟢', label: 'ENTRAR' },
+    AGUARDANDO: { bg: 'bg-[#161B22]', border: 'border-[#30363D]', text: 'text-gray-400', btn: 'bg-[#21262d] hover:bg-[#2d333b] text-gray-300 border border-[#30363D]', icon: '⏳', label: 'AGUARDANDO' },
+    AGUARDAR: { bg: 'bg-[#161B22]', border: 'border-[#30363D]', text: 'text-gray-400', btn: 'bg-[#21262d] hover:bg-[#2d333b] text-gray-300 border border-[#30363D]', icon: '⏳', label: 'AGUARDANDO' },
+    BLOQUEADO: { bg: 'bg-red-500/10', border: 'border-red-500/50', text: 'text-red-400', btn: 'bg-gray-700 cursor-not-allowed text-gray-400', icon: '🔴', label: 'BLOQUEADO' },
+  }[decision.action as 'ENTRAR' | 'AGUARDANDO' | 'AGUARDAR' | 'BLOQUEADO'];
   const strengthMap = { forte: '🔥🔥🔥', médio: '🔥🔥', fraco: '🔥' };
+  const isWaiting = decision.action !== 'ENTRAR';
 
   return (
     <div className={`${actionStyles.bg} border-2 ${actionStyles.border} rounded-xl p-4 shadow-lg`}>
@@ -455,73 +469,81 @@ function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: (
       </div>
       <div className="text-center mb-3">
         <div className={`text-3xl sm:text-4xl font-black ${actionStyles.text} tracking-tight`}>
-          {actionStyles.icon} {decision.action}
+          {actionStyles.icon} {actionStyles.label}
+        </div>
+        <div className={`mt-1 text-[10px] font-bold ${filtersValidated >= 3 ? 'text-emerald-400' : 'text-gray-500'}`}>
+          FILTROS {filtersValidated}/5 {filtersValidated >= 3 ? '✓' : ''}
         </div>
       </div>
       <div className="space-y-2 mb-4">
         <div className="bg-[#0D1117]/50 rounded-lg px-3 py-2 border border-[#30363D]">
           <p className="text-[10px] text-gray-500 uppercase">Mercado</p>
-          <p className="font-bold text-sm text-white">{decision.market}</p>
+          <p className={`font-bold text-sm ${isWaiting ? 'text-gray-400' : 'text-white'}`}>{decision.market}</p>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-[#0D1117]/50 rounded-lg px-2 py-1.5 border border-[#30363D]">
             <p className="text-[9px] text-gray-500 uppercase">Confiança</p>
-            <p className={`font-bold text-base ${actionStyles.text}`}>{decision.confidence}%</p>
+            <p className={`font-bold text-base ${isWaiting ? 'text-gray-400' : actionStyles.text}`}>{decision.confidence}%</p>
           </div>
           <div className="bg-[#0D1117]/50 rounded-lg px-2 py-1.5 border border-[#30363D]">
             <p className="text-[9px] text-gray-500 uppercase">Força</p>
-            <p className="font-bold text-base text-white">{strengthMap[decision.strength]}</p>
+            <p className={`font-bold text-base ${isWaiting ? 'text-gray-500' : 'text-white'}`}>{strengthMap[decision.strength]}</p>
           </div>
         </div>
         <div className="bg-[#0D1117]/50 rounded-lg px-3 py-2 border border-[#30363D]">
           <p className="text-[10px] text-gray-500 uppercase">Janela ideal</p>
-          <p className="font-bold text-sm text-white">{decision.windowText}</p>
+          <p className={`font-bold text-sm ${isWaiting ? 'text-gray-400' : 'text-white'}`}>{decision.windowText}</p>
         </div>
         <p className="text-[10px] text-gray-400 italic px-1">{decision.reason}</p>
       </div>
       <Button
         onClick={onGenerate}
-        disabled={decision.action === 'BLOQUEADO'}
+        disabled={isWaiting || decision.action === 'BLOQUEADO'}
         className={`w-full font-bold text-sm h-11 ${actionStyles.btn}`}
       >
-        <Zap className="w-4 h-4 mr-2" /> GERAR ENTRADA
+        <Zap className="w-4 h-4 mr-2" /> {isWaiting ? 'AGUARDANDO SINAL' : 'GERAR ENTRADA'}
       </Button>
     </div>
   );
 }
 
 function KpiGrid({ analysis }: { analysis: any }) {
-  const { pressure, homeStats, awayStats } = analysis;
+  const { pressure, homeStats, awayStats, pressureDataValid } = analysis;
   const homePI = pressure?.homePI || 0;
   const awayPI = pressure?.awayPI || 0;
   const totalPI = homePI + awayPI || 1;
-  const homeShare = Math.round((homePI / totalPI) * 100);
+  const homeShare = pressureDataValid ? Math.round((homePI / totalPI) * 100) : 50;
   const homeDA = homeStats?.dangerousAttacks || 0;
   const awayDA = awayStats?.dangerousAttacks || 0;
   const daDiff = Math.abs(homeDA - awayDA);
-  const homePoss = homeStats?.possession || 50;
-  const awayPoss = awayStats?.possession || 50;
+  const homePoss = homeStats?.possession ?? 0;
+  const awayPoss = awayStats?.possession ?? 0;
+  const possessionValid = homePoss > 0 || awayPoss > 0;
   const maxPI = Math.max(homePI, awayPI);
 
-  const piColor = maxPI >= 60 ? 'text-red-400' : maxPI >= 40 ? 'text-yellow-400' : 'text-emerald-400';
+  const piColor = !pressureDataValid ? 'text-gray-500' : maxPI >= 60 ? 'text-red-400' : maxPI >= 40 ? 'text-yellow-400' : 'text-emerald-400';
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-      <KpiCard icon={Flame} label="Pressão" valueText={`${homeShare}% / ${100 - homeShare}%`} accent="text-orange-400">
-        <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
-          <div className="h-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${homeShare}%` }} />
-        </div>
+      <KpiCard icon={Flame} label="Pressão" valueText={pressureDataValid ? `${homeShare}% / ${100 - homeShare}%` : 'N/A'} accent={pressureDataValid ? 'text-orange-400' : 'text-gray-500'}>
+        {pressureDataValid ? (
+          <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
+            <div className="h-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${homeShare}%` }} />
+          </div>
+        ) : <p className="text-[9px] text-gray-600 mt-1">Sem scouts</p>}
       </KpiCard>
-      <KpiCard icon={Zap} label="Ataques Perigosos" valueText={`${homeDA} vs ${awayDA}`} accent="text-yellow-400">
-        <p className="text-[9px] text-gray-500 mt-1">Δ {daDiff}</p>
+      <KpiCard icon={Zap} label="Ataques Perigosos" valueText={pressureDataValid ? `${homeDA} vs ${awayDA}` : 'N/A'} accent={pressureDataValid ? 'text-yellow-400' : 'text-gray-500'}>
+        <p className="text-[9px] text-gray-500 mt-1">{pressureDataValid ? `Δ ${daDiff}` : 'Sem dados'}</p>
       </KpiCard>
-      <KpiCard icon={Activity} label="Posse" valueText={`${homePoss}% / ${awayPoss}%`} accent="text-cyan-400">
-        <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
-          <div className="h-full bg-cyan-500" style={{ width: `${homePoss}%` }} />
-        </div>
+      <KpiCard icon={Activity} label="Posse" valueText={possessionValid ? `${homePoss}% / ${awayPoss}%` : 'N/A'} accent={possessionValid ? 'text-cyan-400' : 'text-gray-500'}>
+        {possessionValid ? (
+          <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
+            <div className="h-full bg-cyan-500" style={{ width: `${homePoss}%` }} />
+          </div>
+        ) : <p className="text-[9px] text-gray-600 mt-1">Sem scouts</p>}
       </KpiCard>
-      <KpiCard icon={TrendingUp} label="Índice PI" valueText={`${homePI.toFixed(1)} / ${awayPI.toFixed(1)}`} accent={piColor}>
-        <p className="text-[9px] text-gray-500 mt-1">Máx {maxPI.toFixed(1)}</p>
+      <KpiCard icon={TrendingUp} label="Índice PI" valueText={pressureDataValid ? `${homePI.toFixed(1)} / ${awayPI.toFixed(1)}` : 'N/A'} accent={piColor}>
+        <p className="text-[9px] text-gray-500 mt-1">{pressureDataValid ? `Máx ${maxPI.toFixed(1)}` : 'Aguardando API'}</p>
       </KpiCard>
     </div>
   );

@@ -210,6 +210,7 @@ const LivePro = () => {
   const { performance, registerSignal, resolve } = useHybridPerformance();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(false);
+  const [testMode, setTestMode] = useState(false);
   const [bankroll, setBankroll] = useState(() => Number(localStorage.getItem('livepro_bankroll') || '1000'));
   const [exposure, setExposure] = useState(() => Number(localStorage.getItem('livepro_exposure') || '5'));
 

@@ -199,12 +199,6 @@ const LivePro = () => {
 
     const totalGoals = homeGoals + awayGoals;
     const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
-    // Mercados já batidos → 100%
-    if (totalGoals >= 1) poisson.over05 = 100;
-    if (totalGoals >= 2) poisson.over15 = 100;
-    if (totalGoals >= 3) poisson.over25 = 100;
-    const totalGoals = homeGoals + awayGoals;
-    const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
     // Verifica integridade dos dados de pressão (DA + posse válidos)
     const totalDA_check = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
     const possessionValid = (homeStats?.possession || 0) > 0 || (awayStats?.possession || 0) > 0;

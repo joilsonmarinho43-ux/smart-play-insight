@@ -308,7 +308,7 @@ const LivePro = () => {
     const filtersValidated = filters.filter(f => f.ok).length;
     const filtersOk = filtersValidated >= 4 && rawDecision.action === 'ENTRAR';
 
-    // Gate final: ENTRAR só se ≥ 3/5 filtros validados; senão AGUARDANDO neutro
+    // Gate final: ENTRAR só se ≥ 4/5 filtros validados; senão AGUARDANDO neutro
     const decision: SignalDecision = filtersOk
       ? rawDecision
       : { ...rawDecision, action: 'AGUARDANDO', reason: rawDecision.action === 'ENTRAR'

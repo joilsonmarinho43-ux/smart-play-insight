@@ -480,7 +480,7 @@ const LivePro = () => {
             <EntrySuggestion analysis={analysis} bankroll={bankroll} />
 
             {/* Filtros Inteligentes */}
-            <SmartFilters analysis={analysis} />
+            <SmartFilters analysis={analysis} sensitivity={sensitivity} setSensitivity={setSensitivity} />
 
             {/* Gráficos (colapsável no mobile) */}
             <ChartsBlock analysis={analysis} />
@@ -835,12 +835,17 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
   );
 }
 
-function SmartFilters({ analysis }: { analysis: any }) {
+function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: any; sensitivity: string; setSensitivity: (v: any) => void }) {
   const filters = analysis.filters as { label: string; ok: boolean; detail: string }[];
   const validated = analysis.filtersValidated as number;
+  const modes = [
+    { key: 'conservador', label: '🛡️ Conservador', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
+    { key: 'moderado', label: '⚖️ Moderado', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },
+    { key: 'agressivo', label: '🔥 Agressivo', color: 'bg-red-500/20 text-red-400 border-red-500/40' },
+  ];
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
@@ -848,6 +853,18 @@ function SmartFilters({ analysis }: { analysis: any }) {
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${validated >= 4 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
           {validated}/5 OK
         </span>
+      </div>
+      {/* Sensitivity selector */}
+      <div className="flex gap-1 mb-3">
+        {modes.map(m => (
+          <button
+            key={m.key}
+            onClick={() => setSensitivity(m.key)}
+            className={`flex-1 text-[9px] font-bold py-1.5 rounded-lg border transition-all ${sensitivity === m.key ? m.color : 'bg-[#0D1117] text-gray-500 border-[#30363D] hover:border-gray-500'}`}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
       <div className="space-y-1.5">
         {filters.map(f => (

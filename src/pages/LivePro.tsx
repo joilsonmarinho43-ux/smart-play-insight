@@ -363,6 +363,8 @@ const LivePro = () => {
     console.log('[AUTO-MODE] ✓ EXECUTANDO entrada automática', {
       market: analysis.decision.market, stake: `R$ ${stakeValue.toFixed(2)}`,
     });
+    // Enviar sinal ao Telegram automaticamente
+    sendTelegramSignal(analysis);
     if (analysis.hybrid && analysis.hybrid.canExecute) {
       registerSignal(analysis.hybrid).then(row => {
         if (row) toast.success(`AUTO: ${analysis.decision.market}`, {

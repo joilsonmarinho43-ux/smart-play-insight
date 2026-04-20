@@ -105,6 +105,21 @@ const Admin = () => {
     setConflicts(prev => prev.map(c => ({ ...c, seen: true })));
   };
 
+  const checkSignalResults = async () => {
+    setCheckingResults(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-signal-results');
+      if (error) throw error;
+      toast.success(`Verificação concluída: ${data?.processed || 0} sinais atualizados`);
+      fetchSignals();
+    } catch (e) {
+      console.error('Check results failed:', e);
+      toast.error('Erro ao verificar resultados');
+    } finally {
+      setCheckingResults(false);
+    }
+  };
+
   const grantDays = async (userId: string, days: number) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;

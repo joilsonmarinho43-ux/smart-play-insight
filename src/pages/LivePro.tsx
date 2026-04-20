@@ -32,17 +32,20 @@ interface PoissonProbs {
   over25: number;
   over35: number;
   expectedGoals: number;
+  /** Markets already achieved — UI should show "Concluído" */
+  completed: Set<string>;
 }
 
 function factorial(n: number): number { if (n <= 1) return 1; let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
 function poissonPMF(l: number, k: number) { if (l <= 0) return k === 0 ? 1 : 0; return (Math.pow(l, k) * Math.exp(-l)) / factorial(k); }
-function poissonOver(lambda: number, threshold: number, currentTotal: number) {
+
+/**
+ * Calcula probabilidade de MAIS gols acontecerem no tempo restante.
+ * Para mercados já batidos retorna -1 (sinaliza "Concluído").
+ */
+function poissonOverFuture(lambda: number, threshold: number, currentTotal: number): number {
   const need = Math.max(0, Math.ceil(threshold) - currentTotal);
-  // Mercados já batidos: prob de mais 1 gol no tempo restante (nunca 100%)
-  if (need <= 0) {
-    const pNoMore = poissonPMF(lambda, 0);
-    return Math.max(50, Math.min(99, Math.round((1 - pNoMore * 0.5) * 100)));
-  }
+  if (need <= 0) return -1; // Mercado já concluído
   let cdf = 0;
   for (let k = 0; k <= need - 1; k++) cdf += poissonPMF(lambda, k);
   return Math.max(1, Math.min(99, Math.round((1 - cdf) * 100)));
@@ -52,18 +55,35 @@ function calculatePoisson(homeStats: any, awayStats: any, minute: number, totalG
   const h = homeStats || {};
   const a = awayStats || {};
   const safeMin = Math.max(minute, 1);
-  const remaining = Math.max(90 - minute, 0);
-  const totalShots = (h.totalShots || 0) + (a.totalShots || 0);
+  const remaining = Math.max(90 - minute, 1);
+
+  // xG proxy: shots on goal * 0.22 + total shots * 0.08
   const totalSoG = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
-  const conversion = totalShots > 0 ? totalSoG / totalShots : 0.3;
-  const shotsPerMin = totalShots / safeMin;
-  const lambda = shotsPerMin * conversion * remaining * 0.10;
+  const totalShots = (h.totalShots || 0) + (a.totalShots || 0);
+  const xgSoFar = totalSoG * 0.22 + totalShots * 0.08;
+
+  // Project xG for remaining time based on current rate
+  const xgPerMin = xgSoFar / safeMin;
+  const lambda = Math.max(0.05, xgPerMin * remaining);
+
+  const completed = new Set<string>();
+  const raw05 = poissonOverFuture(lambda, 0.5, totalGoals);
+  const raw15 = poissonOverFuture(lambda, 1.5, totalGoals);
+  const raw25 = poissonOverFuture(lambda, 2.5, totalGoals);
+  const raw35 = poissonOverFuture(lambda, 3.5, totalGoals);
+
+  if (raw05 === -1) completed.add('Over 0.5');
+  if (raw15 === -1) completed.add('Over 1.5');
+  if (raw25 === -1) completed.add('Over 2.5');
+  if (raw35 === -1) completed.add('Over 3.5');
+
   return {
-    over05: poissonOver(lambda, 0.5, totalGoals),
-    over15: poissonOver(lambda, 1.5, totalGoals),
-    over25: poissonOver(lambda, 2.5, totalGoals),
-    over35: poissonOver(lambda, 3.5, totalGoals),
+    over05: raw05 === -1 ? 0 : raw05,
+    over15: raw15 === -1 ? 0 : raw15,
+    over25: raw25 === -1 ? 0 : raw25,
+    over35: raw35 === -1 ? 0 : raw35,
     expectedGoals: Math.round((totalGoals + lambda) * 10) / 10,
+    completed,
   };
 }
 
@@ -210,17 +230,34 @@ const LivePro = () => {
       : 'Sem scouts disponíveis para esta partida';
     const rawDecision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
 
-    // Filtros inteligentes (gatilhos reativos) — só com dados válidos
+    // Filtros inteligentes (gatilhos reativos) — sensibilidade melhorada
     const maxPI = Math.max(homePI, awayPI);
     const totalDA = totalDA_check;
     const daPerMin = totalDA / Math.max(minute, 1);
     const noGoalRecent = totalGoals === 0 && minute >= 20;
+
+    // PI trend: verifica se PI subiu ≥10% nos últimos 5 snapshots
+    let piTrending = false;
+    if (history.length >= 2) {
+      const recent = history.slice(-5);
+      const oldest = Math.max(recent[0].homePI, recent[0].awayPI);
+      const newest = Math.max(recent[recent.length - 1].homePI, recent[recent.length - 1].awayPI);
+      if (oldest > 0 && ((newest - oldest) / oldest) >= 0.10) piTrending = true;
+    }
+
+    // Pressão Alta: PI ≥ 60 OU trending up ≥10% nos últimos 5min
+    const pressaoAlta = pressureDataValid && (maxPI >= 60 || piTrending);
+    // PI Alto: threshold mais acessível (≥ 40 ao invés de 50)
+    const piAlto = pressureDataValid && maxPI >= 40;
+    // Ataques: threshold mais acessível (≥ 1.0/min ao invés de 1.5)
+    const ataquesAltos = pressureDataValid && daPerMin >= 1.0;
+
     const filters = [
-      { label: 'Pressão alta', ok: pressureDataValid && maxPI >= 60 },
-      { label: 'PI alto', ok: pressureDataValid && maxPI >= 50 },
-      { label: 'Ataques acima da média', ok: pressureDataValid && daPerMin >= 1.5 },
-      { label: 'Sem gol recente', ok: noGoalRecent },
-      { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR' },
+      { label: 'Pressão alta', ok: pressaoAlta, detail: pressureDataValid ? `PI ${maxPI.toFixed(0)}${piTrending ? ' ↑' : ''}` : 'N/A' },
+      { label: 'PI alto', ok: piAlto, detail: pressureDataValid ? `${maxPI.toFixed(1)}` : 'N/A' },
+      { label: 'Ataques ≥1/min', ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
+      { label: 'Sem gol recente', ok: noGoalRecent, detail: noGoalRecent ? `0 gols em ${minute}'` : `${totalGoals} gol(s)` },
+      { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR', detail: rawDecision.action === 'ENTRAR' ? `${rawDecision.confidence}%` : '—' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
     const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';

@@ -3,7 +3,7 @@
  * Mantém todas as regras de negócio existentes; apenas reorganiza a apresentação.
  * Responsivo: 1 coluna (mobile) → 2 colunas (tablet) → 3 colunas (desktop)
  */
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -72,38 +72,52 @@ interface SignalDecision {
   reason: string;
 }
 
+/** Texto descritivo coerente com os dados de pressão reais */
+function buildPressureNarrative(homePI: number, awayPI: number, homeName: string, awayName: string): string {
+  const total = homePI + awayPI;
+  if (total < 1) return 'Sem pressão relevante registrada';
+  const homeShare = Math.round((homePI / total) * 100);
+  const awayShare = 100 - homeShare;
+  const dom = homeShare >= awayShare ? homeName : awayName;
+  const share = Math.max(homeShare, awayShare);
+  if (share >= 70) return `${dom} dominando (${share}% da pressão)`;
+  if (share >= 58) return `${dom} pressionando (${share}% da pressão)`;
+  return `Pressão equilibrada (${homeShare}% / ${awayShare}%)`;
+}
+
 function buildSignalDecision(
   hybrid: HybridSignal | null,
   sniper: SniperSignal | null,
   topStrategy: LiveStrategy | undefined,
   minute: number,
+  pressureNarrative: string,
 ): SignalDecision {
-  // Hybrid SNIPER tem prioridade máxima
+  const enrich = (base: string) => `${base} • ${pressureNarrative}`;
   if (hybrid && hybrid.tier === 'SNIPER' && hybrid.canExecute) {
     return {
       action: 'ENTRAR', market: hybrid.market, confidence: 85,
       windowText: `${minute}'–${Math.min(minute + 15, 45)}'`,
-      strength: 'forte', reason: hybrid.executionReason,
+      strength: 'forte', reason: enrich(hybrid.executionReason),
     };
   }
   if (hybrid && hybrid.tier === 'SEMI' && hybrid.canExecute) {
     return {
       action: 'ENTRAR', market: hybrid.market, confidence: 72,
       windowText: `${minute}'–${Math.min(minute + 20, 60)}'`,
-      strength: 'médio', reason: hybrid.executionReason,
+      strength: 'médio', reason: enrich(hybrid.executionReason),
     };
   }
   if (sniper?.canExecute) {
     return {
       action: 'ENTRAR', market: sniper.market, confidence: 78,
       windowText: `${minute}'–${Math.min(minute + 15, 45)}'`,
-      strength: 'forte', reason: sniper.executionReason,
+      strength: 'forte', reason: enrich(sniper.executionReason),
     };
   }
   if (hybrid && !hybrid.canExecute) {
     return {
       action: 'BLOQUEADO', market: hybrid.market, confidence: hybrid.tier === 'SNIPER' ? 80 : 65,
-      windowText: '—', strength: 'fraco', reason: hybrid.executionReason,
+      windowText: '—', strength: 'fraco', reason: enrich(hybrid.executionReason),
     };
   }
   if (topStrategy && topStrategy.signal === 'entry' && topStrategy.confidence >= 60) {
@@ -111,14 +125,14 @@ function buildSignalDecision(
       action: 'ENTRAR', market: topStrategy.market, confidence: topStrategy.confidence,
       windowText: `${minute}'–${Math.min(minute + 15, 90)}'`,
       strength: topStrategy.confidence >= 75 ? 'forte' : 'médio',
-      reason: topStrategy.reason,
+      reason: enrich(topStrategy.reason),
     };
   }
   return {
     action: 'AGUARDAR', market: topStrategy?.market || 'Aguardando padrão',
     confidence: topStrategy?.confidence || 0,
     windowText: '—', strength: 'fraco',
-    reason: topStrategy?.reason || 'Sem sinal de alta confiança no momento',
+    reason: enrich(topStrategy?.reason || 'Sem sinal de alta confiança no momento'),
   };
 }
 
@@ -181,13 +195,80 @@ const LivePro = () => {
 
     const totalGoals = homeGoals + awayGoals;
     const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
-    const decision = buildSignalDecision(hybrid, sniper, strategies[0], minute);
+    // Mercados já batidos → 100%
+    if (totalGoals >= 1) poisson.over05 = 100;
+    if (totalGoals >= 2) poisson.over15 = 100;
+    if (totalGoals >= 3) poisson.over25 = 100;
+    if (totalGoals >= 4) poisson.over35 = 100;
+    const homePI = pressure?.homePI || 0;
+    const awayPI = pressure?.awayPI || 0;
+    const narrative = buildPressureNarrative(homePI, awayPI, homeName, awayName);
+    const decision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
+
+    // Filtros inteligentes (gatilhos reativos)
+    const maxPI = Math.max(homePI, awayPI);
+    const totalDA = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
+    const daPerMin = totalDA / Math.max(minute, 1);
+    const noGoalRecent = totalGoals === 0 && minute >= 20;
+    const filters = [
+      { label: 'Pressão alta', ok: maxPI >= 60 },
+      { label: 'PI alto', ok: maxPI >= 50 },
+      { label: 'Ataques acima da média', ok: daPerMin >= 1.5 },
+      { label: 'Sem gol recente', ok: noGoalRecent },
+      { label: 'Odd com valor', ok: decision.action === 'ENTRAR' },
+    ];
+    const filtersValidated = filters.filter(f => f.ok).length;
+    const filtersOk = filtersValidated >= 3 && decision.action === 'ENTRAR';
 
     return {
       id, minute, homeGoals, awayGoals, homeName, awayName, homeStats, awayStats,
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
+      filters, filtersValidated, filtersOk,
     };
   }, [selectedMatch]);
+
+  // Auto-Mode: monitora sinal e dispara entrada interna quando filtros validados
+  const autoExecutedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!autoMode || !analysis) return;
+    const key = `${analysis.id}-${analysis.decision.market}-${analysis.minute}`;
+    const prevKey = `${analysis.id}-${analysis.decision.market}`;
+
+    console.log('[AUTO-MODE]', {
+      match: `${analysis.homeName} vs ${analysis.awayName}`,
+      minute: analysis.minute,
+      action: analysis.decision.action,
+      market: analysis.decision.market,
+      confidence: analysis.decision.confidence,
+      filtersValidated: `${analysis.filtersValidated}/5`,
+      filtersOk: analysis.filtersOk,
+    });
+
+    if (!analysis.filtersOk) {
+      console.log('[AUTO-MODE] ✗ Entrada recusada — filtros insuficientes ou sem sinal ENTRAR');
+      return;
+    }
+    if ([...autoExecutedRef.current].some(k => k.startsWith(prevKey))) {
+      console.log('[AUTO-MODE] ✗ Entrada já executada para este mercado neste jogo');
+      return;
+    }
+    autoExecutedRef.current.add(key);
+    const stakeValue = (bankroll * exposure) / 100;
+    console.log('[AUTO-MODE] ✓ EXECUTANDO entrada automática', {
+      market: analysis.decision.market, stake: `R$ ${stakeValue.toFixed(2)}`,
+    });
+    if (analysis.hybrid && analysis.hybrid.canExecute) {
+      registerSignal(analysis.hybrid).then(row => {
+        if (row) toast.success(`AUTO: ${analysis.decision.market}`, {
+          description: `Stake R$ ${stakeValue.toFixed(2)} • ${analysis.minute}'`,
+        });
+      });
+    } else {
+      toast.success(`AUTO (simulado): ${analysis.decision.market}`, {
+        description: `Stake R$ ${stakeValue.toFixed(2)} • ${analysis.minute}'`,
+      });
+    }
+  }, [autoMode, analysis, bankroll, exposure, registerSignal]);
 
   const handleGenerateEntry = useCallback(async () => {
     if (!analysis) return;
@@ -297,6 +378,7 @@ const LivePro = () => {
               autoMode={autoMode} setAutoMode={setAutoMode}
               bankroll={bankroll} setBankroll={setBankroll}
               exposure={exposure} setExposure={setExposure}
+              analysis={analysis}
             />
           </div>
 
@@ -604,25 +686,18 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
 }
 
 function SmartFilters({ analysis }: { analysis: any }) {
-  const { pressure, homeStats, awayStats, minute, decision } = analysis;
-  const maxPI = Math.max(pressure?.homePI || 0, pressure?.awayPI || 0);
-  const totalDA = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
-  const daPerMin = totalDA / Math.max(minute, 1);
-  const recentNoGoal = analysis.totalGoals === 0 && minute >= 20;
-
-  const filters = [
-    { label: 'Pressão alta', ok: maxPI >= 60 },
-    { label: 'PI alto', ok: maxPI >= 50 },
-    { label: 'Ataques acima da média', ok: daPerMin >= 1.5 },
-    { label: 'Sem gol recente', ok: recentNoGoal || analysis.totalGoals === 0 },
-    { label: 'Odd com valor', ok: decision.action === 'ENTRAR' },
-  ];
-
+  const filters = analysis.filters as { label: string; ok: boolean }[];
+  const validated = analysis.filtersValidated as number;
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-        <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
+        </div>
+        <span className={`text-[10px] font-bold ${validated >= 3 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+          {validated}/5 OK
+        </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
         {filters.map(f => (
@@ -696,38 +771,52 @@ const Stat = ({ label, value, accent }: any) => (
   </div>
 );
 
-function AutoModeBlock({ autoMode, setAutoMode, bankroll, setBankroll, exposure, setExposure }: any) {
+function AutoModeBlock({ autoMode, setAutoMode, bankroll, setBankroll, exposure, setExposure, analysis }: any) {
   const exposureValue = (bankroll * exposure) / 100;
+  const validated = analysis?.filtersValidated ?? 0;
+  const ready = analysis?.filtersOk;
+
+  // Log mudanças de toggle
+  useEffect(() => {
+    console.log(`[AUTO-MODE] toggle ${autoMode ? 'ATIVADO ✓' : 'DESATIVADO ✗'}`, {
+      bankroll, exposure, exposicaoMax: exposureValue,
+    });
+  }, [autoMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Bot className={`w-4 h-4 ${autoMode ? 'text-emerald-400' : 'text-gray-500'}`} />
+          <Bot className={`w-4 h-4 ${autoMode ? 'text-emerald-400 animate-pulse' : 'text-gray-500'}`} />
           <h3 className="font-bold text-sm text-white">MODO AUTOMÁTICO</h3>
         </div>
         <Switch checked={autoMode} onCheckedChange={setAutoMode} />
       </div>
       {autoMode && (
-        <p className="text-[10px] text-yellow-400 mb-3 italic">⚠️ UI ativa — execução manual ainda obrigatória</p>
+        <div className={`text-[10px] mb-3 px-2 py-1.5 rounded border ${ready ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'}`}>
+          {ready
+            ? `✓ Pronto para executar — ${validated}/5 filtros OK • sinal ENTRAR`
+            : `⏸ Monitorando — ${validated}/5 filtros validados (precisa ≥3 + ENTRAR)`}
+        </div>
       )}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-[9px] text-gray-500 uppercase">Banca (R$)</label>
           <input
-            type="number" value={bankroll} onChange={e => setBankroll(Number(e.target.value))}
+            type="number" min={0} value={bankroll} onChange={e => setBankroll(Number(e.target.value))}
             className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-sm text-white mt-1"
           />
         </div>
         <div>
           <label className="text-[9px] text-gray-500 uppercase">Exposição máx (%)</label>
           <input
-            type="number" value={exposure} onChange={e => setExposure(Number(e.target.value))}
+            type="number" min={0} max={100} value={exposure} onChange={e => setExposure(Number(e.target.value))}
             className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-sm text-white mt-1"
           />
         </div>
       </div>
       <div className="mt-2 text-center text-[10px] text-gray-400">
-        Exposição máx: <span className="text-orange-400 font-bold">R$ {exposureValue.toFixed(2)}</span>
+        Exposição máx: <span className="text-orange-400 font-bold tabular-nums">R$ {exposureValue.toFixed(2)}</span>
       </div>
     </div>
   );

@@ -451,13 +451,15 @@ function ScoreHeader({ analysis, match }: { analysis: any; match: any }) {
 }
 
 function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: () => void }) {
-  const { decision } = analysis;
+  const { decision, filtersValidated } = analysis;
   const actionStyles = {
-    ENTRAR: { bg: 'bg-emerald-500/15', border: 'border-emerald-500', text: 'text-emerald-400', btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', icon: '🟢' },
-    AGUARDAR: { bg: 'bg-yellow-500/15', border: 'border-yellow-500', text: 'text-yellow-400', btn: 'bg-yellow-600 hover:bg-yellow-700 text-white', icon: '🟡' },
-    BLOQUEADO: { bg: 'bg-red-500/15', border: 'border-red-500', text: 'text-red-400', btn: 'bg-gray-600 cursor-not-allowed text-gray-300', icon: '🔴' },
-  }[decision.action];
+    ENTRAR: { bg: 'bg-emerald-500/15', border: 'border-emerald-500', text: 'text-emerald-400', btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', icon: '🟢', label: 'ENTRAR' },
+    AGUARDANDO: { bg: 'bg-[#161B22]', border: 'border-[#30363D]', text: 'text-gray-400', btn: 'bg-[#21262d] hover:bg-[#2d333b] text-gray-300 border border-[#30363D]', icon: '⏳', label: 'AGUARDANDO' },
+    AGUARDAR: { bg: 'bg-[#161B22]', border: 'border-[#30363D]', text: 'text-gray-400', btn: 'bg-[#21262d] hover:bg-[#2d333b] text-gray-300 border border-[#30363D]', icon: '⏳', label: 'AGUARDANDO' },
+    BLOQUEADO: { bg: 'bg-red-500/10', border: 'border-red-500/50', text: 'text-red-400', btn: 'bg-gray-700 cursor-not-allowed text-gray-400', icon: '🔴', label: 'BLOQUEADO' },
+  }[decision.action as 'ENTRAR' | 'AGUARDANDO' | 'AGUARDAR' | 'BLOQUEADO'];
   const strengthMap = { forte: '🔥🔥🔥', médio: '🔥🔥', fraco: '🔥' };
+  const isWaiting = decision.action !== 'ENTRAR';
 
   return (
     <div className={`${actionStyles.bg} border-2 ${actionStyles.border} rounded-xl p-4 shadow-lg`}>

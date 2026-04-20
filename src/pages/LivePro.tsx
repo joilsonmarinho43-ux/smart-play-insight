@@ -285,33 +285,38 @@ const LivePro = () => {
     const daPerMin = totalDA / Math.max(minute, 1);
     const noGoalRecent = totalGoals === 0 && minute >= 20;
 
-    // PI trend: verifica se PI subiu ≥8% nos últimos 5 snapshots
+    // PI trend: verifica se PI subiu nos últimos 5 snapshots
+    const trendThreshold = sensitivity === 'agressivo' ? 0.05 : sensitivity === 'moderado' ? 0.08 : 0.12;
     let piTrending = false;
     if (history.length >= 2) {
       const recent = history.slice(-5);
       const oldest = Math.max(recent[0].homePI, recent[0].awayPI);
       const newest = Math.max(recent[recent.length - 1].homePI, recent[recent.length - 1].awayPI);
-      if (oldest > 0 && ((newest - oldest) / oldest) >= 0.08) piTrending = true;
+      if (oldest > 0 && ((newest - oldest) / oldest) >= trendThreshold) piTrending = true;
     }
 
-    // Pressão Alta: PI ≥ 45 OU trending up ≥8% nos últimos 5min
-    const pressaoAlta = pressureDataValid && (maxPI >= 45 || piTrending);
-    // PI Alto: threshold acessível (≥ 30)
-    const piAlto = pressureDataValid && maxPI >= 30;
-    // Ataques: threshold acessível (≥ 0.7/min)
-    const ataquesAltos = pressureDataValid && daPerMin >= 0.7;
-    // Sem gol recente OU placar baixo (≤1 gol) após 25min — indica pressão acumulada
-    const pressaoAcumulada = (noGoalRecent) || (totalGoals <= 1 && minute >= 25);
+    // Thresholds por sensibilidade
+    const thresholds = {
+      conservador: { piPressao: 60, piAlto: 45, daMin: 1.0, minGate: 4, goalsCap: 0, minuteCap: 30 },
+      moderado:    { piPressao: 45, piAlto: 30, daMin: 0.7, minGate: 3, goalsCap: 1, minuteCap: 25 },
+      agressivo:   { piPressao: 30, piAlto: 20, daMin: 0.5, minGate: 2, goalsCap: 2, minuteCap: 20 },
+    }[sensitivity];
 
+    const pressaoAlta = pressureDataValid && (maxPI >= thresholds.piPressao || piTrending);
+    const piAlto = pressureDataValid && maxPI >= thresholds.piAlto;
+    const ataquesAltos = pressureDataValid && daPerMin >= thresholds.daMin;
+    const pressaoAcumulada = (noGoalRecent) || (totalGoals <= thresholds.goalsCap && minute >= thresholds.minuteCap);
+
+    const daLabel = `Ataques ≥${thresholds.daMin}/min`;
     const filters = [
       { label: 'Pressão alta', ok: pressaoAlta, detail: pressureDataValid ? `PI ${maxPI.toFixed(0)}${piTrending ? ' ↑' : ''}` : 'N/A' },
       { label: 'PI alto', ok: piAlto, detail: pressureDataValid ? `${maxPI.toFixed(1)}` : 'N/A' },
-      { label: 'Ataques ≥0.7/min', ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
+      { label: daLabel, ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
       { label: 'Pressão acumulada', ok: pressaoAcumulada, detail: pressaoAcumulada ? `${totalGoals} gol(s) em ${minute}'` : `${totalGoals} gol(s)` },
       { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR', detail: rawDecision.action === 'ENTRAR' ? `${rawDecision.confidence}%` : '—' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
-    const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';
+    const filtersOk = filtersValidated >= thresholds.minGate && rawDecision.action === 'ENTRAR';
 
     // Gate final: ENTRAR só se ≥ 3/5 filtros validados; senão AGUARDANDO neutro
     const decision: SignalDecision = filtersOk

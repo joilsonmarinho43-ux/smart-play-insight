@@ -203,31 +203,45 @@ const LivePro = () => {
     if (totalGoals >= 1) poisson.over05 = 100;
     if (totalGoals >= 2) poisson.over15 = 100;
     if (totalGoals >= 3) poisson.over25 = 100;
-    if (totalGoals >= 4) poisson.over35 = 100;
-    const homePI = pressure?.homePI || 0;
-    const awayPI = pressure?.awayPI || 0;
-    const narrative = buildPressureNarrative(homePI, awayPI, homeName, awayName);
-    const decision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
+    const totalGoals = homeGoals + awayGoals;
+    const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
+    // Verifica integridade dos dados de pressão (DA + posse válidos)
+    const totalDA_check = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
+    const possessionValid = (homeStats?.possession || 0) > 0 || (awayStats?.possession || 0) > 0;
+    const pressureDataValid = totalDA_check > 0 || possessionValid;
+    const homePI = pressureDataValid ? (pressure?.homePI || 0) : 0;
+    const awayPI = pressureDataValid ? (pressure?.awayPI || 0) : 0;
+    const narrative = pressureDataValid
+      ? buildPressureNarrative(homePI, awayPI, homeName, awayName)
+      : 'Sem scouts disponíveis para esta partida';
+    const rawDecision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
 
-    // Filtros inteligentes (gatilhos reativos)
+    // Filtros inteligentes (gatilhos reativos) — só com dados válidos
     const maxPI = Math.max(homePI, awayPI);
-    const totalDA = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
+    const totalDA = totalDA_check;
     const daPerMin = totalDA / Math.max(minute, 1);
     const noGoalRecent = totalGoals === 0 && minute >= 20;
     const filters = [
-      { label: 'Pressão alta', ok: maxPI >= 60 },
-      { label: 'PI alto', ok: maxPI >= 50 },
-      { label: 'Ataques acima da média', ok: daPerMin >= 1.5 },
+      { label: 'Pressão alta', ok: pressureDataValid && maxPI >= 60 },
+      { label: 'PI alto', ok: pressureDataValid && maxPI >= 50 },
+      { label: 'Ataques acima da média', ok: pressureDataValid && daPerMin >= 1.5 },
       { label: 'Sem gol recente', ok: noGoalRecent },
-      { label: 'Odd com valor', ok: decision.action === 'ENTRAR' },
+      { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
-    const filtersOk = filtersValidated >= 3 && decision.action === 'ENTRAR';
+    const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';
+
+    // Gate final: ENTRAR só se ≥ 3/5 filtros validados; senão AGUARDANDO neutro
+    const decision: SignalDecision = filtersOk
+      ? rawDecision
+      : { ...rawDecision, action: 'AGUARDANDO', reason: rawDecision.action === 'ENTRAR'
+          ? `Sinal detectado mas só ${filtersValidated}/5 filtros validados • ${narrative}`
+          : rawDecision.reason };
 
     return {
       id, minute, homeGoals, awayGoals, homeName, awayName, homeStats, awayStats,
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
-      filters, filtersValidated, filtersOk,
+      filters, filtersValidated, filtersOk, pressureDataValid,
     };
   }, [selectedMatch]);
 

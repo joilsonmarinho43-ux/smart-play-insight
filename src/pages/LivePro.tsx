@@ -243,8 +243,13 @@ const LivePro = () => {
     const awayGoals = selectedMatch?.goals?.away ?? selectedMatch?.liveScore?.away ?? 0;
     const homeName = selectedMatch?.teams?.home?.name || selectedMatch?.homeTeam || 'Casa';
     const awayName = selectedMatch?.teams?.away?.name || selectedMatch?.awayTeam || 'Fora';
-    const homeStats = selectedMatch?.stats?.home || null;
-    const awayStats = selectedMatch?.stats?.away || null;
+    // TEST MODE: injeta scouts fictícios para validação do fluxo
+    const homeStats = testMode
+      ? { shotsOnGoal: 6, totalShots: 14, possession: 58, corners: 5, dangerousAttacks: 42 }
+      : (selectedMatch?.stats?.home || null);
+    const awayStats = testMode
+      ? { shotsOnGoal: 3, totalShots: 8, possession: 42, corners: 3, dangerousAttacks: 28 }
+      : (selectedMatch?.stats?.away || null);
 
     let pressure: PressureData | null = null;
     let history: PISnapshot[] = [];

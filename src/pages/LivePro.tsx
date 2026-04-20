@@ -210,12 +210,14 @@ const LivePro = () => {
   const { performance, registerSignal, resolve } = useHybridPerformance();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(false);
+  const [sensitivity, setSensitivity] = useState<'conservador' | 'moderado' | 'agressivo'>(() => (localStorage.getItem('livepro_sensitivity') as any) || 'moderado');
   
   const [bankroll, setBankroll] = useState(() => Number(localStorage.getItem('livepro_bankroll') || '1000'));
   const [exposure, setExposure] = useState(() => Number(localStorage.getItem('livepro_exposure') || '5'));
 
   useEffect(() => { localStorage.setItem('livepro_bankroll', String(bankroll)); }, [bankroll]);
   useEffect(() => { localStorage.setItem('livepro_exposure', String(exposure)); }, [exposure]);
+  useEffect(() => { localStorage.setItem('livepro_sensitivity', sensitivity); }, [sensitivity]);
 
   const { data: matches = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['live-matches'], queryFn: () => fetchLiveMatches(),
@@ -283,33 +285,38 @@ const LivePro = () => {
     const daPerMin = totalDA / Math.max(minute, 1);
     const noGoalRecent = totalGoals === 0 && minute >= 20;
 
-    // PI trend: verifica se PI subiu ≥8% nos últimos 5 snapshots
+    // PI trend: verifica se PI subiu nos últimos 5 snapshots
+    const trendThreshold = sensitivity === 'agressivo' ? 0.05 : sensitivity === 'moderado' ? 0.08 : 0.12;
     let piTrending = false;
     if (history.length >= 2) {
       const recent = history.slice(-5);
       const oldest = Math.max(recent[0].homePI, recent[0].awayPI);
       const newest = Math.max(recent[recent.length - 1].homePI, recent[recent.length - 1].awayPI);
-      if (oldest > 0 && ((newest - oldest) / oldest) >= 0.08) piTrending = true;
+      if (oldest > 0 && ((newest - oldest) / oldest) >= trendThreshold) piTrending = true;
     }
 
-    // Pressão Alta: PI ≥ 45 OU trending up ≥8% nos últimos 5min
-    const pressaoAlta = pressureDataValid && (maxPI >= 45 || piTrending);
-    // PI Alto: threshold acessível (≥ 30)
-    const piAlto = pressureDataValid && maxPI >= 30;
-    // Ataques: threshold acessível (≥ 0.7/min)
-    const ataquesAltos = pressureDataValid && daPerMin >= 0.7;
-    // Sem gol recente OU placar baixo (≤1 gol) após 25min — indica pressão acumulada
-    const pressaoAcumulada = (noGoalRecent) || (totalGoals <= 1 && minute >= 25);
+    // Thresholds por sensibilidade
+    const thresholds = {
+      conservador: { piPressao: 60, piAlto: 45, daMin: 1.0, minGate: 4, goalsCap: 0, minuteCap: 30 },
+      moderado:    { piPressao: 45, piAlto: 30, daMin: 0.7, minGate: 3, goalsCap: 1, minuteCap: 25 },
+      agressivo:   { piPressao: 30, piAlto: 20, daMin: 0.5, minGate: 2, goalsCap: 2, minuteCap: 20 },
+    }[sensitivity];
 
+    const pressaoAlta = pressureDataValid && (maxPI >= thresholds.piPressao || piTrending);
+    const piAlto = pressureDataValid && maxPI >= thresholds.piAlto;
+    const ataquesAltos = pressureDataValid && daPerMin >= thresholds.daMin;
+    const pressaoAcumulada = (noGoalRecent) || (totalGoals <= thresholds.goalsCap && minute >= thresholds.minuteCap);
+
+    const daLabel = `Ataques ≥${thresholds.daMin}/min`;
     const filters = [
       { label: 'Pressão alta', ok: pressaoAlta, detail: pressureDataValid ? `PI ${maxPI.toFixed(0)}${piTrending ? ' ↑' : ''}` : 'N/A' },
       { label: 'PI alto', ok: piAlto, detail: pressureDataValid ? `${maxPI.toFixed(1)}` : 'N/A' },
-      { label: 'Ataques ≥0.7/min', ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
+      { label: daLabel, ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
       { label: 'Pressão acumulada', ok: pressaoAcumulada, detail: pressaoAcumulada ? `${totalGoals} gol(s) em ${minute}'` : `${totalGoals} gol(s)` },
       { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR', detail: rawDecision.action === 'ENTRAR' ? `${rawDecision.confidence}%` : '—' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
-    const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';
+    const filtersOk = filtersValidated >= thresholds.minGate && rawDecision.action === 'ENTRAR';
 
     // Gate final: ENTRAR só se ≥ 3/5 filtros validados; senão AGUARDANDO neutro
     const decision: SignalDecision = filtersOk
@@ -323,7 +330,7 @@ const LivePro = () => {
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
       filters, filtersValidated, filtersOk, pressureDataValid,
     };
-  }, [selectedMatch]);
+  }, [selectedMatch, sensitivity]);
 
   // Auto-Mode: monitora sinal e dispara entrada interna quando filtros validados
   const autoExecutedRef = useRef<Set<string>>(new Set());
@@ -473,7 +480,7 @@ const LivePro = () => {
             <EntrySuggestion analysis={analysis} bankroll={bankroll} />
 
             {/* Filtros Inteligentes */}
-            <SmartFilters analysis={analysis} />
+            <SmartFilters analysis={analysis} sensitivity={sensitivity} setSensitivity={setSensitivity} />
 
             {/* Gráficos (colapsável no mobile) */}
             <ChartsBlock analysis={analysis} />
@@ -828,12 +835,17 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
   );
 }
 
-function SmartFilters({ analysis }: { analysis: any }) {
+function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: any; sensitivity: string; setSensitivity: (v: any) => void }) {
   const filters = analysis.filters as { label: string; ok: boolean; detail: string }[];
   const validated = analysis.filtersValidated as number;
+  const modes = [
+    { key: 'conservador', label: '🛡️ Conservador', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
+    { key: 'moderado', label: '⚖️ Moderado', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },
+    { key: 'agressivo', label: '🔥 Agressivo', color: 'bg-red-500/20 text-red-400 border-red-500/40' },
+  ];
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
@@ -841,6 +853,18 @@ function SmartFilters({ analysis }: { analysis: any }) {
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${validated >= 4 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
           {validated}/5 OK
         </span>
+      </div>
+      {/* Sensitivity selector */}
+      <div className="flex gap-1 mb-3">
+        {modes.map(m => (
+          <button
+            key={m.key}
+            onClick={() => setSensitivity(m.key)}
+            className={`flex-1 text-[9px] font-bold py-1.5 rounded-lg border transition-all ${sensitivity === m.key ? m.color : 'bg-[#0D1117] text-gray-500 border-[#30363D] hover:border-gray-500'}`}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
       <div className="space-y-1.5">
         {filters.map(f => (

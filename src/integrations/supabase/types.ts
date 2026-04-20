@@ -209,6 +209,7 @@ export type Database = {
           id: string
           janela: string | null
           market: string
+          match_id: string | null
           match_name: string
           minute: number
           odd_min: string | null
@@ -216,7 +217,9 @@ export type Database = {
           reason: string | null
           score: string | null
           sensitivity: string | null
+          status: string
           success: boolean
+          telegram_message_id: number | null
         }
         Insert: {
           confidence?: number
@@ -226,6 +229,7 @@ export type Database = {
           id?: string
           janela?: string | null
           market: string
+          match_id?: string | null
           match_name: string
           minute?: number
           odd_min?: string | null
@@ -233,7 +237,9 @@ export type Database = {
           reason?: string | null
           score?: string | null
           sensitivity?: string | null
+          status?: string
           success?: boolean
+          telegram_message_id?: number | null
         }
         Update: {
           confidence?: number
@@ -243,6 +249,7 @@ export type Database = {
           id?: string
           janela?: string | null
           market?: string
+          match_id?: string | null
           match_name?: string
           minute?: number
           odd_min?: string | null
@@ -250,7 +257,9 @@ export type Database = {
           reason?: string | null
           score?: string | null
           sensitivity?: string | null
+          status?: string
           success?: boolean
+          telegram_message_id?: number | null
         }
         Relationships: []
       }

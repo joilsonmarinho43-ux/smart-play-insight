@@ -72,38 +72,52 @@ interface SignalDecision {
   reason: string;
 }
 
+/** Texto descritivo coerente com os dados de pressão reais */
+function buildPressureNarrative(homePI: number, awayPI: number, homeName: string, awayName: string): string {
+  const total = homePI + awayPI;
+  if (total < 1) return 'Sem pressão relevante registrada';
+  const homeShare = Math.round((homePI / total) * 100);
+  const awayShare = 100 - homeShare;
+  const dom = homeShare >= awayShare ? homeName : awayName;
+  const share = Math.max(homeShare, awayShare);
+  if (share >= 70) return `${dom} dominando (${share}% da pressão)`;
+  if (share >= 58) return `${dom} pressionando (${share}% da pressão)`;
+  return `Pressão equilibrada (${homeShare}% / ${awayShare}%)`;
+}
+
 function buildSignalDecision(
   hybrid: HybridSignal | null,
   sniper: SniperSignal | null,
   topStrategy: LiveStrategy | undefined,
   minute: number,
+  pressureNarrative: string,
 ): SignalDecision {
-  // Hybrid SNIPER tem prioridade máxima
+  const enrich = (base: string) => `${base} • ${pressureNarrative}`;
   if (hybrid && hybrid.tier === 'SNIPER' && hybrid.canExecute) {
     return {
       action: 'ENTRAR', market: hybrid.market, confidence: 85,
       windowText: `${minute}'–${Math.min(minute + 15, 45)}'`,
-      strength: 'forte', reason: hybrid.executionReason,
+      strength: 'forte', reason: enrich(hybrid.executionReason),
     };
   }
   if (hybrid && hybrid.tier === 'SEMI' && hybrid.canExecute) {
     return {
       action: 'ENTRAR', market: hybrid.market, confidence: 72,
       windowText: `${minute}'–${Math.min(minute + 20, 60)}'`,
-      strength: 'médio', reason: hybrid.executionReason,
+      strength: 'médio', reason: enrich(hybrid.executionReason),
     };
   }
   if (sniper?.canExecute) {
     return {
       action: 'ENTRAR', market: sniper.market, confidence: 78,
       windowText: `${minute}'–${Math.min(minute + 15, 45)}'`,
-      strength: 'forte', reason: sniper.executionReason,
+      strength: 'forte', reason: enrich(sniper.executionReason),
     };
   }
   if (hybrid && !hybrid.canExecute) {
     return {
       action: 'BLOQUEADO', market: hybrid.market, confidence: hybrid.tier === 'SNIPER' ? 80 : 65,
-      windowText: '—', strength: 'fraco', reason: hybrid.executionReason,
+      windowText: '—', strength: 'fraco', reason: enrich(hybrid.executionReason),
     };
   }
   if (topStrategy && topStrategy.signal === 'entry' && topStrategy.confidence >= 60) {
@@ -111,14 +125,14 @@ function buildSignalDecision(
       action: 'ENTRAR', market: topStrategy.market, confidence: topStrategy.confidence,
       windowText: `${minute}'–${Math.min(minute + 15, 90)}'`,
       strength: topStrategy.confidence >= 75 ? 'forte' : 'médio',
-      reason: topStrategy.reason,
+      reason: enrich(topStrategy.reason),
     };
   }
   return {
     action: 'AGUARDAR', market: topStrategy?.market || 'Aguardando padrão',
     confidence: topStrategy?.confidence || 0,
     windowText: '—', strength: 'fraco',
-    reason: topStrategy?.reason || 'Sem sinal de alta confiança no momento',
+    reason: enrich(topStrategy?.reason || 'Sem sinal de alta confiança no momento'),
   };
 }
 

@@ -326,7 +326,7 @@ const LivePro = () => {
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
       filters, filtersValidated, filtersOk, pressureDataValid,
     };
-  }, [selectedMatch]);
+  }, [selectedMatch, testMode]);
 
   // Auto-Mode: monitora sinal e dispara entrada interna quando filtros validados
   const autoExecutedRef = useRef<Set<string>>(new Set());

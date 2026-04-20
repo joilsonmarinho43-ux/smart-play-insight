@@ -3,7 +3,7 @@
  * Mantém todas as regras de negócio existentes; apenas reorganiza a apresentação.
  * Responsivo: 1 coluna (mobile) → 2 colunas (tablet) → 3 colunas (desktop)
  */
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {

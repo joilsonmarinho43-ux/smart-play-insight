@@ -469,36 +469,39 @@ function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: (
       </div>
       <div className="text-center mb-3">
         <div className={`text-3xl sm:text-4xl font-black ${actionStyles.text} tracking-tight`}>
-          {actionStyles.icon} {decision.action}
+          {actionStyles.icon} {actionStyles.label}
+        </div>
+        <div className={`mt-1 text-[10px] font-bold ${filtersValidated >= 3 ? 'text-emerald-400' : 'text-gray-500'}`}>
+          FILTROS {filtersValidated}/5 {filtersValidated >= 3 ? '✓' : ''}
         </div>
       </div>
       <div className="space-y-2 mb-4">
         <div className="bg-[#0D1117]/50 rounded-lg px-3 py-2 border border-[#30363D]">
           <p className="text-[10px] text-gray-500 uppercase">Mercado</p>
-          <p className="font-bold text-sm text-white">{decision.market}</p>
+          <p className={`font-bold text-sm ${isWaiting ? 'text-gray-400' : 'text-white'}`}>{decision.market}</p>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-[#0D1117]/50 rounded-lg px-2 py-1.5 border border-[#30363D]">
             <p className="text-[9px] text-gray-500 uppercase">Confiança</p>
-            <p className={`font-bold text-base ${actionStyles.text}`}>{decision.confidence}%</p>
+            <p className={`font-bold text-base ${isWaiting ? 'text-gray-400' : actionStyles.text}`}>{decision.confidence}%</p>
           </div>
           <div className="bg-[#0D1117]/50 rounded-lg px-2 py-1.5 border border-[#30363D]">
             <p className="text-[9px] text-gray-500 uppercase">Força</p>
-            <p className="font-bold text-base text-white">{strengthMap[decision.strength]}</p>
+            <p className={`font-bold text-base ${isWaiting ? 'text-gray-500' : 'text-white'}`}>{strengthMap[decision.strength]}</p>
           </div>
         </div>
         <div className="bg-[#0D1117]/50 rounded-lg px-3 py-2 border border-[#30363D]">
           <p className="text-[10px] text-gray-500 uppercase">Janela ideal</p>
-          <p className="font-bold text-sm text-white">{decision.windowText}</p>
+          <p className={`font-bold text-sm ${isWaiting ? 'text-gray-400' : 'text-white'}`}>{decision.windowText}</p>
         </div>
         <p className="text-[10px] text-gray-400 italic px-1">{decision.reason}</p>
       </div>
       <Button
         onClick={onGenerate}
-        disabled={decision.action === 'BLOQUEADO'}
+        disabled={isWaiting || decision.action === 'BLOQUEADO'}
         className={`w-full font-bold text-sm h-11 ${actionStyles.btn}`}
       >
-        <Zap className="w-4 h-4 mr-2" /> GERAR ENTRADA
+        <Zap className="w-4 h-4 mr-2" /> {isWaiting ? 'AGUARDANDO SINAL' : 'GERAR ENTRADA'}
       </Button>
     </div>
   );

@@ -210,7 +210,7 @@ const LivePro = () => {
   const { performance, registerSignal, resolve } = useHybridPerformance();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(false);
-  const [testMode, setTestMode] = useState(false);
+  
   const [bankroll, setBankroll] = useState(() => Number(localStorage.getItem('livepro_bankroll') || '1000'));
   const [exposure, setExposure] = useState(() => Number(localStorage.getItem('livepro_exposure') || '5'));
 
@@ -243,13 +243,8 @@ const LivePro = () => {
     const awayGoals = selectedMatch?.goals?.away ?? selectedMatch?.liveScore?.away ?? 0;
     const homeName = selectedMatch?.teams?.home?.name || selectedMatch?.homeTeam || 'Casa';
     const awayName = selectedMatch?.teams?.away?.name || selectedMatch?.awayTeam || 'Fora';
-    // TEST MODE: injeta scouts fictícios para validação do fluxo
-    const homeStats = testMode
-      ? { shotsOnGoal: 6, totalShots: 14, possession: 58, corners: 5, dangerousAttacks: 42 }
-      : (selectedMatch?.stats?.home || null);
-    const awayStats = testMode
-      ? { shotsOnGoal: 3, totalShots: 8, possession: 42, corners: 3, dangerousAttacks: 28 }
-      : (selectedMatch?.stats?.away || null);
+    const homeStats = selectedMatch?.stats?.home || null;
+    const awayStats = selectedMatch?.stats?.away || null;
 
     let pressure: PressureData | null = null;
     let history: PISnapshot[] = [];
@@ -328,7 +323,7 @@ const LivePro = () => {
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
       filters, filtersValidated, filtersOk, pressureDataValid,
     };
-  }, [selectedMatch, testMode]);
+  }, [selectedMatch]);
 
   // Auto-Mode: monitora sinal e dispara entrada interna quando filtros validados
   const autoExecutedRef = useRef<Set<string>>(new Set());
@@ -432,13 +427,6 @@ const LivePro = () => {
             </Link>
             <h1 className="font-bold text-base sm:text-lg tracking-tight text-white">LIVE TRADER PRO</h1>
             <span className="text-[9px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-bold">BETA</span>
-            <button
-              onClick={() => setTestMode(t => !t)}
-              className={`text-[9px] px-1.5 py-0.5 rounded font-bold border transition-colors ${testMode ? 'bg-purple-500/20 text-purple-400 border-purple-500/50' : 'bg-[#161B22] text-gray-500 border-[#30363D] hover:text-gray-300'}`}
-              title="Modo teste: injeta scouts fictícios"
-            >
-              {testMode ? '🧪 TEST ON' : '🧪'}
-            </button>
           </div>
           <div className="flex items-center gap-2">
             <select

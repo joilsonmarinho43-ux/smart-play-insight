@@ -169,6 +169,9 @@ const Admin = () => {
     total: signals.length,
     success: signals.filter(s => s.success).length,
     failed: signals.filter(s => !s.success).length,
+    green: signals.filter(s => s.status === 'green').length,
+    loss: signals.filter(s => s.status === 'loss').length,
+    pendente: signals.filter(s => s.status === 'pendente').length,
   };
 
   if (profileLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;

@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -65,27 +67,65 @@ Deno.serve(async (req) => {
 
     const text = `${shortMsg}\n\n${fullMsg}`;
 
-    const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
-    });
+    let telegramSuccess = false;
+    let telegramError = '';
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(`Telegram API failed [${response.status}]: ${JSON.stringify(data)}`);
+    try {
+      const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'X-Connection-Api-Key': TELEGRAM_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: CHAT_ID,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        telegramError = `Telegram API failed [${response.status}]: ${JSON.stringify(data)}`;
+      } else {
+        telegramSuccess = true;
+      }
+    } catch (e) {
+      telegramError = e instanceof Error ? e.message : 'Unknown Telegram error';
     }
 
-    return new Response(JSON.stringify({ success: true, message_id: data.result?.message_id }), {
+    // Log signal to database
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const sb = createClient(supabaseUrl, supabaseKey);
+
+      await sb.from('telegram_signals').insert({
+        match_name: payload.match,
+        market: payload.market,
+        confidence: payload.confidence,
+        filters_validated: payload.filtersValidated,
+        sensitivity: payload.sensitivity,
+        minute: payload.minute,
+        score: payload.score,
+        poisson: payload.poisson || null,
+        odd_min: payload.oddMin || null,
+        janela: payload.janela || null,
+        reason: payload.reason || null,
+        success: telegramSuccess,
+        error_message: telegramError || null,
+      });
+    } catch (logErr) {
+      console.error('Failed to log signal:', logErr);
+    }
+
+    if (!telegramSuccess) {
+      throw new Error(telegramError);
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

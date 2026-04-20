@@ -200,6 +200,60 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_signals: {
+        Row: {
+          confidence: number
+          created_at: string
+          error_message: string | null
+          filters_validated: string | null
+          id: string
+          janela: string | null
+          market: string
+          match_name: string
+          minute: number
+          odd_min: string | null
+          poisson: string | null
+          reason: string | null
+          score: string | null
+          sensitivity: string | null
+          success: boolean
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          error_message?: string | null
+          filters_validated?: string | null
+          id?: string
+          janela?: string | null
+          market: string
+          match_name: string
+          minute?: number
+          odd_min?: string | null
+          poisson?: string | null
+          reason?: string | null
+          score?: string | null
+          sensitivity?: string | null
+          success?: boolean
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          error_message?: string | null
+          filters_validated?: string | null
+          id?: string
+          janela?: string | null
+          market?: string
+          match_name?: string
+          minute?: number
+          odd_min?: string | null
+          poisson?: string | null
+          reason?: string | null
+          score?: string | null
+          sensitivity?: string | null
+          success?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

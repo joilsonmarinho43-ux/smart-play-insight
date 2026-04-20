@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DAYS_OPTIONS = [3, 7, 15, 30];
@@ -16,18 +16,37 @@ interface SessionConflict {
   seen: boolean;
 }
 
+interface TelegramSignal {
+  id: string;
+  match_name: string;
+  market: string;
+  confidence: number;
+  filters_validated: string | null;
+  sensitivity: string | null;
+  minute: number;
+  score: string | null;
+  poisson: string | null;
+  reason: string | null;
+  success: boolean;
+  error_message: string | null;
+  created_at: string;
+}
+
 const Admin = () => {
   const { profile, loading: profileLoading } = useProfile();
   const [users, setUsers] = useState<Profile[]>([]);
   const [conflicts, setConflicts] = useState<SessionConflict[]>([]);
+  const [signals, setSignals] = useState<TelegramSignal[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [showConflicts, setShowConflicts] = useState(false);
+  const [showSignals, setShowSignals] = useState(false);
 
   useEffect(() => {
     if (profile?.is_admin) {
       fetchUsers();
       fetchConflicts();
+      fetchSignals();
     }
   }, [profile]);
 
@@ -55,6 +74,18 @@ const Admin = () => {
 
     if (data) {
       setConflicts(data);
+    }
+  };
+
+  const fetchSignals = async () => {
+    const { data } = await supabase
+      .from('telegram_signals')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100) as { data: TelegramSignal[] | null };
+
+    if (data) {
+      setSignals(data);
     }
   };
 
@@ -115,6 +146,11 @@ const Admin = () => {
   };
 
   const unseenConflicts = conflicts.filter(c => !c.seen).length;
+  const signalStats = {
+    total: signals.length,
+    success: signals.filter(s => s.success).length,
+    failed: signals.filter(s => !s.success).length,
+  };
 
   if (profileLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   if (!profile?.is_admin) return <Navigate to="/" replace />;
@@ -130,20 +166,35 @@ const Admin = () => {
               <h1 className="font-bold text-xl tracking-tight">CENTRAL DO ANALISTA</h1>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setShowConflicts(!showConflicts);
-              if (!showConflicts) markConflictsSeen();
-            }}
-            className="relative p-2 hover:bg-white/5 rounded-lg transition-all"
-          >
-            <AlertTriangle className="w-5 h-5 text-yellow-500" />
-            {unseenConflicts > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                {unseenConflicts}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowSignals(!showSignals); setShowConflicts(false); }}
+              className={`relative p-2 rounded-lg transition-all ${showSignals ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
+              title="Sinais Telegram"
+            >
+              <Send className="w-5 h-5 text-blue-400" />
+              {signalStats.total > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {signalStats.total > 99 ? '99+' : signalStats.total}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowConflicts(!showConflicts);
+                setShowSignals(false);
+                if (!showConflicts) markConflictsSeen();
+              }}
+              className={`relative p-2 rounded-lg transition-all ${showConflicts ? 'bg-yellow-500/20' : 'hover:bg-white/5'}`}
+            >
+              <AlertTriangle className="w-5 h-5 text-yellow-500" />
+              {unseenConflicts > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {unseenConflicts}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -169,6 +220,46 @@ const Admin = () => {
                   <p className="text-muted-foreground/60">
                     {new Date(c.created_at).toLocaleString('pt-BR')}
                   </p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* HISTÓRICO DE SINAIS TELEGRAM */}
+        {showSignals && (
+          <div className="mb-8 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-blue-400 uppercase flex items-center gap-2">
+                <Send className="w-4 h-4" /> Sinais Telegram
+              </h2>
+              <div className="flex gap-3 text-[10px] font-bold">
+                <span className="text-green-500">{signalStats.success} ✓</span>
+                {signalStats.failed > 0 && <span className="text-red-500">{signalStats.failed} ✗</span>}
+              </div>
+            </div>
+            {signals.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum sinal enviado ainda.</p>
+            ) : (
+              signals.map((s) => (
+                <div key={s.id} className={`border rounded-xl p-4 text-xs space-y-1.5 ${s.success ? 'border-white/5 bg-card/20' : 'border-red-500/30 bg-red-500/5'}`}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-sm">{s.success ? '✅' : '❌'} {s.match_name}</p>
+                    <span className="text-muted-foreground/60 text-[10px]">
+                      {new Date(s.created_at).toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-bold">{s.market}</span>
+                    <span className="bg-green-500/10 text-green-400 px-2 py-0.5 rounded-md font-bold">{s.confidence}%</span>
+                    <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{s.minute}'</span>
+                    <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{s.score}</span>
+                    {s.filters_validated && <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md">Filtros: {s.filters_validated}</span>}
+                    {s.sensitivity && <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md capitalize">{s.sensitivity}</span>}
+                  </div>
+                  {s.poisson && <p className="text-muted-foreground">🧮 {s.poisson}</p>}
+                  {s.reason && <p className="text-muted-foreground/70 italic">💡 {s.reason}</p>}
+                  {s.error_message && <p className="text-red-400 text-[10px]">Erro: {s.error_message}</p>}
                 </div>
               ))
             )}

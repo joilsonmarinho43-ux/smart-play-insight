@@ -210,12 +210,14 @@ const LivePro = () => {
   const { performance, registerSignal, resolve } = useHybridPerformance();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(false);
+  const [sensitivity, setSensitivity] = useState<'conservador' | 'moderado' | 'agressivo'>(() => (localStorage.getItem('livepro_sensitivity') as any) || 'moderado');
   
   const [bankroll, setBankroll] = useState(() => Number(localStorage.getItem('livepro_bankroll') || '1000'));
   const [exposure, setExposure] = useState(() => Number(localStorage.getItem('livepro_exposure') || '5'));
 
   useEffect(() => { localStorage.setItem('livepro_bankroll', String(bankroll)); }, [bankroll]);
   useEffect(() => { localStorage.setItem('livepro_exposure', String(exposure)); }, [exposure]);
+  useEffect(() => { localStorage.setItem('livepro_sensitivity', sensitivity); }, [sensitivity]);
 
   const { data: matches = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['live-matches'], queryFn: () => fetchLiveMatches(),

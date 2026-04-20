@@ -600,13 +600,16 @@ function KpiCard({ icon: Icon, label, valueText, accent, children }: any) {
 }
 
 function ProbabilityBlock({ analysis }: { analysis: any }) {
-  const { poisson } = analysis;
+  const { poisson, totalGoals } = analysis;
   const items = [
-    { label: 'Over 0.5', value: poisson.over05 },
-    { label: 'Over 1.5', value: poisson.over15 },
-    { label: 'Over 2.5', value: poisson.over25 },
-    { label: 'Over 3.5', value: poisson.over35 },
+    { label: 'Over 0.5', value: poisson.over05, threshold: 0.5 },
+    { label: 'Over 1.5', value: poisson.over15, threshold: 1.5 },
+    { label: 'Over 2.5', value: poisson.over25, threshold: 2.5 },
+    { label: 'Over 3.5', value: poisson.over35, threshold: 3.5 },
   ];
+  // Próximo mercado relevante (primeiro não concluído)
+  const nextMarketIdx = items.findIndex(it => !poisson.completed.has(it.label));
+
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3">
@@ -614,15 +617,32 @@ function ProbabilityBlock({ analysis }: { analysis: any }) {
           <BarChart3 className="w-4 h-4 text-cyan-400" />
           <h3 className="font-bold text-sm text-white">PROBABILIDADE (Poisson)</h3>
         </div>
-        <span className="text-[10px] text-gray-400">xG: <span className="text-cyan-400 font-bold">{poisson.expectedGoals.toFixed(1)}</span></span>
+        <span className="text-[10px] text-gray-400">xG proj: <span className="text-cyan-400 font-bold">{poisson.expectedGoals.toFixed(1)}</span></span>
       </div>
       <div className="space-y-2">
-        {items.map(it => {
+        {items.map((it, idx) => {
+          const isCompleted = poisson.completed.has(it.label);
+          const isNext = idx === nextMarketIdx;
+
+          if (isCompleted) {
+            return (
+              <div key={it.label} className="flex items-center gap-2 opacity-60">
+                <span className="text-[10px] text-gray-500 w-14">{it.label}</span>
+                <div className="flex-1 h-2.5 bg-[#0D1117] rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-700 w-full" />
+                </div>
+                <span className="text-[10px] font-bold text-emerald-600 w-16 text-right">✓ Concluído</span>
+              </div>
+            );
+          }
+
           const color = it.value >= 70 ? 'bg-emerald-500' : it.value >= 50 ? 'bg-yellow-500' : 'bg-red-500';
           const text = it.value >= 70 ? 'text-emerald-400' : it.value >= 50 ? 'text-yellow-400' : 'text-red-400';
           return (
-            <div key={it.label} className="flex items-center gap-2">
-              <span className="text-[10px] text-gray-400 w-14">{it.label}</span>
+            <div key={it.label} className={`flex items-center gap-2 ${isNext ? 'ring-1 ring-cyan-500/30 rounded-lg px-1 -mx-1 py-0.5' : ''}`}>
+              <span className={`text-[10px] w-14 ${isNext ? 'text-cyan-400 font-bold' : 'text-gray-400'}`}>
+                {isNext ? '▶ ' : ''}{it.label}
+              </span>
               <div className="flex-1 h-2.5 bg-[#0D1117] rounded-full overflow-hidden">
                 <div className={`h-full ${color} transition-all duration-500`} style={{ width: `${it.value}%` }} />
               </div>
@@ -631,6 +651,11 @@ function ProbabilityBlock({ analysis }: { analysis: any }) {
           );
         })}
       </div>
+      {nextMarketIdx >= 0 && (
+        <p className="text-[9px] text-gray-500 mt-2 text-center">
+          Foco: <span className="text-cyan-400 font-medium">{items[nextMarketIdx].label}</span> — prob. de +gol no tempo restante
+        </p>
+      )}
     </div>
   );
 }
@@ -745,7 +770,7 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
 }
 
 function SmartFilters({ analysis }: { analysis: any }) {
-  const filters = analysis.filters as { label: string; ok: boolean }[];
+  const filters = analysis.filters as { label: string; ok: boolean; detail: string }[];
   const validated = analysis.filtersValidated as number;
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
@@ -754,15 +779,19 @@ function SmartFilters({ analysis }: { analysis: any }) {
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
         </div>
-        <span className={`text-[10px] font-bold ${validated >= 3 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${validated >= 3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
           {validated}/5 OK
         </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+      <div className="space-y-1.5">
         {filters.map(f => (
-          <div key={f.label} className="flex items-center gap-1.5 text-[11px]">
-            {f.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> : <XCircle className="w-3.5 h-3.5 text-gray-600 shrink-0" />}
-            <span className={f.ok ? 'text-gray-200' : 'text-gray-500 line-through'}>{f.label}</span>
+          <div key={f.label} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg ${f.ok ? 'bg-emerald-500/5 border border-emerald-500/20' : 'bg-[#0D1117] border border-[#30363D]'}`}>
+            {f.ok
+              ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              : <XCircle className="w-4 h-4 text-gray-600 shrink-0" />
+            }
+            <span className={`text-xs flex-1 ${f.ok ? 'text-gray-200 font-medium' : 'text-gray-500'}`}>{f.label}</span>
+            <span className={`text-[10px] tabular-nums ${f.ok ? 'text-emerald-400' : 'text-gray-600'}`}>{f.detail}</span>
           </div>
         ))}
       </div>

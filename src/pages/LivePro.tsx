@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import {
   Loader2, RefreshCw, Zap, TrendingUp, AlertTriangle, Target, Activity,
   ChevronDown, ChevronUp, Flame, Star, ArrowLeft, Bot, Wallet, BarChart3,
-  CheckCircle2, XCircle, Circle,
+  CheckCircle2, XCircle, Circle, Volume2, VolumeX, Check, X, RotateCcw,
 } from 'lucide-react';
 import { fetchLiveMatches } from '@/services/footballApi';
 import { analyzeLivePressure, generateLiveStrategy, recordPISnapshot, type PressureData, type PISnapshot, type LiveStrategy } from '@/lib/pressureEngine';

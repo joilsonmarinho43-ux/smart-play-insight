@@ -770,38 +770,52 @@ const Stat = ({ label, value, accent }: any) => (
   </div>
 );
 
-function AutoModeBlock({ autoMode, setAutoMode, bankroll, setBankroll, exposure, setExposure }: any) {
+function AutoModeBlock({ autoMode, setAutoMode, bankroll, setBankroll, exposure, setExposure, analysis }: any) {
   const exposureValue = (bankroll * exposure) / 100;
+  const validated = analysis?.filtersValidated ?? 0;
+  const ready = analysis?.filtersOk;
+
+  // Log mudanças de toggle
+  useEffect(() => {
+    console.log(`[AUTO-MODE] toggle ${autoMode ? 'ATIVADO ✓' : 'DESATIVADO ✗'}`, {
+      bankroll, exposure, exposicaoMax: exposureValue,
+    });
+  }, [autoMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Bot className={`w-4 h-4 ${autoMode ? 'text-emerald-400' : 'text-gray-500'}`} />
+          <Bot className={`w-4 h-4 ${autoMode ? 'text-emerald-400 animate-pulse' : 'text-gray-500'}`} />
           <h3 className="font-bold text-sm text-white">MODO AUTOMÁTICO</h3>
         </div>
         <Switch checked={autoMode} onCheckedChange={setAutoMode} />
       </div>
       {autoMode && (
-        <p className="text-[10px] text-yellow-400 mb-3 italic">⚠️ UI ativa — execução manual ainda obrigatória</p>
+        <div className={`text-[10px] mb-3 px-2 py-1.5 rounded border ${ready ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'}`}>
+          {ready
+            ? `✓ Pronto para executar — ${validated}/5 filtros OK • sinal ENTRAR`
+            : `⏸ Monitorando — ${validated}/5 filtros validados (precisa ≥3 + ENTRAR)`}
+        </div>
       )}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-[9px] text-gray-500 uppercase">Banca (R$)</label>
           <input
-            type="number" value={bankroll} onChange={e => setBankroll(Number(e.target.value))}
+            type="number" min={0} value={bankroll} onChange={e => setBankroll(Number(e.target.value))}
             className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-sm text-white mt-1"
           />
         </div>
         <div>
           <label className="text-[9px] text-gray-500 uppercase">Exposição máx (%)</label>
           <input
-            type="number" value={exposure} onChange={e => setExposure(Number(e.target.value))}
+            type="number" min={0} max={100} value={exposure} onChange={e => setExposure(Number(e.target.value))}
             className="w-full bg-[#0D1117] border border-[#30363D] rounded-lg px-2 py-1.5 text-sm text-white mt-1"
           />
         </div>
       </div>
       <div className="mt-2 text-center text-[10px] text-gray-400">
-        Exposição máx: <span className="text-orange-400 font-bold">R$ {exposureValue.toFixed(2)}</span>
+        Exposição máx: <span className="text-orange-400 font-bold tabular-nums">R$ {exposureValue.toFixed(2)}</span>
       </div>
     </div>
   );

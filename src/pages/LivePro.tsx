@@ -508,37 +508,42 @@ function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: (
 }
 
 function KpiGrid({ analysis }: { analysis: any }) {
-  const { pressure, homeStats, awayStats } = analysis;
+  const { pressure, homeStats, awayStats, pressureDataValid } = analysis;
   const homePI = pressure?.homePI || 0;
   const awayPI = pressure?.awayPI || 0;
   const totalPI = homePI + awayPI || 1;
-  const homeShare = Math.round((homePI / totalPI) * 100);
+  const homeShare = pressureDataValid ? Math.round((homePI / totalPI) * 100) : 50;
   const homeDA = homeStats?.dangerousAttacks || 0;
   const awayDA = awayStats?.dangerousAttacks || 0;
   const daDiff = Math.abs(homeDA - awayDA);
-  const homePoss = homeStats?.possession || 50;
-  const awayPoss = awayStats?.possession || 50;
+  const homePoss = homeStats?.possession ?? 0;
+  const awayPoss = awayStats?.possession ?? 0;
+  const possessionValid = homePoss > 0 || awayPoss > 0;
   const maxPI = Math.max(homePI, awayPI);
 
-  const piColor = maxPI >= 60 ? 'text-red-400' : maxPI >= 40 ? 'text-yellow-400' : 'text-emerald-400';
+  const piColor = !pressureDataValid ? 'text-gray-500' : maxPI >= 60 ? 'text-red-400' : maxPI >= 40 ? 'text-yellow-400' : 'text-emerald-400';
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-      <KpiCard icon={Flame} label="Pressão" valueText={`${homeShare}% / ${100 - homeShare}%`} accent="text-orange-400">
-        <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
-          <div className="h-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${homeShare}%` }} />
-        </div>
+      <KpiCard icon={Flame} label="Pressão" valueText={pressureDataValid ? `${homeShare}% / ${100 - homeShare}%` : 'N/A'} accent={pressureDataValid ? 'text-orange-400' : 'text-gray-500'}>
+        {pressureDataValid ? (
+          <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
+            <div className="h-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${homeShare}%` }} />
+          </div>
+        ) : <p className="text-[9px] text-gray-600 mt-1">Sem scouts</p>}
       </KpiCard>
-      <KpiCard icon={Zap} label="Ataques Perigosos" valueText={`${homeDA} vs ${awayDA}`} accent="text-yellow-400">
-        <p className="text-[9px] text-gray-500 mt-1">Δ {daDiff}</p>
+      <KpiCard icon={Zap} label="Ataques Perigosos" valueText={pressureDataValid ? `${homeDA} vs ${awayDA}` : 'N/A'} accent={pressureDataValid ? 'text-yellow-400' : 'text-gray-500'}>
+        <p className="text-[9px] text-gray-500 mt-1">{pressureDataValid ? `Δ ${daDiff}` : 'Sem dados'}</p>
       </KpiCard>
-      <KpiCard icon={Activity} label="Posse" valueText={`${homePoss}% / ${awayPoss}%`} accent="text-cyan-400">
-        <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
-          <div className="h-full bg-cyan-500" style={{ width: `${homePoss}%` }} />
-        </div>
+      <KpiCard icon={Activity} label="Posse" valueText={possessionValid ? `${homePoss}% / ${awayPoss}%` : 'N/A'} accent={possessionValid ? 'text-cyan-400' : 'text-gray-500'}>
+        {possessionValid ? (
+          <div className="h-1 bg-[#30363D] rounded-full overflow-hidden mt-1">
+            <div className="h-full bg-cyan-500" style={{ width: `${homePoss}%` }} />
+          </div>
+        ) : <p className="text-[9px] text-gray-600 mt-1">Sem scouts</p>}
       </KpiCard>
-      <KpiCard icon={TrendingUp} label="Índice PI" valueText={`${homePI.toFixed(1)} / ${awayPI.toFixed(1)}`} accent={piColor}>
-        <p className="text-[9px] text-gray-500 mt-1">Máx {maxPI.toFixed(1)}</p>
+      <KpiCard icon={TrendingUp} label="Índice PI" valueText={pressureDataValid ? `${homePI.toFixed(1)} / ${awayPI.toFixed(1)}` : 'N/A'} accent={piColor}>
+        <p className="text-[9px] text-gray-500 mt-1">{pressureDataValid ? `Máx ${maxPI.toFixed(1)}` : 'Aguardando API'}</p>
       </KpiCard>
     </div>
   );

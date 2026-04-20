@@ -9,6 +9,7 @@ const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 interface SignalPayload {
   match: string;
+  matchId?: string;
   market: string;
   confidence: number;
   filtersValidated: string;
@@ -38,7 +39,7 @@ Deno.serve(async (req) => {
 
     const payload: SignalPayload = await req.json();
 
-    // Build message — short summary + full details
+    // Build message
     const emoji = payload.confidence >= 80 ? '🔥' : payload.confidence >= 70 ? '⚡' : '📊';
     const sensitivityEmoji = { conservador: '🛡️', moderado: '⚖️', agressivo: '🔥' }[payload.sensitivity] || '⚖️';
 
@@ -61,6 +62,8 @@ Deno.serve(async (req) => {
       payload.janela ? `🕐 Janela: <b>${payload.janela}</b>` : null,
       payload.reason ? `\n💡 <i>${payload.reason}</i>` : null,
       ``,
+      `⏳ Status: <b>PENDENTE</b>`,
+      ``,
       `━━━━━━━━━━━━━━━━━━━━━`,
       `🤖 <i>Analista Joilson • Live Trader PRO</i>`,
     ].filter(Boolean).join('\n');
@@ -69,6 +72,7 @@ Deno.serve(async (req) => {
 
     let telegramSuccess = false;
     let telegramError = '';
+    let telegramMessageId: number | null = null;
 
     try {
       const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
@@ -91,6 +95,7 @@ Deno.serve(async (req) => {
         telegramError = `Telegram API failed [${response.status}]: ${JSON.stringify(data)}`;
       } else {
         telegramSuccess = true;
+        telegramMessageId = data.result?.message_id ?? null;
       }
     } catch (e) {
       telegramError = e instanceof Error ? e.message : 'Unknown Telegram error';
@@ -104,6 +109,7 @@ Deno.serve(async (req) => {
 
       await sb.from('telegram_signals').insert({
         match_name: payload.match,
+        match_id: payload.matchId || null,
         market: payload.market,
         confidence: payload.confidence,
         filters_validated: payload.filtersValidated,
@@ -116,6 +122,8 @@ Deno.serve(async (req) => {
         reason: payload.reason || null,
         success: telegramSuccess,
         error_message: telegramError || null,
+        telegram_message_id: telegramMessageId,
+        status: 'pendente',
       });
     } catch (logErr) {
       console.error('Failed to log signal:', logErr);
@@ -125,7 +133,7 @@ Deno.serve(async (req) => {
       throw new Error(telegramError);
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, messageId: telegramMessageId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

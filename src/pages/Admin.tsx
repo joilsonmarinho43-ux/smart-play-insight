@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DAYS_OPTIONS = [3, 7, 15, 30];
@@ -30,6 +30,9 @@ interface TelegramSignal {
   success: boolean;
   error_message: string | null;
   created_at: string;
+  status: string;
+  telegram_message_id: number | null;
+  match_id: string | null;
 }
 
 const Admin = () => {
@@ -41,6 +44,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const [showConflicts, setShowConflicts] = useState(false);
   const [showSignals, setShowSignals] = useState(false);
+  const [checkingResults, setCheckingResults] = useState(false);
 
   useEffect(() => {
     if (profile?.is_admin) {
@@ -101,6 +105,21 @@ const Admin = () => {
     setConflicts(prev => prev.map(c => ({ ...c, seen: true })));
   };
 
+  const checkSignalResults = async () => {
+    setCheckingResults(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-signal-results');
+      if (error) throw error;
+      toast.success(`Verificação concluída: ${data?.processed || 0} sinais atualizados`);
+      fetchSignals();
+    } catch (e) {
+      console.error('Check results failed:', e);
+      toast.error('Erro ao verificar resultados');
+    } finally {
+      setCheckingResults(false);
+    }
+  };
+
   const grantDays = async (userId: string, days: number) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
@@ -150,6 +169,9 @@ const Admin = () => {
     total: signals.length,
     success: signals.filter(s => s.success).length,
     failed: signals.filter(s => !s.success).length,
+    green: signals.filter(s => s.status === 'green').length,
+    loss: signals.filter(s => s.status === 'loss').length,
+    pendente: signals.filter(s => s.status === 'pendente').length,
   };
 
   if (profileLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -229,25 +251,46 @@ const Admin = () => {
         {/* HISTÓRICO DE SINAIS TELEGRAM */}
         {showSignals && (
           <div className="mb-8 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-sm font-bold text-blue-400 uppercase flex items-center gap-2">
                 <Send className="w-4 h-4" /> Sinais Telegram
               </h2>
-              <div className="flex gap-3 text-[10px] font-bold">
-                <span className="text-green-500">{signalStats.success} ✓</span>
-                {signalStats.failed > 0 && <span className="text-red-500">{signalStats.failed} ✗</span>}
+              <div className="flex items-center gap-3">
+                <div className="flex gap-2 text-[10px] font-bold">
+                  <span className="text-green-500">{signalStats.green} GREEN</span>
+                  <span className="text-red-500">{signalStats.loss} LOSS</span>
+                  <span className="text-yellow-500">{signalStats.pendente} ⏳</span>
+                </div>
+                <button
+                  onClick={checkSignalResults}
+                  disabled={checkingResults}
+                  className="flex items-center gap-1 text-[10px] font-bold bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-lg hover:bg-blue-500/30 transition-all disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${checkingResults ? 'animate-spin' : ''}`} />
+                  {checkingResults ? 'Verificando...' : 'Atualizar Agora'}
+                </button>
               </div>
             </div>
             {signals.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum sinal enviado ainda.</p>
             ) : (
-              signals.map((s) => (
-                <div key={s.id} className={`border rounded-xl p-4 text-xs space-y-1.5 ${s.success ? 'border-white/5 bg-card/20' : 'border-red-500/30 bg-red-500/5'}`}>
+              signals.map((s) => {
+                const statusBadge = s.status === 'green'
+                  ? { text: '✅ GREEN', cls: 'bg-green-500/20 text-green-400' }
+                  : s.status === 'loss'
+                    ? { text: '❌ LOSS', cls: 'bg-red-500/20 text-red-400' }
+                    : { text: '⏳ Pendente', cls: 'bg-yellow-500/20 text-yellow-400' };
+
+                return (
+                <div key={s.id} className={`border rounded-xl p-4 text-xs space-y-1.5 ${s.status === 'green' ? 'border-green-500/20 bg-green-500/5' : s.status === 'loss' ? 'border-red-500/30 bg-red-500/5' : 'border-white/5 bg-card/20'}`}>
                   <div className="flex items-center justify-between">
-                    <p className="font-bold text-sm">{s.success ? '✅' : '❌'} {s.match_name}</p>
-                    <span className="text-muted-foreground/60 text-[10px]">
-                      {new Date(s.created_at).toLocaleString('pt-BR')}
-                    </span>
+                    <p className="font-bold text-sm">{s.success ? '📲' : '❌'} {s.match_name}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusBadge.cls}`}>{statusBadge.text}</span>
+                      <span className="text-muted-foreground/60 text-[10px]">
+                        {new Date(s.created_at).toLocaleString('pt-BR')}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-bold">{s.market}</span>
@@ -261,7 +304,8 @@ const Admin = () => {
                   {s.reason && <p className="text-muted-foreground/70 italic">💡 {s.reason}</p>}
                   {s.error_message && <p className="text-red-400 text-[10px]">Erro: {s.error_message}</p>}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         )}

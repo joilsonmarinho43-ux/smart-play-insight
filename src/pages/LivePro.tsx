@@ -339,6 +339,7 @@ const LivePro = () => {
       const { error } = await supabase.functions.invoke('telegram-signal', {
         body: {
           match: `${a.homeName} vs ${a.awayName}`,
+          matchId: String(a.id),
           market: a.decision.market,
           confidence: a.decision.confidence,
           filtersValidated: `${a.filtersValidated}/5`,

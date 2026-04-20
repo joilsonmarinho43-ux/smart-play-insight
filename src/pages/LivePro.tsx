@@ -32,17 +32,20 @@ interface PoissonProbs {
   over25: number;
   over35: number;
   expectedGoals: number;
+  /** Markets already achieved — UI should show "Concluído" */
+  completed: Set<string>;
 }
 
 function factorial(n: number): number { if (n <= 1) return 1; let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
 function poissonPMF(l: number, k: number) { if (l <= 0) return k === 0 ? 1 : 0; return (Math.pow(l, k) * Math.exp(-l)) / factorial(k); }
-function poissonOver(lambda: number, threshold: number, currentTotal: number) {
+
+/**
+ * Calcula probabilidade de MAIS gols acontecerem no tempo restante.
+ * Para mercados já batidos retorna -1 (sinaliza "Concluído").
+ */
+function poissonOverFuture(lambda: number, threshold: number, currentTotal: number): number {
   const need = Math.max(0, Math.ceil(threshold) - currentTotal);
-  // Mercados já batidos: prob de mais 1 gol no tempo restante (nunca 100%)
-  if (need <= 0) {
-    const pNoMore = poissonPMF(lambda, 0);
-    return Math.max(50, Math.min(99, Math.round((1 - pNoMore * 0.5) * 100)));
-  }
+  if (need <= 0) return -1; // Mercado já concluído
   let cdf = 0;
   for (let k = 0; k <= need - 1; k++) cdf += poissonPMF(lambda, k);
   return Math.max(1, Math.min(99, Math.round((1 - cdf) * 100)));
@@ -52,18 +55,35 @@ function calculatePoisson(homeStats: any, awayStats: any, minute: number, totalG
   const h = homeStats || {};
   const a = awayStats || {};
   const safeMin = Math.max(minute, 1);
-  const remaining = Math.max(90 - minute, 0);
-  const totalShots = (h.totalShots || 0) + (a.totalShots || 0);
+  const remaining = Math.max(90 - minute, 1);
+
+  // xG proxy: shots on goal * 0.22 + total shots * 0.08
   const totalSoG = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
-  const conversion = totalShots > 0 ? totalSoG / totalShots : 0.3;
-  const shotsPerMin = totalShots / safeMin;
-  const lambda = shotsPerMin * conversion * remaining * 0.10;
+  const totalShots = (h.totalShots || 0) + (a.totalShots || 0);
+  const xgSoFar = totalSoG * 0.22 + totalShots * 0.08;
+
+  // Project xG for remaining time based on current rate
+  const xgPerMin = xgSoFar / safeMin;
+  const lambda = Math.max(0.05, xgPerMin * remaining);
+
+  const completed = new Set<string>();
+  const raw05 = poissonOverFuture(lambda, 0.5, totalGoals);
+  const raw15 = poissonOverFuture(lambda, 1.5, totalGoals);
+  const raw25 = poissonOverFuture(lambda, 2.5, totalGoals);
+  const raw35 = poissonOverFuture(lambda, 3.5, totalGoals);
+
+  if (raw05 === -1) completed.add('Over 0.5');
+  if (raw15 === -1) completed.add('Over 1.5');
+  if (raw25 === -1) completed.add('Over 2.5');
+  if (raw35 === -1) completed.add('Over 3.5');
+
   return {
-    over05: poissonOver(lambda, 0.5, totalGoals),
-    over15: poissonOver(lambda, 1.5, totalGoals),
-    over25: poissonOver(lambda, 2.5, totalGoals),
-    over35: poissonOver(lambda, 3.5, totalGoals),
+    over05: raw05 === -1 ? 0 : raw05,
+    over15: raw15 === -1 ? 0 : raw15,
+    over25: raw25 === -1 ? 0 : raw25,
+    over35: raw35 === -1 ? 0 : raw35,
     expectedGoals: Math.round((totalGoals + lambda) * 10) / 10,
+    completed,
   };
 }
 
@@ -210,17 +230,34 @@ const LivePro = () => {
       : 'Sem scouts disponíveis para esta partida';
     const rawDecision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
 
-    // Filtros inteligentes (gatilhos reativos) — só com dados válidos
+    // Filtros inteligentes (gatilhos reativos) — sensibilidade melhorada
     const maxPI = Math.max(homePI, awayPI);
     const totalDA = totalDA_check;
     const daPerMin = totalDA / Math.max(minute, 1);
     const noGoalRecent = totalGoals === 0 && minute >= 20;
+
+    // PI trend: verifica se PI subiu ≥10% nos últimos 5 snapshots
+    let piTrending = false;
+    if (history.length >= 2) {
+      const recent = history.slice(-5);
+      const oldest = Math.max(recent[0].homePI, recent[0].awayPI);
+      const newest = Math.max(recent[recent.length - 1].homePI, recent[recent.length - 1].awayPI);
+      if (oldest > 0 && ((newest - oldest) / oldest) >= 0.10) piTrending = true;
+    }
+
+    // Pressão Alta: PI ≥ 60 OU trending up ≥10% nos últimos 5min
+    const pressaoAlta = pressureDataValid && (maxPI >= 60 || piTrending);
+    // PI Alto: threshold mais acessível (≥ 40 ao invés de 50)
+    const piAlto = pressureDataValid && maxPI >= 40;
+    // Ataques: threshold mais acessível (≥ 1.0/min ao invés de 1.5)
+    const ataquesAltos = pressureDataValid && daPerMin >= 1.0;
+
     const filters = [
-      { label: 'Pressão alta', ok: pressureDataValid && maxPI >= 60 },
-      { label: 'PI alto', ok: pressureDataValid && maxPI >= 50 },
-      { label: 'Ataques acima da média', ok: pressureDataValid && daPerMin >= 1.5 },
-      { label: 'Sem gol recente', ok: noGoalRecent },
-      { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR' },
+      { label: 'Pressão alta', ok: pressaoAlta, detail: pressureDataValid ? `PI ${maxPI.toFixed(0)}${piTrending ? ' ↑' : ''}` : 'N/A' },
+      { label: 'PI alto', ok: piAlto, detail: pressureDataValid ? `${maxPI.toFixed(1)}` : 'N/A' },
+      { label: 'Ataques ≥1/min', ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
+      { label: 'Sem gol recente', ok: noGoalRecent, detail: noGoalRecent ? `0 gols em ${minute}'` : `${totalGoals} gol(s)` },
+      { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR', detail: rawDecision.action === 'ENTRAR' ? `${rawDecision.confidence}%` : '—' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
     const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';
@@ -563,13 +600,16 @@ function KpiCard({ icon: Icon, label, valueText, accent, children }: any) {
 }
 
 function ProbabilityBlock({ analysis }: { analysis: any }) {
-  const { poisson } = analysis;
+  const { poisson, totalGoals } = analysis;
   const items = [
-    { label: 'Over 0.5', value: poisson.over05 },
-    { label: 'Over 1.5', value: poisson.over15 },
-    { label: 'Over 2.5', value: poisson.over25 },
-    { label: 'Over 3.5', value: poisson.over35 },
+    { label: 'Over 0.5', value: poisson.over05, threshold: 0.5 },
+    { label: 'Over 1.5', value: poisson.over15, threshold: 1.5 },
+    { label: 'Over 2.5', value: poisson.over25, threshold: 2.5 },
+    { label: 'Over 3.5', value: poisson.over35, threshold: 3.5 },
   ];
+  // Próximo mercado relevante (primeiro não concluído)
+  const nextMarketIdx = items.findIndex(it => !poisson.completed.has(it.label));
+
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
       <div className="flex items-center justify-between mb-3">
@@ -577,15 +617,32 @@ function ProbabilityBlock({ analysis }: { analysis: any }) {
           <BarChart3 className="w-4 h-4 text-cyan-400" />
           <h3 className="font-bold text-sm text-white">PROBABILIDADE (Poisson)</h3>
         </div>
-        <span className="text-[10px] text-gray-400">xG: <span className="text-cyan-400 font-bold">{poisson.expectedGoals.toFixed(1)}</span></span>
+        <span className="text-[10px] text-gray-400">xG proj: <span className="text-cyan-400 font-bold">{poisson.expectedGoals.toFixed(1)}</span></span>
       </div>
       <div className="space-y-2">
-        {items.map(it => {
+        {items.map((it, idx) => {
+          const isCompleted = poisson.completed.has(it.label);
+          const isNext = idx === nextMarketIdx;
+
+          if (isCompleted) {
+            return (
+              <div key={it.label} className="flex items-center gap-2 opacity-60">
+                <span className="text-[10px] text-gray-500 w-14">{it.label}</span>
+                <div className="flex-1 h-2.5 bg-[#0D1117] rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-700 w-full" />
+                </div>
+                <span className="text-[10px] font-bold text-emerald-600 w-16 text-right">✓ Concluído</span>
+              </div>
+            );
+          }
+
           const color = it.value >= 70 ? 'bg-emerald-500' : it.value >= 50 ? 'bg-yellow-500' : 'bg-red-500';
           const text = it.value >= 70 ? 'text-emerald-400' : it.value >= 50 ? 'text-yellow-400' : 'text-red-400';
           return (
-            <div key={it.label} className="flex items-center gap-2">
-              <span className="text-[10px] text-gray-400 w-14">{it.label}</span>
+            <div key={it.label} className={`flex items-center gap-2 ${isNext ? 'ring-1 ring-cyan-500/30 rounded-lg px-1 -mx-1 py-0.5' : ''}`}>
+              <span className={`text-[10px] w-14 ${isNext ? 'text-cyan-400 font-bold' : 'text-gray-400'}`}>
+                {isNext ? '▶ ' : ''}{it.label}
+              </span>
               <div className="flex-1 h-2.5 bg-[#0D1117] rounded-full overflow-hidden">
                 <div className={`h-full ${color} transition-all duration-500`} style={{ width: `${it.value}%` }} />
               </div>
@@ -594,6 +651,11 @@ function ProbabilityBlock({ analysis }: { analysis: any }) {
           );
         })}
       </div>
+      {nextMarketIdx >= 0 && (
+        <p className="text-[9px] text-gray-500 mt-2 text-center">
+          Foco: <span className="text-cyan-400 font-medium">{items[nextMarketIdx].label}</span> — prob. de +gol no tempo restante
+        </p>
+      )}
     </div>
   );
 }
@@ -708,7 +770,7 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
 }
 
 function SmartFilters({ analysis }: { analysis: any }) {
-  const filters = analysis.filters as { label: string; ok: boolean }[];
+  const filters = analysis.filters as { label: string; ok: boolean; detail: string }[];
   const validated = analysis.filtersValidated as number;
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
@@ -717,15 +779,19 @@ function SmartFilters({ analysis }: { analysis: any }) {
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
         </div>
-        <span className={`text-[10px] font-bold ${validated >= 3 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${validated >= 3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
           {validated}/5 OK
         </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+      <div className="space-y-1.5">
         {filters.map(f => (
-          <div key={f.label} className="flex items-center gap-1.5 text-[11px]">
-            {f.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> : <XCircle className="w-3.5 h-3.5 text-gray-600 shrink-0" />}
-            <span className={f.ok ? 'text-gray-200' : 'text-gray-500 line-through'}>{f.label}</span>
+          <div key={f.label} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg ${f.ok ? 'bg-emerald-500/5 border border-emerald-500/20' : 'bg-[#0D1117] border border-[#30363D]'}`}>
+            {f.ok
+              ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              : <XCircle className="w-4 h-4 text-gray-600 shrink-0" />
+            }
+            <span className={`text-xs flex-1 ${f.ok ? 'text-gray-200 font-medium' : 'text-gray-500'}`}>{f.label}</span>
+            <span className={`text-[10px] tabular-nums ${f.ok ? 'text-emerald-400' : 'text-gray-600'}`}>{f.detail}</span>
           </div>
         ))}
       </div>

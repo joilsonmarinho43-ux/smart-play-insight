@@ -205,11 +205,70 @@ const LivePro = () => {
     const narrative = buildPressureNarrative(homePI, awayPI, homeName, awayName);
     const decision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
 
+    // Filtros inteligentes (gatilhos reativos)
+    const maxPI = Math.max(homePI, awayPI);
+    const totalDA = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
+    const daPerMin = totalDA / Math.max(minute, 1);
+    const noGoalRecent = totalGoals === 0 && minute >= 20;
+    const filters = [
+      { label: 'Pressão alta', ok: maxPI >= 60 },
+      { label: 'PI alto', ok: maxPI >= 50 },
+      { label: 'Ataques acima da média', ok: daPerMin >= 1.5 },
+      { label: 'Sem gol recente', ok: noGoalRecent },
+      { label: 'Odd com valor', ok: decision.action === 'ENTRAR' },
+    ];
+    const filtersValidated = filters.filter(f => f.ok).length;
+    const filtersOk = filtersValidated >= 3 && decision.action === 'ENTRAR';
+
     return {
       id, minute, homeGoals, awayGoals, homeName, awayName, homeStats, awayStats,
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
+      filters, filtersValidated, filtersOk,
     };
   }, [selectedMatch]);
+
+  // Auto-Mode: monitora sinal e dispara entrada interna quando filtros validados
+  const autoExecutedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!autoMode || !analysis) return;
+    const key = `${analysis.id}-${analysis.decision.market}-${analysis.minute}`;
+    const prevKey = `${analysis.id}-${analysis.decision.market}`;
+
+    console.log('[AUTO-MODE]', {
+      match: `${analysis.homeName} vs ${analysis.awayName}`,
+      minute: analysis.minute,
+      action: analysis.decision.action,
+      market: analysis.decision.market,
+      confidence: analysis.decision.confidence,
+      filtersValidated: `${analysis.filtersValidated}/5`,
+      filtersOk: analysis.filtersOk,
+    });
+
+    if (!analysis.filtersOk) {
+      console.log('[AUTO-MODE] ✗ Entrada recusada — filtros insuficientes ou sem sinal ENTRAR');
+      return;
+    }
+    if ([...autoExecutedRef.current].some(k => k.startsWith(prevKey))) {
+      console.log('[AUTO-MODE] ✗ Entrada já executada para este mercado neste jogo');
+      return;
+    }
+    autoExecutedRef.current.add(key);
+    const stakeValue = (bankroll * exposure) / 100;
+    console.log('[AUTO-MODE] ✓ EXECUTANDO entrada automática', {
+      market: analysis.decision.market, stake: `R$ ${stakeValue.toFixed(2)}`,
+    });
+    if (analysis.hybrid && analysis.hybrid.canExecute) {
+      registerSignal(analysis.hybrid).then(row => {
+        if (row) toast.success(`AUTO: ${analysis.decision.market}`, {
+          description: `Stake R$ ${stakeValue.toFixed(2)} • ${analysis.minute}'`,
+        });
+      });
+    } else {
+      toast.success(`AUTO (simulado): ${analysis.decision.market}`, {
+        description: `Stake R$ ${stakeValue.toFixed(2)} • ${analysis.minute}'`,
+      });
+    }
+  }, [autoMode, analysis, bankroll, exposure, registerSignal]);
 
   const handleGenerateEntry = useCallback(async () => {
     if (!analysis) return;

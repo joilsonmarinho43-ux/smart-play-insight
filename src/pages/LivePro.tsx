@@ -160,8 +160,54 @@ function buildSignalDecision(
   };
 }
 
+/** Hook: alerta sonoro quando sinal muda para ENTRADA CONFIRMADA */
+function useSignalSound(signalAction: string | undefined) {
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const prevAction = useRef<string | undefined>(undefined);
+  const audioCtx = useRef<AudioContext | null>(null);
+
+  const playBeep = useCallback(() => {
+    try {
+      if (!audioCtx.current) audioCtx.current = new AudioContext();
+      const ctx = audioCtx.current;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      console.warn('[SOUND] Falha ao tocar beep:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!soundEnabled || !signalAction) return;
+    const wasWaiting = prevAction.current !== 'ENTRAR';
+    const nowEntry = signalAction === 'ENTRAR';
+    if (wasWaiting && nowEntry) {
+      console.log('[SOUND] 🔔 Sinal mudou para ENTRAR — disparando alerta sonoro');
+      playBeep();
+      toast.info('🔔 ENTRADA CONFIRMADA — sinal ativo!');
+    }
+    prevAction.current = signalAction;
+  }, [signalAction, soundEnabled, playBeep]);
+
+  const enableSound = useCallback(() => {
+    // Cria AudioContext com user gesture para garantir autoplay
+    if (!audioCtx.current) audioCtx.current = new AudioContext();
+    setSoundEnabled(prev => !prev);
+  }, []);
+
+  return { soundEnabled, enableSound };
+}
+
 const LivePro = () => {
-  const { performance, registerSignal } = useHybridPerformance();
+  const { performance, registerSignal, resolve } = useHybridPerformance();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(false);
   const [bankroll, setBankroll] = useState(() => Number(localStorage.getItem('livepro_bankroll') || '1000'));
@@ -260,7 +306,7 @@ const LivePro = () => {
       { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR', detail: rawDecision.action === 'ENTRAR' ? `${rawDecision.confidence}%` : '—' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
-    const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';
+    const filtersOk = filtersValidated >= 4 && rawDecision.action === 'ENTRAR';
 
     // Gate final: ENTRAR só se ≥ 3/5 filtros validados; senão AGUARDANDO neutro
     const decision: SignalDecision = filtersOk

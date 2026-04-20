@@ -376,7 +376,7 @@ const LivePro = () => {
         description: `Stake R$ ${stakeValue.toFixed(2)} • ${analysis.minute}'`,
       });
     }
-  }, [autoMode, analysis, bankroll, exposure, registerSignal]);
+  }, [autoMode, analysis, bankroll, exposure, registerSignal, sendTelegramSignal]);
 
   const sendTelegramSignal = useCallback(async (a: typeof analysis) => {
     if (!a) return;

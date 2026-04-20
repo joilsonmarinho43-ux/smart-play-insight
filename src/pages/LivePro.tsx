@@ -389,6 +389,9 @@ const LivePro = () => {
     }));
   }, [matches]);
 
+  // Sound alert hook
+  const { soundEnabled, enableSound } = useSignalSound(analysis?.decision?.action);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0D1117] flex items-center justify-center">

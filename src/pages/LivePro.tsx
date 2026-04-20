@@ -378,6 +378,7 @@ const LivePro = () => {
               autoMode={autoMode} setAutoMode={setAutoMode}
               bankroll={bankroll} setBankroll={setBankroll}
               exposure={exposure} setExposure={setExposure}
+              analysis={analysis}
             />
           </div>
 

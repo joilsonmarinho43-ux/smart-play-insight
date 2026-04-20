@@ -38,7 +38,11 @@ function factorial(n: number): number { if (n <= 1) return 1; let r = 1; for (le
 function poissonPMF(l: number, k: number) { if (l <= 0) return k === 0 ? 1 : 0; return (Math.pow(l, k) * Math.exp(-l)) / factorial(k); }
 function poissonOver(lambda: number, threshold: number, currentTotal: number) {
   const need = Math.max(0, Math.ceil(threshold) - currentTotal);
-  if (need <= 0) return 99;
+  // Mercados já batidos: prob de mais 1 gol no tempo restante (nunca 100%)
+  if (need <= 0) {
+    const pNoMore = poissonPMF(lambda, 0);
+    return Math.max(50, Math.min(99, Math.round((1 - pNoMore * 0.5) * 100)));
+  }
   let cdf = 0;
   for (let k = 0; k <= need - 1; k++) cdf += poissonPMF(lambda, k);
   return Math.max(1, Math.min(99, Math.round((1 - cdf) * 100)));

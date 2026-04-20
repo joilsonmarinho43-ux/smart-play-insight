@@ -835,7 +835,7 @@ function SmartFilters({ analysis }: { analysis: any }) {
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
         </div>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${validated >= 3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${validated >= 4 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
           {validated}/5 OK
         </span>
       </div>
@@ -882,8 +882,21 @@ function ChartsBlock({ analysis }: { analysis: any }) {
   );
 }
 
-function PerformanceBlock({ performance }: { performance: any }) {
+function PerformanceBlock({ performance, resolve }: { performance: any; resolve: (id: string, result: 'WIN' | 'LOSS' | 'CASHOUT', exitMinute?: number) => Promise<void> }) {
+  const [resolving, setResolving] = useState<string | null>(null);
   if (!performance) return null;
+
+  const handleResolve = async (id: string, result: 'WIN' | 'LOSS' | 'CASHOUT') => {
+    setResolving(id);
+    try {
+      await resolve(id, result);
+      toast.success(result === 'WIN' ? '✅ Ganhou!' : result === 'LOSS' ? '❌ Perdeu' : '↩ Reembolsado');
+    } catch {
+      toast.error('Erro ao atualizar');
+    }
+    setResolving(null);
+  };
+
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
       <div className="flex items-center gap-2 mb-3">
@@ -904,6 +917,47 @@ function PerformanceBlock({ performance }: { performance: any }) {
         ))}
         {performance.last10.length === 0 && <span className="text-[10px] text-gray-500 italic">Sem entradas resolvidas</span>}
       </div>
+
+      {/* Entradas pendentes com botões de resolução */}
+      {performance.entries && performance.entries.filter((e: any) => e.result === 'PENDING').length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-[9px] text-gray-500 uppercase tracking-wider">Pendentes — resolver:</p>
+          {performance.entries.filter((e: any) => e.result === 'PENDING').map((entry: any) => (
+            <div key={entry.id} className="flex items-center gap-2 bg-[#0D1117] border border-[#30363D] rounded-lg px-2.5 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium text-gray-200 truncate">{entry.match_name}</p>
+                <p className="text-[9px] text-gray-500">{entry.market} • {entry.minute}'</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => handleResolve(entry.id, 'WIN')}
+                  disabled={resolving === entry.id}
+                  className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 active:scale-95 transition-all flex items-center justify-center"
+                  title="Ganhou"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleResolve(entry.id, 'LOSS')}
+                  disabled={resolving === entry.id}
+                  className="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 active:scale-95 transition-all flex items-center justify-center"
+                  title="Perdeu"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleResolve(entry.id, 'CASHOUT')}
+                  disabled={resolving === entry.id}
+                  className="w-8 h-8 rounded-lg bg-gray-500/20 border border-gray-500/40 text-gray-400 hover:bg-gray-500/30 active:scale-95 transition-all flex items-center justify-center"
+                  title="Reembolsado"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

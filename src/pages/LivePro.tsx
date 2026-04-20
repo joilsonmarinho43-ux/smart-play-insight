@@ -288,13 +288,13 @@ const LivePro = () => {
     const daPerMin = totalDA / Math.max(minute, 1);
     const noGoalRecent = totalGoals === 0 && minute >= 20;
 
-    // PI trend: verifica se PI subiu ≥10% nos últimos 5 snapshots
+    // PI trend: verifica se PI subiu ≥8% nos últimos 5 snapshots
     let piTrending = false;
     if (history.length >= 2) {
       const recent = history.slice(-5);
       const oldest = Math.max(recent[0].homePI, recent[0].awayPI);
       const newest = Math.max(recent[recent.length - 1].homePI, recent[recent.length - 1].awayPI);
-      if (oldest > 0 && ((newest - oldest) / oldest) >= 0.10) piTrending = true;
+      if (oldest > 0 && ((newest - oldest) / oldest) >= 0.08) piTrending = true;
     }
 
     // Pressão Alta: PI ≥ 45 OU trending up ≥8% nos últimos 5min

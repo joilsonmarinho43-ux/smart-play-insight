@@ -297,22 +297,24 @@ const LivePro = () => {
       if (oldest > 0 && ((newest - oldest) / oldest) >= 0.10) piTrending = true;
     }
 
-    // Pressão Alta: PI ≥ 60 OU trending up ≥10% nos últimos 5min
-    const pressaoAlta = pressureDataValid && (maxPI >= 60 || piTrending);
-    // PI Alto: threshold mais acessível (≥ 40 ao invés de 50)
-    const piAlto = pressureDataValid && maxPI >= 40;
-    // Ataques: threshold mais acessível (≥ 1.0/min ao invés de 1.5)
-    const ataquesAltos = pressureDataValid && daPerMin >= 1.0;
+    // Pressão Alta: PI ≥ 45 OU trending up ≥8% nos últimos 5min
+    const pressaoAlta = pressureDataValid && (maxPI >= 45 || piTrending);
+    // PI Alto: threshold acessível (≥ 30)
+    const piAlto = pressureDataValid && maxPI >= 30;
+    // Ataques: threshold acessível (≥ 0.7/min)
+    const ataquesAltos = pressureDataValid && daPerMin >= 0.7;
+    // Sem gol recente OU placar baixo (≤1 gol) após 25min — indica pressão acumulada
+    const pressaoAcumulada = (noGoalRecent) || (totalGoals <= 1 && minute >= 25);
 
     const filters = [
       { label: 'Pressão alta', ok: pressaoAlta, detail: pressureDataValid ? `PI ${maxPI.toFixed(0)}${piTrending ? ' ↑' : ''}` : 'N/A' },
       { label: 'PI alto', ok: piAlto, detail: pressureDataValid ? `${maxPI.toFixed(1)}` : 'N/A' },
-      { label: 'Ataques ≥1/min', ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
-      { label: 'Sem gol recente', ok: noGoalRecent, detail: noGoalRecent ? `0 gols em ${minute}'` : `${totalGoals} gol(s)` },
+      { label: 'Ataques ≥0.7/min', ok: ataquesAltos, detail: pressureDataValid ? `${daPerMin.toFixed(1)}/min` : 'N/A' },
+      { label: 'Pressão acumulada', ok: pressaoAcumulada, detail: pressaoAcumulada ? `${totalGoals} gol(s) em ${minute}'` : `${totalGoals} gol(s)` },
       { label: 'Odd com valor', ok: rawDecision.action === 'ENTRAR', detail: rawDecision.action === 'ENTRAR' ? `${rawDecision.confidence}%` : '—' },
     ];
     const filtersValidated = filters.filter(f => f.ok).length;
-    const filtersOk = filtersValidated >= 4 && rawDecision.action === 'ENTRAR';
+    const filtersOk = filtersValidated >= 3 && rawDecision.action === 'ENTRAR';
 
     // Gate final: ENTRAR só se ≥ 4/5 filtros validados; senão AGUARDANDO neutro
     const decision: SignalDecision = filtersOk

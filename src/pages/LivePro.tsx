@@ -195,7 +195,15 @@ const LivePro = () => {
 
     const totalGoals = homeGoals + awayGoals;
     const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
-    const decision = buildSignalDecision(hybrid, sniper, strategies[0], minute);
+    // Mercados já batidos → 100%
+    if (totalGoals >= 1) poisson.over05 = 100;
+    if (totalGoals >= 2) poisson.over15 = 100;
+    if (totalGoals >= 3) poisson.over25 = 100;
+    if (totalGoals >= 4) poisson.over35 = 100;
+    const homePI = pressure?.homePI || 0;
+    const awayPI = pressure?.awayPI || 0;
+    const narrative = buildPressureNarrative(homePI, awayPI, homeName, awayName);
+    const decision = buildSignalDecision(hybrid, sniper, strategies[0], minute, narrative);
 
     return {
       id, minute, homeGoals, awayGoals, homeName, awayName, homeStats, awayStats,

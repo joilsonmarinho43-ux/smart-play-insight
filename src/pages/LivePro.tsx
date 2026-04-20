@@ -376,12 +376,41 @@ const LivePro = () => {
     }
   }, [autoMode, analysis, bankroll, exposure, registerSignal]);
 
+  const sendTelegramSignal = useCallback(async (a: typeof analysis) => {
+    if (!a) return;
+    try {
+      const { error } = await supabase.functions.invoke('telegram-signal', {
+        body: {
+          match: `${a.homeName} vs ${a.awayName}`,
+          market: a.decision.market,
+          confidence: a.decision.confidence,
+          filtersValidated: `${a.filtersValidated}/5`,
+          sensitivity,
+          minute: a.minute,
+          score: `${a.homeGoals} x ${a.awayGoals}`,
+          poisson: a.poisson ? `O2.5 ${(a.poisson.over25 * 100).toFixed(0)}%` : undefined,
+          oddMin: a.decision.oddMin ? String(a.decision.oddMin) : undefined,
+          janela: a.decision.windowText || undefined,
+          reason: a.decision.reason || undefined,
+        },
+      });
+      if (error) throw error;
+      toast.success('📲 Sinal enviado ao Telegram!');
+    } catch (e) {
+      console.error('Telegram send failed:', e);
+      toast.error('Falha ao enviar ao Telegram');
+    }
+  }, [sensitivity]);
+
   const handleGenerateEntry = useCallback(async () => {
     if (!analysis) return;
     if (analysis.decision.action !== 'ENTRAR') {
       toast.warning('Nenhum sinal de entrada ativo no momento');
       return;
     }
+    // Send to Telegram
+    sendTelegramSignal(analysis);
+
     if (analysis.hybrid && analysis.hybrid.canExecute) {
       const row = await registerSignal(analysis.hybrid);
       if (row) toast.success(`Entrada registrada: ${analysis.hybrid.market}`, { description: `${analysis.homeName} vs ${analysis.awayName} • ${analysis.minute}'` });
@@ -389,7 +418,7 @@ const LivePro = () => {
     } else {
       toast.success(`Sugestão: ${analysis.decision.market}`, { description: `Confiança ${analysis.decision.confidence}% • Janela ${analysis.decision.windowText}` });
     }
-  }, [analysis, registerSignal]);
+  }, [analysis, registerSignal, sendTelegramSignal]);
 
   const matchOptions = useMemo(() => {
     return (matches as any[]).map(m => ({

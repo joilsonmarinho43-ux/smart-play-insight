@@ -994,7 +994,7 @@ function AutoModeBlock({ autoMode, setAutoMode, bankroll, setBankroll, exposure,
         <div className={`text-[10px] mb-3 px-2 py-1.5 rounded border ${ready ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'}`}>
           {ready
             ? `✓ Pronto para executar — ${validated}/5 filtros OK • sinal ENTRAR`
-            : `⏸ Monitorando — ${validated}/5 filtros validados (precisa ≥3 + ENTRAR)`}
+            : `⏸ Monitorando — ${validated}/5 filtros validados (precisa ≥4 + ENTRAR)`}
         </div>
       )}
       <div className="grid grid-cols-2 gap-2">

@@ -333,6 +333,32 @@ const LivePro = () => {
     };
   }, [selectedMatch, sensitivity]);
 
+  const sendTelegramSignal = useCallback(async (a: typeof analysis) => {
+    if (!a) return;
+    try {
+      const { error } = await supabase.functions.invoke('telegram-signal', {
+        body: {
+          match: `${a.homeName} vs ${a.awayName}`,
+          market: a.decision.market,
+          confidence: a.decision.confidence,
+          filtersValidated: `${a.filtersValidated}/5`,
+          sensitivity,
+          minute: a.minute,
+          score: `${a.homeGoals} x ${a.awayGoals}`,
+          poisson: a.poisson ? `O2.5 ${(a.poisson.over25 * 100).toFixed(0)}%` : undefined,
+          oddMin: (a.decision as any).oddMin ? String((a.decision as any).oddMin) : undefined,
+          janela: a.decision.windowText || undefined,
+          reason: a.decision.reason || undefined,
+        },
+      });
+      if (error) throw error;
+      toast.success('📲 Sinal enviado ao Telegram!');
+    } catch (e) {
+      console.error('Telegram send failed:', e);
+      toast.error('Falha ao enviar ao Telegram');
+    }
+  }, [sensitivity]);
+
   // Auto-Mode: monitora sinal e dispara entrada interna quando filtros validados
   const autoExecutedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -377,32 +403,6 @@ const LivePro = () => {
       });
     }
   }, [autoMode, analysis, bankroll, exposure, registerSignal, sendTelegramSignal]);
-
-  const sendTelegramSignal = useCallback(async (a: typeof analysis) => {
-    if (!a) return;
-    try {
-      const { error } = await supabase.functions.invoke('telegram-signal', {
-        body: {
-          match: `${a.homeName} vs ${a.awayName}`,
-          market: a.decision.market,
-          confidence: a.decision.confidence,
-          filtersValidated: `${a.filtersValidated}/5`,
-          sensitivity,
-          minute: a.minute,
-          score: `${a.homeGoals} x ${a.awayGoals}`,
-          poisson: a.poisson ? `O2.5 ${(a.poisson.over25 * 100).toFixed(0)}%` : undefined,
-          oddMin: (a.decision as any).oddMin ? String((a.decision as any).oddMin) : undefined,
-          janela: a.decision.windowText || undefined,
-          reason: a.decision.reason || undefined,
-        },
-      });
-      if (error) throw error;
-      toast.success('📲 Sinal enviado ao Telegram!');
-    } catch (e) {
-      console.error('Telegram send failed:', e);
-      toast.error('Falha ao enviar ao Telegram');
-    }
-  }, [sensitivity]);
 
   const handleGenerateEntry = useCallback(async () => {
     if (!analysis) return;

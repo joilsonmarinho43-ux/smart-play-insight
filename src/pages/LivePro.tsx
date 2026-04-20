@@ -685,25 +685,18 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
 }
 
 function SmartFilters({ analysis }: { analysis: any }) {
-  const { pressure, homeStats, awayStats, minute, decision } = analysis;
-  const maxPI = Math.max(pressure?.homePI || 0, pressure?.awayPI || 0);
-  const totalDA = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
-  const daPerMin = totalDA / Math.max(minute, 1);
-  const recentNoGoal = analysis.totalGoals === 0 && minute >= 20;
-
-  const filters = [
-    { label: 'Pressão alta', ok: maxPI >= 60 },
-    { label: 'PI alto', ok: maxPI >= 50 },
-    { label: 'Ataques acima da média', ok: daPerMin >= 1.5 },
-    { label: 'Sem gol recente', ok: recentNoGoal || analysis.totalGoals === 0 },
-    { label: 'Odd com valor', ok: decision.action === 'ENTRAR' },
-  ];
-
+  const filters = analysis.filters as { label: string; ok: boolean }[];
+  const validated = analysis.filtersValidated as number;
   return (
     <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 sm:p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-        <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <h3 className="font-bold text-sm text-white">FILTROS INTELIGENTES</h3>
+        </div>
+        <span className={`text-[10px] font-bold ${validated >= 3 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+          {validated}/5 OK
+        </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
         {filters.map(f => (

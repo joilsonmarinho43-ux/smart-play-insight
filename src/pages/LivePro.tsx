@@ -430,6 +430,13 @@ const LivePro = () => {
             </Link>
             <h1 className="font-bold text-base sm:text-lg tracking-tight text-white">LIVE TRADER PRO</h1>
             <span className="text-[9px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-bold">BETA</span>
+            <button
+              onClick={() => setTestMode(t => !t)}
+              className={`text-[9px] px-1.5 py-0.5 rounded font-bold border transition-colors ${testMode ? 'bg-purple-500/20 text-purple-400 border-purple-500/50' : 'bg-[#161B22] text-gray-500 border-[#30363D] hover:text-gray-300'}`}
+              title="Modo teste: injeta scouts fictícios"
+            >
+              {testMode ? '🧪 TEST ON' : '🧪'}
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <select

@@ -43,6 +43,7 @@ export interface HybridPerformance {
   blockReason?: string;
   dailyCount: number;
   maxDaily: number;
+  entries: HybridEntryRow[];
 }
 
 const AVG_ODD = 1.35;
@@ -201,5 +202,6 @@ export async function getPerformance(): Promise<HybridPerformance> {
     dayStatus: dayProfit > 0 ? 'positivo' : dayProfit < 0 ? 'negativo' : 'neutro',
     isBlocked: blocked, blockReason: reason || undefined,
     dailyCount, maxDaily: MAX_DAILY,
+    entries,
   };
 }

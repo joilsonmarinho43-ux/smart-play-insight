@@ -438,6 +438,13 @@ const LivePro = () => {
             <button onClick={() => refetch()} className="p-1.5 rounded-lg bg-[#161B22] border border-[#30363D] hover:bg-[#1c2333]">
               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-orange-500' : 'text-gray-400'}`} />
             </button>
+            <button
+              onClick={enableSound}
+              className={`p-1.5 rounded-lg border transition-colors ${soundEnabled ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-[#161B22] border-[#30363D] text-gray-400 hover:bg-[#1c2333]'}`}
+              title={soundEnabled ? 'Som ativado' : 'Ativar som'}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 
@@ -469,7 +476,7 @@ const LivePro = () => {
             <ChartsBlock analysis={analysis} />
 
             {/* Histórico */}
-            <PerformanceBlock performance={performance} />
+            <PerformanceBlock performance={performance} resolve={resolve} />
 
             {/* Modo Automático */}
             <AutoModeBlock

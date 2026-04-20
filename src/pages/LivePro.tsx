@@ -22,6 +22,7 @@ import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import MomentumChart from '@/components/MomentumChart';
 import CornerTimeline from '@/components/CornerTimeline';
 import OverGoalsPanel from '@/components/OverGoalsPanel';

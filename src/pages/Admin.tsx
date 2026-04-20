@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DAYS_OPTIONS = [3, 7, 15, 30];
@@ -30,6 +30,9 @@ interface TelegramSignal {
   success: boolean;
   error_message: string | null;
   created_at: string;
+  status: string;
+  telegram_message_id: number | null;
+  match_id: string | null;
 }
 
 const Admin = () => {
@@ -41,6 +44,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const [showConflicts, setShowConflicts] = useState(false);
   const [showSignals, setShowSignals] = useState(false);
+  const [checkingResults, setCheckingResults] = useState(false);
 
   useEffect(() => {
     if (profile?.is_admin) {

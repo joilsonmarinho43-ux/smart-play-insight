@@ -8,11 +8,12 @@ interface Props {
 }
 
 // Custom cell shape to avoid ref warning on Cell in recharts v3
-const CustomBar = (props: any) => {
+const CustomBar = React.forwardRef<SVGRectElement, any>((props, ref) => {
   const { x, y, width, height, fill } = props;
   if (!height || height <= 0) return null;
-  return <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} ry={2} />;
-};
+  return <rect ref={ref} x={x} y={y} width={width} height={height} fill={fill} rx={2} ry={2} />;
+});
+CustomBar.displayName = 'CustomBar';
 
 const CornerTimeline = ({ data, currentMinute }: Props) => {
   if (!data || data.length === 0) return null;

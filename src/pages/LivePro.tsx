@@ -64,7 +64,7 @@ function calculatePoisson(homeStats: any, awayStats: any, minute: number, totalG
 }
 
 interface SignalDecision {
-  action: 'ENTRAR' | 'AGUARDAR' | 'BLOQUEADO';
+  action: 'ENTRAR' | 'AGUARDAR' | 'AGUARDANDO' | 'BLOQUEADO';
   market: string;
   confidence: number;
   windowText: string;

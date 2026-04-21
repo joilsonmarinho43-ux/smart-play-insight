@@ -589,18 +589,26 @@ const Admin = () => {
                           <div className="mt-2 bg-black/30 rounded-lg p-2.5 space-y-2 border border-white/5">
                             {/* Score components */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                              {[
-                                { label: 'Pressão', value: log.pressure != null ? log.pressure.toFixed(0) : (log.rma_score != null ? ((log.rma_score - (log.ap_norm ?? 0) * 0.35 - (log.f_norm ?? 0) * 0.15 - (log.sot_norm ?? 0) * 0.10) / 0.4).toFixed(0) : '—'), color: 'text-orange-400', desc: '×0.40' },
-                                { label: 'AP_norm', value: log.ap_norm?.toFixed(2) ?? '—', color: 'text-blue-400', desc: '×0.35' },
-                                { label: 'F_norm', value: log.f_norm?.toFixed(2) ?? '—', color: 'text-purple-400', desc: '×0.15' },
-                                { label: 'SOT_norm', value: log.sot_norm?.toFixed(2) ?? '—', color: 'text-emerald-400', desc: '×0.10' },
-                              ].map((m) => (
+                              {(() => {
+                                const hasPressure = log.pressure != null;
+                                const derivedPressure = log.rma_score != null ? ((log.rma_score - (log.ap_norm ?? 0) * 0.35 - (log.f_norm ?? 0) * 0.15 - (log.sot_norm ?? 0) * 0.10) / 0.4).toFixed(0) : null;
+                                const pressureValue = hasPressure ? log.pressure!.toFixed(0) : (derivedPressure ?? '—');
+                                const pressureSuffix = !hasPressure && derivedPressure != null ? ' *' : '';
+                                return [
+                                  { label: 'Pressão', value: pressureValue + pressureSuffix, color: hasPressure ? 'text-orange-400' : 'text-orange-400/60', desc: '×0.40' },
+                                  { label: 'AP_norm', value: log.ap_norm?.toFixed(2) ?? '—', color: 'text-blue-400', desc: '×0.35' },
+                                  { label: 'F_norm', value: log.f_norm?.toFixed(2) ?? '—', color: 'text-purple-400', desc: '×0.15' },
+                                  { label: 'SOT_norm', value: log.sot_norm?.toFixed(2) ?? '—', color: 'text-emerald-400', desc: '×0.10' },
+                                ];})().map((m) => (
                                 <div key={m.label} className="bg-white/5 rounded-md p-1.5 text-center">
                                   <p className="text-[8px] text-muted-foreground uppercase">{m.label} <span className="text-muted-foreground/40">{m.desc}</span></p>
                                   <p className={`text-sm font-bold font-mono ${m.color}`}>{m.value}</p>
                                 </div>
                               ))}
                             </div>
+                            {log.pressure == null && (
+                              <p className="text-[8px] text-muted-foreground/50 italic">* Pressão derivada do score (log antigo sem coluna dedicada)</p>
+                            )}
                             {log.acceleration != null && log.acceleration !== 0 && (
                               <p className="text-[10px] text-muted-foreground">
                                 ⚡ Aceleração: <span className={`font-bold ${log.acceleration > 0 ? 'text-green-400' : 'text-red-400'}`}>{log.acceleration > 0 ? '+' : ''}{log.acceleration}</span>

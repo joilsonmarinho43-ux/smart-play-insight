@@ -45,7 +45,12 @@ const Admin = () => {
   const [showConflicts, setShowConflicts] = useState(false);
   const [showSignals, setShowSignals] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showAutoMode, setShowAutoMode] = useState(false);
   const [checkingResults, setCheckingResults] = useState(false);
+  const [autoModeActive, setAutoModeActive] = useState(true);
+  const [togglingAutoMode, setTogglingAutoMode] = useState(false);
+  const [autoModeLastRun, setAutoModeLastRun] = useState<any>(null);
+  const [testingAutoMode, setTestingAutoMode] = useState(false);
 
   useEffect(() => {
     if (profile?.is_admin) {

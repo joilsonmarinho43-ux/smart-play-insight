@@ -60,11 +60,59 @@ function calculatePressure(h: any, a: any): number {
   return Math.min(100, Math.max(0, (hDA + aDA) * 3 + corners * 5 + sog * 10) / 5);
 }
 
-function estimateEV(probability: number): number {
+// ═══════════════════════════════════════
+// Confidence cap — nunca 100%, penalidade por tempo baixo
+// ═══════════════════════════════════════
+function capConfidence(rawProb: number, minute: number, totalGoals: number): number {
+  // Hard cap at 95%
+  let conf = Math.min(rawProb, 95);
+
+  // Penalidade por jogo cedo (< 25 min): -15% proporcional
+  if (minute < 25) {
+    const earlyPenalty = (25 - minute) / 25 * 15;
+    conf = conf - earlyPenalty;
+  }
+
+  // Penalidade se 0-0 e minuto < 30
+  if (totalGoals === 0 && minute < 30) {
+    conf = conf - 8;
+  }
+
+  return Math.max(50, Math.round(conf));
+}
+
+// ═══════════════════════════════════════
+// EV real — baseado em odd de mercado estimada via Poisson
+// ═══════════════════════════════════════
+function estimateEV(probability: number, market: string, minute: number): number {
   if (probability <= 0) return -1;
   const p = probability / 100;
-  const marketOdd = 1 / (p * 0.88);
-  return Math.round((p * marketOdd - 1) * 100) / 100;
+
+  // Margem da casa varia por mercado
+  const margins: Record<string, number> = {
+    'Over 0.5 Gols': 0.92,
+    'Over 1.5 Gols': 0.90,
+    'Over 2.5 Gols': 0.87,
+    'Ambas Marcam': 0.88,
+  };
+  const margin = margins[market] || 0.88;
+
+  // Odd estimada do mercado (com margem da casa)
+  const marketOdd = 1 / (p * margin);
+
+  // Odd mínima realista por mercado
+  const minOdds: Record<string, number> = {
+    'Over 0.5 Gols': 1.05,
+    'Over 1.5 Gols': 1.20,
+    'Over 2.5 Gols': 1.50,
+    'Ambas Marcam': 1.40,
+  };
+  const minOdd = minOdds[market] || 1.20;
+  const finalOdd = Math.max(marketOdd, minOdd);
+
+  // EV = (prob * odd) - 1
+  const ev = p * finalOdd - 1;
+  return Math.round(ev * 100) / 100;
 }
 
 function oppScore(prob: number, ev: number, pressure: number): number {
@@ -117,10 +165,13 @@ function scanMatch(match: any): ScannerOpp[] {
     const remainingNeeded = m.k - totalGoals;
     const remainingMin = Math.max(1, 90 - minute);
     const remainingLambda = totalLambda * (remainingMin / 90);
-    const prob = Math.round(poissonOver(remainingLambda, remainingNeeded) * 100);
+    const rawProb = Math.round(poissonOver(remainingLambda, remainingNeeded) * 100);
+
+    // Apply confidence cap
+    const prob = capConfidence(rawProb, minute, totalGoals);
 
     if (prob < 60) continue;
-    const ev = estimateEV(prob);
+    const ev = estimateEV(prob, m.name, minute);
     if (ev <= 0) continue;
 
     const score = oppScore(prob, ev, pressure);
@@ -146,12 +197,14 @@ function scanMatch(match: any): ScannerOpp[] {
   if (homeGoals === 0 || awayGoals === 0) {
     const bttsProbH = 1 - poissonProb(homeLambda, 0);
     const bttsProbA = 1 - poissonProb(awayLambda, 0);
-    let bttsProb = Math.round(bttsProbH * bttsProbA * 100);
-    if (homeGoals > 0) bttsProb = Math.round(bttsProbA * 100);
-    if (awayGoals > 0) bttsProb = Math.round(bttsProbH * 100);
+    let rawBtts = Math.round(bttsProbH * bttsProbA * 100);
+    if (homeGoals > 0) rawBtts = Math.round(bttsProbA * 100);
+    if (awayGoals > 0) rawBtts = Math.round(bttsProbH * 100);
+
+    const bttsProb = capConfidence(rawBtts, minute, totalGoals);
 
     if (bttsProb >= 60) {
-      const ev = estimateEV(bttsProb);
+      const ev = estimateEV(bttsProb, 'Ambas Marcam', minute);
       if (ev > 0) {
         results.push({
           matchId, match: `${homeTeam} vs ${awayTeam}`, league, minute,

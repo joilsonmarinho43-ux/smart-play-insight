@@ -86,8 +86,11 @@ function validateLiveData(
   // Apply DA fallback (API often returns 0 for dangerousAttacks)
   const rawDA = (h.dangerousAttacks || 0) + (a.dangerousAttacks || 0);
   const totalShots = (h.totalShots || 0) + (a.totalShots || 0);
+  const totalCorners = (h.corners || 0) + (a.corners || 0);
   const totalDA = rawDA > 0 ? rawDA : Math.round(totalShots * 1.5 + totalCorners * 2);
   const totalShotsOnGoal = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
+  const homePoss = Number(h.possession || 0);
+  const awayPoss = Number(a.possession || 0);
 
   const allZero = totalDA === 0 && totalShots === 0 && totalShotsOnGoal === 0 && totalCorners === 0;
 
@@ -135,7 +138,13 @@ function computeScannerScore(
   const aDA = rawADA > 0 ? rawADA : Math.round(((a.totalShots || 0) * 1.5) + ((a.corners || 0) * 2));
   const totalDA = hDA + aDA;
   const totalSoG = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
+  const totalCorners = (h.corners || 0) + (a.corners || 0);
+  const maxDA = Math.max(hDA, aDA);
+  const minDA = Math.min(hDA, aDA);
   const dominanceDiff = maxDA - minDA;
+
+  // Offensive frequency (per minute)
+  const offFreq = totalDA / safeMin;
 
   // Composite: weighted sum
   const score =

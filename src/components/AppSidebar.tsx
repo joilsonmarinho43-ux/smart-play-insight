@@ -22,8 +22,6 @@ const navItems = [
   { title: "Live Trader", url: "/live", icon: Zap },
   { title: "Live PRO", url: "/live-pro", icon: Target },
   { title: "Scanner PRO", url: "/scanner", icon: Crosshair },
-  { title: "Elite", url: "/elite", icon: Crown },
-  { title: "Bingo VIP", url: "/bingo", icon: Trophy },
   { title: "Favoritos", url: "/favorites", icon: Star },
 ];
 

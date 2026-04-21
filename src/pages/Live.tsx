@@ -320,7 +320,46 @@ const Live = () => {
     return map;
   }, [matches, statsMap]);
 
-  // Sound alert
+  // ═══ AUDIT ENTRIES ═══
+  const auditEntries = useMemo(() => {
+    return (matches as any[]).map((match) => {
+      const id = match?.fixture?.id || match?.id;
+      const rawStats = match?.stats;
+      const isFakeCheck = (st: any) => {
+        if (!st) return true;
+        const p = Number(st.possession || 0);
+        const hasAnyShots = (st.shotsOnGoal || 0) > 0 || (st.totalShots || 0) > 0;
+        const hasAnyDA = (st.dangerousAttacks || 0) > 0;
+        const hasCorners = (st.corners || 0) > 0;
+        const hasRealPoss = p > 0 && p !== 50;
+        return !hasAnyShots && !hasAnyDA && !hasCorners && !hasRealPoss;
+      };
+      const homeFake = isFakeCheck(rawStats?.home);
+      const awayFake = isFakeCheck(rawStats?.away);
+      const analysis = analysisMap[id] || BLOCKED_RESULT;
+
+      return {
+        id,
+        homeName: match?.teams?.home?.name || 'Casa',
+        awayName: match?.teams?.away?.name || 'Fora',
+        league: match?.league || '',
+        minute: match?.fixture?.status?.elapsed || 0,
+        homeGoals: match?.goals?.home ?? 0,
+        awayGoals: match?.goals?.away ?? 0,
+        rawHome: rawStats?.home || null,
+        rawAway: rawStats?.away || null,
+        homeFake,
+        awayFake,
+        filteredHome: statsMap[id]?.home || null,
+        filteredAway: statsMap[id]?.away || null,
+        dataStatus: analysis.dataStatus,
+        statusMessage: analysis.statusMessage,
+        scannerScore: analysis.scannerScore,
+      };
+    });
+  }, [matches, statsMap, analysisMap]);
+
+
   const [soundEnabled, setSoundEnabled] = useState(true);
   const alertedRef = useRef<Set<string>>(new Set());
 

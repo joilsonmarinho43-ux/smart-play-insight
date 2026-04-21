@@ -155,7 +155,7 @@ function computeScannerScore(
   return Math.round(score * 10) / 10;
 }
 
-function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
+function safeAnalyze(match: any, statsMap: Record<string, any>, calibration?: CalibrationProfile | null): MatchAnalysis {
   const id = match?.fixture?.id || match?.id;
   const stats = statsMap[id];
   const minute = match?.fixture?.status?.elapsed || 0;
@@ -183,7 +183,7 @@ function safeAnalyze(match: any, statsMap: Record<string, any>): MatchAnalysis {
 
   try { pressure = analyzeLivePressure(homeStats, awayStats, minute); } catch (e) { console.error('Pressure error:', e); }
   try { history = recordPISnapshot(id, pressure.homePI, pressure.awayPI, minute); } catch (e) { console.error('PI history error:', e); }
-  try { strategies = generateLiveStrategy(homeStats, awayStats, minute, homeGoals, awayGoals, homeName, awayName); } catch (e) { console.error('Strategy error:', e); }
+  try { strategies = generateLiveStrategy(homeStats, awayStats, minute, homeGoals, awayGoals, homeName, awayName, calibration); } catch (e) { console.error('Strategy error:', e); }
   try { apWindows = calculateAPWindows(history, minute); } catch (e) { console.error('AP error:', e); }
   try { periculosity = calculatePericulosity(homeStats, awayStats, minute); } catch (e) { console.error('Periculosity error:', e); }
   try { imminentHome = detectImminentGoal(homeStats, minute, apWindows.ap5Home); } catch (e) { console.error('Imminent home error:', e); }

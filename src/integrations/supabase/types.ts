@@ -164,6 +164,60 @@ export type Database = {
         }
         Relationships: []
       }
+      rma_shadow_logs: {
+        Row: {
+          acceleration: number | null
+          ap_norm: number | null
+          block_reason: string | null
+          created_at: string
+          f_norm: number | null
+          id: string
+          market: string
+          match_id: string
+          match_name: string
+          match_result: string | null
+          minute: number
+          original_signal: string | null
+          rma_score: number
+          rma_verdict: string
+          sot_norm: number | null
+        }
+        Insert: {
+          acceleration?: number | null
+          ap_norm?: number | null
+          block_reason?: string | null
+          created_at?: string
+          f_norm?: number | null
+          id?: string
+          market: string
+          match_id: string
+          match_name: string
+          match_result?: string | null
+          minute?: number
+          original_signal?: string | null
+          rma_score?: number
+          rma_verdict: string
+          sot_norm?: number | null
+        }
+        Update: {
+          acceleration?: number | null
+          ap_norm?: number | null
+          block_reason?: string | null
+          created_at?: string
+          f_norm?: number | null
+          id?: string
+          market?: string
+          match_id?: string
+          match_name?: string
+          match_result?: string | null
+          minute?: number
+          original_signal?: string | null
+          rma_score?: number
+          rma_verdict?: string
+          sot_norm?: number | null
+        }
+        Relationships: []
+      }
       session_conflicts: {
         Row: {
           created_at: string
@@ -215,6 +269,8 @@ export type Database = {
           odd_min: string | null
           poisson: string | null
           reason: string | null
+          rma_score: number | null
+          rma_verdict: string | null
           score: string | null
           sensitivity: string | null
           status: string
@@ -235,6 +291,8 @@ export type Database = {
           odd_min?: string | null
           poisson?: string | null
           reason?: string | null
+          rma_score?: number | null
+          rma_verdict?: string | null
           score?: string | null
           sensitivity?: string | null
           status?: string
@@ -255,6 +313,8 @@ export type Database = {
           odd_min?: string | null
           poisson?: string | null
           reason?: string | null
+          rma_score?: number | null
+          rma_verdict?: string | null
           score?: string | null
           sensitivity?: string | null
           status?: string

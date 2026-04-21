@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { fetchLiveMatches } from '@/services/footballApi';
 import { analyzeLivePressure, generateLiveStrategy, recordPISnapshot, type PressureData, type PISnapshot, type LiveStrategy } from '@/lib/pressureEngine';
+import { getCalibrationProfile, type CalibrationProfile } from '@/lib/calibrationEngine';
 import { calculateAPWindows, calculateLiveOddsDeviation, projectCornersByPeriod, type AttackPressureWindows, type OddsDeviation, type CornerPeriod } from '@/lib/eliteMetrics';
 import { classifyHybridSignal, type HybridSignal } from '@/lib/hybridEngine';
 import { analyzeSniperSignal, type SniperSignal } from '@/lib/sniperEngine';
@@ -212,6 +213,9 @@ const LivePro = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(false);
   const [sensitivity, setSensitivity] = useState<'conservador' | 'moderado' | 'agressivo'>(() => (localStorage.getItem('livepro_sensitivity') as any) || 'moderado');
+  const [calibration, setCalibration] = useState<CalibrationProfile | null>(null);
+
+  useEffect(() => { getCalibrationProfile().then(setCalibration).catch(() => {}); }, []);
   
   const [bankroll, setBankroll] = useState(() => Number(localStorage.getItem('livepro_bankroll') || '1000'));
   const [exposure, setExposure] = useState(() => Number(localStorage.getItem('livepro_exposure') || '5'));
@@ -260,7 +264,7 @@ const LivePro = () => {
 
     try { pressure = analyzeLivePressure(homeStats, awayStats, minute); } catch {}
     try { if (pressure) history = recordPISnapshot(id, pressure.homePI, pressure.awayPI, minute); } catch {}
-    try { strategies = generateLiveStrategy(homeStats, awayStats, minute, homeGoals, awayGoals, homeName, awayName); } catch {}
+    try { strategies = generateLiveStrategy(homeStats, awayStats, minute, homeGoals, awayGoals, homeName, awayName, calibration); } catch {}
     try { apWindows = calculateAPWindows(history, minute); } catch {}
     try { oddsDev = calculateLiveOddsDeviation(homeStats, awayStats, homeGoals, awayGoals, minute); } catch {}
     try { hybrid = classifyHybridSignal(selectedMatch); } catch {}
@@ -335,7 +339,7 @@ const LivePro = () => {
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
       filters, filtersValidated, filtersOk, pressureDataValid,
     };
-  }, [selectedMatch, sensitivity]);
+  }, [selectedMatch, sensitivity, calibration]);
 
   const sendTelegramSignal = useCallback(async (a: typeof analysis) => {
     if (!a) return;

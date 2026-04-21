@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;
       signalsToSend.push(signal);
-      if (signalsToSend.length + dailyCount >= 5) break;
+      if (signalsToSend.length + dailyCount >= 15) break;
     }
 
     console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} sinais qualificados`);

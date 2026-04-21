@@ -137,35 +137,27 @@ Deno.serve(async (req) => {
       const data = matchData[signal.match_id];
       if (!data) continue;
 
-      // Check if signal is older than 3 hours (safety timeout)
-      const signalAge = Date.now() - new Date(signal.created_at).getTime();
-      const timedOut = signalAge > 3 * 60 * 60 * 1000;
+      // Determine the resolved status
+      let newStatus = signal.status;
+      if (signal.status === 'pendente') {
+        const signalAge = Date.now() - new Date(signal.created_at).getTime();
+        const timedOut = signalAge > 3 * 60 * 60 * 1000;
 
-      let newStatus = checkMarketResult(
-        signal.market,
-        data.homeGoals,
-        data.awayGoals,
-        data.corners,
-        data.finished || timedOut
-      );
+        newStatus = checkMarketResult(
+          signal.market,
+          data.homeGoals,
+          data.awayGoals,
+          data.corners,
+          data.finished || timedOut
+        );
 
-      if (newStatus === 'pendente') continue;
-
-      // Update status in DB
-      const { error: updateErr } = await sb
-        .from('telegram_signals')
-        .update({ status: newStatus })
-        .eq('id', signal.id);
-
-      if (updateErr) {
-        console.error(`Failed to update signal ${signal.id}:`, updateErr);
-        continue;
+        if (newStatus === 'pendente') continue;
       }
 
-      // Edit Telegram message
+      // Edit Telegram message FIRST (before DB update)
+      let telegramEdited = false;
       if (signal.telegram_message_id) {
         try {
-          // We need to reconstruct the original message and append result
           const emoji = signal.confidence >= 80 ? '🔥' : signal.confidence >= 70 ? '⚡' : '📊';
           const confBar = '🟢'.repeat(Math.round(signal.confidence / 20)) + '⚪'.repeat(5 - Math.round(signal.confidence / 20));
 
@@ -183,7 +175,7 @@ Deno.serve(async (req) => {
             `🤖 <i>Analista Joilson</i>`,
           ].join('\n');
 
-          await fetch(`${GATEWAY_URL}/editMessageText`, {
+          const tgResp = await fetch(`${GATEWAY_URL}/editMessageText`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -198,9 +190,28 @@ Deno.serve(async (req) => {
               disable_web_page_preview: true,
             }),
           });
+
+          const tgResult = await tgResp.json();
+          telegramEdited = tgResult.ok === true || tgResp.ok;
+          if (!telegramEdited) {
+            console.error(`Telegram edit failed for signal ${signal.id}:`, JSON.stringify(tgResult));
+          } else {
+            console.log(`Telegram edit OK for signal ${signal.id}, message ${signal.telegram_message_id}`);
+          }
         } catch (e) {
           console.error(`Failed to edit Telegram message for signal ${signal.id}:`, e);
         }
+      }
+
+      // Update status + telegram_edited flag in DB
+      const { error: updateErr } = await sb
+        .from('telegram_signals')
+        .update({ status: newStatus, telegram_edited: telegramEdited })
+        .eq('id', signal.id);
+
+      if (updateErr) {
+        console.error(`Failed to update signal ${signal.id}:`, updateErr);
+        continue;
       }
 
       processed++;

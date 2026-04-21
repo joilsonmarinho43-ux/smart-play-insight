@@ -292,11 +292,13 @@ const Live = () => {
       const s = match?.stats;
       const isFake = (st: any) => {
         if (!st) return true;
-        const p = Number(st.possession);
-        return (st.shotsOnGoal === 0 || st.shotsOnGoal === null) &&
-               (st.totalShots === 0 || st.totalShots === null) &&
-               (st.dangerousAttacks === 0 || st.dangerousAttacks === null) &&
-               (p === 50 || p === 0 || st.possession === null);
+        // Only fake if literally ALL metrics are zero/null — real games always have at least 1 non-zero stat
+        const p = Number(st.possession || 0);
+        const hasAnyShots = (st.shotsOnGoal || 0) > 0 || (st.totalShots || 0) > 0;
+        const hasAnyDA = (st.dangerousAttacks || 0) > 0;
+        const hasCorners = (st.corners || 0) > 0;
+        const hasRealPoss = p > 0 && p !== 50;
+        return !hasAnyShots && !hasAnyDA && !hasCorners && !hasRealPoss;
       };
       result[id] = {
         home: isFake(s?.home) ? null : s.home,

@@ -378,6 +378,36 @@ const Admin = () => {
               </div>
             )}
 
+            {/* Scanner PRO Server */}
+            <div className="border border-orange-500/20 bg-orange-500/5 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
+                  <div>
+                    <p className="font-bold text-sm text-orange-400">🎯 Scanner PRO Server</p>
+                    <p className="text-[10px] text-muted-foreground">Cron: a cada 5 minutos • Prob ≥60% + EV+</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    toast.info('Scanner PRO analisando...');
+                    const { data, error } = await supabase.functions.invoke('scanner-pro-server');
+                    if (error) throw error;
+                    setAutoModeLastRun({ ...data, source: 'scanner' });
+                    toast.success(`Scanner: ${data.analyzed} jogos, ${data.total_opps || 0} opps, ${data.signals} enviados`);
+                  } catch (err: any) {
+                    toast.error('Erro: ' + err.message);
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-orange-500/20 text-orange-400 py-3 rounded-xl font-bold text-xs hover:bg-orange-500/30 transition-all"
+              >
+                <RefreshCw className="w-4 h-4" />
+                🎯 Executar Scanner PRO Agora
+              </button>
+            </div>
+
             {/* Cron Jobs Info */}
             <div className="border border-white/5 bg-card/20 rounded-xl p-4 text-xs space-y-2">
               <p className="font-bold text-muted-foreground uppercase text-[10px]">⏰ Cron Jobs Ativos</p>
@@ -385,6 +415,10 @@ const Admin = () => {
                 <div className="flex items-center justify-between py-1 border-b border-white/5">
                   <span className="text-muted-foreground">Auto-Mode Server</span>
                   <span className="text-purple-400 font-bold">*/3 * * * *</span>
+                </div>
+                <div className="flex items-center justify-between py-1 border-b border-white/5">
+                  <span className="text-muted-foreground">Scanner PRO Server</span>
+                  <span className="text-orange-400 font-bold">*/5 * * * *</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-b border-white/5">
                   <span className="text-muted-foreground">Check Green/Loss</span>

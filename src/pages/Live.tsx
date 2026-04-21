@@ -246,6 +246,12 @@ const Live = () => {
     try { return JSON.parse(localStorage.getItem('liveMatchFavorites') || '[]'); } catch { return []; }
   });
   const [showAudit, setShowAudit] = useState(false);
+  const [calibration, setCalibration] = useState<CalibrationProfile | null>(null);
+
+  // Load calibration profile on mount
+  useEffect(() => {
+    getCalibrationProfile().then(setCalibration).catch(() => {});
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('liveMatchFavorites', JSON.stringify(favorites));
@@ -316,7 +322,7 @@ const Live = () => {
         map[id] = { ...BLOCKED_RESULT, dataStatus: 'awaiting_api', statusMessage: 'AGUARDANDO DADOS DA API' };
         continue;
       }
-      map[id] = safeAnalyze(match, statsMap);
+      map[id] = safeAnalyze(match, statsMap, calibration);
     }
     return map;
   }, [matches, statsMap]);

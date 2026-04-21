@@ -1,5 +1,6 @@
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets, isValidBet } from '@/lib/matchAnalysis';
+import { evaluateRMA, buildRMAInput, type RMAVerdict, type RMAResult } from '@/lib/rmaEngine';
 
 export interface ScannerOpportunity {
   matchId: string;
@@ -14,6 +15,8 @@ export interface ScannerOpportunity {
   signal: string | null;
   isLive: boolean;
   dataQuality: 'high' | 'medium' | 'low';
+  rmaVerdict?: RMAVerdict;
+  rmaScore?: number;
 }
 
 export interface ScannerLog {
@@ -246,6 +249,19 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         isLive,
         dataQuality,
       });
+    }
+
+    // ═══ RMA VALIDATION (parallel layer) ═══
+    if (isLive && minute && minute > 0) {
+      const rmaInput = buildRMAInput(lH, lA, minute, pressure);
+      const rmaResult = evaluateRMA(rmaInput);
+      // Attach RMA verdict to all opportunities from this match
+      for (const opp of opportunities) {
+        if (opp.matchId === match.id && opp.rmaVerdict === undefined) {
+          opp.rmaVerdict = rmaResult.verdict;
+          opp.rmaScore = rmaResult.score;
+        }
+      }
     }
 
     // Standalone imminent goal

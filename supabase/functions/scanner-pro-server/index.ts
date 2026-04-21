@@ -45,6 +45,27 @@ interface ScannerOpp {
   signal: string | null;
   homeGoals: number;
   awayGoals: number;
+  rmaVerdict?: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO';
+  rmaScore?: number;
+}
+
+// ═══════════════════════════════════════
+// RMA ENGINE (inline for edge function)
+// ═══════════════════════════════════════
+function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number; blockReason: string | null } {
+  const safeMin = Math.max(minute, 1);
+  const ap_norm = (da / safeMin) * 10;
+  const f_norm = (shots / safeMin) * 10;
+  const sot_norm = (sot / safeMin) * 10;
+
+  let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
+
+  if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'AP_norm < 1.5' };
+  if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake' };
+  if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score, blockReason: 'SOT_norm = 0' };
+
+  const verdict = rma_score > 65 ? 'CONFIRMADO' as const : rma_score >= 50 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
+  return { verdict, score: Math.round(rma_score * 100) / 100, blockReason: null };
 }
 
 function safeDangerousAttacks(stats: any): number {
@@ -216,6 +237,17 @@ function scanMatch(match: any): ScannerOpp[] {
     }
   }
 
+  // ═══ RMA VALIDATION ═══
+  if (minute > 0) {
+    const totalDA_raw = (lH.dangerousAttacks || 0) + (lA.dangerousAttacks || 0);
+    const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
+    const rma = evaluateRMAServer(minute, pressure, totalDA_raw, totalShots, totalSoG);
+    for (const r of results) {
+      r.rmaVerdict = rma.verdict;
+      r.rmaScore = rma.score;
+    }
+  }
+
   return results;
 }
 
@@ -306,8 +338,9 @@ Deno.serve(async (req) => {
     const oppLines = newOpps.map((o, i) => {
       const priorityEmoji = o.score > 0.75 ? '🔥' : o.score >= 0.65 ? '⚡' : '📊';
       const confBar = '🟢'.repeat(Math.round(o.probability / 20)) + '⚪'.repeat(5 - Math.round(o.probability / 20));
+      const rmaIcon = o.rmaVerdict === 'CONFIRMADO' ? '🟢' : o.rmaVerdict === 'BLOQUEADO' ? '🔴' : '🟡';
       return [
-        `${priorityEmoji} <b>${o.market}</b>`,
+        `${priorityEmoji} <b>${o.market}</b> ${rmaIcon}`,
         `⚽ ${o.match} • ${o.minute}'`,
         `📊 ${o.homeGoals}-${o.awayGoals} ${confBar} <b>${o.probability}%</b>`,
         o.signal ? `${o.signal}` : null,
@@ -342,6 +375,7 @@ Deno.serve(async (req) => {
 
     // 5. Log each opportunity to DB
     for (const opp of newOpps) {
+      // Log signal with RMA verdict
       await supabase.from('telegram_signals').insert({
         match_name: opp.match,
         match_id: opp.matchId,
@@ -356,7 +390,22 @@ Deno.serve(async (req) => {
         error_message: tgRes.ok ? null : JSON.stringify(tgData),
         telegram_message_id: telegramMessageId,
         status: 'pendente',
+        rma_verdict: opp.rmaVerdict || null,
+        rma_score: opp.rmaScore || null,
       });
+
+      // Shadow log for RMA analysis
+      if (opp.rmaVerdict) {
+        await supabase.from('rma_shadow_logs').insert({
+          match_id: opp.matchId,
+          match_name: opp.match,
+          market: opp.market,
+          minute: opp.minute,
+          original_signal: `${opp.market} ${opp.probability}%`,
+          rma_verdict: opp.rmaVerdict,
+          rma_score: opp.rmaScore || 0,
+        });
+      }
     }
 
     console.log(`[SCANNER-PRO-SERVER] ${tgRes.ok ? '✅' : '❌'} ${newOpps.length} oportunidades enviadas`);

@@ -469,8 +469,10 @@ const Live = () => {
           const stats = statsMap[id];
           const homeCorners = stats?.home?.corners || 0;
           const awayCorners = stats?.away?.corners || 0;
-          const homeDA = stats?.home?.dangerousAttacks || 0;
-          const awayDA = stats?.away?.dangerousAttacks || 0;
+          const rawHomeDA = stats?.home?.dangerousAttacks || 0;
+          const rawAwayDA = stats?.away?.dangerousAttacks || 0;
+          const homeDA = rawHomeDA > 0 ? rawHomeDA : Math.round(((stats?.home?.totalShots || 0) * 1.5) + ((homeCorners || 0) * 2));
+          const awayDA = rawAwayDA > 0 ? rawAwayDA : Math.round(((stats?.away?.totalShots || 0) * 1.5) + ((awayCorners || 0) * 2));
 
           let cornerTimeline: ReturnType<typeof projectCornersByPeriod> = [];
           try { cornerTimeline = projectCornersByPeriod(homeCorners, awayCorners, elapsed); } catch (e) { /* safe */ }

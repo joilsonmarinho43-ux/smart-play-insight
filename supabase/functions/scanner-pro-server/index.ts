@@ -375,6 +375,7 @@ Deno.serve(async (req) => {
 
     // 5. Log each opportunity to DB
     for (const opp of newOpps) {
+      // Log signal with RMA verdict
       await supabase.from('telegram_signals').insert({
         match_name: opp.match,
         match_id: opp.matchId,
@@ -389,7 +390,22 @@ Deno.serve(async (req) => {
         error_message: tgRes.ok ? null : JSON.stringify(tgData),
         telegram_message_id: telegramMessageId,
         status: 'pendente',
+        rma_verdict: opp.rmaVerdict || null,
+        rma_score: opp.rmaScore || null,
       });
+
+      // Shadow log for RMA analysis
+      if (opp.rmaVerdict) {
+        await supabase.from('rma_shadow_logs').insert({
+          match_id: opp.matchId,
+          match_name: opp.match,
+          market: opp.market,
+          minute: opp.minute,
+          original_signal: `${opp.market} ${opp.probability}%`,
+          rma_verdict: opp.rmaVerdict,
+          rma_score: opp.rmaScore || 0,
+        });
+      }
     }
 
     console.log(`[SCANNER-PRO-SERVER] ${tgRes.ok ? '✅' : '❌'} ${newOpps.length} oportunidades enviadas`);

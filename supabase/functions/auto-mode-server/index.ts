@@ -183,11 +183,11 @@ Deno.serve(async (req) => {
 
     const signaledIds = new Set((existingSignals || []).map((s: any) => s.match_id).filter(Boolean));
 
-    // 3. Daily limit: max 5 signals/day
+    // 3. Daily limit: max 15 signals/day
     const dailyCount = existingSignals?.length || 0;
-    if (dailyCount >= 5) {
-      console.log('[AUTO-MODE-SERVER] Limite diário de 5 sinais atingido');
-      return new Response(JSON.stringify({ success: true, signals: 0, message: 'Limite diário atingido (5/5)' }), {
+    if (dailyCount >= 15) {
+      console.log('[AUTO-MODE-SERVER] Limite diário de 15 sinais atingido');
+      return new Response(JSON.stringify({ success: true, signals: 0, message: 'Limite diário atingido (15/15)' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;
       signalsToSend.push(signal);
-      if (signalsToSend.length + dailyCount >= 5) break;
+      if (signalsToSend.length + dailyCount >= 15) break;
     }
 
     console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} sinais qualificados`);

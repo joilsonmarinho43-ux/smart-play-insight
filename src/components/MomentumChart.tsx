@@ -1,7 +1,7 @@
 /**
- * MOMENTUM DE PRESSÃO — Estilo SofaScore Pressure Chart
- * Gráfico de área com pressão home (azul para cima) e away (verde para baixo).
- * Timeline de 0' a 90' com marcador de HT aos 45'.
+ * MOMENTUM DE PRESSÃO — Estilo SofaScore Pressure Chart (pixel-perfect)
+ * Gráfico de área: azul escuro para cima (home), verde para baixo (away).
+ * A pressão preenche agressivamente a área, com picos e vales dinâmicos.
  */
 
 import { useMemo } from 'react';
@@ -15,27 +15,66 @@ interface Props {
 }
 
 /**
- * Normaliza os snapshots em pontos de pressão relativa (-1 a 1)
- * Positivo = home dominando, Negativo = away dominando
+ * Interpola snapshots para criar pontos a cada minuto (suavização)
+ * e gera a curva de pressão normalizada.
+ * Retorna valores de -1 (100% away) a +1 (100% home).
  */
-function buildPressureLine(history: PISnapshot[]): { minute: number; value: number }[] {
+function buildPressureCurve(history: PISnapshot[], currentMinute: number): { minute: number; value: number }[] {
   if (history.length === 0) return [];
 
-  return history.map((s) => {
-    const total = s.homePI + s.awayPI;
-    if (total === 0) return { minute: s.minute, value: 0 };
-    // Normaliza: +1 = 100% home, -1 = 100% away
-    const value = (s.homePI - s.awayPI) / total;
-    return { minute: s.minute, value };
-  });
+  // Ordena por minuto
+  const sorted = [...history].sort((a, b) => a.minute - b.minute);
+
+  // Cria ponto para cada minuto, interpolando entre snapshots
+  const firstMin = Math.max(0, sorted[0].minute);
+  const lastMin = Math.min(currentMinute, 90);
+  const points: { minute: number; value: number }[] = [];
+
+  for (let m = firstMin; m <= lastMin; m++) {
+    // Encontra os snapshots mais próximos antes e depois
+    let before = sorted[0];
+    let after = sorted[sorted.length - 1];
+
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].minute <= m) before = sorted[i];
+      if (sorted[i].minute >= m && (after.minute < m || sorted[i].minute < after.minute)) {
+        after = sorted[i];
+      }
+    }
+
+    let homePI: number, awayPI: number;
+
+    if (before.minute === after.minute || before === after) {
+      homePI = before.homePI;
+      awayPI = before.awayPI;
+    } else {
+      // Interpolação linear
+      const t = (m - before.minute) / (after.minute - before.minute);
+      homePI = before.homePI + (after.homePI - before.homePI) * t;
+      awayPI = before.awayPI + (after.awayPI - before.awayPI) * t;
+    }
+
+    const total = homePI + awayPI;
+    if (total === 0) {
+      points.push({ minute: m, value: 0 });
+    } else {
+      // Normaliza para -1 a +1 e amplifica para preencher mais o gráfico
+      const raw = (homePI - awayPI) / total;
+      // Amplifica o sinal para parecer mais dramático (como SofaScore)
+      const amplified = Math.sign(raw) * Math.pow(Math.abs(raw), 0.6);
+      points.push({ minute: m, value: Math.max(-1, Math.min(1, amplified * 1.5)) });
+    }
+  }
+
+  return points;
 }
 
 const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) => {
-  const points = useMemo(() => buildPressureLine(history), [history]);
+  const points = useMemo(() => buildPressureCurve(history, currentMinute), [history, currentMinute]);
 
   if (points.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+      <div className="rounded-xl border border-gray-200 bg-[#f8f9fa] p-6 text-center">
         <span className="text-[11px] text-gray-400 font-medium">
           Aguardando dados de pressão...
         </span>
@@ -43,164 +82,107 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
     );
   }
 
-  // Layout
-  const W = 400;
-  const H = 160;
-  const padL = 8;
-  const padR = 8;
-  const padT = 28; // space for event icons top
-  const padB = 32; // space for event icons bottom + timeline
+  // ── Layout ──
+  const W = 420;
+  const H = 180;
+  const padL = 4;
+  const padR = 4;
+  const padT = 6;
+  const padB = 24; // timeline
   const chartH = H - padT - padB;
   const plotW = W - padL - padR;
   const midY = padT + chartH / 2;
 
-  // Map minute (0-90) → X
-  const maxMin = Math.max(currentMinute, 90);
-  const toX = (min: number) => padL + (min / maxMin) * plotW;
-  // Map value (-1 to 1) → Y  (1 = top, -1 = bottom)
+  // ── Mapping ──
+  const toX = (min: number) => padL + (min / 90) * plotW;
   const toY = (v: number) => midY - v * (chartH / 2);
 
-  // Build area path for home (above center) and away (below center)
-  // We create TWO separate filled areas: one clipped above midY, one below
-  const linePath = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.minute).toFixed(1)},${toY(p.value).toFixed(1)}`)
-    .join(' ');
-
-  // For smooth look, extend to current minute if last point is behind
   const lastPt = points[points.length - 1];
+  const firstPt = points[0];
 
-  // Upper area (home pressure) — fill from line to midY, clip above
-  const upperArea =
-    linePath +
-    ` L${toX(lastPt.minute).toFixed(1)},${midY} L${toX(points[0].minute).toFixed(1)},${midY} Z`;
+  // ── Build SVG path (starts and ends at midY) ──
+  const areaPath =
+    `M${toX(firstPt.minute).toFixed(1)},${midY} ` +
+    points.map((p) => `L${toX(p.minute).toFixed(1)},${toY(p.value).toFixed(1)}`).join(' ') +
+    ` L${toX(lastPt.minute).toFixed(1)},${midY} Z`;
 
-  // We'll use clip paths to separate upper and lower fills
+  // ── Timeline dots ──
+  const dots: number[] = [];
+  for (let m = 0; m <= 90; m += 3) dots.push(m);
 
-  // Timeline dots
-  const timelineDots: number[] = [];
-  for (let m = 0; m <= 90; m += 3) timelineDots.push(m);
-
-  // HT position
   const htX = toX(45);
 
   return (
-    <div className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+    <div className="rounded-xl overflow-hidden border border-gray-200 bg-[#f8f9fa] shadow-sm">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         preserveAspectRatio="xMidYMid meet"
         className="block"
       >
+        {/* ── Clip paths ── */}
         <defs>
-          {/* Clip for upper half (home) */}
-          <clipPath id="clipUpper">
-            <rect x={padL} y={padT} width={plotW} height={chartH / 2} />
+          <clipPath id="pressClipUp">
+            <rect x={0} y={padT} width={W} height={chartH / 2} />
           </clipPath>
-          {/* Clip for lower half (away) */}
-          <clipPath id="clipLower">
-            <rect x={padL} y={midY} width={plotW} height={chartH / 2} />
+          <clipPath id="pressClipDn">
+            <rect x={0} y={midY} width={W} height={chartH / 2} />
           </clipPath>
         </defs>
 
-        {/* Background zones */}
-        {/* Upper (home) — light blue */}
-        <rect x={padL} y={padT} width={plotW} height={chartH / 2} fill="#dbeafe" rx={0} />
-        {/* Lower (away) — light green */}
-        <rect x={padL} y={midY} width={plotW} height={chartH / 2} fill="#dcfce7" rx={0} />
+        {/* ── Background zones ── */}
+        <rect x={padL} y={padT} width={plotW} height={chartH / 2} fill="#d6e4f7" />
+        <rect x={padL} y={midY} width={plotW} height={chartH / 2} fill="#d4f0d8" />
 
-        {/* Center line */}
+        {/* ── Center line ── */}
+        <line x1={padL} x2={padL + plotW} y1={midY} y2={midY} stroke="#c8cdd3" strokeWidth={0.8} />
+
+        {/* ── HT vertical dotted line ── */}
         <line
-          x1={padL}
-          x2={padL + plotW}
-          y1={midY}
-          y2={midY}
-          stroke="#e5e7eb"
-          strokeWidth={1}
+          x1={htX} x2={htX}
+          y1={padT} y2={padT + chartH}
+          stroke="#b0b8c1"
+          strokeWidth={0.8}
+          strokeDasharray="2 3"
         />
 
-        {/* HT vertical dotted line */}
-        <line
-          x1={htX}
-          x2={htX}
-          y1={padT}
-          y2={padT + chartH}
-          stroke="#d1d5db"
-          strokeWidth={1}
-          strokeDasharray="3 3"
-        />
-
-        {/* Filled area — home (blue, clipped upper) */}
+        {/* ── Home pressure fill (BLUE — clipped upper half) ── */}
         <path
-          d={
-            `M${toX(points[0].minute).toFixed(1)},${midY} ` +
-            points.map((p) => `L${toX(p.minute).toFixed(1)},${toY(p.value).toFixed(1)}`).join(' ') +
-            ` L${toX(lastPt.minute).toFixed(1)},${midY} Z`
-          }
-          fill="#3b82f6"
-          opacity={0.85}
-          clipPath="url(#clipUpper)"
+          d={areaPath}
+          fill="#1a56db"
+          opacity={0.92}
+          clipPath="url(#pressClipUp)"
         />
 
-        {/* Filled area — away (green, clipped lower) */}
+        {/* ── Away pressure fill (GREEN — clipped lower half) ── */}
         <path
-          d={
-            `M${toX(points[0].minute).toFixed(1)},${midY} ` +
-            points.map((p) => `L${toX(p.minute).toFixed(1)},${toY(p.value).toFixed(1)}`).join(' ') +
-            ` L${toX(lastPt.minute).toFixed(1)},${midY} Z`
-          }
-          fill="#22c55e"
-          opacity={0.85}
-          clipPath="url(#clipLower)"
+          d={areaPath}
+          fill="#16a34a"
+          opacity={0.88}
+          clipPath="url(#pressClipDn)"
         />
 
-        {/* Pressure line (darker stroke on top) */}
-        <path
-          d={
-            points
-              .map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.minute).toFixed(1)},${toY(p.value).toFixed(1)}`)
-              .join(' ')
-          }
-          fill="none"
-          stroke="#1e3a5f"
-          strokeWidth={1.2}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          opacity={0.3}
-        />
-
-        {/* Timeline markers — dotted line at bottom */}
-        {timelineDots.map((m) => (
-          <circle
-            key={`dot${m}`}
-            cx={toX(m)}
-            cy={H - 10}
-            r={1}
-            fill="#9ca3af"
-          />
+        {/* ── Timeline dots ── */}
+        {dots.map((m) => (
+          <circle key={m} cx={toX(m)} cy={H - 11} r={1.2} fill="#adb5bd" />
         ))}
 
-        {/* Timeline labels */}
-        <text x={toX(0)} y={H - 2} textAnchor="start" fontSize={11} fill="#6b7280" fontWeight="500">
-          0'
-        </text>
-        <text x={htX} y={H - 2} textAnchor="middle" fontSize={11} fill="#6b7280" fontWeight="500">
-          45'
-        </text>
-        <text x={toX(90)} y={H - 2} textAnchor="end" fontSize={11} fill="#6b7280" fontWeight="500">
-          90'
-        </text>
+        {/* ── Timeline labels ── */}
+        <text x={toX(0) + 2} y={H - 2} textAnchor="start" fontSize={12} fill="#6b7280" fontWeight="500" fontFamily="system-ui, sans-serif">0'</text>
+        <text x={htX} y={H - 2} textAnchor="middle" fontSize={12} fill="#6b7280" fontWeight="500" fontFamily="system-ui, sans-serif">45'</text>
+        <text x={toX(90) - 2} y={H - 2} textAnchor="end" fontSize={12} fill="#6b7280" fontWeight="500" fontFamily="system-ui, sans-serif">90'</text>
       </svg>
 
-      {/* Legend footer */}
-      <div className="flex justify-between items-center px-3 py-1.5 border-t border-gray-100 bg-gray-50/50">
+      {/* ── Legend ── */}
+      <div className="flex justify-between items-center px-3 py-1.5 bg-[#f0f2f5]">
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
-          <span className="text-[10px] text-gray-600 font-medium truncate max-w-[100px]">{homeName}</span>
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#1a56db' }} />
+          <span className="text-[11px] text-gray-700 font-semibold truncate max-w-[110px]">{homeName}</span>
         </div>
-        <span className="text-[9px] text-gray-400 font-medium">{currentMinute}'</span>
+        <span className="text-[10px] text-gray-400 font-medium tabular-nums">{currentMinute}'</span>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-gray-600 font-medium truncate max-w-[100px]">{awayName}</span>
-          <span className="w-2.5 h-2.5 rounded-sm bg-green-500" />
+          <span className="text-[11px] text-gray-700 font-semibold truncate max-w-[110px]">{awayName}</span>
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#16a34a' }} />
         </div>
       </div>
     </div>

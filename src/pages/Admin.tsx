@@ -256,6 +256,7 @@ const Admin = () => {
                 setShowConflicts(!showConflicts);
                 setShowSignals(false);
                 setShowDashboard(false);
+                setShowAutoMode(false);
                 if (!showConflicts) markConflictsSeen();
               }}
               className={`relative p-2 rounded-lg transition-all ${showConflicts ? 'bg-yellow-500/20' : 'hover:bg-white/5'}`}

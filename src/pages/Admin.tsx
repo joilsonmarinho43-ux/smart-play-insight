@@ -90,12 +90,20 @@ const Admin = () => {
   }, [profile]);
 
   const fetchRMALogs = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('rma_shadow_logs')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
-    if (data) setRmaLogs(data as RMAShadowLog[]);
+    if (error) {
+      console.error('Erro ao carregar RMA logs:', error);
+      toast.error('Erro ao carregar logs RMA');
+      return;
+    }
+    if (data) {
+      setRmaLogs(data as RMAShadowLog[]);
+      toast.success(`${data.length} logs RMA carregados`);
+    }
   };
 
   const fetchUsers = async () => {

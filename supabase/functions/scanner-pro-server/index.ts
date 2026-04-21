@@ -354,10 +354,10 @@ Deno.serve(async (req) => {
     }
 
     // 4. Build and send consolidated Telegram message
-    const oppLines = newOpps.map((o, i) => {
+    const oppLines = approvedOpps.map((o, i) => {
       const priorityEmoji = o.score > 0.75 ? '🔥' : o.score >= 0.65 ? '⚡' : '📊';
       const confBar = '🟢'.repeat(Math.round(o.probability / 20)) + '⚪'.repeat(5 - Math.round(o.probability / 20));
-      const rmaIcon = o.rmaVerdict === 'CONFIRMADO' ? '🟢' : o.rmaVerdict === 'BLOQUEADO' ? '🔴' : '🟡';
+      const rmaIcon = o.rmaVerdict === 'CONFIRMADO' ? '🟢' : '🟡';
       return [
         `${priorityEmoji} <b>${o.market}</b> ${rmaIcon}`,
         `⚽ ${o.match} • ${o.minute}'`,
@@ -367,7 +367,7 @@ Deno.serve(async (req) => {
     }).join('\n\n');
 
     const text = [
-      `🎯 <b>SCANNER PRO</b> • ${newOpps.length} sinais`,
+      `🎯 <b>SCANNER PRO</b> • ${approvedOpps.length} sinais`,
       ``,
       oppLines,
       ``,
@@ -392,9 +392,8 @@ Deno.serve(async (req) => {
     const tgData = await tgRes.json();
     const telegramMessageId = tgData.result?.message_id ?? null;
 
-    // 5. Log each opportunity to DB
-    for (const opp of newOpps) {
-      // Log signal with RMA verdict
+    // 5. Log approved signals to DB
+    for (const opp of approvedOpps) {
       await supabase.from('telegram_signals').insert({
         match_name: opp.match,
         match_id: opp.matchId,
@@ -404,7 +403,7 @@ Deno.serve(async (req) => {
         sensitivity: 'scanner-pro',
         minute: opp.minute,
         score: `${opp.homeGoals}-${opp.awayGoals}`,
-        reason: `Scanner PRO Server • EV ${opp.ev > 0 ? '+' : ''}${opp.ev} • Pressão ${opp.pressure}`,
+        reason: `Scanner PRO Server • EV ${opp.ev > 0 ? '+' : ''}${opp.ev} • Pressão ${opp.pressure} • RMA ${opp.rmaVerdict}`,
         success: tgRes.ok,
         error_message: tgRes.ok ? null : JSON.stringify(tgData),
         telegram_message_id: telegramMessageId,
@@ -413,7 +412,6 @@ Deno.serve(async (req) => {
         rma_score: opp.rmaScore || null,
       });
 
-      // Shadow log for RMA analysis
       if (opp.rmaVerdict) {
         await supabase.from('rma_shadow_logs').insert({
           match_id: opp.matchId,
@@ -427,10 +425,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[SCANNER-PRO-SERVER] ${tgRes.ok ? '✅' : '❌'} ${newOpps.length} oportunidades enviadas`);
+    console.log(`[SCANNER-PRO-SERVER] ${tgRes.ok ? '✅' : '❌'} ${approvedOpps.length} enviadas, ${blockedOpps.length} bloqueadas pelo RMA`);
 
     return new Response(
-      JSON.stringify({ success: true, signals: newOpps.length, analyzed: matches.length, total_opps: allOpps.length }),
+      JSON.stringify({ success: true, signals: approvedOpps.length, analyzed: matches.length, blocked: blockedOpps.length, total_opps: allOpps.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

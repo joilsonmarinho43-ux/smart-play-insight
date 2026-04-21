@@ -252,6 +252,7 @@ Deno.serve(async (req) => {
     });
 
     const tgData = await tgRes.json();
+    if (!tgRes.ok) console.error('[DAILY-VALIDATION] Telegram error:', JSON.stringify(tgData));
 
     return new Response(JSON.stringify({
       success: true,

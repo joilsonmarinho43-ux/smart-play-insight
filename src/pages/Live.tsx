@@ -325,7 +325,7 @@ const Live = () => {
       map[id] = safeAnalyze(match, statsMap, calibration);
     }
     return map;
-  }, [matches, statsMap]);
+  }, [matches, statsMap, calibration]);
 
   // ═══ AUDIT ENTRIES ═══
   const auditEntries = useMemo(() => {

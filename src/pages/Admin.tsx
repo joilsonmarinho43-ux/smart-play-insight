@@ -63,19 +63,39 @@ const Admin = () => {
   const [showSignals, setShowSignals] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showAutoMode, setShowAutoMode] = useState(false);
+  const [showRMA, setShowRMA] = useState(false);
+  const [rmaLogs, setRmaLogs] = useState<RMAShadowLog[]>([]);
   const [checkingResults, setCheckingResults] = useState(false);
   const [autoModeActive, setAutoModeActive] = useState(true);
   const [togglingAutoMode, setTogglingAutoMode] = useState(false);
   const [autoModeLastRun, setAutoModeLastRun] = useState<any>(null);
   const [testingAutoMode, setTestingAutoMode] = useState(false);
 
+  const resetPanels = () => {
+    setShowConflicts(false);
+    setShowSignals(false);
+    setShowDashboard(false);
+    setShowAutoMode(false);
+    setShowRMA(false);
+  };
+
   useEffect(() => {
     if (profile?.is_admin) {
       fetchUsers();
       fetchConflicts();
       fetchSignals();
+      fetchRMALogs();
     }
   }, [profile]);
+
+  const fetchRMALogs = async () => {
+    const { data } = await supabase
+      .from('rma_shadow_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (data) setRmaLogs(data as RMAShadowLog[]);
+  };
 
   const fetchUsers = async () => {
     setLoading(true);

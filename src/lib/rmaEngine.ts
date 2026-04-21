@@ -57,17 +57,9 @@ export function evaluateRMA(input: RMAInput): RMAResult {
   // Acceleration (reforço / enfraquecimento)
   const acceleration = (input.recentDA ?? 0) - (input.previousDA ?? 0);
 
-  // ── Hard-block rules ──
-  if (ap_norm < 1.5) {
-    return { verdict: 'BLOQUEADO', score: rma_score, ap_norm, f_norm, sot_norm, acceleration, blockReason: 'AP_norm < 1.5 — atividade ofensiva insuficiente' };
-  }
-
-  if (input.pressure > 60 && input.dangerousAttacks === 0) {
-    return { verdict: 'BLOQUEADO', score: rma_score, ap_norm, f_norm, sot_norm, acceleration, blockReason: 'Pressão fake: pressão > 60 mas DA = 0' };
-  }
-
-  if (sot_norm === 0) {
-    return { verdict: 'NEUTRO', score: rma_score, ap_norm, f_norm, sot_norm, acceleration, blockReason: 'SOT_norm = 0 — sem finalização no gol' };
+  // ── Hard-block: only obvious fake pressure ──
+  if (input.pressure > 60 && input.dangerousAttacks === 0 && input.shotsOnTarget === 0) {
+    return { verdict: 'BLOQUEADO', score: rma_score, ap_norm, f_norm, sot_norm, acceleration, blockReason: 'Pressão fake: pressão alta sem atividade' };
   }
 
   // Apply acceleration bonus/penalty (±5 pts max)
@@ -77,17 +69,17 @@ export function evaluateRMA(input: RMAInput): RMAResult {
     rma_score += Math.max(acceleration * 2, -5);
   }
 
-  // ── Classification ──
+  // ── Classification with adjusted thresholds ──
   let verdict: RMAVerdict;
-  if (rma_score > 65) {
+  if (rma_score > 40) {
     verdict = 'CONFIRMADO';
-  } else if (rma_score >= 50) {
+  } else if (rma_score >= 25) {
     verdict = 'NEUTRO';
   } else {
     verdict = 'BLOQUEADO';
   }
 
-  return { verdict, score: Math.round(rma_score * 100) / 100, ap_norm: Math.round(ap_norm * 100) / 100, f_norm: Math.round(f_norm * 100) / 100, sot_norm: Math.round(sot_norm * 100) / 100, acceleration, blockReason: null };
+  return { verdict, score: Math.round(rma_score * 100) / 100, ap_norm: Math.round(ap_norm * 100) / 100, f_norm: Math.round(f_norm * 100) / 100, sot_norm: Math.round(sot_norm * 100) / 100, acceleration, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 25` : null };
 }
 
 /**

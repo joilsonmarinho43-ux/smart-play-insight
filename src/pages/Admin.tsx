@@ -606,6 +606,9 @@ const Admin = () => {
                                 </div>
                               ))}
                             </div>
+                            {log.pressure == null && (
+                              <p className="text-[8px] text-muted-foreground/50 italic">* Pressão derivada do score (log antigo sem coluna dedicada)</p>
+                            )}
                             {log.acceleration != null && log.acceleration !== 0 && (
                               <p className="text-[10px] text-muted-foreground">
                                 ⚡ Aceleração: <span className={`font-bold ${log.acceleration > 0 ? 'text-green-400' : 'text-red-400'}`}>{log.acceleration > 0 ? '+' : ''}{log.acceleration}</span>

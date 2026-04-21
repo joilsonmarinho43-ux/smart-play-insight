@@ -1,0 +1,1 @@
+ALTER TABLE public.rma_shadow_logs ADD COLUMN pressure numeric DEFAULT NULL;

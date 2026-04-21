@@ -178,6 +178,7 @@ export type Database = {
           match_result: string | null
           minute: number
           original_signal: string | null
+          pressure: number | null
           rma_score: number
           rma_verdict: string
           sot_norm: number | null
@@ -195,6 +196,7 @@ export type Database = {
           match_result?: string | null
           minute?: number
           original_signal?: string | null
+          pressure?: number | null
           rma_score?: number
           rma_verdict: string
           sot_norm?: number | null
@@ -212,6 +214,7 @@ export type Database = {
           match_result?: string | null
           minute?: number
           original_signal?: string | null
+          pressure?: number | null
           rma_score?: number
           rma_verdict?: string
           sot_norm?: number | null

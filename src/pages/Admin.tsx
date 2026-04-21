@@ -48,6 +48,7 @@ interface RMAShadowLog {
   f_norm: number | null;
   sot_norm: number | null;
   acceleration: number | null;
+  pressure: number | null;
   block_reason: string | null;
   match_result: string | null;
   created_at: string;
@@ -589,7 +590,7 @@ const Admin = () => {
                             {/* Score components */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               {[
-                                { label: 'Pressão', value: log.rma_score != null ? ((log.rma_score - (log.ap_norm ?? 0) * 0.35 - (log.f_norm ?? 0) * 0.15 - (log.sot_norm ?? 0) * 0.10) / 0.4).toFixed(0) : '—', color: 'text-orange-400', desc: '×0.40' },
+                                { label: 'Pressão', value: log.pressure != null ? log.pressure.toFixed(0) : (log.rma_score != null ? ((log.rma_score - (log.ap_norm ?? 0) * 0.35 - (log.f_norm ?? 0) * 0.15 - (log.sot_norm ?? 0) * 0.10) / 0.4).toFixed(0) : '—'), color: 'text-orange-400', desc: '×0.40' },
                                 { label: 'AP_norm', value: log.ap_norm?.toFixed(2) ?? '—', color: 'text-blue-400', desc: '×0.35' },
                                 { label: 'F_norm', value: log.f_norm?.toFixed(2) ?? '—', color: 'text-purple-400', desc: '×0.15' },
                                 { label: 'SOT_norm', value: log.sot_norm?.toFixed(2) ?? '—', color: 'text-emerald-400', desc: '×0.10' },

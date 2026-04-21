@@ -84,12 +84,14 @@ Deno.serve(async (req) => {
     const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
     if (!API_KEY) throw new Error('API_FUTEBOL_KEY not configured');
 
-    // Fetch pending signals
+    // Fetch pending signals + signals that resolved but Telegram edit failed
     const { data: pendingSignals, error: fetchErr } = await sb
       .from('telegram_signals')
       .select('*')
-      .eq('status', 'pendente')
-      .not('match_id', 'is', null);
+      .not('match_id', 'is', null)
+      .or('status.eq.pendente,and(status.in.(green,loss),telegram_edited.eq.false)')
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (fetchErr) throw new Error(`DB fetch error: ${fetchErr.message}`);
     if (!pendingSignals || pendingSignals.length === 0) {
@@ -135,35 +137,27 @@ Deno.serve(async (req) => {
       const data = matchData[signal.match_id];
       if (!data) continue;
 
-      // Check if signal is older than 3 hours (safety timeout)
-      const signalAge = Date.now() - new Date(signal.created_at).getTime();
-      const timedOut = signalAge > 3 * 60 * 60 * 1000;
+      // Determine the resolved status
+      let newStatus = signal.status;
+      if (signal.status === 'pendente') {
+        const signalAge = Date.now() - new Date(signal.created_at).getTime();
+        const timedOut = signalAge > 3 * 60 * 60 * 1000;
 
-      let newStatus = checkMarketResult(
-        signal.market,
-        data.homeGoals,
-        data.awayGoals,
-        data.corners,
-        data.finished || timedOut
-      );
+        newStatus = checkMarketResult(
+          signal.market,
+          data.homeGoals,
+          data.awayGoals,
+          data.corners,
+          data.finished || timedOut
+        );
 
-      if (newStatus === 'pendente') continue;
-
-      // Update status in DB
-      const { error: updateErr } = await sb
-        .from('telegram_signals')
-        .update({ status: newStatus })
-        .eq('id', signal.id);
-
-      if (updateErr) {
-        console.error(`Failed to update signal ${signal.id}:`, updateErr);
-        continue;
+        if (newStatus === 'pendente') continue;
       }
 
-      // Edit Telegram message
+      // Edit Telegram message FIRST (before DB update)
+      let telegramEdited = false;
       if (signal.telegram_message_id) {
         try {
-          // We need to reconstruct the original message and append result
           const emoji = signal.confidence >= 80 ? '🔥' : signal.confidence >= 70 ? '⚡' : '📊';
           const confBar = '🟢'.repeat(Math.round(signal.confidence / 20)) + '⚪'.repeat(5 - Math.round(signal.confidence / 20));
 
@@ -181,7 +175,7 @@ Deno.serve(async (req) => {
             `🤖 <i>Analista Joilson</i>`,
           ].join('\n');
 
-          await fetch(`${GATEWAY_URL}/editMessageText`, {
+          const tgResp = await fetch(`${GATEWAY_URL}/editMessageText`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -196,9 +190,39 @@ Deno.serve(async (req) => {
               disable_web_page_preview: true,
             }),
           });
+
+          const tgResult = await tgResp.json();
+          // "message is not modified" means it was already edited successfully before
+          const alreadyEdited = tgResult.description?.includes('message is not modified');
+          telegramEdited = tgResult.ok === true || tgResp.ok || alreadyEdited;
+          if (!telegramEdited) {
+            // If rate limited, skip remaining to avoid more 429s
+            if (tgResult.error_code === 429) {
+              console.error(`Rate limited, stopping. Retry after ${tgResult.parameters?.retry_after}s`);
+              // Still update this signal's DB status
+              await sb.from('telegram_signals').update({ status: newStatus, telegram_edited: false }).eq('id', signal.id);
+              break;
+            }
+            console.error(`Telegram edit failed for signal ${signal.id}:`, JSON.stringify(tgResult));
+          } else {
+            console.log(`Telegram edit OK for signal ${signal.id}, message ${signal.telegram_message_id}`);
+          }
         } catch (e) {
           console.error(`Failed to edit Telegram message for signal ${signal.id}:`, e);
         }
+        // Delay between Telegram edits to avoid rate limiting
+        await new Promise(r => setTimeout(r, 1500));
+      }
+
+      // Update status + telegram_edited flag in DB
+      const { error: updateErr } = await sb
+        .from('telegram_signals')
+        .update({ status: newStatus, telegram_edited: telegramEdited })
+        .eq('id', signal.id);
+
+      if (updateErr) {
+        console.error(`Failed to update signal ${signal.id}:`, updateErr);
+        continue;
       }
 
       processed++;

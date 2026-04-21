@@ -176,15 +176,15 @@ export function analyzeSniperSignal(match: any): SniperSignal | null {
   const appm = minute > 0 ? totalDA / minute : 0;
 
   const totalSoG = (lH.shotsOnGoal || 0) + (lA.shotsOnGoal || 0);
-  const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0) + totalSoG;
+  const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
   const totalCorners = (lH.corners || 0) + (lA.corners || 0);
   
   // Estimate recent corner (simplified: if corners > 0 and minute > 5)
   const recentCorner = totalCorners >= 1 && minute >= 5;
 
-  // Pressure calculation
+  // Pressure calculation (consistent with other engines)
   const pressure = Math.min(100, Math.max(0,
-    (totalDA * 3 + totalCorners * 5 + totalSoG * 10) / 5
+    totalDA * 2 + totalCorners * 4 + totalSoG * 8
   ));
 
   const thresholds = getAdjustedThresholds();

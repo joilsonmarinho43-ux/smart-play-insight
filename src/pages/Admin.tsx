@@ -259,6 +259,79 @@ const Admin = () => {
       </header>
 
       <main className="container max-w-5xl mx-auto px-4 py-8">
+        {/* DASHBOARD WIN RATE */}
+        {showDashboard && (
+          <div className="mb-8 space-y-4">
+            <h2 className="text-sm font-bold text-green-400 uppercase flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" /> Dashboard de Performance
+            </h2>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-card/40 border border-white/5 p-4 rounded-2xl text-center">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold">Win Rate</p>
+                <p className={`text-3xl font-bold ${winRateData.overallWinRate >= 60 ? 'text-green-500' : winRateData.overallWinRate >= 40 ? 'text-yellow-500' : 'text-red-500'}`}>
+                  {winRateData.overallWinRate}%
+                </p>
+              </div>
+              <div className="bg-card/40 border border-white/5 p-4 rounded-2xl text-center">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold">Total</p>
+                <p className="text-3xl font-bold">{winRateData.totalResolved}</p>
+              </div>
+              <div className="bg-card/40 border border-green-500/10 p-4 rounded-2xl text-center">
+                <p className="text-[10px] text-green-500 uppercase font-bold">✅ Green</p>
+                <p className="text-3xl font-bold text-green-500">{winRateData.totalGreen}</p>
+              </div>
+              <div className="bg-card/40 border border-red-500/10 p-4 rounded-2xl text-center">
+                <p className="text-[10px] text-red-500 uppercase font-bold">❌ Loss</p>
+                <p className="text-3xl font-bold text-red-500">{winRateData.totalLoss}</p>
+              </div>
+            </div>
+
+            {/* Chart */}
+            {winRateData.days.length > 0 ? (
+              <div className="bg-card/40 border border-white/5 rounded-2xl p-4">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold mb-4">Win Rate por Dia (últimos 14 dias)</p>
+                <div className="flex items-end gap-1 h-40">
+                  {winRateData.days.map((day, i) => {
+                    const maxTotal = Math.max(...winRateData.days.map(d => d.total), 1);
+                    const barHeight = (day.total / maxTotal) * 100;
+                    const greenPct = day.total > 0 ? (day.green / day.total) * 100 : 0;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                        <span className="text-[9px] font-bold text-muted-foreground">{day.winRate}%</span>
+                        <div className="w-full rounded-t-md overflow-hidden" style={{ height: `${barHeight}%` }}>
+                          <div className="bg-green-500 w-full" style={{ height: `${greenPct}%` }} />
+                          <div className="bg-red-500/60 w-full" style={{ height: `${100 - greenPct}%` }} />
+                        </div>
+                        <span className="text-[8px] text-muted-foreground/60 truncate w-full text-center">{day.date}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-center gap-4 mt-3 text-[10px]">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Green</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500/60" /> Loss</span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-card/40 border border-white/5 rounded-2xl p-8 text-center">
+                <BarChart3 className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Nenhum sinal resolvido ainda.</p>
+                <p className="text-[10px] text-muted-foreground/60 mt-1">Os dados aparecerão aqui quando sinais forem marcados como GREEN ou LOSS.</p>
+              </div>
+            )}
+
+            {/* Pendentes info */}
+            {signalStats.pendente > 0 && (
+              <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 text-xs text-yellow-400 flex items-center gap-2">
+                <Clock className="w-4 h-4 shrink-0" />
+                {signalStats.pendente} sinal(is) pendente(s) aguardando resolução automática
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ALERTAS DE COMPARTILHAMENTO */}
         {showConflicts && (
           <div className="mb-8 space-y-3">

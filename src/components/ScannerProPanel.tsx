@@ -75,14 +75,14 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
           return (
             <div key={`${opp.matchId}-${opp.opportunity}-${i}`} className="px-4 py-3 hover:bg-white/5 transition-colors">
               {/* Row 1: Match + Signal */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
                   <span className="text-xs font-mono text-orange-500/60">#{i + 1}</span>
-                  <span className="text-sm font-bold text-white truncate">{opp.match}</span>
+                  <span className="text-sm font-bold text-white break-words">{opp.match}</span>
                   {getDataQualityIcon(opp.dataQuality)}
                 </div>
                 {opp.signal && (
-                  <span className="shrink-0 flex items-center gap-1 text-[11px] font-black text-red-400 animate-pulse">
+                  <span className="flex items-center gap-1 text-[11px] font-black text-red-400 animate-pulse">
                     <Flame className="w-3.5 h-3.5" />
                     {opp.signal}
                   </span>

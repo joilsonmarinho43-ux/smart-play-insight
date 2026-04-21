@@ -239,27 +239,29 @@ export function projectCornersByPeriod(
 
   const periods = ['0-15\'', '15-30\'', '30-45\'', '45-60\'', '60-75\'', '75-90\''];
   
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+
   return periods.map((period, i) => {
     const periodEnd = (i + 1) * 15;
     if (periodEnd <= minute) {
       const share = 15 / safeMin;
       return {
         period,
-        home: Math.round(homeCorners * share * 10) / 10,
-        away: Math.round(awayCorners * share * 10) / 10,
+        home: round1(homeCorners * share),
+        away: round1(awayCorners * share),
       };
     } else if (i * 15 < minute) {
       const elapsed = minute - i * 15;
       return {
         period,
-        home: Math.round(homeRate * elapsed * 10) / 10,
-        away: Math.round(awayRate * elapsed * 10) / 10,
+        home: round1(homeRate * elapsed),
+        away: round1(awayRate * elapsed),
       };
     } else {
       return {
         period,
-        home: Math.round(homeRate * 15 * 10) / 10,
-        away: Math.round(awayRate * 15 * 10) / 10,
+        home: round1(homeRate * 15),
+        away: round1(awayRate * 15),
       };
     }
   });

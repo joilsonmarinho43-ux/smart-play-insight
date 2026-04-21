@@ -244,6 +244,7 @@ const Live = () => {
   const [favorites, setFavorites] = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('liveMatchFavorites') || '[]'); } catch { return []; }
   });
+  const [showAudit, setShowAudit] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('liveMatchFavorites', JSON.stringify(favorites));

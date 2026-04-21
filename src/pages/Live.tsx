@@ -928,9 +928,11 @@ const Live = () => {
               {/* ═══ CORNER TIMELINE ═══ */}
               {(homeCorners > 0 || awayCorners > 0) && cornerTimeline.length > 0 && (
                 <div className="px-4 pb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <BarChart3 className="w-3.5 h-3.5 text-green-400" />
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Escanteios por Período</span>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 rounded-lg bg-green-500/15 border border-green-500/25">
+                      <BarChart3 className="w-3.5 h-3.5 text-green-400" />
+                    </div>
+                    <span className="text-[11px] text-gray-300 font-black uppercase tracking-wider">Escanteios por Período</span>
                   </div>
                   <CornerTimeline data={cornerTimeline} currentMinute={elapsed} />
                 </div>

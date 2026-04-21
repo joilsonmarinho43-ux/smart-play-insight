@@ -220,6 +220,13 @@ const Admin = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => { setShowDashboard(!showDashboard); setShowSignals(false); setShowConflicts(false); }}
+              className={`relative p-2 rounded-lg transition-all ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
+              title="Dashboard Win Rate"
+            >
+              <BarChart3 className="w-5 h-5 text-green-400" />
+            </button>
+            <button
               onClick={() => { setShowSignals(!showSignals); setShowConflicts(false); setShowDashboard(false); }}
               className={`relative p-2 rounded-lg transition-all ${showSignals ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               title="Sinais Telegram"

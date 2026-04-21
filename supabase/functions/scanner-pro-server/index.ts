@@ -237,6 +237,17 @@ function scanMatch(match: any): ScannerOpp[] {
     }
   }
 
+  // ═══ RMA VALIDATION ═══
+  if (minute > 0) {
+    const totalDA_raw = (lH.dangerousAttacks || 0) + (lA.dangerousAttacks || 0);
+    const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
+    const rma = evaluateRMAServer(minute, pressure, totalDA_raw, totalShots, totalSoG);
+    for (const r of results) {
+      r.rmaVerdict = rma.verdict;
+      r.rmaScore = rma.score;
+    }
+  }
+
   return results;
 }
 

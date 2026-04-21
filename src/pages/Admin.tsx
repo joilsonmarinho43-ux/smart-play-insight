@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
 const DAYS_OPTIONS = [3, 7, 15, 30];
@@ -35,6 +35,23 @@ interface TelegramSignal {
   match_id: string | null;
 }
 
+interface RMAShadowLog {
+  id: string;
+  match_name: string;
+  market: string;
+  minute: number;
+  original_signal: string | null;
+  rma_verdict: string;
+  rma_score: number;
+  ap_norm: number | null;
+  f_norm: number | null;
+  sot_norm: number | null;
+  acceleration: number | null;
+  block_reason: string | null;
+  match_result: string | null;
+  created_at: string;
+}
+
 const Admin = () => {
   const { profile, loading: profileLoading } = useProfile();
   const [users, setUsers] = useState<Profile[]>([]);
@@ -46,19 +63,39 @@ const Admin = () => {
   const [showSignals, setShowSignals] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showAutoMode, setShowAutoMode] = useState(false);
+  const [showRMA, setShowRMA] = useState(false);
+  const [rmaLogs, setRmaLogs] = useState<RMAShadowLog[]>([]);
   const [checkingResults, setCheckingResults] = useState(false);
   const [autoModeActive, setAutoModeActive] = useState(true);
   const [togglingAutoMode, setTogglingAutoMode] = useState(false);
   const [autoModeLastRun, setAutoModeLastRun] = useState<any>(null);
   const [testingAutoMode, setTestingAutoMode] = useState(false);
 
+  const resetPanels = () => {
+    setShowConflicts(false);
+    setShowSignals(false);
+    setShowDashboard(false);
+    setShowAutoMode(false);
+    setShowRMA(false);
+  };
+
   useEffect(() => {
     if (profile?.is_admin) {
       fetchUsers();
       fetchConflicts();
       fetchSignals();
+      fetchRMALogs();
     }
   }, [profile]);
+
+  const fetchRMALogs = async () => {
+    const { data } = await supabase
+      .from('rma_shadow_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (data) setRmaLogs(data as RMAShadowLog[]);
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -225,7 +262,7 @@ const Admin = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setShowAutoMode(!showAutoMode); setShowDashboard(false); setShowSignals(false); setShowConflicts(false); }}
+              onClick={() => { resetPanels(); setShowAutoMode(!showAutoMode); }}
               className={`relative p-2 rounded-lg transition-all ${showAutoMode ? 'bg-purple-500/20' : 'hover:bg-white/5'}`}
               title="Auto-Mode Server"
             >
@@ -233,14 +270,21 @@ const Admin = () => {
               <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${autoModeActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
             </button>
             <button
-              onClick={() => { setShowDashboard(!showDashboard); setShowSignals(false); setShowConflicts(false); setShowAutoMode(false); }}
+              onClick={() => { resetPanels(); setShowRMA(!showRMA); }}
+              className={`relative p-2 rounded-lg transition-all ${showRMA ? 'bg-cyan-500/20' : 'hover:bg-white/5'}`}
+              title="Dashboard RMA"
+            >
+              <Shield className="w-5 h-5 text-cyan-400" />
+            </button>
+            <button
+              onClick={() => { resetPanels(); setShowDashboard(!showDashboard); }}
               className={`relative p-2 rounded-lg transition-all ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
               title="Dashboard Win Rate"
             >
               <BarChart3 className="w-5 h-5 text-green-400" />
             </button>
             <button
-              onClick={() => { setShowSignals(!showSignals); setShowConflicts(false); setShowDashboard(false); setShowAutoMode(false); }}
+              onClick={() => { resetPanels(); setShowSignals(!showSignals); }}
               className={`relative p-2 rounded-lg transition-all ${showSignals ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               title="Sinais Telegram"
             >
@@ -253,10 +297,8 @@ const Admin = () => {
             </button>
             <button
               onClick={() => {
+                resetPanels();
                 setShowConflicts(!showConflicts);
-                setShowSignals(false);
-                setShowDashboard(false);
-                setShowAutoMode(false);
                 if (!showConflicts) markConflictsSeen();
               }}
               className={`relative p-2 rounded-lg transition-all ${showConflicts ? 'bg-yellow-500/20' : 'hover:bg-white/5'}`}
@@ -430,6 +472,107 @@ const Admin = () => {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* DASHBOARD RMA */}
+        {showRMA && (
+          <div className="mb-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-cyan-400 uppercase flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Dashboard RMA
+              </h2>
+              <button
+                onClick={fetchRMALogs}
+                className="flex items-center gap-1 text-[10px] font-bold bg-cyan-500/20 text-cyan-400 px-3 py-1.5 rounded-lg hover:bg-cyan-500/30 transition-all"
+              >
+                <RefreshCw className="w-3 h-3" /> Atualizar
+              </button>
+            </div>
+
+            {/* RMA KPIs */}
+            {(() => {
+              const confirmed = rmaLogs.filter(l => l.rma_verdict === 'CONFIRMADO').length;
+              const neutral = rmaLogs.filter(l => l.rma_verdict === 'NEUTRO').length;
+              const blocked = rmaLogs.filter(l => l.rma_verdict === 'BLOQUEADO').length;
+              const total = rmaLogs.length;
+              const avgScore = total > 0 ? Math.round(rmaLogs.reduce((s, l) => s + (l.rma_score || 0), 0) / total * 10) / 10 : 0;
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="bg-card/40 border border-white/5 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Total</p>
+                    <p className="text-2xl font-bold">{total}</p>
+                  </div>
+                  <div className="bg-card/40 border border-green-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-green-400 uppercase font-bold">🟢 Confirmado</p>
+                    <p className="text-2xl font-bold text-green-400">{confirmed}</p>
+                  </div>
+                  <div className="bg-card/40 border border-yellow-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-yellow-400 uppercase font-bold">🟡 Neutro</p>
+                    <p className="text-2xl font-bold text-yellow-400">{neutral}</p>
+                  </div>
+                  <div className="bg-card/40 border border-red-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-red-400 uppercase font-bold">🔴 Bloqueado</p>
+                    <p className="text-2xl font-bold text-red-400">{blocked}</p>
+                  </div>
+                  <div className="bg-card/40 border border-cyan-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-cyan-400 uppercase font-bold">Score Médio</p>
+                    <p className="text-2xl font-bold text-cyan-400">{avgScore}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* RMA Log List */}
+            {rmaLogs.length === 0 ? (
+              <div className="bg-card/40 border border-white/5 rounded-2xl p-8 text-center">
+                <Shield className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Nenhum log RMA registrado ainda.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {rmaLogs.map((log) => {
+                  const verdictStyle = log.rma_verdict === 'CONFIRMADO'
+                    ? { icon: '🟢', border: 'border-green-500/20', bg: 'bg-green-500/5', text: 'text-green-400' }
+                    : log.rma_verdict === 'NEUTRO'
+                      ? { icon: '🟡', border: 'border-yellow-500/20', bg: 'bg-yellow-500/5', text: 'text-yellow-400' }
+                      : { icon: '🔴', border: 'border-red-500/20', bg: 'bg-red-500/5', text: 'text-red-400' };
+
+                  return (
+                    <div key={log.id} className={`border rounded-xl p-3 text-xs space-y-1.5 ${verdictStyle.border} ${verdictStyle.bg}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{verdictStyle.icon}</span>
+                          <span className="font-bold text-sm text-white">{log.match_name}</span>
+                        </div>
+                        <span className="text-muted-foreground/60 text-[10px]">
+                          {new Date(log.created_at).toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-bold">{log.market}</span>
+                        <span className={`px-2 py-0.5 rounded-md font-bold ${verdictStyle.text} bg-white/5`}>
+                          {log.rma_verdict}
+                        </span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-mono font-bold">
+                          Score: {typeof log.rma_score === 'number' ? log.rma_score.toFixed(1) : log.rma_score}
+                        </span>
+                        <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.minute}'</span>
+                        {log.original_signal && (
+                          <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.original_signal}</span>
+                        )}
+                      </div>
+                      {log.block_reason && (
+                        <p className="text-red-400/80 text-[10px] italic">⛔ {log.block_reason}</p>
+                      )}
+                      {log.match_result && (
+                        <p className="text-muted-foreground text-[10px]">📊 Resultado: {log.match_result}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

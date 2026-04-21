@@ -61,12 +61,16 @@ export function generateLiveStrategy(
   homeGoals: number,
   awayGoals: number,
   homeName: string,
-  awayName: string
+  awayName: string,
+  calibration?: CalibrationProfile | null
 ): LiveStrategy[] {
   const strategies: LiveStrategy[] = [];
   const h = homeStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
   const a = awayStats || { shotsOnGoal: 0, possession: 50, corners: 0, dangerousAttacks: 0, totalShots: 0 };
 
+  // Helper: apply calibration if available
+  const cal = (market: string, raw: number) =>
+    calibration ? calibrateConfidence(calibration, market, raw) : Math.round(raw);
   const totalGoals = homeGoals + awayGoals;
   const totalShots = h.shotsOnGoal + a.shotsOnGoal;
   const totalShotsAll = h.totalShots + a.totalShots;

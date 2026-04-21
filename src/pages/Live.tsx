@@ -224,8 +224,10 @@ function getScannerAlertLevel(analysis: MatchAnalysis, homeStats: any, awayStats
   if (analysis.dataStatus !== 'valid') return null;
   const h = homeStats || {};
   const a = awayStats || {};
-  const homeDA = h.dangerousAttacks || 0;
-  const awayDA = a.dangerousAttacks || 0;
+  const rawHomeDA = h.dangerousAttacks || 0;
+  const rawAwayDA = a.dangerousAttacks || 0;
+  const homeDA = rawHomeDA > 0 ? rawHomeDA : Math.round(((h.totalShots || 0) * 1.5) + ((h.corners || 0) * 2));
+  const awayDA = rawAwayDA > 0 ? rawAwayDA : Math.round(((a.totalShots || 0) * 1.5) + ((a.corners || 0) * 2));
   const maxDA = Math.max(homeDA, awayDA);
   const totalDA = homeDA + awayDA;
   const diffPct = totalDA > 0 ? (maxDA / totalDA) * 100 : 0;

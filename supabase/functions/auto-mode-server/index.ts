@@ -81,13 +81,13 @@ function classifyServer(match: any): HybridSignal | null {
 
   // SEMI criteria
   const validScore = (s.homeGoals === 0 && s.awayGoals === 0) || (s.homeGoals + s.awayGoals === 1);
-  const isSemi = !isSniper && s.minute >= 5 && s.minute <= 35 &&
+  const isSemi = !isSniper && s.minute >= 5 && s.minute <= 45 &&
     validScore && s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 35;
 
   if (!isSniper && !isSemi) return null;
 
-  // SEMI must be in execution window
-  if (isSemi && (s.minute < 10 || s.minute > 30)) return null;
+  // Execution window for market selection
+  if (isSemi && s.minute > 45) return null;
 
   const tier: HybridTier = isSniper ? 'SNIPER' : 'SEMI';
   const market = isSniper ? 'Over 0.5 HT' : (s.homeGoals + s.awayGoals === 0 ? 'Over 0.5' : 'Over 1.5');

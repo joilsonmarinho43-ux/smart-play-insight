@@ -1,0 +1,1 @@
+ALTER TABLE public.telegram_signals ADD COLUMN IF NOT EXISTS telegram_edited boolean NOT NULL DEFAULT false;

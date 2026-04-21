@@ -278,6 +278,7 @@ export type Database = {
           sensitivity: string | null
           status: string
           success: boolean
+          telegram_edited: boolean
           telegram_message_id: number | null
         }
         Insert: {
@@ -300,6 +301,7 @@ export type Database = {
           sensitivity?: string | null
           status?: string
           success?: boolean
+          telegram_edited?: boolean
           telegram_message_id?: number | null
         }
         Update: {
@@ -322,6 +324,7 @@ export type Database = {
           sensitivity?: string | null
           status?: string
           success?: boolean
+          telegram_edited?: boolean
           telegram_message_id?: number | null
         }
         Relationships: []

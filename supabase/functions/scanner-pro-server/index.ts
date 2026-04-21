@@ -63,9 +63,9 @@ function evaluateRMAServer(minute: number, pressure: number, da: number, shots: 
   // Hard-block only obvious fake pressure
   if (pressure > 60 && da === 0 && sot === 0) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake: pressão alta sem atividade' };
 
-  // Classification with adjusted thresholds
-  const verdict = rma_score > 40 ? 'CONFIRMADO' as const : rma_score >= 25 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
-  return { verdict, score: Math.round(rma_score * 100) / 100, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 25` : null };
+  // Classification — thresholds calibrados para dados reais (pressure 10-30 típico)
+  const verdict = rma_score > 15 ? 'CONFIRMADO' as const : rma_score >= 8 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
+  return { verdict, score: Math.round(rma_score * 100) / 100, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 8` : null };
 }
 
 function safeDangerousAttacks(stats: any): number {

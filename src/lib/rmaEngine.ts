@@ -69,17 +69,17 @@ export function evaluateRMA(input: RMAInput): RMAResult {
     rma_score += Math.max(acceleration * 2, -5);
   }
 
-  // ── Classification with adjusted thresholds ──
+  // ── Classification — thresholds calibrados para dados reais ──
   let verdict: RMAVerdict;
-  if (rma_score > 40) {
+  if (rma_score > 15) {
     verdict = 'CONFIRMADO';
-  } else if (rma_score >= 25) {
+  } else if (rma_score >= 8) {
     verdict = 'NEUTRO';
   } else {
     verdict = 'BLOQUEADO';
   }
 
-  return { verdict, score: Math.round(rma_score * 100) / 100, ap_norm: Math.round(ap_norm * 100) / 100, f_norm: Math.round(f_norm * 100) / 100, sot_norm: Math.round(sot_norm * 100) / 100, acceleration, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 25` : null };
+  return { verdict, score: Math.round(rma_score * 100) / 100, ap_norm: Math.round(ap_norm * 100) / 100, f_norm: Math.round(f_norm * 100) / 100, sot_norm: Math.round(sot_norm * 100) / 100, acceleration, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 8` : null };
 }
 
 /**

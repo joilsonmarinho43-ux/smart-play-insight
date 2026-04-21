@@ -2,7 +2,11 @@
  * MOTOR DE PRESSÃO REAL (PI - Pressure Index)
  * Fórmula: PI = (Ataques Perigosos/Minuto * 2) + (Chutes no Alvo * 1.5) + (Posse * 0.5)
  * 100% baseado em stats LIVE reais da API-Sports
+ * 
+ * CALIBRAGEM AUTOMÁTICA: confiança ajustada por histórico via CalibrationProfile
  */
+
+import { CalibrationProfile, calibrateConfidence } from '@/lib/calibrationEngine';
 
 export interface PressureData {
   homePI: number;

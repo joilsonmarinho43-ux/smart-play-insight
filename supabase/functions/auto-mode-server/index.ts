@@ -41,7 +41,7 @@ function extractStats(match: any) {
   const lH = match.stats?.home || {};
   const lA = match.stats?.away || {};
   const sog = (lH.shotsOnGoal || 0) + (lA.shotsOnGoal || 0);
-  const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0) + sog;
+  const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
   const corners = (lH.corners || 0) + (lA.corners || 0);
 
   let da = (lH.dangerousAttacks || 0) + (lA.dangerousAttacks || 0);
@@ -54,7 +54,8 @@ function extractStats(match: any) {
   const homePoss = Number(lH.possession || 0);
   const awayPoss = Number(lA.possession || 0);
   const dominantPoss = Math.max(homePoss, awayPoss);
-  const pressure = Math.min(100, Math.max(0, (da * 3 + corners * 5 + sog * 10) / 5));
+  // Pressure: weighted sum without /5 divisor to produce realistic 0-100 values
+  const pressure = Math.min(100, Math.max(0, da * 2 + corners * 4 + sog * 8));
   const homeTeam = match.teams?.home?.name || 'Casa';
   const awayTeam = match.teams?.away?.name || 'Fora';
   const matchId = String(match.id || match.fixture?.id);

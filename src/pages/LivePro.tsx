@@ -339,7 +339,7 @@ const LivePro = () => {
       pressure, history, strategies, apWindows, oddsDev, hybrid, sniper, poisson, decision, totalGoals, cornerData,
       filters, filtersValidated, filtersOk, pressureDataValid,
     };
-  }, [selectedMatch, sensitivity]);
+  }, [selectedMatch, sensitivity, calibration]);
 
   const sendTelegramSignal = useCallback(async (a: typeof analysis) => {
     if (!a) return;

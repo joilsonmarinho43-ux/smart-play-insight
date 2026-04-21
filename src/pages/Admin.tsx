@@ -599,8 +599,7 @@ const Admin = () => {
                                   { label: 'AP_norm', value: log.ap_norm?.toFixed(2) ?? '—', color: 'text-blue-400', desc: '×0.35' },
                                   { label: 'F_norm', value: log.f_norm?.toFixed(2) ?? '—', color: 'text-purple-400', desc: '×0.15' },
                                   { label: 'SOT_norm', value: log.sot_norm?.toFixed(2) ?? '—', color: 'text-emerald-400', desc: '×0.10' },
-                                ];})()
-                              ].map((m) => (
+                                ];})().map((m) => (
                                 <div key={m.label} className="bg-white/5 rounded-md p-1.5 text-center">
                                   <p className="text-[8px] text-muted-foreground uppercase">{m.label} <span className="text-muted-foreground/40">{m.desc}</span></p>
                                   <p className={`text-sm font-bold font-mono ${m.color}`}>{m.value}</p>

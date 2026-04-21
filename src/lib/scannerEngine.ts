@@ -224,7 +224,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     for (const market of markets) {
       if (!targetMarkets.includes(market.market)) continue;
 
-      const ev = estimateEV(market.probability);
+      const ev = estimateEV(market.probability, market.market);
       if (market.probability < 60 || ev <= 0) continue;
 
       const score = calculateOpportunityScore(market.probability, ev, pressure);

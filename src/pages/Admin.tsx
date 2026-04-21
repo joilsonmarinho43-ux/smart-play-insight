@@ -262,7 +262,7 @@ const Admin = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setShowAutoMode(!showAutoMode); setShowDashboard(false); setShowSignals(false); setShowConflicts(false); }}
+              onClick={() => { resetPanels(); setShowAutoMode(!showAutoMode); }}
               className={`relative p-2 rounded-lg transition-all ${showAutoMode ? 'bg-purple-500/20' : 'hover:bg-white/5'}`}
               title="Auto-Mode Server"
             >
@@ -270,14 +270,21 @@ const Admin = () => {
               <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${autoModeActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
             </button>
             <button
-              onClick={() => { setShowDashboard(!showDashboard); setShowSignals(false); setShowConflicts(false); setShowAutoMode(false); }}
+              onClick={() => { resetPanels(); setShowRMA(!showRMA); }}
+              className={`relative p-2 rounded-lg transition-all ${showRMA ? 'bg-cyan-500/20' : 'hover:bg-white/5'}`}
+              title="Dashboard RMA"
+            >
+              <Shield className="w-5 h-5 text-cyan-400" />
+            </button>
+            <button
+              onClick={() => { resetPanels(); setShowDashboard(!showDashboard); }}
               className={`relative p-2 rounded-lg transition-all ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
               title="Dashboard Win Rate"
             >
               <BarChart3 className="w-5 h-5 text-green-400" />
             </button>
             <button
-              onClick={() => { setShowSignals(!showSignals); setShowConflicts(false); setShowDashboard(false); setShowAutoMode(false); }}
+              onClick={() => { resetPanels(); setShowSignals(!showSignals); }}
               className={`relative p-2 rounded-lg transition-all ${showSignals ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               title="Sinais Telegram"
             >

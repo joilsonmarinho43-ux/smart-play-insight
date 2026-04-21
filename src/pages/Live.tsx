@@ -224,8 +224,10 @@ function getScannerAlertLevel(analysis: MatchAnalysis, homeStats: any, awayStats
   if (analysis.dataStatus !== 'valid') return null;
   const h = homeStats || {};
   const a = awayStats || {};
-  const homeDA = h.dangerousAttacks || 0;
-  const awayDA = a.dangerousAttacks || 0;
+  const rawHomeDA = h.dangerousAttacks || 0;
+  const rawAwayDA = a.dangerousAttacks || 0;
+  const homeDA = rawHomeDA > 0 ? rawHomeDA : Math.round(((h.totalShots || 0) * 1.5) + ((h.corners || 0) * 2));
+  const awayDA = rawAwayDA > 0 ? rawAwayDA : Math.round(((a.totalShots || 0) * 1.5) + ((a.corners || 0) * 2));
   const maxDA = Math.max(homeDA, awayDA);
   const totalDA = homeDA + awayDA;
   const diffPct = totalDA > 0 ? (maxDA / totalDA) * 100 : 0;
@@ -469,8 +471,10 @@ const Live = () => {
           const stats = statsMap[id];
           const homeCorners = stats?.home?.corners || 0;
           const awayCorners = stats?.away?.corners || 0;
-          const homeDA = stats?.home?.dangerousAttacks || 0;
-          const awayDA = stats?.away?.dangerousAttacks || 0;
+          const rawHomeDA = stats?.home?.dangerousAttacks || 0;
+          const rawAwayDA = stats?.away?.dangerousAttacks || 0;
+          const homeDA = rawHomeDA > 0 ? rawHomeDA : Math.round(((stats?.home?.totalShots || 0) * 1.5) + ((homeCorners || 0) * 2));
+          const awayDA = rawAwayDA > 0 ? rawAwayDA : Math.round(((stats?.away?.totalShots || 0) * 1.5) + ((awayCorners || 0) * 2));
 
           let cornerTimeline: ReturnType<typeof projectCornersByPeriod> = [];
           try { cornerTimeline = projectCornersByPeriod(homeCorners, awayCorners, elapsed); } catch (e) { /* safe */ }

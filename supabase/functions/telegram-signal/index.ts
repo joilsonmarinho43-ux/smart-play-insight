@@ -60,6 +60,45 @@ Deno.serve(async (req) => {
 
     const payload: SignalPayload = await req.json();
 
+    // ═══ RMA GATE ═══
+    // If live stats are provided, validate through RMA
+    if (payload.pressure !== undefined && payload.minute > 0) {
+      const rma = evaluateRMAServer(
+        payload.minute,
+        payload.pressure || 0,
+        payload.dangerousAttacks || 0,
+        payload.totalShots || 0,
+        payload.shotsOnGoal || 0,
+      );
+
+      if (rma.verdict === 'BLOQUEADO') {
+        console.log(`[TELEGRAM-SIGNAL] 🔴 RMA BLOQUEOU: ${payload.match} • ${payload.market} (score: ${rma.score})`);
+
+        // Log to shadow table
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+          const sb = createClient(supabaseUrl, supabaseKey);
+          await sb.from('rma_shadow_logs').insert({
+            match_id: payload.matchId || 'unknown',
+            match_name: payload.match,
+            market: payload.market,
+            minute: payload.minute,
+            original_signal: `${payload.market} ${payload.confidence}%`,
+            rma_verdict: 'BLOQUEADO',
+            rma_score: rma.score,
+            block_reason: 'telegram-signal — sinal bloqueado pelo RMA',
+          });
+        } catch (e) {
+          console.error('Failed to log RMA block:', e);
+        }
+
+        return new Response(JSON.stringify({ success: false, blocked: true, rma_verdict: 'BLOQUEADO', rma_score: rma.score }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Build message
     const emoji = payload.confidence >= 80 ? '🔥' : payload.confidence >= 70 ? '⚡' : '📊';
     const sensitivityEmoji = { conservador: '🛡️', moderado: '⚖️', agressivo: '🔥' }[payload.sensitivity] || '⚖️';

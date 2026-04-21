@@ -1,21 +1,9 @@
 /**
- * MOMENTUM DE PRESSÃO (PI DIFF) — Terminal de Trading Profissional
- * Candlesticks OHLC em janelas de 5 minutos + área de momentum
+ * MOMENTUM DE PRESSÃO (PI DIFF) — Gráfico de Velas (Candlestick)
+ * Candlesticks OHLC puros em janelas de 5 minutos
  */
 
-import { useMemo } from 'react';
-import {
-  ComposedChart,
-  Area,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  ReferenceLine,
-  Tooltip,
-  CartesianGrid,
-  Cell,
-} from 'recharts';
+import { useMemo, useCallback } from 'react';
 import type { PISnapshot } from '@/lib/pressureEngine';
 
 interface Props {
@@ -27,19 +15,15 @@ interface Props {
 
 interface OHLCData {
   minute: number;
-  momentum: number;
   open: number;
   high: number;
   low: number;
   close: number;
-  ohlc: [number, number, number, number]; // recharts Bar range
   isBullish: boolean;
 }
 
-/** Group snapshots into 5-min windows and compute OHLC */
 function buildOHLC(history: PISnapshot[], windowSize = 5): OHLCData[] {
   if (history.length === 0) return [];
-
   const windows: Map<number, PISnapshot[]> = new Map();
   history.forEach((snap) => {
     const bucket = Math.floor(snap.minute / windowSize) * windowSize;
@@ -57,162 +41,66 @@ function buildOHLC(history: PISnapshot[], windowSize = 5): OHLCData[] {
     const close = diffs[diffs.length - 1];
     const high = Math.max(...diffs);
     const low = Math.min(...diffs);
-    const isBullish = close >= open;
 
     result.push({
-      minute: bucket + Math.floor(windowSize / 2), // center label
-      momentum: close,
+      minute: bucket,
       open,
       high,
       low,
       close,
-      ohlc: [low, open, close, high],
-      isBullish,
+      isBullish: close >= open,
     });
   });
 
   return result;
 }
 
-/** Custom candlestick shape for recharts Bar */
-const CandlestickShape = (props: any) => {
-  const { x, y, width, height, payload } = props;
-  if (!payload) return null;
-
-  const { open, high, low, close, isBullish } = payload;
-  const yScale = props.yAxis || props.background;
-
-  // We need to compute pixel positions from the data values
-  // The bar already gives us x, y, width, height for the [low, high] range
-  // We need to figure out the scale
-  const chartHeight = props.background?.height || 160;
-  const chartY = props.background?.y || 10;
-  const domain = props.yAxis?.domain || [-30, 30];
-  
-  // Fallback: use the bar's own positioning
-  const barColor = isBullish ? '#10b981' : '#ef4444';
-  const wickColor = isBullish ? '#34d399' : '#f87171';
-
-  // The Bar component maps [low, high] to y + height
-  // low is at y + height, high is at y
-  const totalRange = high - low || 1;
-  const barTop = y; // = high position
-  const barBottom = y + height; // = low position
-  const pixelsPerUnit = height / totalRange || 1;
-
-  // Body = open to close
-  const bodyTop = barBottom - (Math.max(open, close) - low) * pixelsPerUnit;
-  const bodyBottom = barBottom - (Math.min(open, close) - low) * pixelsPerUnit;
-  const bodyHeight = Math.max(bodyBottom - bodyTop, 1.5);
-
-  // Wick center
-  const wickX = x + width / 2;
-
-  return (
-    <g>
-      {/* Upper wick */}
-      <line
-        x1={wickX}
-        y1={barTop}
-        x2={wickX}
-        y2={bodyTop}
-        stroke={wickColor}
-        strokeWidth={1}
-        opacity={0.8}
-      />
-      {/* Lower wick */}
-      <line
-        x1={wickX}
-        y1={bodyBottom}
-        x2={wickX}
-        y2={barBottom}
-        stroke={wickColor}
-        strokeWidth={1}
-        opacity={0.8}
-      />
-      {/* Body */}
-      <rect
-        x={x + 1}
-        y={bodyTop}
-        width={Math.max(width - 2, 3)}
-        height={bodyHeight}
-        fill={isBullish ? barColor : barColor}
-        fillOpacity={isBullish ? 0.9 : 0.9}
-        stroke={wickColor}
-        strokeWidth={0.5}
-        rx={1}
-      />
-      {/* Glow effect for strong candles */}
-      {Math.abs(close - open) > 5 && (
-        <rect
-          x={x + 1}
-          y={bodyTop}
-          width={Math.max(width - 2, 3)}
-          height={bodyHeight}
-          fill={barColor}
-          fillOpacity={0.3}
-          filter="blur(3px)"
-          rx={1}
-        />
-      )}
-    </g>
-  );
-};
-
 const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) => {
   const ohlcData = useMemo(() => buildOHLC(history, 5), [history]);
 
-  const lineData = useMemo(() => {
-    if (history.length === 0) return [];
-    return history.map((snap) => ({
-      minute: snap.minute,
-      momentum: +(snap.homePI - snap.awayPI).toFixed(1),
-    }));
-  }, [history]);
+  const domainMax = useMemo(() => {
+    if (ohlcData.length === 0) return 10;
+    const allValues = ohlcData.flatMap((d) => [d.high, d.low]);
+    return Math.ceil(Math.max(...allValues.map(Math.abs), 10) * 1.2);
+  }, [ohlcData]);
 
-  // Merge: use OHLC data as base, overlay line momentum
-  const chartData = useMemo(() => {
-    if (ohlcData.length === 0) return [];
-    // Build a combined dataset keyed by minute
-    const map = new Map<number, any>();
+  if (ohlcData.length === 0) return null;
 
-    // Line data points
-    lineData.forEach((d) => {
-      map.set(d.minute, { minute: d.minute, momentum: d.momentum });
-    });
-
-    // OHLC candles
-    ohlcData.forEach((d) => {
-      const existing = map.get(d.minute) || { minute: d.minute };
-      map.set(d.minute, {
-        ...existing,
-        ...d,
-        hasCandle: true,
-      });
-    });
-
-    return [...map.values()].sort((a, b) => a.minute - b.minute);
-  }, [ohlcData, lineData]);
-
-  const maxAbs = useMemo(() => {
-    if (chartData.length === 0) return 10;
-    const allValues = chartData.flatMap((d) => [
-      d.momentum ?? 0,
-      d.high ?? 0,
-      d.low ?? 0,
-    ]);
-    return Math.max(...allValues.map(Math.abs), 10);
-  }, [chartData]);
-
-  const domainMax = Math.ceil(maxAbs * 1.3);
-
-  if (chartData.length === 0) return null;
-
-  const lastMomentum = ohlcData.length > 0
-    ? ohlcData[ohlcData.length - 1].close
-    : 0;
-  const isPositive = lastMomentum >= 0;
   const lastCandle = ohlcData[ohlcData.length - 1];
+  const lastMomentum = lastCandle.close;
+  const isPositive = lastMomentum >= 0;
+
+  // Chart dimensions
+  const chartW = 340;
+  const chartH = 200;
+  const padL = 36;
+  const padR = 8;
+  const padT = 12;
+  const padB = 24;
+  const plotW = chartW - padL - padR;
+  const plotH = chartH - padT - padB;
+
+  const yMin = -domainMax;
+  const yMax = domainMax;
+
+  const toY = useCallback((val: number) => {
+    return padT + plotH * (1 - (val - yMin) / (yMax - yMin));
+  }, [plotH, yMin, yMax]);
+
+  const candleCount = ohlcData.length;
+  const candleW = Math.min(Math.max(plotW / Math.max(candleCount, 1) - 2, 4), 16);
+  const gap = (plotW - candleW * candleCount) / Math.max(candleCount, 1);
+
+  const toX = useCallback((i: number) => {
+    return padL + gap / 2 + i * (candleW + gap) + candleW / 2;
+  }, [gap, candleW]);
+
+  // Y-axis ticks
+  const yTicks: number[] = [];
+  const step = Math.max(Math.round(domainMax / 3), 1);
+  for (let v = -step * 3; v <= step * 3; v += step) {
+    if (v >= yMin && v <= yMax) yTicks.push(v);
+  }
 
   return (
     <div className="bg-[#161B22] rounded-xl overflow-hidden border border-[#30363D]">
@@ -223,7 +111,7 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
           <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">{homeName}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[8px] text-[#484F58] font-mono">OHLC 5min</span>
+          <span className="text-[8px] text-[#484F58] font-mono">VELAS 5min</span>
           <span className="text-[10px] text-gray-500 font-mono bg-[#0D1117] px-1.5 py-0.5 rounded">{currentMinute}'</span>
         </div>
         <div className="flex items-center gap-2">
@@ -232,156 +120,123 @@ const MomentumChart = ({ history, homeName, awayName, currentMinute }: Props) =>
         </div>
       </div>
 
-      {/* Chart */}
+      {/* Candlestick SVG */}
       <div className="px-1 bg-[#0D1117]">
-        <ResponsiveContainer width="100%" height={200}>
-          <ComposedChart data={chartData} margin={{ top: 10, right: 8, bottom: 4, left: 8 }}>
-            <defs>
-              <linearGradient id="piGreenUp" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="50%" stopColor="#10b981" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="piRedDown" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="50%" stopColor="#ef4444" stopOpacity={0} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
-              </linearGradient>
-            </defs>
+        <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" preserveAspectRatio="xMidYMid meet">
+          {/* Grid lines */}
+          {yTicks.map((v) => (
+            <g key={v}>
+              <line
+                x1={padL}
+                x2={chartW - padR}
+                y1={toY(v)}
+                y2={toY(v)}
+                stroke={v === 0 ? '#30363D' : 'rgba(48,54,61,0.3)'}
+                strokeWidth={v === 0 ? 1.5 : 0.5}
+                strokeDasharray={v === 0 ? undefined : '2 4'}
+              />
+              <text
+                x={padL - 4}
+                y={toY(v) + 3}
+                textAnchor="end"
+                fontSize={8}
+                fill="#484F58"
+                fontFamily="monospace"
+              >
+                {v > 0 ? `+${v}` : v}
+              </text>
+            </g>
+          ))}
 
-            <CartesianGrid
-              strokeDasharray="2 6"
-              stroke="rgba(48,54,61,0.4)"
-              vertical={false}
-            />
-
-            <XAxis
-              dataKey="minute"
-              tick={{ fontSize: 9, fill: '#484F58' }}
-              tickFormatter={(v) => `${v}'`}
-              axisLine={{ stroke: '#30363D' }}
-              tickLine={false}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              domain={[-domainMax, domainMax]}
-              tick={{ fontSize: 9, fill: '#484F58' }}
-              axisLine={false}
-              tickLine={false}
-              width={30}
-              tickFormatter={(v: number) => (v > 0 ? `+${v}` : `${v}`)}
-            />
-
-            <ReferenceLine y={0} stroke="#30363D" strokeWidth={1.5} />
-            <ReferenceLine
-              x={45}
-              stroke="#30363D"
-              strokeDasharray="4 4"
-              label={{ value: 'HT', position: 'top', fontSize: 8, fill: '#484F58' }}
-            />
-
-            <Tooltip
-              isAnimationActive={false}
-              cursor={{ stroke: 'rgba(139,148,158,0.3)', strokeWidth: 1, strokeDasharray: '4 4' }}
-              contentStyle={{
-                background: '#161B22',
-                border: '1px solid #30363D',
-                borderRadius: '8px',
-                fontSize: '10px',
-                color: '#e6edf3',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                padding: '8px 12px',
-              }}
-              labelFormatter={(v) => `${v}'`}
-              content={({ active, payload, label }) => {
-                if (!active || !payload?.length) return null;
-                const d = payload[0]?.payload;
-                if (!d) return null;
+          {/* HT line at 45' if visible */}
+          {ohlcData.some(d => d.minute <= 45) && ohlcData.some(d => d.minute >= 45) && (
+            <>
+              {(() => {
+                const htIdx = ohlcData.findIndex(d => d.minute >= 45);
+                if (htIdx < 0) return null;
+                const htX = toX(htIdx);
                 return (
-                  <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-2 text-[10px] text-[#e6edf3] shadow-xl">
-                    <div className="font-mono text-[#484F58] mb-1">{label}'</div>
-                    {d.hasCandle && (
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 font-mono">
-                        <span className="text-[#484F58]">O:</span>
-                        <span className={d.open >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                          {d.open > 0 ? '+' : ''}{d.open?.toFixed(1)}
-                        </span>
-                        <span className="text-[#484F58]">H:</span>
-                        <span className="text-emerald-400">+{d.high?.toFixed(1)}</span>
-                        <span className="text-[#484F58]">L:</span>
-                        <span className="text-red-400">{d.low?.toFixed(1)}</span>
-                        <span className="text-[#484F58]">C:</span>
-                        <span className={d.close >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                          {d.close > 0 ? '+' : ''}{d.close?.toFixed(1)}
-                        </span>
-                      </div>
-                    )}
-                    {d.momentum !== undefined && !d.hasCandle && (
-                      <div className="font-mono">
-                        PI: <span className={d.momentum >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                          {d.momentum > 0 ? '+' : ''}{d.momentum?.toFixed(1)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <>
+                    <line x1={htX} x2={htX} y1={padT} y2={chartH - padB} stroke="#30363D" strokeDasharray="4 4" strokeWidth={0.8} />
+                    <text x={htX} y={padT - 2} textAnchor="middle" fontSize={7} fill="#484F58">HT</text>
+                  </>
                 );
-              }}
-            />
+              })()}
+            </>
+          )}
 
-            {/* Area fills behind candles */}
-            <Area
-              type="monotone"
-              dataKey="momentum"
-              stroke="none"
-              fill="url(#piGreenUp)"
-              fillOpacity={1}
-              baseValue={0}
-              isAnimationActive={false}
-              connectNulls
-            />
-            <Area
-              type="monotone"
-              dataKey="momentum"
-              stroke="none"
-              fill="url(#piRedDown)"
-              fillOpacity={1}
-              baseValue={0}
-              isAnimationActive={false}
-              connectNulls
-            />
-            {/* Momentum line */}
-            <Area
-              type="monotone"
-              dataKey="momentum"
-              stroke="#6ee7b7"
-              strokeWidth={1}
-              strokeOpacity={0.4}
-              fill="transparent"
-              baseValue={0}
-              isAnimationActive={false}
-              dot={false}
-              connectNulls
-            />
+          {/* Candles */}
+          {ohlcData.map((candle, i) => {
+            const cx = toX(i);
+            const highY = toY(candle.high);
+            const lowY = toY(candle.low);
+            const openY = toY(candle.open);
+            const closeY = toY(candle.close);
+            const bodyTop = Math.min(openY, closeY);
+            const bodyH = Math.max(Math.abs(openY - closeY), 1.5);
+            const bull = candle.isBullish;
+            const bodyColor = bull ? '#10b981' : '#ef4444';
+            const wickColor = bull ? '#34d399' : '#f87171';
+            const halfW = candleW / 2;
 
-            {/* Candlestick bars */}
-            <Bar
-              dataKey="ohlc"
-              barSize={8}
-              isAnimationActive={false}
-              shape={<CandlestickShape />}
-              fill="#10b981"
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+            return (
+              <g key={i}>
+                {/* Upper wick */}
+                <line x1={cx} x2={cx} y1={highY} y2={bodyTop} stroke={wickColor} strokeWidth={1} opacity={0.8} />
+                {/* Lower wick */}
+                <line x1={cx} x2={cx} y1={bodyTop + bodyH} y2={lowY} stroke={wickColor} strokeWidth={1} opacity={0.8} />
+                {/* Body */}
+                <rect
+                  x={cx - halfW}
+                  y={bodyTop}
+                  width={candleW}
+                  height={bodyH}
+                  fill={bodyColor}
+                  fillOpacity={bull ? 1 : 1}
+                  stroke={wickColor}
+                  strokeWidth={0.5}
+                  rx={1}
+                />
+                {/* Glow for strong moves */}
+                {Math.abs(candle.close - candle.open) > 5 && (
+                  <rect
+                    x={cx - halfW - 2}
+                    y={bodyTop - 2}
+                    width={candleW + 4}
+                    height={bodyH + 4}
+                    fill={bodyColor}
+                    fillOpacity={0.25}
+                    rx={3}
+                  />
+                )}
+              </g>
+            );
+          })}
+
+          {/* X-axis labels */}
+          {ohlcData.map((candle, i) => (
+            <text
+              key={i}
+              x={toX(i)}
+              y={chartH - padB + 14}
+              textAnchor="middle"
+              fontSize={8}
+              fill="#484F58"
+              fontFamily="monospace"
+            >
+              {candle.minute}'
+            </text>
+          ))}
+        </svg>
       </div>
 
       {/* Footer */}
       <div className="px-3 py-2 flex justify-between items-center border-t border-[#30363D] bg-[#161B22]">
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-[#484F58] font-mono uppercase tracking-wider">PI OHLC</span>
-          {lastCandle && (
-            <span className="text-[8px] text-[#484F58] font-mono">
-              O:{lastCandle.open.toFixed(0)} H:{lastCandle.high.toFixed(0)} L:{lastCandle.low.toFixed(0)} C:{lastCandle.close.toFixed(0)}
-            </span>
-          )}
+          <span className="text-[8px] text-[#484F58] font-mono">
+            O:{lastCandle.open.toFixed(0)} H:{lastCandle.high.toFixed(0)} L:{lastCandle.low.toFixed(0)} C:{lastCandle.close.toFixed(0)}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-black font-mono tabular-nums ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>

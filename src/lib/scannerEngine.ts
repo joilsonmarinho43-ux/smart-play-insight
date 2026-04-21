@@ -251,6 +251,19 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
       });
     }
 
+    // ═══ RMA VALIDATION (parallel layer) ═══
+    if (isLive && minute && minute > 0) {
+      const rmaInput = buildRMAInput(lH, lA, minute, pressure);
+      const rmaResult = evaluateRMA(rmaInput);
+      // Attach RMA verdict to all opportunities from this match
+      for (const opp of opportunities) {
+        if (opp.matchId === match.id && opp.rmaVerdict === undefined) {
+          opp.rmaVerdict = rmaResult.verdict;
+          opp.rmaScore = rmaResult.score;
+        }
+      }
+    }
+
     // Standalone imminent goal
     if (hasGoalSignal) {
       const existingGoalOpp = opportunities.find(o => o.matchId === match.id && o.signal);

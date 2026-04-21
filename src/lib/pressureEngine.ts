@@ -81,7 +81,7 @@ export function generateLiveStrategy(
     strategies.push({ signal: 'entry', market: '⚽ Over 0.5 Gols', reason: `0 gols mas ${totalShotsAll} finalizações (${totalShots} no gol). Pressão acumulada sem converter.`, confidence: conf });
   }
 
-  if (minute >= 20 && minute <= 75 && totalGoals <= 1 && (totalShots >= 4 || totalShotsAll >= 6)) {
+  if (minute >= 20 && minute <= 75 && totalGoals >= 1 && totalGoals <= 1 && (totalShots >= 4 || totalShotsAll >= 6)) {
     const conf = Math.min(78, 40 + totalShots * 3 + totalShotsAll + Math.floor(totalDangerous / 6));
     strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `${totalShotsAll} finalizações com apenas ${totalGoals} gol(s). Ritmo ofensivo alto.`, confidence: conf });
   }

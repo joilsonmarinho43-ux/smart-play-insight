@@ -175,6 +175,35 @@ const Admin = () => {
     pendente: signals.filter(s => s.status === 'pendente').length,
   };
 
+  const winRateData = useMemo(() => {
+    const resolved = signals.filter(s => s.status === 'green' || s.status === 'loss');
+    // Group by date
+    const byDate: Record<string, { green: number; loss: number }> = {};
+    resolved.forEach(s => {
+      const date = new Date(s.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      if (!byDate[date]) byDate[date] = { green: 0, loss: 0 };
+      if (s.status === 'green') byDate[date].green++;
+      else byDate[date].loss++;
+    });
+
+    const days = Object.entries(byDate)
+      .map(([date, counts]) => ({
+        date,
+        green: counts.green,
+        loss: counts.loss,
+        total: counts.green + counts.loss,
+        winRate: counts.green + counts.loss > 0 ? Math.round((counts.green / (counts.green + counts.loss)) * 100) : 0,
+      }))
+      .reverse() // most recent last (for chart left-to-right)
+      .slice(-14); // last 14 days
+
+    const totalGreen = resolved.filter(s => s.status === 'green').length;
+    const totalLoss = resolved.filter(s => s.status === 'loss').length;
+    const overallWinRate = totalGreen + totalLoss > 0 ? Math.round((totalGreen / (totalGreen + totalLoss)) * 100) : 0;
+
+    return { days, totalGreen, totalLoss, overallWinRate, totalResolved: resolved.length };
+  }, [signals]);
+
   if (profileLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   if (!profile?.is_admin) return <Navigate to="/" replace />;
 

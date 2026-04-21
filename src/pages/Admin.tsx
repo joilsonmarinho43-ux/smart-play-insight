@@ -233,7 +233,7 @@ const Admin = () => {
               <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${autoModeActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
             </button>
             <button
-              onClick={() => { setShowDashboard(!showDashboard); setShowSignals(false); setShowConflicts(false); }}
+              onClick={() => { setShowDashboard(!showDashboard); setShowSignals(false); setShowConflicts(false); setShowAutoMode(false); }}
               className={`relative p-2 rounded-lg transition-all ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
               title="Dashboard Win Rate"
             >

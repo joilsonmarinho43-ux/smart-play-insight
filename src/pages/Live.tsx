@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
-import { Loader2, RefreshCw, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck, Flame, BarChart3, Crosshair, Star, Eye } from 'lucide-react';
+import { Loader2, RefreshCw, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck, Flame, BarChart3, Crosshair, Star, Eye, Bug } from 'lucide-react';
 import SniperPanel from '@/components/SniperPanel';
+import AuditPanel from '@/components/AuditPanel';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMatches } from '@/services/footballApi';

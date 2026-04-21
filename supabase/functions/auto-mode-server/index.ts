@@ -41,7 +41,7 @@ function extractStats(match: any) {
   const lH = match.stats?.home || {};
   const lA = match.stats?.away || {};
   const sog = (lH.shotsOnGoal || 0) + (lA.shotsOnGoal || 0);
-  const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0) + sog;
+  const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
   const corners = (lH.corners || 0) + (lA.corners || 0);
 
   let da = (lH.dangerousAttacks || 0) + (lA.dangerousAttacks || 0);
@@ -54,7 +54,8 @@ function extractStats(match: any) {
   const homePoss = Number(lH.possession || 0);
   const awayPoss = Number(lA.possession || 0);
   const dominantPoss = Math.max(homePoss, awayPoss);
-  const pressure = Math.min(100, Math.max(0, (da * 3 + corners * 5 + sog * 10) / 5));
+  // Pressure: weighted sum without /5 divisor to produce realistic 0-100 values
+  const pressure = Math.min(100, Math.max(0, da * 2 + corners * 4 + sog * 8));
   const homeTeam = match.teams?.home?.name || 'Casa';
   const awayTeam = match.teams?.away?.name || 'Fora';
   const matchId = String(match.id || match.fixture?.id);
@@ -76,17 +77,17 @@ function classifyServer(match: any): HybridSignal | null {
   // SNIPER criteria
   const isSniper = s.minute >= 5 && s.minute <= 30 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
-    s.sog >= 2 && s.dominantPoss >= 60 && s.da >= 6 && s.corners >= 2 && s.pressure >= 70;
+    s.sog >= 2 && s.dominantPoss >= 55 && s.da >= 6 && s.corners >= 2 && s.pressure >= 50;
 
   // SEMI criteria
   const validScore = (s.homeGoals === 0 && s.awayGoals === 0) || (s.homeGoals + s.awayGoals === 1);
-  const isSemi = !isSniper && s.minute >= 5 && s.minute <= 35 &&
-    validScore && s.sog >= 1 && s.dominantPoss >= 55 && s.da >= 4 && s.corners >= 1 && s.pressure >= 60;
+  const isSemi = !isSniper && s.minute >= 5 && s.minute <= 45 &&
+    validScore && s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 35;
 
   if (!isSniper && !isSemi) return null;
 
-  // SEMI must be in execution window
-  if (isSemi && (s.minute < 10 || s.minute > 30)) return null;
+  // Execution window for market selection
+  if (isSemi && s.minute > 45) return null;
 
   const tier: HybridTier = isSniper ? 'SNIPER' : 'SEMI';
   const market = isSniper ? 'Over 0.5 HT' : (s.homeGoals + s.awayGoals === 0 ? 'Over 0.5' : 'Over 1.5');
@@ -194,6 +195,10 @@ Deno.serve(async (req) => {
     // 4. Classify each match
     const signalsToSend: HybridSignal[] = [];
     for (const match of matches) {
+      const s = extractStats(match);
+      if (s.hasStats) {
+        console.log(`[AUTO-MODE-SERVER] ${s.homeTeam} vs ${s.awayTeam} | min:${s.minute} sog:${s.sog} da:${s.da}${s.daEstimated?'≈':''} crn:${s.corners} poss:${s.dominantPoss} prs:${Math.round(s.pressure)} score:${s.homeGoals}-${s.awayGoals}`);
+      }
       const signal = classifyServer(match);
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;
@@ -203,73 +208,41 @@ Deno.serve(async (req) => {
 
     console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} sinais qualificados`);
 
-    // 5. Send each signal to Telegram and log
+    // 5. Send each signal via telegram-signal edge function
     let sentCount = 0;
     for (const signal of signalsToSend) {
       try {
-        const emoji = signal.tier === 'SNIPER' ? '🔥' : '⚡';
-        const score = `${signal.homeGoals}-${signal.awayGoals}`;
+        const score = `${signal.homeGoals} x ${signal.awayGoals}`;
 
-        const text = [
-          `━━━━━━━━━━━━━━━━━━━━━`,
-          `${emoji} <b>SINAL AUTOMÁTICO • ${signal.label}</b>`,
-          `━━━━━━━━━━━━━━━━━━━━━`,
-          ``,
-          `⚽ <b>${signal.match}</b>`,
-          `🏆 ${signal.league}`,
-          `⏱ Minuto: <b>${signal.minute}'</b>`,
-          `📈 Mercado: <b>${signal.market}</b>`,
-          `🎯 Confiança: <b>${signal.confidence}%</b>`,
-          `📊 Placar: <b>${score}</b>`,
-          `✅ Filtros: <b>${signal.filtersValidated}</b>`,
-          ``,
-          `📉 Pressão: <b>${signal.pressure}</b> | SoG: <b>${signal.shotsOnGoal}</b>`,
-          `🔄 Posse: <b>${signal.possession}%</b> | Cantos: <b>${signal.corners}</b>`,
-          signal.daEstimated ? `⚠️ DA estimado via fallback` : null,
-          ``,
-          `⏳ Status: <b>PENDENTE</b>`,
-          ``,
-          `━━━━━━━━━━━━━━━━━━━━━`,
-          `🤖 <i>Analista Joilson • Auto-Mode Server</i>`,
-        ].filter(Boolean).join('\n');
-
-        const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'X-Connection-Api-Key': TELEGRAM_API_KEY,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text,
-            parse_mode: 'HTML',
-            disable_web_page_preview: true,
-          }),
-        });
-
-        const tgData = await tgRes.json();
-        const telegramMessageId = tgData.result?.message_id ?? null;
-
-        // Log to DB
-        await supabase.from('telegram_signals').insert({
-          match_name: signal.match,
-          match_id: signal.matchId,
+        const tgPayload = {
+          match: signal.match,
+          matchId: signal.matchId,
           market: signal.market,
           confidence: signal.confidence,
-          filters_validated: signal.filtersValidated,
+          filtersValidated: signal.filtersValidated,
           sensitivity: signal.tier === 'SNIPER' ? 'agressivo' : 'moderado',
           minute: signal.minute,
           score,
-          reason: `Auto-Mode Server • ${signal.label}`,
-          success: tgRes.ok,
-          error_message: tgRes.ok ? null : JSON.stringify(tgData),
-          telegram_message_id: telegramMessageId,
-          status: 'pendente',
+          reason: `Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,
+        };
+
+        const tgRes = await fetch(`${supabaseUrl}/functions/v1/telegram-signal`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(tgPayload),
         });
 
-        if (tgRes.ok) sentCount++;
-        console.log(`[AUTO-MODE-SERVER] ${tgRes.ok ? '✅' : '❌'} ${signal.match} • ${signal.label}`);
+        const tgData = await tgRes.json();
+
+        if (tgRes.ok && tgData.success) {
+          sentCount++;
+          console.log(`[AUTO-MODE-SERVER] ✅ ${signal.match} • ${signal.label}`);
+        } else {
+          console.log(`[AUTO-MODE-SERVER] ❌ ${signal.match} • ${JSON.stringify(tgData)}`);
+        }
 
       } catch (err) {
         console.error(`[AUTO-MODE-SERVER] Erro ao enviar sinal:`, err);

@@ -208,73 +208,46 @@ Deno.serve(async (req) => {
 
     console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} sinais qualificados`);
 
-    // 5. Send each signal to Telegram and log
+    // 5. Send each signal via telegram-signal edge function
     let sentCount = 0;
     for (const signal of signalsToSend) {
       try {
-        const emoji = signal.tier === 'SNIPER' ? '🔥' : '⚡';
-        const score = `${signal.homeGoals}-${signal.awayGoals}`;
+        const score = `${signal.homeGoals} x ${signal.awayGoals}`;
 
-        const text = [
-          `━━━━━━━━━━━━━━━━━━━━━`,
-          `${emoji} <b>SINAL AUTOMÁTICO • ${signal.label}</b>`,
-          `━━━━━━━━━━━━━━━━━━━━━`,
-          ``,
-          `⚽ <b>${signal.match}</b>`,
-          `🏆 ${signal.league}`,
-          `⏱ Minuto: <b>${signal.minute}'</b>`,
-          `📈 Mercado: <b>${signal.market}</b>`,
-          `🎯 Confiança: <b>${signal.confidence}%</b>`,
-          `📊 Placar: <b>${score}</b>`,
-          `✅ Filtros: <b>${signal.filtersValidated}</b>`,
-          ``,
-          `📉 Pressão: <b>${signal.pressure}</b> | SoG: <b>${signal.shotsOnGoal}</b>`,
-          `🔄 Posse: <b>${signal.possession}%</b> | Cantos: <b>${signal.corners}</b>`,
-          signal.daEstimated ? `⚠️ DA estimado via fallback` : null,
-          ``,
-          `⏳ Status: <b>PENDENTE</b>`,
-          ``,
-          `━━━━━━━━━━━━━━━━━━━━━`,
-          `🤖 <i>Analista Joilson • Auto-Mode Server</i>`,
-        ].filter(Boolean).join('\n');
-
-        const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'X-Connection-Api-Key': TELEGRAM_API_KEY,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text,
-            parse_mode: 'HTML',
-            disable_web_page_preview: true,
-          }),
-        });
-
-        const tgData = await tgRes.json();
-        const telegramMessageId = tgData.result?.message_id ?? null;
-
-        // Log to DB
-        await supabase.from('telegram_signals').insert({
-          match_name: signal.match,
-          match_id: signal.matchId,
+        const tgPayload = {
+          match: signal.match,
+          matchId: signal.matchId,
           market: signal.market,
           confidence: signal.confidence,
-          filters_validated: signal.filtersValidated,
+          filtersValidated: signal.filtersValidated,
           sensitivity: signal.tier === 'SNIPER' ? 'agressivo' : 'moderado',
           minute: signal.minute,
           score,
-          reason: `Auto-Mode Server • ${signal.label}`,
-          success: tgRes.ok,
-          error_message: tgRes.ok ? null : JSON.stringify(tgData),
-          telegram_message_id: telegramMessageId,
-          status: 'pendente',
+          reason: `Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,
+        };
+
+        const tgRes = await fetch(`${supabaseUrl}/functions/v1/telegram-signal`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(tgPayload),
         });
 
-        if (tgRes.ok) sentCount++;
-        console.log(`[AUTO-MODE-SERVER] ${tgRes.ok ? '✅' : '❌'} ${signal.match} • ${signal.label}`);
+        const tgData = await tgRes.json();
+
+        if (tgRes.ok && tgData.success) {
+          sentCount++;
+          console.log(`[AUTO-MODE-SERVER] ✅ ${signal.match} • ${signal.label}`);
+        } else {
+          console.log(`[AUTO-MODE-SERVER] ❌ ${signal.match} • ${JSON.stringify(tgData)}`);
+        }
+
+      } catch (err) {
+        console.error(`[AUTO-MODE-SERVER] Erro ao enviar sinal:`, err);
+      }
+    }
 
       } catch (err) {
         console.error(`[AUTO-MODE-SERVER] Erro ao enviar sinal:`, err);

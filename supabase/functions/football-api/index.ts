@@ -156,21 +156,19 @@ function shouldFetchLiveStats(
   match: any,
   leagueId: number
 ): boolean {
-  if (!LEAGUES_WITH_STATS.has(leagueId)) return false;
-
   const minute = match?.fixture?.status?.elapsed || 0;
-  if (minute < 10) return false; // Too early, no useful data
+  if (minute < 8) return false; // Too early, no useful data
 
+  // Priority leagues always get stats
+  if (LEAGUES_WITH_STATS.has(leagueId)) return true;
+
+  // For other leagues, fetch if enough time has passed (API may have data)
+  if (minute >= 15) return true;
+
+  // Also fetch if there are goals (interesting game)
   const homeGoals = match?.goals?.home ?? 0;
   const awayGoals = match?.goals?.away ?? 0;
-  const isCloseScore = Math.abs(homeGoals - awayGoals) <= 1;
-  const hasGoals = homeGoals + awayGoals > 0;
-
-  // Always fetch if close score or has goals (interesting game)
-  if (isCloseScore || hasGoals) return true;
-
-  // For 0-0 games, only fetch after 15 min
-  if (minute >= 15) return true;
+  if (homeGoals + awayGoals > 0) return true;
 
   return false;
 }

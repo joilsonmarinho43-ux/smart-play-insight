@@ -70,7 +70,7 @@ const BLOCKED_RESULT: MatchAnalysis = {
   oddsDeviation: DEFAULT_ODDS, smartFilter: null, htft: [], scannerScore: 0,
 };
 
-const MAX_SCANNER_MATCHES = 5;
+const MAX_SCANNER_MATCHES = 10;
 
 /** Validate live data integrity before running any analysis */
 function validateLiveData(
@@ -91,26 +91,18 @@ function validateLiveData(
   const totalShotsOnGoal = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
   const homePoss = Number(h.possession || 0);
   const awayPoss = Number(a.possession || 0);
+  const hasPossession = (homePoss > 0 && homePoss !== 50) || (awayPoss > 0 && awayPoss !== 50);
 
-  const allZero = totalDA === 0 && totalShots === 0 && totalShotsOnGoal === 0 && totalCorners === 0;
+  const allZero = totalDA === 0 && totalShots === 0 && totalShotsOnGoal === 0 && totalCorners === 0 && !hasPossession;
 
   if (minute < 5 || allZero) {
     return { status: 'awaiting_data', message: 'AGUARDANDO DADOS REAIS' };
   }
 
-  // Scanner entry filter: DA ≥ 5 OR SoG ≥ 2
-  const passesEntryFilter = totalDA >= 5 || totalShotsOnGoal >= 2;
+  // Relaxed entry filter: any meaningful stat qualifies
+  const passesEntryFilter = totalDA >= 3 || totalShotsOnGoal >= 1 || totalShots >= 2 || totalCorners >= 1 || hasPossession;
   if (!passesEntryFilter) {
     return { status: 'blocked', message: 'SEM VALOR — Pressão insuficiente' };
-  }
-
-  const activityPerMin = (totalShots + totalDA) / Math.max(minute, 1);
-  if (minute >= 15 && activityPerMin < 0.15) {
-    return { status: 'blocked', message: 'SEM VALOR — Jogo sem intensidade' };
-  }
-
-  if (homePoss === 50 && awayPoss === 50 && totalShots > 3) {
-    return { status: 'error', message: 'ERRO NO SISTEMA LIVE — Dados inconsistentes' };
   }
 
   return { status: 'valid', message: '' };
@@ -292,11 +284,13 @@ const Live = () => {
       const s = match?.stats;
       const isFake = (st: any) => {
         if (!st) return true;
-        const p = Number(st.possession);
-        return (st.shotsOnGoal === 0 || st.shotsOnGoal === null) &&
-               (st.totalShots === 0 || st.totalShots === null) &&
-               (st.dangerousAttacks === 0 || st.dangerousAttacks === null) &&
-               (p === 50 || p === 0 || st.possession === null);
+        // Only fake if literally ALL metrics are zero/null — real games always have at least 1 non-zero stat
+        const p = Number(st.possession || 0);
+        const hasAnyShots = (st.shotsOnGoal || 0) > 0 || (st.totalShots || 0) > 0;
+        const hasAnyDA = (st.dangerousAttacks || 0) > 0;
+        const hasCorners = (st.corners || 0) > 0;
+        const hasRealPoss = p > 0 && p !== 50;
+        return !hasAnyShots && !hasAnyDA && !hasCorners && !hasRealPoss;
       };
       result[id] = {
         home: isFake(s?.home) ? null : s.home,
@@ -481,8 +475,8 @@ const Live = () => {
           <div className="text-center py-16">
             <Eye className="w-10 h-10 text-gray-600 mx-auto mb-3" />
             <p className="text-gray-400 text-sm font-bold">NENHUMA OPORTUNIDADE DETECTADA</p>
-            <p className="text-gray-500 text-xs mt-2">{totalLive} jogos monitorados — nenhum atinge o critério mínimo de pressão.</p>
-            <p className="text-gray-600 text-[10px] mt-1">Filtro: DA ≥ 5 ou Chutes no Gol ≥ 2</p>
+            <p className="text-gray-500 text-xs mt-2">{totalLive} jogos monitorados — aguardando dados de estatísticas.</p>
+            <p className="text-gray-600 text-[10px] mt-1">Filtro: DA ≥ 3 ou Chutes ≥ 1 ou Escanteios ≥ 1</p>
           </div>
         )}
 

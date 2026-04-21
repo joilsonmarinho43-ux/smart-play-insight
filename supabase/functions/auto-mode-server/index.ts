@@ -76,12 +76,12 @@ function classifyServer(match: any): HybridSignal | null {
   // SNIPER criteria
   const isSniper = s.minute >= 5 && s.minute <= 30 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
-    s.sog >= 2 && s.dominantPoss >= 60 && s.da >= 8 && s.corners >= 2 && s.pressure >= 70;
+    s.sog >= 2 && s.dominantPoss >= 60 && s.da >= 6 && s.corners >= 2 && s.pressure >= 70;
 
   // SEMI criteria
   const validScore = (s.homeGoals === 0 && s.awayGoals === 0) || (s.homeGoals + s.awayGoals === 1);
   const isSemi = !isSniper && s.minute >= 5 && s.minute <= 35 &&
-    validScore && s.sog >= 1 && s.dominantPoss >= 55 && s.da >= 6 && s.corners >= 1 && s.pressure >= 60;
+    validScore && s.sog >= 1 && s.dominantPoss >= 55 && s.da >= 4 && s.corners >= 1 && s.pressure >= 60;
 
   if (!isSniper && !isSemi) return null;
 
@@ -95,7 +95,7 @@ function classifyServer(match: any): HybridSignal | null {
   const filters = [
     s.sog >= (isSniper ? 2 : 1),
     s.dominantPoss >= (isSniper ? 60 : 55),
-    s.da >= (isSniper ? 8 : 6),
+    s.da >= (isSniper ? 6 : 4),
     s.corners >= (isSniper ? 2 : 1),
     s.pressure >= (isSniper ? 70 : 60),
   ];

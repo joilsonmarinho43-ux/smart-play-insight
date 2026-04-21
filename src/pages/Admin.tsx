@@ -2,8 +2,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power, Shield } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power, Shield, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 
 const DAYS_OPTIONS = [3, 7, 15, 30];
 
@@ -539,36 +540,80 @@ const Admin = () => {
                       : { icon: '🔴', border: 'border-red-500/20', bg: 'bg-red-500/5', text: 'text-red-400' };
 
                   return (
-                    <div key={log.id} className={`border rounded-xl p-3 text-xs space-y-1.5 ${verdictStyle.border} ${verdictStyle.bg}`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">{verdictStyle.icon}</span>
-                          <span className="font-bold text-sm text-white">{log.match_name}</span>
+                    <Collapsible key={log.id}>
+                      <div className={`border rounded-xl p-3 text-xs space-y-1.5 ${verdictStyle.border} ${verdictStyle.bg}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{verdictStyle.icon}</span>
+                            <span className="font-bold text-sm text-white">{log.match_name}</span>
+                          </div>
+                          <span className="text-muted-foreground/60 text-[10px]">
+                            {new Date(log.created_at).toLocaleString('pt-BR')}
+                          </span>
                         </div>
-                        <span className="text-muted-foreground/60 text-[10px]">
-                          {new Date(log.created_at).toLocaleString('pt-BR')}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-bold">{log.market}</span>
-                        <span className={`px-2 py-0.5 rounded-md font-bold ${verdictStyle.text} bg-white/5`}>
-                          {log.rma_verdict}
-                        </span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-mono font-bold">
-                          Score: {typeof log.rma_score === 'number' ? log.rma_score.toFixed(1) : log.rma_score}
-                        </span>
-                        <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.minute}'</span>
-                        {log.original_signal && (
-                          <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.original_signal}</span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-bold">{log.market}</span>
+                          <span className={`px-2 py-0.5 rounded-md font-bold ${verdictStyle.text} bg-white/5`}>
+                            {log.rma_verdict}
+                          </span>
+                          <span className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-mono font-bold">
+                            Score: {typeof log.rma_score === 'number' ? log.rma_score.toFixed(1) : log.rma_score}
+                          </span>
+                          <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.minute}'</span>
+                          {log.original_signal && (
+                            <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.original_signal}</span>
+                          )}
+                        </div>
+                        {log.block_reason && (
+                          <p className="text-red-400/80 text-[10px] italic">⛔ {log.block_reason}</p>
                         )}
+                        {log.match_result && (
+                          <p className="text-muted-foreground text-[10px]">📊 Resultado: {log.match_result}</p>
+                        )}
+
+                        {/* Expandable "Veredito: por quê" */}
+                        <CollapsibleTrigger className="flex items-center gap-1 text-[10px] text-cyan-400/70 hover:text-cyan-400 transition-colors cursor-pointer mt-1 group">
+                          <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
+                          Veredito: por quê?
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="mt-2 bg-black/30 rounded-lg p-2.5 space-y-2 border border-white/5">
+                            {/* Score components */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {[
+                                { label: 'Pressão', value: log.rma_score != null ? ((log.rma_score - (log.ap_norm ?? 0) * 0.35 - (log.f_norm ?? 0) * 0.15 - (log.sot_norm ?? 0) * 0.10) / 0.4).toFixed(0) : '—', color: 'text-orange-400', desc: '×0.40' },
+                                { label: 'AP_norm', value: log.ap_norm?.toFixed(2) ?? '—', color: 'text-blue-400', desc: '×0.35' },
+                                { label: 'F_norm', value: log.f_norm?.toFixed(2) ?? '—', color: 'text-purple-400', desc: '×0.15' },
+                                { label: 'SOT_norm', value: log.sot_norm?.toFixed(2) ?? '—', color: 'text-emerald-400', desc: '×0.10' },
+                              ].map((m) => (
+                                <div key={m.label} className="bg-white/5 rounded-md p-1.5 text-center">
+                                  <p className="text-[8px] text-muted-foreground uppercase">{m.label} <span className="text-muted-foreground/40">{m.desc}</span></p>
+                                  <p className={`text-sm font-bold font-mono ${m.color}`}>{m.value}</p>
+                                </div>
+                              ))}
+                            </div>
+                            {log.acceleration != null && log.acceleration !== 0 && (
+                              <p className="text-[10px] text-muted-foreground">
+                                ⚡ Aceleração: <span className={`font-bold ${log.acceleration > 0 ? 'text-green-400' : 'text-red-400'}`}>{log.acceleration > 0 ? '+' : ''}{log.acceleration}</span>
+                              </p>
+                            )}
+                            {/* Decision explanation */}
+                            <div className="text-[10px] text-muted-foreground/80 border-t border-white/5 pt-1.5 space-y-0.5">
+                              <p className="font-bold text-muted-foreground">📐 Regra decisiva:</p>
+                              {log.block_reason ? (
+                                <p className="text-red-400">⛔ {log.block_reason}</p>
+                              ) : log.rma_verdict === 'CONFIRMADO' ? (
+                                <p className="text-green-400">✅ Score {'>'} 40 — atividade ofensiva confirmada</p>
+                              ) : log.rma_verdict === 'NEUTRO' ? (
+                                <p className="text-yellow-400">🟡 Score entre 25-40 — sinal marginal, passou com cautela</p>
+                              ) : (
+                                <p className="text-red-400">🔴 Score {'<'} 25 — atividade insuficiente</p>
+                              )}
+                            </div>
+                          </div>
+                        </CollapsibleContent>
                       </div>
-                      {log.block_reason && (
-                        <p className="text-red-400/80 text-[10px] italic">⛔ {log.block_reason}</p>
-                      )}
-                      {log.match_result && (
-                        <p className="text-muted-foreground text-[10px]">📊 Resultado: {log.match_result}</p>
-                      )}
-                    </div>
+                    </Collapsible>
                   );
                 })}
               </div>

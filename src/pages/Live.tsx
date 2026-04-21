@@ -91,26 +91,18 @@ function validateLiveData(
   const totalShotsOnGoal = (h.shotsOnGoal || 0) + (a.shotsOnGoal || 0);
   const homePoss = Number(h.possession || 0);
   const awayPoss = Number(a.possession || 0);
+  const hasPossession = (homePoss > 0 && homePoss !== 50) || (awayPoss > 0 && awayPoss !== 50);
 
-  const allZero = totalDA === 0 && totalShots === 0 && totalShotsOnGoal === 0 && totalCorners === 0;
+  const allZero = totalDA === 0 && totalShots === 0 && totalShotsOnGoal === 0 && totalCorners === 0 && !hasPossession;
 
   if (minute < 5 || allZero) {
     return { status: 'awaiting_data', message: 'AGUARDANDO DADOS REAIS' };
   }
 
-  // Scanner entry filter: DA ≥ 5 OR SoG ≥ 2
-  const passesEntryFilter = totalDA >= 5 || totalShotsOnGoal >= 2;
+  // Relaxed entry filter: any meaningful stat qualifies
+  const passesEntryFilter = totalDA >= 3 || totalShotsOnGoal >= 1 || totalShots >= 2 || totalCorners >= 1 || hasPossession;
   if (!passesEntryFilter) {
     return { status: 'blocked', message: 'SEM VALOR — Pressão insuficiente' };
-  }
-
-  const activityPerMin = (totalShots + totalDA) / Math.max(minute, 1);
-  if (minute >= 15 && activityPerMin < 0.15) {
-    return { status: 'blocked', message: 'SEM VALOR — Jogo sem intensidade' };
-  }
-
-  if (homePoss === 50 && awayPoss === 50 && totalShots > 3) {
-    return { status: 'error', message: 'ERRO NO SISTEMA LIVE — Dados inconsistentes' };
   }
 
   return { status: 'valid', message: '' };

@@ -24,8 +24,8 @@ const CornerTimeline = ({ data, currentMinute }: Props) => {
     isFuture: (i + 1) * 15 > currentMinute,
   }));
 
-  const totalHome = data.reduce((s, d) => s + d.home, 0);
-  const totalAway = data.reduce((s, d) => s + d.away, 0);
+  const totalHome = Math.round(data.reduce((s, d) => s + d.home, 0) * 10) / 10;
+  const totalAway = Math.round(data.reduce((s, d) => s + d.away, 0) * 10) / 10;
 
   return (
     <div className="bg-gradient-to-br from-[#0D1117] to-[#111827] rounded-xl p-4 border border-[#1e293b] shadow-lg shadow-black/30">

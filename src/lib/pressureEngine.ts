@@ -93,7 +93,7 @@ export function generateLiveStrategy(
   if (minute >= 25 && minute <= 78 && totalGoals === 0 && totalShotsAll >= 5 && totalShots >= 2) {
     const conf = Math.min(80, 48 + totalShots * 4 + totalShotsAll * 1.5 + Math.floor(totalDangerous / 6) - minutePenalty);
     if (conf >= MIN_CONFIDENCE) {
-      strategies.push({ signal: 'entry', market: '⚽ Over 0.5 Gols', reason: `0 gols mas ${totalShotsAll} finalizações (${totalShots} no gol) em ${minute}'. Pressão acumulada.`, confidence: Math.round(conf) });
+      strategies.push({ signal: 'entry', market: '⚽ Over 0.5 Gols', reason: `0 gols mas ${totalShotsAll} finalizações (${totalShots} no gol) em ${minute}'. Pressão acumulada.`, confidence: cal('Over 0.5 Gols', conf) });
     }
   }
 
@@ -101,7 +101,7 @@ export function generateLiveStrategy(
   if (minute >= 25 && minute <= 72 && totalGoals >= 1 && totalGoals <= 1 && totalShots >= 4 && totalShotsAll >= 7) {
     const conf = Math.min(76, 42 + totalShots * 3 + totalShotsAll * 0.8 + Math.floor(totalDangerous / 5) - minutePenalty);
     if (conf >= MIN_CONFIDENCE) {
-      strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `${totalShotsAll} finalizações (${totalShots} no gol) com apenas ${totalGoals} gol. Volume alto.`, confidence: Math.round(conf) });
+      strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `${totalShotsAll} finalizações (${totalShots} no gol) com apenas ${totalGoals} gol. Volume alto.`, confidence: cal('Over 1.5 Gols', conf) });
     }
   }
 
@@ -110,7 +110,7 @@ export function generateLiveStrategy(
     const rhythm = (totalGoals / minute * 90).toFixed(1);
     const conf = Math.min(78, 40 + totalGoals * 6 + totalShots * 2 - minutePenalty);
     if (conf >= MIN_CONFIDENCE) {
-      strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `Jogo aberto: ${totalGoals} gols em ${minute}'. Ritmo: ${rhythm} gols/jogo. ${totalShots} no gol.`, confidence: Math.round(conf) });
+      strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `Jogo aberto: ${totalGoals} gols em ${minute}'. Ritmo: ${rhythm} gols/jogo. ${totalShots} no gol.`, confidence: cal('Over 2.5 Gols', conf) });
     }
   }
 
@@ -119,7 +119,7 @@ export function generateLiveStrategy(
   if (minute >= 60 && totalGoals <= 1 && totalShots <= 1 && totalShotsAll <= 3) {
     const conf = Math.min(78, 52 + (minute - 55) * 1.5 + (2 - totalShots) * 4);
     if (conf >= MIN_CONFIDENCE) {
-      strategies.push({ signal: 'entry', market: `⚽ Under ${totalGoals + 1.5} Gols`, reason: `Jogo travado: apenas ${totalShotsAll} finalizações em ${minute}'. Zero volume ofensivo.`, confidence: Math.round(conf) });
+      strategies.push({ signal: 'entry', market: `⚽ Under ${totalGoals + 1.5} Gols`, reason: `Jogo travado: apenas ${totalShotsAll} finalizações em ${minute}'. Zero volume ofensivo.`, confidence: cal('Under Gols', conf) });
     }
   }
 
@@ -134,19 +134,19 @@ export function generateLiveStrategy(
     if (homeGoals > awayGoals && homeShare >= 60) {
       const conf = Math.min(76, 45 + (homeGoals - awayGoals) * 8 + Math.floor(homeShare / 6));
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: `🏆 Vitória ${homeName}`, reason: `Vencendo ${homeGoals}-${awayGoals} com ${homeShare}% do domínio ofensivo. ${h.shotsOnGoal} chutes no gol.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: `🏆 Vitória ${homeName}`, reason: `Vencendo ${homeGoals}-${awayGoals} com ${homeShare}% do domínio ofensivo. ${h.shotsOnGoal} chutes no gol.`, confidence: cal('Vitória', conf) });
       }
     } else if (awayGoals > homeGoals && (100 - homeShare) >= 60) {
       const conf = Math.min(76, 45 + (awayGoals - homeGoals) * 8 + Math.floor((100 - homeShare) / 6));
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: `🏆 Vitória ${awayName}`, reason: `Vencendo ${awayGoals}-${homeGoals} com ${100 - homeShare}% do domínio ofensivo. ${a.shotsOnGoal} chutes no gol.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: `🏆 Vitória ${awayName}`, reason: `Vencendo ${awayGoals}-${homeGoals} com ${100 - homeShare}% do domínio ofensivo. ${a.shotsOnGoal} chutes no gol.`, confidence: cal('Vitória', conf) });
       }
     } else if (homeGoals === awayGoals && Math.abs(homeShare - 50) >= 20 && minute >= 40) {
       const dominant = homeShare > 50 ? homeName : awayName;
       const share = homeShare > 50 ? homeShare : 100 - homeShare;
       const conf = Math.min(68, 38 + Math.floor(share / 3));
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: `🏆 Chance Dupla ${dominant}`, reason: `Empate ${homeGoals}-${awayGoals} mas ${dominant} domina com ${share}% da pressão ofensiva.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: `🏆 Chance Dupla ${dominant}`, reason: `Empate ${homeGoals}-${awayGoals} mas ${dominant} domina com ${share}% da pressão ofensiva.`, confidence: cal('Chance Dupla', conf) });
       }
     }
   }
@@ -162,7 +162,7 @@ export function generateLiveStrategy(
     if (domShare >= 65) {
       const conf = Math.min(72, domShare - minutePenalty);
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: `🎯 Próximo Gol: ${dominant}`, reason: `${dominant} concentra ${domShare}% das ações ofensivas. ${Math.max(h.shotsOnGoal, a.shotsOnGoal)} chutes no gol.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: `🎯 Próximo Gol: ${dominant}`, reason: `${dominant} concentra ${domShare}% das ações ofensivas. ${Math.max(h.shotsOnGoal, a.shotsOnGoal)} chutes no gol.`, confidence: cal('Próximo Gol', conf) });
       }
     }
   }
@@ -177,7 +177,7 @@ export function generateLiveStrategy(
       if (trPressure >= 4) { // Exigir mais pressão real (era 2)
         const conf = Math.min(72, 40 + Math.floor(trPressure * 4) - minutePenalty);
         if (conf >= MIN_CONFIDENCE) {
-          strategies.push({ signal: 'entry', market: '⚽ Ambas Marcam - Sim', reason: `${scoreless} sem gol mas ativo: ${trailing.shotsOnGoal} no gol, ${trailing.totalShots} finalizações, ${trailing.corners} cantos.`, confidence: Math.round(conf) });
+          strategies.push({ signal: 'entry', market: '⚽ Ambas Marcam - Sim', reason: `${scoreless} sem gol mas ativo: ${trailing.shotsOnGoal} no gol, ${trailing.totalShots} finalizações, ${trailing.corners} cantos.`, confidence: cal('Ambas Marcam', conf) });
         }
       }
     }
@@ -191,12 +191,12 @@ export function generateLiveStrategy(
       const target = totalCorners + 1;
       const conf = Math.min(74, 42 + totalCorners * 4);
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: `📐 Over ${target}.5 Cantos`, reason: `${totalCorners} cantos em ${minute}'. Projeção: ${projected}/jogo. Ritmo ${cornersPerMin.toFixed(2)}/min.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: `📐 Over ${target}.5 Cantos`, reason: `${totalCorners} cantos em ${minute}'. Projeção: ${projected}/jogo. Ritmo ${cornersPerMin.toFixed(2)}/min.`, confidence: cal('Cantos', conf) });
       }
     } else if (minute >= 55 && totalCorners <= 2) {
       const conf = Math.min(72, 48 + (minute - 50));
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: `📐 Under ${totalCorners + 2}.5 Cantos`, reason: `Apenas ${totalCorners} cantos em ${minute}'. Ritmo muito baixo.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: `📐 Under ${totalCorners + 2}.5 Cantos`, reason: `Apenas ${totalCorners} cantos em ${minute}'. Ritmo muito baixo.`, confidence: cal('Cantos', conf) });
       }
     }
   }
@@ -208,7 +208,7 @@ export function generateLiveStrategy(
       const trailing = h.possession < a.possession ? homeName : awayName;
       const conf = Math.min(68, 42 + Math.floor(possessionDiff / 2) + Math.floor(totalShotsAll / 3));
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: '🟨 Over 0.5 Cartões (Próx.)', reason: `${trailing} com menos posse (${Math.min(h.possession, a.possession)}%) tende a cometer mais faltas. Jogo disputado.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: '🟨 Over 0.5 Cartões (Próx.)', reason: `${trailing} com menos posse (${Math.min(h.possession, a.possession)}%) tende a cometer mais faltas. Jogo disputado.`, confidence: cal('Cartões', conf) });
       }
     }
   }
@@ -222,7 +222,7 @@ export function generateLiveStrategy(
     if (trPressure >= 3) { // Exigir mais pressão
       const conf = Math.min(72, 42 + Math.floor(trPressure * 3.5));
       if (conf >= MIN_CONFIDENCE) {
-        strategies.push({ signal: 'entry', market: `⚡ Handicap +${diff - 0.5} ${trailing}`, reason: `${trailing} perdendo por ${diff} mas com ${trailingStats.shotsOnGoal} chutes no gol. Pode descontar.`, confidence: Math.round(conf) });
+        strategies.push({ signal: 'entry', market: `⚡ Handicap +${diff - 0.5} ${trailing}`, reason: `${trailing} perdendo por ${diff} mas com ${trailingStats.shotsOnGoal} chutes no gol. Pode descontar.`, confidence: cal('Handicap', conf) });
       }
     }
   }

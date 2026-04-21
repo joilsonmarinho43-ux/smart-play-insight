@@ -84,12 +84,14 @@ Deno.serve(async (req) => {
     const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
     if (!API_KEY) throw new Error('API_FUTEBOL_KEY not configured');
 
-    // Fetch pending signals
+    // Fetch pending signals + signals that resolved but Telegram edit failed
     const { data: pendingSignals, error: fetchErr } = await sb
       .from('telegram_signals')
       .select('*')
-      .eq('status', 'pendente')
-      .not('match_id', 'is', null);
+      .not('match_id', 'is', null)
+      .or('status.eq.pendente,and(status.in.(green,loss),telegram_edited.eq.false)')
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (fetchErr) throw new Error(`DB fetch error: ${fetchErr.message}`);
     if (!pendingSignals || pendingSignals.length === 0) {

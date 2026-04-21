@@ -497,6 +497,10 @@ const Live = () => {
       </div>
 
       <main className="container max-w-3xl mx-auto px-4 py-4 space-y-5">
+        {/* ═══ AUDIT PANEL ═══ */}
+        {showAudit && !isLoading && auditEntries.length > 0 && (
+          <AuditPanel entries={auditEntries} />
+        )}
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />

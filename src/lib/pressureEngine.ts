@@ -75,27 +75,44 @@ export function generateLiveStrategy(
     return strategies;
   }
 
+  // ═══ FILTRO GLOBAL DE QUALIDADE ═══
+  // Penalidade por minuto: entradas muito cedo são menos confiáveis
+  const minutePenalty = minute < 25 ? Math.floor((25 - minute) * 1.2) : 0;
+  const MIN_CONFIDENCE = 65; // Confiança mínima para emitir sinal
+
   // ═══ OVER GOLS ═══
-  if (minute >= 15 && minute <= 80 && totalGoals === 0 && totalShotsAll >= 3) {
-    const conf = Math.min(82, 45 + totalShots * 5 + totalShotsAll * 2 + Math.floor(totalDangerous / 8));
-    strategies.push({ signal: 'entry', market: '⚽ Over 0.5 Gols', reason: `0 gols mas ${totalShotsAll} finalizações (${totalShots} no gol). Pressão acumulada sem converter.`, confidence: conf });
+  // Over 0.5: exigir min 25' e mais finalizações (padrão de loss em min 16-18)
+  if (minute >= 25 && minute <= 78 && totalGoals === 0 && totalShotsAll >= 5 && totalShots >= 2) {
+    const conf = Math.min(80, 48 + totalShots * 4 + totalShotsAll * 1.5 + Math.floor(totalDangerous / 6) - minutePenalty);
+    if (conf >= MIN_CONFIDENCE) {
+      strategies.push({ signal: 'entry', market: '⚽ Over 0.5 Gols', reason: `0 gols mas ${totalShotsAll} finalizações (${totalShots} no gol) em ${minute}'. Pressão acumulada.`, confidence: Math.round(conf) });
+    }
   }
 
-  if (minute >= 20 && minute <= 75 && totalGoals >= 1 && totalGoals <= 1 && (totalShots >= 4 || totalShotsAll >= 6)) {
-    const conf = Math.min(78, 40 + totalShots * 3 + totalShotsAll + Math.floor(totalDangerous / 6));
-    strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `${totalShotsAll} finalizações com apenas ${totalGoals} gol(s). Ritmo ofensivo alto.`, confidence: conf });
+  // Over 1.5: exigir mais volume ofensivo
+  if (minute >= 25 && minute <= 72 && totalGoals >= 1 && totalGoals <= 1 && totalShots >= 4 && totalShotsAll >= 7) {
+    const conf = Math.min(76, 42 + totalShots * 3 + totalShotsAll * 0.8 + Math.floor(totalDangerous / 5) - minutePenalty);
+    if (conf >= MIN_CONFIDENCE) {
+      strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `${totalShotsAll} finalizações (${totalShots} no gol) com apenas ${totalGoals} gol. Volume alto.`, confidence: Math.round(conf) });
+    }
   }
 
-  if (totalGoals >= 2 && minute <= 70 && totalShotsAll >= 4) {
+  // Over 2.5+: confiança máxima reduzida, sem entradas após 60'
+  if (totalGoals >= 2 && minute >= 15 && minute <= 60 && totalShotsAll >= 6) {
     const rhythm = (totalGoals / minute * 90).toFixed(1);
-    const conf = Math.min(80, 42 + totalGoals * 8 + totalShots * 2);
-    strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `Jogo aberto: ${totalGoals} gols em ${minute}'. Ritmo: ${rhythm} gols/jogo.`, confidence: conf });
+    const conf = Math.min(78, 40 + totalGoals * 6 + totalShots * 2 - minutePenalty);
+    if (conf >= MIN_CONFIDENCE) {
+      strategies.push({ signal: 'entry', market: `⚽ Over ${totalGoals + 0.5} Gols`, reason: `Jogo aberto: ${totalGoals} gols em ${minute}'. Ritmo: ${rhythm} gols/jogo. ${totalShots} no gol.`, confidence: Math.round(conf) });
+    }
   }
 
   // ═══ UNDER ═══
-  if (minute >= 55 && totalGoals <= 1 && totalShots <= 2 && totalShotsAll <= 4) {
-    const conf = Math.min(80, 50 + (minute - 50) + (3 - totalShots) * 3);
-    strategies.push({ signal: 'entry', market: `⚽ Under ${totalGoals + 1.5} Gols`, reason: `Jogo travado: ${totalShotsAll} finalizações em ${minute}'. Sem volume ofensivo.`, confidence: conf });
+  // Under mais conservador: exigir min 60' e pouquíssimo volume
+  if (minute >= 60 && totalGoals <= 1 && totalShots <= 1 && totalShotsAll <= 3) {
+    const conf = Math.min(78, 52 + (minute - 55) * 1.5 + (2 - totalShots) * 4);
+    if (conf >= MIN_CONFIDENCE) {
+      strategies.push({ signal: 'entry', market: `⚽ Under ${totalGoals + 1.5} Gols`, reason: `Jogo travado: apenas ${totalShotsAll} finalizações em ${minute}'. Zero volume ofensivo.`, confidence: Math.round(conf) });
+    }
   }
 
   // ═══ RESULTADO / VITÓRIA ═══

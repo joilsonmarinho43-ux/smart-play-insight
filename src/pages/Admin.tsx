@@ -220,7 +220,7 @@ const Admin = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setShowSignals(!showSignals); setShowConflicts(false); }}
+              onClick={() => { setShowSignals(!showSignals); setShowConflicts(false); setShowDashboard(false); }}
               className={`relative p-2 rounded-lg transition-all ${showSignals ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               title="Sinais Telegram"
             >
@@ -235,6 +235,7 @@ const Admin = () => {
               onClick={() => {
                 setShowConflicts(!showConflicts);
                 setShowSignals(false);
+                setShowDashboard(false);
                 if (!showConflicts) markConflictsSeen();
               }}
               className={`relative p-2 rounded-lg transition-all ${showConflicts ? 'bg-yellow-500/20' : 'hover:bg-white/5'}`}

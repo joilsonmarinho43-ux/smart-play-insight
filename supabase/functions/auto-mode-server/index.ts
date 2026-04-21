@@ -8,6 +8,22 @@ const corsHeaders = {
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // ═══════════════════════════════════════
+// RMA ENGINE (inline)
+// ═══════════════════════════════════════
+function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number } {
+  const safeMin = Math.max(minute, 1);
+  const ap_norm = (da / safeMin) * 10;
+  const f_norm = (shots / safeMin) * 10;
+  const sot_norm = (sot / safeMin) * 10;
+  let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
+  if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score };
+  if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score };
+  if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score };
+  const verdict = rma_score > 65 ? 'CONFIRMADO' as const : rma_score >= 50 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
+  return { verdict, score: Math.round(rma_score * 100) / 100 };
+}
+
+// ═══════════════════════════════════════
 // HYBRID ENGINE (server-side, no localStorage)
 // ═══════════════════════════════════════
 
@@ -192,8 +208,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4. Classify each match
+    // 4. Classify each match + RMA gate
     const signalsToSend: HybridSignal[] = [];
+    let rmaBlocked = 0;
     for (const match of matches) {
       const s = extractStats(match);
       if (s.hasStats) {
@@ -202,11 +219,30 @@ Deno.serve(async (req) => {
       const signal = classifyServer(match);
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;
+
+      // ═══ RMA GATE ═══
+      const rma = evaluateRMAServer(signal.minute, signal.pressure, signal.dangerousAttacks, signal.totalShots, signal.shotsOnGoal);
+      if (rma.verdict === 'BLOQUEADO') {
+        console.log(`[AUTO-MODE-SERVER] 🔴 RMA BLOQUEOU: ${signal.match} • ${signal.market} (score: ${rma.score})`);
+        await supabase.from('rma_shadow_logs').insert({
+          match_id: signal.matchId,
+          match_name: signal.match,
+          market: signal.market,
+          minute: signal.minute,
+          original_signal: `${signal.label} ${signal.market} ${signal.confidence}%`,
+          rma_verdict: 'BLOQUEADO',
+          rma_score: rma.score,
+          block_reason: 'Auto-Mode — sinal bloqueado pelo RMA',
+        });
+        rmaBlocked++;
+        continue;
+      }
+
       signalsToSend.push(signal);
       if (signalsToSend.length + dailyCount >= 15) break;
     }
 
-    console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} sinais qualificados`);
+    console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} aprovados, ${rmaBlocked} bloqueados pelo RMA`);
 
     // 5. Send each signal via telegram-signal edge function
     let sentCount = 0;
@@ -224,6 +260,10 @@ Deno.serve(async (req) => {
           minute: signal.minute,
           score,
           reason: `Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,
+          pressure: signal.pressure,
+          dangerousAttacks: signal.dangerousAttacks,
+          totalShots: signal.totalShots,
+          shotsOnGoal: signal.shotsOnGoal,
         };
 
         const tgRes = await fetch(`${supabaseUrl}/functions/v1/telegram-signal`, {

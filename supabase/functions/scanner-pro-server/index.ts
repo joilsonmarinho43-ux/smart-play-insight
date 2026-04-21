@@ -328,17 +328,36 @@ Deno.serve(async (req) => {
     const signaledKeys = new Set((existingSignals || []).map((s: any) => `${s.match_id}-${s.market}`));
     const newOpps = topOpps.filter(o => !signaledKeys.has(`${o.matchId}-${o.market}`));
 
-    if (newOpps.length === 0) {
-      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, message: 'Todas oportunidades já sinalizadas hoje' }), {
+    // ═══ RMA GATE: Log blocked, keep only CONFIRMADO/NEUTRO ═══
+    const blockedOpps = newOpps.filter(o => o.rmaVerdict === 'BLOQUEADO');
+    const approvedOpps = newOpps.filter(o => o.rmaVerdict !== 'BLOQUEADO');
+
+    // Log blocked signals to shadow table
+    for (const opp of blockedOpps) {
+      console.log(`[SCANNER-PRO-SERVER] 🔴 RMA BLOQUEOU: ${opp.match} • ${opp.market} (score: ${opp.rmaScore})`);
+      await supabase.from('rma_shadow_logs').insert({
+        match_id: opp.matchId,
+        match_name: opp.match,
+        market: opp.market,
+        minute: opp.minute,
+        original_signal: `${opp.market} ${opp.probability}%`,
+        rma_verdict: 'BLOQUEADO',
+        rma_score: opp.rmaScore || 0,
+        block_reason: 'Scanner PRO — sinal bloqueado pelo RMA',
+      });
+    }
+
+    if (approvedOpps.length === 0) {
+      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, blocked: blockedOpps.length, message: 'Todos sinais bloqueados pelo RMA' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // 4. Build and send consolidated Telegram message
-    const oppLines = newOpps.map((o, i) => {
+    const oppLines = approvedOpps.map((o, i) => {
       const priorityEmoji = o.score > 0.75 ? '🔥' : o.score >= 0.65 ? '⚡' : '📊';
       const confBar = '🟢'.repeat(Math.round(o.probability / 20)) + '⚪'.repeat(5 - Math.round(o.probability / 20));
-      const rmaIcon = o.rmaVerdict === 'CONFIRMADO' ? '🟢' : o.rmaVerdict === 'BLOQUEADO' ? '🔴' : '🟡';
+      const rmaIcon = o.rmaVerdict === 'CONFIRMADO' ? '🟢' : '🟡';
       return [
         `${priorityEmoji} <b>${o.market}</b> ${rmaIcon}`,
         `⚽ ${o.match} • ${o.minute}'`,
@@ -348,7 +367,7 @@ Deno.serve(async (req) => {
     }).join('\n\n');
 
     const text = [
-      `🎯 <b>SCANNER PRO</b> • ${newOpps.length} sinais`,
+      `🎯 <b>SCANNER PRO</b> • ${approvedOpps.length} sinais`,
       ``,
       oppLines,
       ``,
@@ -373,9 +392,8 @@ Deno.serve(async (req) => {
     const tgData = await tgRes.json();
     const telegramMessageId = tgData.result?.message_id ?? null;
 
-    // 5. Log each opportunity to DB
-    for (const opp of newOpps) {
-      // Log signal with RMA verdict
+    // 5. Log approved signals to DB
+    for (const opp of approvedOpps) {
       await supabase.from('telegram_signals').insert({
         match_name: opp.match,
         match_id: opp.matchId,
@@ -385,7 +403,7 @@ Deno.serve(async (req) => {
         sensitivity: 'scanner-pro',
         minute: opp.minute,
         score: `${opp.homeGoals}-${opp.awayGoals}`,
-        reason: `Scanner PRO Server • EV ${opp.ev > 0 ? '+' : ''}${opp.ev} • Pressão ${opp.pressure}`,
+        reason: `Scanner PRO Server • EV ${opp.ev > 0 ? '+' : ''}${opp.ev} • Pressão ${opp.pressure} • RMA ${opp.rmaVerdict}`,
         success: tgRes.ok,
         error_message: tgRes.ok ? null : JSON.stringify(tgData),
         telegram_message_id: telegramMessageId,
@@ -394,7 +412,6 @@ Deno.serve(async (req) => {
         rma_score: opp.rmaScore || null,
       });
 
-      // Shadow log for RMA analysis
       if (opp.rmaVerdict) {
         await supabase.from('rma_shadow_logs').insert({
           match_id: opp.matchId,
@@ -408,10 +425,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[SCANNER-PRO-SERVER] ${tgRes.ok ? '✅' : '❌'} ${newOpps.length} oportunidades enviadas`);
+    console.log(`[SCANNER-PRO-SERVER] ${tgRes.ok ? '✅' : '❌'} ${approvedOpps.length} enviadas, ${blockedOpps.length} bloqueadas pelo RMA`);
 
     return new Response(
-      JSON.stringify({ success: true, signals: newOpps.length, analyzed: matches.length, total_opps: allOpps.length }),
+      JSON.stringify({ success: true, signals: approvedOpps.length, analyzed: matches.length, blocked: blockedOpps.length, total_opps: allOpps.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

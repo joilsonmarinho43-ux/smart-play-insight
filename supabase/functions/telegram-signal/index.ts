@@ -7,6 +7,22 @@ const corsHeaders = {
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
+// ═══════════════════════════════════════
+// RMA ENGINE (inline)
+// ═══════════════════════════════════════
+function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number } {
+  const safeMin = Math.max(minute, 1);
+  const ap_norm = (da / safeMin) * 10;
+  const f_norm = (shots / safeMin) * 10;
+  const sot_norm = (sot / safeMin) * 10;
+  let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
+  if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score };
+  if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score };
+  if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score };
+  const verdict = rma_score > 65 ? 'CONFIRMADO' as const : rma_score >= 50 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
+  return { verdict, score: Math.round(rma_score * 100) / 100 };
+}
+
 interface SignalPayload {
   match: string;
   matchId?: string;
@@ -20,6 +36,11 @@ interface SignalPayload {
   oddMin?: string;
   janela?: string;
   reason?: string;
+  // RMA stats (optional — if provided, RMA validates)
+  pressure?: number;
+  dangerousAttacks?: number;
+  totalShots?: number;
+  shotsOnGoal?: number;
 }
 
 Deno.serve(async (req) => {
@@ -38,6 +59,45 @@ Deno.serve(async (req) => {
     if (!CHAT_ID) throw new Error('TELEGRAM_CHAT_ID not configured');
 
     const payload: SignalPayload = await req.json();
+
+    // ═══ RMA GATE ═══
+    // If live stats are provided, validate through RMA
+    if (payload.pressure !== undefined && payload.minute > 0) {
+      const rma = evaluateRMAServer(
+        payload.minute,
+        payload.pressure || 0,
+        payload.dangerousAttacks || 0,
+        payload.totalShots || 0,
+        payload.shotsOnGoal || 0,
+      );
+
+      if (rma.verdict === 'BLOQUEADO') {
+        console.log(`[TELEGRAM-SIGNAL] 🔴 RMA BLOQUEOU: ${payload.match} • ${payload.market} (score: ${rma.score})`);
+
+        // Log to shadow table
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+          const sb = createClient(supabaseUrl, supabaseKey);
+          await sb.from('rma_shadow_logs').insert({
+            match_id: payload.matchId || 'unknown',
+            match_name: payload.match,
+            market: payload.market,
+            minute: payload.minute,
+            original_signal: `${payload.market} ${payload.confidence}%`,
+            rma_verdict: 'BLOQUEADO',
+            rma_score: rma.score,
+            block_reason: 'telegram-signal — sinal bloqueado pelo RMA',
+          });
+        } catch (e) {
+          console.error('Failed to log RMA block:', e);
+        }
+
+        return new Response(JSON.stringify({ success: false, blocked: true, rma_verdict: 'BLOQUEADO', rma_score: rma.score }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     // Build message
     const emoji = payload.confidence >= 80 ? '🔥' : payload.confidence >= 70 ? '⚡' : '📊';

@@ -1,5 +1,6 @@
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets, isValidBet } from '@/lib/matchAnalysis';
+import { evaluateRMA, buildRMAInput, type RMAVerdict, type RMAResult } from '@/lib/rmaEngine';
 
 export interface ScannerOpportunity {
   matchId: string;
@@ -14,6 +15,8 @@ export interface ScannerOpportunity {
   signal: string | null;
   isLive: boolean;
   dataQuality: 'high' | 'medium' | 'low';
+  rmaVerdict?: RMAVerdict;
+  rmaScore?: number;
 }
 
 export interface ScannerLog {

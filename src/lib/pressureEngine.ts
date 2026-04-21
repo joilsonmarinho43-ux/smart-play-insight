@@ -22,13 +22,19 @@ export interface LiveStats {
   totalShots: number;
 }
 
+function safeDangerousAttacks(stats: LiveStats): number {
+  if (stats.dangerousAttacks > 0) return stats.dangerousAttacks;
+  return Math.round((stats.totalShots || 0) * 1.5 + (stats.corners || 0) * 2);
+}
+
 export function calculatePressureIndex(
   stats: LiveStats,
   minute: number
 ): number {
   const safeMinute = Math.max(minute, 1);
+  const da = safeDangerousAttacks(stats);
 
-  const attacksPerMinute = stats.dangerousAttacks / safeMinute;
+  const attacksPerMinute = da / safeMinute;
   const pi =
     attacksPerMinute * 2 +
     stats.shotsOnGoal * 1.5 +
@@ -60,7 +66,7 @@ export function generateLiveStrategy(
   const totalGoals = homeGoals + awayGoals;
   const totalShots = h.shotsOnGoal + a.shotsOnGoal;
   const totalShotsAll = h.totalShots + a.totalShots;
-  const totalDangerous = h.dangerousAttacks + a.dangerousAttacks;
+  const totalDangerous = safeDangerousAttacks(h) + safeDangerousAttacks(a);
   const totalCorners = h.corners + a.corners;
   const hasData = totalShotsAll > 0 || h.possession !== 50 || a.possession !== 50;
 
@@ -94,8 +100,8 @@ export function generateLiveStrategy(
 
   // ═══ RESULTADO / VITÓRIA ═══
   if (minute >= 15) {
-    const homePower = h.shotsOnGoal * 3 + h.totalShots * 1.5 + h.dangerousAttacks * 0.5 + (h.possession > 55 ? 5 : 0);
-    const awayPower = a.shotsOnGoal * 3 + a.totalShots * 1.5 + a.dangerousAttacks * 0.5 + (a.possession > 55 ? 5 : 0);
+    const homePower = h.shotsOnGoal * 3 + h.totalShots * 1.5 + safeDangerousAttacks(h) * 0.5 + (h.possession > 55 ? 5 : 0);
+    const awayPower = a.shotsOnGoal * 3 + a.totalShots * 1.5 + safeDangerousAttacks(a) * 0.5 + (a.possession > 55 ? 5 : 0);
     const totalPower = homePower + awayPower || 1;
     const homeShare = Math.round((homePower / totalPower) * 100);
 
@@ -115,8 +121,8 @@ export function generateLiveStrategy(
 
   // ═══ PRÓXIMO GOL ═══
   if (totalShotsAll >= 3 && minute >= 10) {
-    const homeStr = h.shotsOnGoal * 3 + h.totalShots + h.dangerousAttacks * 0.5 + h.corners;
-    const awayStr = a.shotsOnGoal * 3 + a.totalShots + a.dangerousAttacks * 0.5 + a.corners;
+    const homeStr = h.shotsOnGoal * 3 + h.totalShots + safeDangerousAttacks(h) * 0.5 + h.corners;
+    const awayStr = a.shotsOnGoal * 3 + a.totalShots + safeDangerousAttacks(a) * 0.5 + a.corners;
     const total = homeStr + awayStr || 1;
     const domShare = Math.round((Math.max(homeStr, awayStr) / total) * 100);
     const dominant = homeStr >= awayStr ? homeName : awayName;
@@ -130,7 +136,7 @@ export function generateLiveStrategy(
     const scoreless = homeGoals > 0 && awayGoals === 0 ? awayName : homeGoals === 0 && awayGoals > 0 ? homeName : null;
     if (scoreless) {
       const trailing = homeGoals === 0 ? h : a;
-      const trPressure = trailing.shotsOnGoal * 3 + trailing.totalShots + trailing.dangerousAttacks * 0.3 + trailing.corners;
+      const trPressure = trailing.shotsOnGoal * 3 + trailing.totalShots + safeDangerousAttacks(trailing) * 0.3 + trailing.corners;
       if (trPressure >= 2) {
         const conf = Math.min(72, 38 + Math.floor(trPressure * 5));
         strategies.push({ signal: 'entry', market: '⚽ Ambas Marcam - Sim', reason: `${scoreless} sem gol mas ativo: ${trailing.shotsOnGoal} no gol, ${trailing.totalShots} finalizações, ${trailing.corners} cantos.`, confidence: conf });

@@ -163,10 +163,6 @@ Deno.serve(async (req) => {
       // Edit Telegram message
       if (signal.telegram_message_id) {
         try {
-          const resultHeader = newStatus === 'green'
-            ? `\n\n✅✅✅ GREEN GREEN GREEN ✅✅✅\n📊 Placar Final: ${data.homeGoals} x ${data.awayGoals}`
-            : `\n\n❌ LOSS (Ficou no quase)\n📊 Placar Final: ${data.homeGoals} x ${data.awayGoals}`;
-
           // We need to reconstruct the original message and append result
           const emoji = signal.confidence >= 80 ? '🔥' : signal.confidence >= 70 ? '⚡' : '📊';
           const confBar = '🟢'.repeat(Math.round(signal.confidence / 20)) + '⚪'.repeat(5 - Math.round(signal.confidence / 20));

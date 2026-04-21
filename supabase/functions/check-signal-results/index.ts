@@ -192,8 +192,17 @@ Deno.serve(async (req) => {
           });
 
           const tgResult = await tgResp.json();
-          telegramEdited = tgResult.ok === true || tgResp.ok;
+          // "message is not modified" means it was already edited successfully before
+          const alreadyEdited = tgResult.description?.includes('message is not modified');
+          telegramEdited = tgResult.ok === true || tgResp.ok || alreadyEdited;
           if (!telegramEdited) {
+            // If rate limited, skip remaining to avoid more 429s
+            if (tgResult.error_code === 429) {
+              console.error(`Rate limited, stopping. Retry after ${tgResult.parameters?.retry_after}s`);
+              // Still update this signal's DB status
+              await sb.from('telegram_signals').update({ status: newStatus, telegram_edited: false }).eq('id', signal.id);
+              break;
+            }
             console.error(`Telegram edit failed for signal ${signal.id}:`, JSON.stringify(tgResult));
           } else {
             console.log(`Telegram edit OK for signal ${signal.id}, message ${signal.telegram_message_id}`);
@@ -201,6 +210,8 @@ Deno.serve(async (req) => {
         } catch (e) {
           console.error(`Failed to edit Telegram message for signal ${signal.id}:`, e);
         }
+        // Delay between Telegram edits to avoid rate limiting
+        await new Promise(r => setTimeout(r, 1500));
       }
 
       // Update status + telegram_edited flag in DB

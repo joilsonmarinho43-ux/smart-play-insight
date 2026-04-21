@@ -163,37 +163,23 @@ Deno.serve(async (req) => {
       // Edit Telegram message
       if (signal.telegram_message_id) {
         try {
-          const resultHeader = newStatus === 'green'
-            ? `\n\n✅✅✅ GREEN GREEN GREEN ✅✅✅\n📊 Placar Final: ${data.homeGoals} x ${data.awayGoals}`
-            : `\n\n❌ LOSS (Ficou no quase)\n📊 Placar Final: ${data.homeGoals} x ${data.awayGoals}`;
-
           // We need to reconstruct the original message and append result
           const emoji = signal.confidence >= 80 ? '🔥' : signal.confidence >= 70 ? '⚡' : '📊';
-          const sensitivityEmoji = { conservador: '🛡️', moderado: '⚖️', agressivo: '🔥' }[signal.sensitivity || ''] || '⚖️';
+          const confBar = '🟢'.repeat(Math.round(signal.confidence / 20)) + '⚪'.repeat(5 - Math.round(signal.confidence / 20));
+
+          const resultEmoji = newStatus === 'green' ? '✅' : '❌';
+          const resultLabel = newStatus === 'green' ? 'GREEN' : 'LOSS';
 
           const updatedText = [
-            `${emoji} <b>${signal.match_name}</b> • ${signal.market} • ${signal.confidence}%`,
+            `${emoji} <b>${signal.market}</b>`,
             ``,
-            `━━━━━━━━━━━━━━━━━━━━━`,
-            `${emoji} <b>SINAL CONFIRMADO</b>`,
-            `━━━━━━━━━━━━━━━━━━━━━`,
+            `⚽ ${signal.match_name} • ${signal.minute}'`,
+            `📊 ${signal.score} ${confBar} ${signal.confidence}%`,
             ``,
-            `⚽ <b>${signal.match_name}</b>`,
-            `⏱ Minuto: <b>${signal.minute}'</b>`,
-            `📈 Mercado: <b>${signal.market}</b>`,
-            `🎯 Confiança: <b>${signal.confidence}%</b>`,
-            `📊 Placar: <b>${signal.score}</b>`,
-            `✅ Filtros: <b>${signal.filters_validated}</b>`,
-            `${sensitivityEmoji} Modo: <b>${signal.sensitivity}</b>`,
-            signal.poisson ? `🧮 Poisson: <b>${signal.poisson}</b>` : null,
-            signal.odd_min ? `💰 Odd mín: <b>${signal.odd_min}</b>` : null,
-            signal.janela ? `🕐 Janela: <b>${signal.janela}</b>` : null,
-            signal.reason ? `\n💡 <i>${signal.reason}</i>` : null,
+            `${resultEmoji} <b>${resultLabel}</b> • Final: <b>${data.homeGoals} x ${data.awayGoals}</b>`,
             ``,
-            `━━━━━━━━━━━━━━━━━━━━━`,
-            `🤖 <i>Analista Joilson • Live Trader PRO</i>`,
-            resultHeader,
-          ].filter(Boolean).join('\n');
+            `🤖 <i>Analista Joilson</i>`,
+          ].join('\n');
 
           await fetch(`${GATEWAY_URL}/editMessageText`, {
             method: 'POST',

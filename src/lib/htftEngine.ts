@@ -37,8 +37,10 @@ export function calculateHtFtStrategy(
     const htName = homeGoals > awayGoals ? homeName : homeGoals < awayGoals ? awayName : 'Empate';
 
     // Calculate offensive power for FT projection
-    const homePower = h.shotsOnGoal * 4 + h.totalShots * 1.5 + h.dangerousAttacks * 0.8 + h.corners * 1.2 + (h.possession > 55 ? 8 : 0);
-    const awayPower = a.shotsOnGoal * 4 + a.totalShots * 1.5 + a.dangerousAttacks * 0.8 + a.corners * 1.2 + (a.possession > 55 ? 8 : 0);
+    const hDA = h.dangerousAttacks > 0 ? h.dangerousAttacks : Math.round((h.totalShots || 0) * 1.5 + (h.corners || 0) * 2);
+    const aDA = a.dangerousAttacks > 0 ? a.dangerousAttacks : Math.round((a.totalShots || 0) * 1.5 + (a.corners || 0) * 2);
+    const homePower = h.shotsOnGoal * 4 + h.totalShots * 1.5 + hDA * 0.8 + h.corners * 1.2 + (h.possession > 55 ? 8 : 0);
+    const awayPower = a.shotsOnGoal * 4 + a.totalShots * 1.5 + aDA * 0.8 + a.corners * 1.2 + (a.possession > 55 ? 8 : 0);
     const totalPower = homePower + awayPower || 1;
     const homeShare = (homePower / totalPower) * 100;
 

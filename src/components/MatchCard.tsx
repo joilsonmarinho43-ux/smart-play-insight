@@ -286,31 +286,84 @@ function PoissonTab({ match }: { match: MatchData }) {
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Trophy className="w-3.5 h-3.5 text-primary" />
-          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
-            Placares Mais Prováveis
-          </span>
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {topScores.map((s, i) => (
-            <div
-              key={s.score}
-              className={`flex-shrink-0 rounded-lg border px-3 py-2 text-center ${
-                i === 0 ? 'bg-primary/10 border-primary/30' : 'bg-secondary/30 border-border/30'
-              }`}
-            >
-              <p className={`font-bold text-lg tabular-nums ${i === 0 ? 'text-primary' : 'text-foreground'}`}>
-                {s.score}
-              </p>
-              <p className="text-[9px] text-muted-foreground tabular-nums">
-                {(s.prob * 100).toFixed(1)}%
-              </p>
+      {/* Placares Mais Prováveis — Top 6 com heatmap */}
+      {(() => {
+        const top6 = scores.slice(0, 6);
+        const maxProb = top6[0]?.prob || 1;
+
+        // Aggregate markets
+        const over25 = scores.reduce((s, x) => {
+          const [h, a] = x.score.split('-').map(Number);
+          return h + a > 2 ? s + x.prob : s;
+        }, 0);
+        const btts = scores.reduce((s, x) => {
+          const [h, a] = x.score.split('-').map(Number);
+          return h > 0 && a > 0 ? s + x.prob : s;
+        }, 0);
+
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-3.5 h-3.5 text-primary" />
+              <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                Placares Mais Prováveis
+              </span>
             </div>
-          ))}
-        </div>
-      </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {top6.map((s, i) => {
+                const intensity = s.prob / maxProb;
+                const isTop = i === 0;
+                return (
+                  <div
+                    key={s.score}
+                    className={`relative rounded-xl border text-center py-3 px-2 transition-all ${
+                      isTop
+                        ? 'bg-primary/15 border-primary/40 shadow-lg shadow-primary/10 ring-1 ring-primary/20'
+                        : 'bg-secondary/30 border-border/30'
+                    }`}
+                  >
+                    {isTop && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Favorito
+                      </span>
+                    )}
+                    <p className={`font-black text-xl tabular-nums ${isTop ? 'text-primary' : 'text-foreground'}`}>
+                      {s.score}
+                    </p>
+                    {/* Probability bar */}
+                    <div className="mt-1.5 mx-auto w-4/5 h-1 rounded-full bg-muted/40 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${isTop ? 'bg-primary' : 'bg-muted-foreground/50'}`}
+                        style={{ width: `${intensity * 100}%` }}
+                      />
+                    </div>
+                    <p className={`text-[10px] mt-1 tabular-nums font-bold ${isTop ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {(s.prob * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Market summary */}
+            <div className="flex gap-2">
+              <div className={`flex-1 rounded-lg border px-3 py-2 text-center ${over25 >= 0.5 ? 'bg-green-500/10 border-green-500/25' : 'bg-secondary/30 border-border/30'}`}>
+                <p className="text-[8px] text-muted-foreground uppercase tracking-wider">Over 2.5</p>
+                <p className={`text-sm font-black tabular-nums ${over25 >= 0.5 ? 'text-green-400' : 'text-foreground'}`}>{(over25 * 100).toFixed(1)}%</p>
+              </div>
+              <div className={`flex-1 rounded-lg border px-3 py-2 text-center ${btts >= 0.5 ? 'bg-green-500/10 border-green-500/25' : 'bg-secondary/30 border-border/30'}`}>
+                <p className="text-[8px] text-muted-foreground uppercase tracking-wider">BTTS</p>
+                <p className={`text-sm font-black tabular-nums ${btts >= 0.5 ? 'text-green-400' : 'text-foreground'}`}>{(btts * 100).toFixed(1)}%</p>
+              </div>
+              <div className="flex-1 rounded-lg border bg-secondary/30 border-border/30 px-3 py-2 text-center">
+                <p className="text-[8px] text-muted-foreground uppercase tracking-wider">Total λ</p>
+                <p className="text-sm font-black tabular-nums text-foreground">{(homeLambda + awayLambda).toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

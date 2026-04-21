@@ -305,27 +305,21 @@ Deno.serve(async (req) => {
     // 4. Build and send consolidated Telegram message
     const oppLines = newOpps.map((o, i) => {
       const priorityEmoji = o.score > 0.75 ? '🔥' : o.score >= 0.65 ? '⚡' : '📊';
-      const scoreStr = `${o.homeGoals}-${o.awayGoals}`;
+      const confBar = '🟢'.repeat(Math.round(o.probability / 20)) + '⚪'.repeat(5 - Math.round(o.probability / 20));
       return [
-        `${priorityEmoji} <b>#${i + 1} ${o.match}</b>`,
-        `   🏆 ${o.league} • ⏱ ${o.minute}'`,
-        `   📈 ${o.market} → <b>${o.probability}%</b>`,
-        `   💰 EV: <b>${o.ev > 0 ? '+' : ''}${o.ev}</b> • Pressão: <b>${o.pressure}</b>`,
-        `   📊 Placar: <b>${scoreStr}</b> • Score: <b>${o.score}</b>`,
-        o.signal ? `   ${o.signal}` : null,
+        `${priorityEmoji} <b>${o.market}</b>`,
+        `⚽ ${o.match} • ${o.minute}'`,
+        `📊 ${o.homeGoals}-${o.awayGoals} ${confBar} <b>${o.probability}%</b>`,
+        o.signal ? `${o.signal}` : null,
       ].filter(Boolean).join('\n');
     }).join('\n\n');
 
     const text = [
-      `━━━━━━━━━━━━━━━━━━━━━`,
-      `🎯 <b>SCANNER PRO • TOP ${newOpps.length} OPORTUNIDADES</b>`,
-      `━━━━━━━━━━━━━━━━━━━━━`,
+      `🎯 <b>SCANNER PRO</b> • ${newOpps.length} sinais`,
       ``,
       oppLines,
       ``,
-      `━━━━━━━━━━━━━━━━━━━━━`,
-      `📊 ${matches.length} jogos analisados • Prob ≥60% • EV+`,
-      `🤖 <i>Analista Joilson • Scanner PRO Server</i>`,
+      `🤖 <i>Analista Joilson</i>`,
     ].join('\n');
 
     const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {

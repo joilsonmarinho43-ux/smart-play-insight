@@ -60,15 +60,28 @@ function calculateOverProbs(
     }));
   }
 
-  const homeConversion = h.totalShots > 0 ? h.shotsOnGoal / h.totalShots : 0.3;
-  const awayConversion = a.totalShots > 0 ? a.shotsOnGoal / a.totalShots : 0.3;
-  const homeShotsPerMin = h.totalShots / safeMin;
-  const awayShotsPerMin = a.totalShots / safeMin;
+  let totalLambda: number;
 
-  // Corrected factor: 0.10 instead of 0.12
-  const homeLambda = homeShotsPerMin * homeConversion * remaining * 0.10;
-  const awayLambda = awayShotsPerMin * awayConversion * remaining * 0.10;
-  const totalLambda = homeLambda + awayLambda;
+  const hasRealStats = (homeStats && h.totalShots > 0) || (awayStats && a.totalShots > 0);
+
+  if (hasRealStats) {
+    const homeConversion = h.totalShots > 0 ? h.shotsOnGoal / h.totalShots : 0.3;
+    const awayConversion = a.totalShots > 0 ? a.shotsOnGoal / a.totalShots : 0.3;
+    const homeShotsPerMin = h.totalShots / safeMin;
+    const awayShotsPerMin = a.totalShots / safeMin;
+    const homeLambda = homeShotsPerMin * homeConversion * remaining * 0.10;
+    const awayLambda = awayShotsPerMin * awayConversion * remaining * 0.10;
+    totalLambda = homeLambda + awayLambda;
+  } else {
+    // Fallback: estimate from goals already scored + league average (~2.5 goals/90)
+    const goalsPerMin = (homeGoals + awayGoals) > 0
+      ? (homeGoals + awayGoals) / safeMin
+      : 2.5 / 90; // league average fallback
+    totalLambda = goalsPerMin * remaining;
+  }
+
+  // Ensure minimum lambda for meaningful probabilities
+  totalLambda = Math.max(totalLambda, 0.05);
 
   const currentTotal = homeGoals + awayGoals;
 

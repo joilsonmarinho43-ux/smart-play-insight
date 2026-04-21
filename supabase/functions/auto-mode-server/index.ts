@@ -260,6 +260,10 @@ Deno.serve(async (req) => {
           minute: signal.minute,
           score,
           reason: `Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,
+          pressure: signal.pressure,
+          dangerousAttacks: signal.dangerousAttacks,
+          totalShots: signal.totalShots,
+          shotsOnGoal: signal.shotsOnGoal,
         };
 
         const tgRes = await fetch(`${supabaseUrl}/functions/v1/telegram-signal`, {

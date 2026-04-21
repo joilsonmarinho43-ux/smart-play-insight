@@ -1,4 +1,4 @@
-const CACHE_NAME = "analista-joilson-v1";
+const CACHE_NAME = "analista-joilson-v2";
 const PRECACHE_URLS = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
@@ -22,6 +22,16 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.url.includes("/~oauth")) return;
   if (event.request.method !== "GET") return;
+
+  // Never cache API/Supabase calls — they must always be fresh
+  if (
+    event.request.url.includes("supabase.co") ||
+    event.request.url.includes("/functions/") ||
+    event.request.url.includes("/rest/") ||
+    event.request.url.includes("/auth/")
+  ) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)

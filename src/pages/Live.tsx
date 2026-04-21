@@ -270,7 +270,19 @@ const Live = () => {
     queryFn: () => fetchLiveMatches(),
     refetchInterval: 60000,
     staleTime: 55000,
+    refetchOnWindowFocus: true,
   });
+
+  // Refetch when app returns from background (mobile)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [refetch]);
 
   const statsMap = useMemo(() => {
     const result: Record<string, any> = {};
@@ -296,9 +308,17 @@ const Live = () => {
 
   const analysisMap = useMemo(() => {
     const map: Record<string, MatchAnalysis> = {};
-    for (const match of matches as any[]) {
+    const matchList = matches as any[];
+    // Pre-filter: skip matches with no stats to avoid expensive analysis
+    for (const match of matchList) {
       const id = match?.fixture?.id || match?.id;
       if (!id) continue;
+      const stats = statsMap[id];
+      // Skip analysis entirely if both sides have no stats
+      if (!stats?.home && !stats?.away) {
+        map[id] = { ...BLOCKED_RESULT, dataStatus: 'awaiting_api', statusMessage: 'AGUARDANDO DADOS DA API' };
+        continue;
+      }
       map[id] = safeAnalyze(match, statsMap);
     }
     return map;

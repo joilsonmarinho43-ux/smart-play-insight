@@ -380,6 +380,22 @@ const Admin = () => {
                   <RefreshCw className={`w-3 h-3 ${checkingResults ? 'animate-spin' : ''}`} />
                   {checkingResults ? 'Verificando...' : 'Atualizar Agora'}
                 </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      toast.info('Enviando relatório semanal...');
+                      const { data, error } = await supabase.functions.invoke('telegram-weekly-report');
+                      if (error) throw error;
+                      toast.success(`Relatório enviado! Win Rate: ${data.stats?.winRate}%`);
+                    } catch (err: any) {
+                      toast.error('Erro ao enviar relatório: ' + err.message);
+                    }
+                  }}
+                  className="flex items-center gap-1 text-[10px] font-bold bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-lg hover:bg-purple-500/30 transition-all"
+                >
+                  <TrendingUp className="w-3 h-3" />
+                  Relatório Semanal
+                </button>
               </div>
             </div>
             {signals.length === 0 ? (

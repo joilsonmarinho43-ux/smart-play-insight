@@ -43,30 +43,18 @@ Deno.serve(async (req) => {
     const emoji = payload.confidence >= 80 ? '🔥' : payload.confidence >= 70 ? '⚡' : '📊';
     const sensitivityEmoji = { conservador: '🛡️', moderado: '⚖️', agressivo: '🔥' }[payload.sensitivity] || '⚖️';
 
+    const confBar = '🟢'.repeat(Math.round(payload.confidence / 20)) + '⚪'.repeat(5 - Math.round(payload.confidence / 20));
+
     const text = [
-      `━━━━━━━━━━━━━━━━━━━━━`,
-      `${emoji} <b>SINAL DE ENTRADA</b> ${emoji}`,
-      `━━━━━━━━━━━━━━━━━━━━━`,
+      `${emoji} <b>${payload.market}</b>`,
       ``,
-      `⚽ <b>${payload.match}</b>`,
-      `⏱ Minuto: <b>${payload.minute}'</b>`,
-      `📊 Placar: <b>${payload.score}</b>`,
+      `⚽ ${payload.match} • ${payload.minute}'`,
+      `📊 ${payload.score}`,
       ``,
-      `🎯 <b>ENTRE AGORA:</b>`,
-      `📈 Mercado: <b>${payload.market}</b>`,
-      `🔒 Confiança: <b>${payload.confidence}%</b>`,
-      payload.oddMin ? `💰 Odd mínima: <b>${payload.oddMin}</b>` : null,
+      `${confBar} <b>${payload.confidence}%</b>`,
+      payload.janela ? `🕐 ${payload.janela}` : null,
       ``,
-      `✅ Filtros: <b>${payload.filtersValidated}</b>`,
-      `${sensitivityEmoji} Modo: <b>${payload.sensitivity}</b>`,
-      payload.poisson ? `🧮 Poisson: <b>${payload.poisson}</b>` : null,
-      payload.janela ? `🕐 Janela: <b>${payload.janela}</b>` : null,
-      payload.reason ? `\n💡 <i>${payload.reason}</i>` : null,
-      ``,
-      `⏳ Status: <b>AGUARDANDO RESULTADO</b>`,
-      ``,
-      `━━━━━━━━━━━━━━━━━━━━━`,
-      `🤖 <i>Analista Joilson • Live Trader PRO</i>`,
+      `🤖 <i>Analista Joilson</i>`,
     ].filter(Boolean).join('\n');
 
     let telegramSuccess = false;

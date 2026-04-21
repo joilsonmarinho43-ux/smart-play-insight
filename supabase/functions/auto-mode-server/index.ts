@@ -195,6 +195,10 @@ Deno.serve(async (req) => {
     // 4. Classify each match
     const signalsToSend: HybridSignal[] = [];
     for (const match of matches) {
+      const s = extractStats(match);
+      if (s.hasStats) {
+        console.log(`[AUTO-MODE-SERVER] ${s.homeTeam} vs ${s.awayTeam} | min:${s.minute} sog:${s.sog} da:${s.da}${s.daEstimated?'≈':''} crn:${s.corners} poss:${s.dominantPoss} prs:${Math.round(s.pressure)} score:${s.homeGoals}-${s.awayGoals}`);
+      }
       const signal = classifyServer(match);
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;

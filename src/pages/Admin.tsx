@@ -475,6 +475,107 @@ const Admin = () => {
           </div>
         )}
 
+        {/* DASHBOARD RMA */}
+        {showRMA && (
+          <div className="mb-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-cyan-400 uppercase flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Dashboard RMA
+              </h2>
+              <button
+                onClick={fetchRMALogs}
+                className="flex items-center gap-1 text-[10px] font-bold bg-cyan-500/20 text-cyan-400 px-3 py-1.5 rounded-lg hover:bg-cyan-500/30 transition-all"
+              >
+                <RefreshCw className="w-3 h-3" /> Atualizar
+              </button>
+            </div>
+
+            {/* RMA KPIs */}
+            {(() => {
+              const confirmed = rmaLogs.filter(l => l.rma_verdict === 'CONFIRMADO').length;
+              const neutral = rmaLogs.filter(l => l.rma_verdict === 'NEUTRO').length;
+              const blocked = rmaLogs.filter(l => l.rma_verdict === 'BLOQUEADO').length;
+              const total = rmaLogs.length;
+              const avgScore = total > 0 ? Math.round(rmaLogs.reduce((s, l) => s + (l.rma_score || 0), 0) / total * 10) / 10 : 0;
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="bg-card/40 border border-white/5 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Total</p>
+                    <p className="text-2xl font-bold">{total}</p>
+                  </div>
+                  <div className="bg-card/40 border border-green-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-green-400 uppercase font-bold">🟢 Confirmado</p>
+                    <p className="text-2xl font-bold text-green-400">{confirmed}</p>
+                  </div>
+                  <div className="bg-card/40 border border-yellow-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-yellow-400 uppercase font-bold">🟡 Neutro</p>
+                    <p className="text-2xl font-bold text-yellow-400">{neutral}</p>
+                  </div>
+                  <div className="bg-card/40 border border-red-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-red-400 uppercase font-bold">🔴 Bloqueado</p>
+                    <p className="text-2xl font-bold text-red-400">{blocked}</p>
+                  </div>
+                  <div className="bg-card/40 border border-cyan-500/10 p-3 rounded-2xl text-center">
+                    <p className="text-[9px] text-cyan-400 uppercase font-bold">Score Médio</p>
+                    <p className="text-2xl font-bold text-cyan-400">{avgScore}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* RMA Log List */}
+            {rmaLogs.length === 0 ? (
+              <div className="bg-card/40 border border-white/5 rounded-2xl p-8 text-center">
+                <Shield className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Nenhum log RMA registrado ainda.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {rmaLogs.map((log) => {
+                  const verdictStyle = log.rma_verdict === 'CONFIRMADO'
+                    ? { icon: '🟢', border: 'border-green-500/20', bg: 'bg-green-500/5', text: 'text-green-400' }
+                    : log.rma_verdict === 'NEUTRO'
+                      ? { icon: '🟡', border: 'border-yellow-500/20', bg: 'bg-yellow-500/5', text: 'text-yellow-400' }
+                      : { icon: '🔴', border: 'border-red-500/20', bg: 'bg-red-500/5', text: 'text-red-400' };
+
+                  return (
+                    <div key={log.id} className={`border rounded-xl p-3 text-xs space-y-1.5 ${verdictStyle.border} ${verdictStyle.bg}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{verdictStyle.icon}</span>
+                          <span className="font-bold text-sm text-white">{log.match_name}</span>
+                        </div>
+                        <span className="text-muted-foreground/60 text-[10px]">
+                          {new Date(log.created_at).toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-bold">{log.market}</span>
+                        <span className={`px-2 py-0.5 rounded-md font-bold ${verdictStyle.text} bg-white/5`}>
+                          {log.rma_verdict}
+                        </span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-mono font-bold">
+                          Score: {typeof log.rma_score === 'number' ? log.rma_score.toFixed(1) : log.rma_score}
+                        </span>
+                        <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.minute}'</span>
+                        {log.original_signal && (
+                          <span className="bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md">{log.original_signal}</span>
+                        )}
+                      </div>
+                      {log.block_reason && (
+                        <p className="text-red-400/80 text-[10px] italic">⛔ {log.block_reason}</p>
+                      )}
+                      {log.match_result && (
+                        <p className="text-muted-foreground text-[10px]">📊 Resultado: {log.match_result}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* DASHBOARD WIN RATE */}
         {showDashboard && (
           <div className="mb-8 space-y-4">

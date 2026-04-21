@@ -328,8 +328,27 @@ Deno.serve(async (req) => {
     const signaledKeys = new Set((existingSignals || []).map((s: any) => `${s.match_id}-${s.market}`));
     const newOpps = topOpps.filter(o => !signaledKeys.has(`${o.matchId}-${o.market}`));
 
-    if (newOpps.length === 0) {
-      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, message: 'Todas oportunidades já sinalizadas hoje' }), {
+    // ═══ RMA GATE: Log blocked, keep only CONFIRMADO/NEUTRO ═══
+    const blockedOpps = newOpps.filter(o => o.rmaVerdict === 'BLOQUEADO');
+    const approvedOpps = newOpps.filter(o => o.rmaVerdict !== 'BLOQUEADO');
+
+    // Log blocked signals to shadow table
+    for (const opp of blockedOpps) {
+      console.log(`[SCANNER-PRO-SERVER] 🔴 RMA BLOQUEOU: ${opp.match} • ${opp.market} (score: ${opp.rmaScore})`);
+      await supabase.from('rma_shadow_logs').insert({
+        match_id: opp.matchId,
+        match_name: opp.match,
+        market: opp.market,
+        minute: opp.minute,
+        original_signal: `${opp.market} ${opp.probability}%`,
+        rma_verdict: 'BLOQUEADO',
+        rma_score: opp.rmaScore || 0,
+        block_reason: 'Scanner PRO — sinal bloqueado pelo RMA',
+      });
+    }
+
+    if (approvedOpps.length === 0) {
+      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, blocked: blockedOpps.length, message: 'Todos sinais bloqueados pelo RMA' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

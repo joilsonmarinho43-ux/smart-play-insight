@@ -338,8 +338,9 @@ Deno.serve(async (req) => {
     const oppLines = newOpps.map((o, i) => {
       const priorityEmoji = o.score > 0.75 ? '🔥' : o.score >= 0.65 ? '⚡' : '📊';
       const confBar = '🟢'.repeat(Math.round(o.probability / 20)) + '⚪'.repeat(5 - Math.round(o.probability / 20));
+      const rmaIcon = o.rmaVerdict === 'CONFIRMADO' ? '🟢' : o.rmaVerdict === 'BLOQUEADO' ? '🔴' : '🟡';
       return [
-        `${priorityEmoji} <b>${o.market}</b>`,
+        `${priorityEmoji} <b>${o.market}</b> ${rmaIcon}`,
         `⚽ ${o.match} • ${o.minute}'`,
         `📊 ${o.homeGoals}-${o.awayGoals} ${confBar} <b>${o.probability}%</b>`,
         o.signal ? `${o.signal}` : null,

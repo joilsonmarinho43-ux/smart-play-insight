@@ -249,11 +249,6 @@ Deno.serve(async (req) => {
       }
     }
 
-      } catch (err) {
-        console.error(`[AUTO-MODE-SERVER] Erro ao enviar sinal:`, err);
-      }
-    }
-
     return new Response(
       JSON.stringify({ success: true, signals: sentCount, analyzed: matches.length, qualified: signalsToSend.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

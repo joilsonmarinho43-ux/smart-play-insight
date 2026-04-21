@@ -70,7 +70,7 @@ const BLOCKED_RESULT: MatchAnalysis = {
   oddsDeviation: DEFAULT_ODDS, smartFilter: null, htft: [], scannerScore: 0,
 };
 
-const MAX_SCANNER_MATCHES = 5;
+const MAX_SCANNER_MATCHES = 10;
 
 /** Validate live data integrity before running any analysis */
 function validateLiveData(
@@ -475,8 +475,8 @@ const Live = () => {
           <div className="text-center py-16">
             <Eye className="w-10 h-10 text-gray-600 mx-auto mb-3" />
             <p className="text-gray-400 text-sm font-bold">NENHUMA OPORTUNIDADE DETECTADA</p>
-            <p className="text-gray-500 text-xs mt-2">{totalLive} jogos monitorados — nenhum atinge o critério mínimo de pressão.</p>
-            <p className="text-gray-600 text-[10px] mt-1">Filtro: DA ≥ 5 ou Chutes no Gol ≥ 2</p>
+            <p className="text-gray-500 text-xs mt-2">{totalLive} jogos monitorados — aguardando dados de estatísticas.</p>
+            <p className="text-gray-600 text-[10px] mt-1">Filtro: DA ≥ 3 ou Chutes ≥ 1 ou Escanteios ≥ 1</p>
           </div>
         )}
 

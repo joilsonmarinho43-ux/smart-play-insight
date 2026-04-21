@@ -270,7 +270,11 @@ const LivePro = () => {
     const totalGoals = homeGoals + awayGoals;
     const poisson = calculatePoisson(homeStats, awayStats, minute, totalGoals);
     // Verifica integridade dos dados de pressão (DA + posse válidos)
-    const totalDA_check = (homeStats?.dangerousAttacks || 0) + (awayStats?.dangerousAttacks || 0);
+    const _rawHDA = homeStats?.dangerousAttacks || 0;
+    const _rawADA = awayStats?.dangerousAttacks || 0;
+    const _hDAFallback = _rawHDA > 0 ? _rawHDA : Math.round(((homeStats?.totalShots || 0) * 1.5) + ((homeStats?.corners || 0) * 2));
+    const _aDAFallback = _rawADA > 0 ? _rawADA : Math.round(((awayStats?.totalShots || 0) * 1.5) + ((awayStats?.corners || 0) * 2));
+    const totalDA_check = _hDAFallback + _aDAFallback;
     const possessionValid = (homeStats?.possession || 0) > 0 || (awayStats?.possession || 0) > 0;
     const pressureDataValid = totalDA_check > 0 || possessionValid;
     const homePI = pressureDataValid ? (pressure?.homePI || 0) : 0;
@@ -649,8 +653,10 @@ function KpiGrid({ analysis }: { analysis: any }) {
   const awayPI = pressure?.awayPI || 0;
   const totalPI = homePI + awayPI || 1;
   const homeShare = pressureDataValid ? Math.round((homePI / totalPI) * 100) : 50;
-  const homeDA = homeStats?.dangerousAttacks || 0;
-  const awayDA = awayStats?.dangerousAttacks || 0;
+  const _rawHomeDA2 = homeStats?.dangerousAttacks || 0;
+  const _rawAwayDA2 = awayStats?.dangerousAttacks || 0;
+  const homeDA = _rawHomeDA2 > 0 ? _rawHomeDA2 : Math.round(((homeStats?.totalShots || 0) * 1.5) + ((homeStats?.corners || 0) * 2));
+  const awayDA = _rawAwayDA2 > 0 ? _rawAwayDA2 : Math.round(((awayStats?.totalShots || 0) * 1.5) + ((awayStats?.corners || 0) * 2));
   const daDiff = Math.abs(homeDA - awayDA);
   const homePoss = homeStats?.possession ?? 0;
   const awayPoss = awayStats?.possession ?? 0;

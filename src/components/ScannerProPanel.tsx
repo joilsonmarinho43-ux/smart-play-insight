@@ -101,10 +101,16 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
               </div>
 
               {/* Row 3: Stats */}
-              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <Badge className="bg-orange-500/15 text-orange-300 border-orange-500/25 text-[11px] font-bold">
                   {opp.opportunity}
                 </Badge>
+
+                {opp.rmaVerdict && (
+                  <span title={`RMA: ${opp.rmaVerdict} (${opp.rmaScore ?? '-'})`} className="text-sm">
+                    {opp.rmaVerdict === 'CONFIRMADO' ? '🟢' : opp.rmaVerdict === 'BLOQUEADO' ? '🔴' : '🟡'}
+                  </span>
+                )}
 
                 <Badge className={`${badge.className} text-[10px]`}>
                   {badge.label}

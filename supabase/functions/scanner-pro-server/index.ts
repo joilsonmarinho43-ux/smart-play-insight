@@ -45,6 +45,27 @@ interface ScannerOpp {
   signal: string | null;
   homeGoals: number;
   awayGoals: number;
+  rmaVerdict?: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO';
+  rmaScore?: number;
+}
+
+// ═══════════════════════════════════════
+// RMA ENGINE (inline for edge function)
+// ═══════════════════════════════════════
+function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number; blockReason: string | null } {
+  const safeMin = Math.max(minute, 1);
+  const ap_norm = (da / safeMin) * 10;
+  const f_norm = (shots / safeMin) * 10;
+  const sot_norm = (sot / safeMin) * 10;
+
+  let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
+
+  if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'AP_norm < 1.5' };
+  if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake' };
+  if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score, blockReason: 'SOT_norm = 0' };
+
+  const verdict = rma_score > 65 ? 'CONFIRMADO' as const : rma_score >= 50 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
+  return { verdict, score: Math.round(rma_score * 100) / 100, blockReason: null };
 }
 
 function safeDangerousAttacks(stats: any): number {

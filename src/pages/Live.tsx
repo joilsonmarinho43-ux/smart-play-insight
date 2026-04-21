@@ -458,6 +458,7 @@ const Live = () => {
             title="Auditoria / Debug"
           >
             <Bug className="w-4 h-4" />
+          </button>
           <button
             onClick={() => refetch()}
             className="flex items-center gap-2 text-xs bg-[#161B22] border border-[#30363D] px-3 py-2 rounded-lg hover:bg-[#1c2333] transition-colors"

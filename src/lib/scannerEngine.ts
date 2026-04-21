@@ -64,12 +64,16 @@ function goalSignal(pressure: number, shotsOnGoal: number, minute: number | null
 // ═══════════════════════════════════════
 // EV estimado (odd implícita com margem 8%)
 // ═══════════════════════════════════════
-function estimateEV(probability: number): number {
+function estimateEV(probability: number, market?: string): number {
   if (probability <= 0) return -1;
-  const probDecimal = probability / 100;
-  const marketImpliedProb = probDecimal * 0.88;
-  const marketOdd = 1 / marketImpliedProb;
-  return Math.round((probDecimal * marketOdd - 1) * 100) / 100;
+  const p = probability / 100;
+  const margins: Record<string, number> = {
+    'Over 0.5 Gols': 0.92, 'Over 1.5 Gols': 0.90, 'Over 2.5 Gols': 0.87,
+    'Over 3.5 Gols': 0.85, 'Ambas Marcam': 0.88,
+  };
+  const margin = margins[market || ''] || 0.88;
+  const marketOdd = Math.max(1 / (p * margin), 1.05);
+  return Math.round((p * marketOdd - 1) * 100) / 100;
 }
 
 // ═══════════════════════════════════════

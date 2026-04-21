@@ -35,6 +35,23 @@ interface TelegramSignal {
   match_id: string | null;
 }
 
+interface RMAShadowLog {
+  id: string;
+  match_name: string;
+  market: string;
+  minute: number;
+  original_signal: string | null;
+  rma_verdict: string;
+  rma_score: number;
+  ap_norm: number | null;
+  f_norm: number | null;
+  sot_norm: number | null;
+  acceleration: number | null;
+  block_reason: string | null;
+  match_result: string | null;
+  created_at: string;
+}
+
 const Admin = () => {
   const { profile, loading: profileLoading } = useProfile();
   const [users, setUsers] = useState<Profile[]>([]);

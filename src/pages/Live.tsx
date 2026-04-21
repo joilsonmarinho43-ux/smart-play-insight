@@ -453,6 +453,12 @@ const Live = () => {
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
           <button
+            onClick={() => setShowAudit(!showAudit)}
+            className={`p-2 rounded-lg transition-colors border ${showAudit ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-[#161B22] text-gray-500 border-[#30363D]'}`}
+            title="Auditoria / Debug"
+          >
+            <Bug className="w-4 h-4" />
+          <button
             onClick={() => refetch()}
             className="flex items-center gap-2 text-xs bg-[#161B22] border border-[#30363D] px-3 py-2 rounded-lg hover:bg-[#1c2333] transition-colors"
           >

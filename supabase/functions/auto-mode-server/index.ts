@@ -232,6 +232,7 @@ Deno.serve(async (req) => {
           original_signal: `${signal.label} ${signal.market} ${signal.confidence}%`,
           rma_verdict: 'BLOQUEADO',
           rma_score: rma.score,
+          pressure: signal.pressure,
           block_reason: 'Auto-Mode — sinal bloqueado pelo RMA',
         });
         rmaBlocked++;

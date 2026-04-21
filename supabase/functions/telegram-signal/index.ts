@@ -85,6 +85,7 @@ Deno.serve(async (req) => {
             original_signal: `${payload.market} ${payload.confidence}%`,
             rma_verdict: 'BLOQUEADO',
             rma_score: rma.score,
+            pressure: payload.pressure || null,
             block_reason: 'telegram-signal — sinal bloqueado pelo RMA',
           });
         } catch (e) {

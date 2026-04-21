@@ -343,6 +343,7 @@ Deno.serve(async (req) => {
         original_signal: `${opp.market} ${opp.probability}%`,
         rma_verdict: 'BLOQUEADO',
         rma_score: opp.rmaScore || 0,
+        pressure: opp.pressure,
         block_reason: 'Scanner PRO — sinal bloqueado pelo RMA',
       });
     }
@@ -421,6 +422,7 @@ Deno.serve(async (req) => {
           original_signal: `${opp.market} ${opp.probability}%`,
           rma_verdict: opp.rmaVerdict,
           rma_score: opp.rmaScore || 0,
+          pressure: opp.pressure,
         });
       }
     }

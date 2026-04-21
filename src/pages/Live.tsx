@@ -270,7 +270,19 @@ const Live = () => {
     queryFn: () => fetchLiveMatches(),
     refetchInterval: 60000,
     staleTime: 55000,
+    refetchOnWindowFocus: true,
   });
+
+  // Refetch when app returns from background (mobile)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [refetch]);
 
   const statsMap = useMemo(() => {
     const result: Record<string, any> = {};

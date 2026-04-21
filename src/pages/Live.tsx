@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
-import { Loader2, RefreshCw, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck, Flame, BarChart3, Crosshair, Star, Eye } from 'lucide-react';
+import { Loader2, RefreshCw, Zap, TrendingUp, AlertTriangle, Volume2, VolumeX, Target, ShieldCheck, Flame, BarChart3, Crosshair, Star, Eye, Bug } from 'lucide-react';
 import SniperPanel from '@/components/SniperPanel';
+import AuditPanel from '@/components/AuditPanel';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveMatches } from '@/services/footballApi';
@@ -243,6 +244,7 @@ const Live = () => {
   const [favorites, setFavorites] = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('liveMatchFavorites') || '[]'); } catch { return []; }
   });
+  const [showAudit, setShowAudit] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('liveMatchFavorites', JSON.stringify(favorites));
@@ -318,7 +320,46 @@ const Live = () => {
     return map;
   }, [matches, statsMap]);
 
-  // Sound alert
+  // ═══ AUDIT ENTRIES ═══
+  const auditEntries = useMemo(() => {
+    return (matches as any[]).map((match) => {
+      const id = match?.fixture?.id || match?.id;
+      const rawStats = match?.stats;
+      const isFakeCheck = (st: any) => {
+        if (!st) return true;
+        const p = Number(st.possession || 0);
+        const hasAnyShots = (st.shotsOnGoal || 0) > 0 || (st.totalShots || 0) > 0;
+        const hasAnyDA = (st.dangerousAttacks || 0) > 0;
+        const hasCorners = (st.corners || 0) > 0;
+        const hasRealPoss = p > 0 && p !== 50;
+        return !hasAnyShots && !hasAnyDA && !hasCorners && !hasRealPoss;
+      };
+      const homeFake = isFakeCheck(rawStats?.home);
+      const awayFake = isFakeCheck(rawStats?.away);
+      const analysis = analysisMap[id] || BLOCKED_RESULT;
+
+      return {
+        id,
+        homeName: match?.teams?.home?.name || 'Casa',
+        awayName: match?.teams?.away?.name || 'Fora',
+        league: match?.league || '',
+        minute: match?.fixture?.status?.elapsed || 0,
+        homeGoals: match?.goals?.home ?? 0,
+        awayGoals: match?.goals?.away ?? 0,
+        rawHome: rawStats?.home || null,
+        rawAway: rawStats?.away || null,
+        homeFake,
+        awayFake,
+        filteredHome: statsMap[id]?.home || null,
+        filteredAway: statsMap[id]?.away || null,
+        dataStatus: analysis.dataStatus,
+        statusMessage: analysis.statusMessage,
+        scannerScore: analysis.scannerScore,
+      };
+    });
+  }, [matches, statsMap, analysisMap]);
+
+
   const [soundEnabled, setSoundEnabled] = useState(true);
   const alertedRef = useRef<Set<string>>(new Set());
 
@@ -412,6 +453,13 @@ const Live = () => {
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
           <button
+            onClick={() => setShowAudit(!showAudit)}
+            className={`p-2 rounded-lg transition-colors border ${showAudit ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-[#161B22] text-gray-500 border-[#30363D]'}`}
+            title="Auditoria / Debug"
+          >
+            <Bug className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => refetch()}
             className="flex items-center gap-2 text-xs bg-[#161B22] border border-[#30363D] px-3 py-2 rounded-lg hover:bg-[#1c2333] transition-colors"
           >
@@ -449,6 +497,10 @@ const Live = () => {
       </div>
 
       <main className="container max-w-3xl mx-auto px-4 py-4 space-y-5">
+        {/* ═══ AUDIT PANEL ═══ */}
+        {showAudit && !isLoading && auditEntries.length > 0 && (
+          <AuditPanel entries={auditEntries} />
+        )}
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />

@@ -77,12 +77,12 @@ function classifyServer(match: any): HybridSignal | null {
   // SNIPER criteria
   const isSniper = s.minute >= 5 && s.minute <= 30 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
-    s.sog >= 2 && s.dominantPoss >= 60 && s.da >= 6 && s.corners >= 2 && s.pressure >= 70;
+    s.sog >= 2 && s.dominantPoss >= 55 && s.da >= 6 && s.corners >= 2 && s.pressure >= 50;
 
   // SEMI criteria
   const validScore = (s.homeGoals === 0 && s.awayGoals === 0) || (s.homeGoals + s.awayGoals === 1);
   const isSemi = !isSniper && s.minute >= 5 && s.minute <= 35 &&
-    validScore && s.sog >= 1 && s.dominantPoss >= 55 && s.da >= 4 && s.corners >= 1 && s.pressure >= 60;
+    validScore && s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 35;
 
   if (!isSniper && !isSemi) return null;
 

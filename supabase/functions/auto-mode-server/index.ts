@@ -208,8 +208,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4. Classify each match
+    // 4. Classify each match + RMA gate
     const signalsToSend: HybridSignal[] = [];
+    let rmaBlocked = 0;
     for (const match of matches) {
       const s = extractStats(match);
       if (s.hasStats) {
@@ -218,11 +219,30 @@ Deno.serve(async (req) => {
       const signal = classifyServer(match);
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;
+
+      // ═══ RMA GATE ═══
+      const rma = evaluateRMAServer(signal.minute, signal.pressure, signal.dangerousAttacks, signal.totalShots, signal.shotsOnGoal);
+      if (rma.verdict === 'BLOQUEADO') {
+        console.log(`[AUTO-MODE-SERVER] 🔴 RMA BLOQUEOU: ${signal.match} • ${signal.market} (score: ${rma.score})`);
+        await supabase.from('rma_shadow_logs').insert({
+          match_id: signal.matchId,
+          match_name: signal.match,
+          market: signal.market,
+          minute: signal.minute,
+          original_signal: `${signal.label} ${signal.market} ${signal.confidence}%`,
+          rma_verdict: 'BLOQUEADO',
+          rma_score: rma.score,
+          block_reason: 'Auto-Mode — sinal bloqueado pelo RMA',
+        });
+        rmaBlocked++;
+        continue;
+      }
+
       signalsToSend.push(signal);
       if (signalsToSend.length + dailyCount >= 15) break;
     }
 
-    console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} sinais qualificados`);
+    console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} aprovados, ${rmaBlocked} bloqueados pelo RMA`);
 
     // 5. Send each signal via telegram-signal edge function
     let sentCount = 0;

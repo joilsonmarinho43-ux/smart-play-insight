@@ -98,6 +98,18 @@ interface SignalDecision {
   reason: string;
 }
 
+interface FilterItem { label: string; ok: boolean; detail: string; }
+
+interface AnalysisData {
+  id: string; minute: number; homeGoals: number; awayGoals: number;
+  homeName: string; awayName: string; homeStats: any; awayStats: any;
+  pressure: PressureData | null; history: PISnapshot[]; strategies: LiveStrategy[];
+  apWindows: AttackPressureWindows | null; oddsDev: OddsDeviation | null;
+  hybrid: HybridSignal | null; sniper: SniperSignal | null;
+  poisson: PoissonProbs; decision: SignalDecision; totalGoals: number;
+  cornerData: CornerPeriod[]; filters: FilterItem[];
+  filtersValidated: number; filtersOk: boolean; pressureDataValid: boolean;
+}
 /** Texto descritivo coerente com os dados de pressão reais */
 function buildPressureNarrative(homePI: number, awayPI: number, homeName: string, awayName: string): string {
   const total = homePI + awayPI;
@@ -354,8 +366,8 @@ const LivePro = () => {
           sensitivity,
           minute: a.minute,
           score: `${a.homeGoals} x ${a.awayGoals}`,
-          poisson: a.poisson ? `O2.5 ${(a.poisson.over25 * 100).toFixed(0)}%` : undefined,
-          oddMin: (a.decision as any).oddMin ? String((a.decision as any).oddMin) : undefined,
+          poisson: a.poisson ? `O2.5 ${a.poisson.over25}%` : undefined,
+          oddMin: a.decision.confidence ? String(a.decision.confidence) : undefined,
           janela: a.decision.windowText || undefined,
           reason: a.decision.reason || undefined,
         },
@@ -554,7 +566,7 @@ const LivePro = () => {
 // SUB-COMPONENTES
 // ═══════════════════════════════════════════════════════════
 
-function ScoreHeader({ analysis, match }: { analysis: any; match: any }) {
+function ScoreHeader({ analysis, match }: { analysis: AnalysisData; match: any }) {
   return (
     <div className="bg-gradient-to-br from-[#161B22] to-[#0D1117] border border-[#30363D] rounded-xl p-3 sm:p-4">
       <div className="flex items-center justify-between mb-2">
@@ -594,7 +606,7 @@ function ScoreHeader({ analysis, match }: { analysis: any; match: any }) {
   );
 }
 
-function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: () => void }) {
+function MainSignalCard({ analysis, onGenerate }: { analysis: AnalysisData; onGenerate: () => void }) {
   const { decision, filtersValidated } = analysis;
   const actionStyles = {
     ENTRAR: { bg: 'bg-emerald-500/15', border: 'border-emerald-500', text: 'text-emerald-400', btn: 'bg-emerald-500 hover:bg-emerald-600 text-white', icon: '🟢', label: 'ENTRAR' },
@@ -651,7 +663,7 @@ function MainSignalCard({ analysis, onGenerate }: { analysis: any; onGenerate: (
   );
 }
 
-function KpiGrid({ analysis }: { analysis: any }) {
+function KpiGrid({ analysis }: { analysis: AnalysisData }) {
   const { pressure, homeStats, awayStats, pressureDataValid } = analysis;
   const homePI = pressure?.homePI || 0;
   const awayPI = pressure?.awayPI || 0;
@@ -708,7 +720,7 @@ function KpiCard({ icon: Icon, label, valueText, accent, children }: any) {
   );
 }
 
-function ProbabilityBlock({ analysis }: { analysis: any }) {
+function ProbabilityBlock({ analysis }: { analysis: AnalysisData }) {
   const { poisson, totalGoals } = analysis;
   const items = [
     { label: 'Over 0.5', value: poisson.over05, threshold: 0.5 },
@@ -769,7 +781,7 @@ function ProbabilityBlock({ analysis }: { analysis: any }) {
   );
 }
 
-function OddsValueBlock({ analysis }: { analysis: any }) {
+function OddsValueBlock({ analysis }: { analysis: AnalysisData }) {
   const { oddsDev, poisson } = analysis;
   if (!oddsDev) return null;
 
@@ -839,7 +851,7 @@ function OddsValueBlock({ analysis }: { analysis: any }) {
   );
 }
 
-function EntrySuggestion({ analysis, bankroll }: { analysis: any; bankroll: number }) {
+function EntrySuggestion({ analysis, bankroll }: { analysis: AnalysisData; bankroll: number }) {
   const { decision, poisson } = analysis;
   const stakePct = decision.action === 'ENTRAR' ? (decision.strength === 'forte' ? 3 : decision.strength === 'médio' ? 2 : 1) : 0;
   const stakeValue = (bankroll * stakePct) / 100;
@@ -878,9 +890,9 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
   );
 }
 
-function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: any; sensitivity: string; setSensitivity: (v: any) => void }) {
-  const filters = analysis.filters as { label: string; ok: boolean; detail: string }[];
-  const validated = analysis.filtersValidated as number;
+function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: AnalysisData; sensitivity: string; setSensitivity: (v: string) => void }) {
+  const filters = analysis.filters;
+  const validated = analysis.filtersValidated;
   const modes = [
     { key: 'conservador', label: '🛡️ Conservador', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
     { key: 'moderado', label: '⚖️ Moderado', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },
@@ -925,7 +937,7 @@ function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: any
   );
 }
 
-function ChartsBlock({ analysis }: { analysis: any }) {
+function ChartsBlock({ analysis }: { analysis: AnalysisData }) {
   const [open, setOpen] = useState(true);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -952,7 +964,7 @@ function ChartsBlock({ analysis }: { analysis: any }) {
   );
 }
 
-function PerformanceBlock({ performance, resolve }: { performance: any; resolve: (id: string, result: 'WIN' | 'LOSS' | 'CASHOUT', exitMinute?: number) => Promise<void> }) {
+function PerformanceBlock({ performance, resolve }: { performance: ReturnType<typeof useHybridPerformance>["performance"]; resolve: (id: string, result: 'WIN' | 'LOSS' | 'CASHOUT', exitMinute?: number) => Promise<void> }) {
   const [resolving, setResolving] = useState<string | null>(null);
   if (!performance) return null;
 

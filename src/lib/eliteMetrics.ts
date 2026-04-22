@@ -239,10 +239,15 @@ export function projectCornersByPeriod(
 
   const periods = ['0-15\'', '15-30\'', '30-45\'', '45-60\'', '60-75\'', '75-90\''];
   
+  // Pesos de distribuição por período (2º tempo tem ~30% mais escanteios)
+  const periodWeights = [0.80, 0.95, 1.00, 1.10, 1.20, 1.30];
+  const avgWeight = periodWeights.reduce((a, b) => a + b, 0) / periodWeights.length;
+
   const round1 = (v: number) => Math.round(v * 10) / 10;
 
   return periods.map((period, i) => {
     const periodEnd = (i + 1) * 15;
+    const weight = periodWeights[i] / avgWeight; // normalizado para manter total consistente
     if (periodEnd <= minute) {
       const share = 15 / safeMin;
       return {
@@ -254,14 +259,14 @@ export function projectCornersByPeriod(
       const elapsed = minute - i * 15;
       return {
         period,
-        home: round1(homeRate * elapsed),
-        away: round1(awayRate * elapsed),
+        home: round1(homeRate * elapsed * weight),
+        away: round1(awayRate * elapsed * weight),
       };
     } else {
       return {
         period,
-        home: round1(homeRate * 15),
-        away: round1(awayRate * 15),
+        home: round1(homeRate * 15 * weight),
+        away: round1(awayRate * 15 * weight),
       };
     }
   });

@@ -99,8 +99,8 @@ function SignalCard({ signal, modoLucroReal, onEntry }: { signal: HybridSignal; 
 export default function SniperPanel({ matches, modoSniper = true, modoLucroReal = true }: SniperPanelProps) {
   const [showNormal, setShowNormal] = useState(false);
   const [showOperations, setShowOperations] = useState(false);
-  const [, setForceUpdate] = useState(0);
   const notifiedRef = useRef<Set<string>>(new Set());
+  const { performance, loading, registerSignal, resolve } = useHybridPerformance();
 
   const signals = useMemo(() => {
     if (!modoSniper) return [];
@@ -110,7 +110,6 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
       const signal = classifyHybridSignal(match);
       if (signal) results.push(signal);
     }
-    // Sort: SNIPER > SEMI > NORMAL, then by pressure
     const tierOrder: Record<HybridTier, number> = { SNIPER: 0, SEMI: 1, NORMAL: 2 };
     return results.sort((a, b) => {
       const td = tierOrder[a.tier] - tierOrder[b.tier];
@@ -119,18 +118,15 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
     });
   }, [matches, modoSniper]);
 
-  // Smart notifications
   useEffect(() => {
     for (const signal of signals) {
       if (shouldNotify(signal) && !notifiedRef.current.has(signal.matchId)) {
         notifiedRef.current.add(signal.matchId);
         markNotified(signal.matchId);
-        const style = TIER_STYLES[signal.tier];
         toast({
           title: signal.label,
           description: `${signal.match} - ${signal.minute}' | P:${signal.pressure} SoG:${signal.shotsOnGoal} C:${signal.corners}`,
         });
-        // Browser notification
         if ('Notification' in window && Notification.permission === 'granted') {
           try { new Notification(signal.label, { body: buildNotificationText(signal), icon: '/favicon.ico' }); } catch {}
         }
@@ -138,7 +134,6 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
     }
   }, [signals]);
 
-  // Request notification permission
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {});
@@ -148,18 +143,23 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
   const sniperSignals = signals.filter(s => s.tier === 'SNIPER');
   const semiSignals = signals.filter(s => s.tier === 'SEMI');
   const normalSignals = signals.filter(s => s.tier === 'NORMAL');
-  const performance = getHybridPerformance();
-  const pendingOps = getHybridPendingOps();
-  const allOps = getAllHybridOps();
 
-  const handleEntry = (signal: HybridSignal) => {
-    const op = registerHybridEntry(signal);
-    if (op) setForceUpdate(n => n + 1);
+  // Use Supabase-backed performance; fallback while loading
+  const perf = performance || {
+    totalEntries: 0, wins: 0, losses: 0, cashouts: 0, winrate: 0, roi: 0,
+    last10: [] as ('W' | 'L' | 'C')[], dayStatus: 'neutro' as const,
+    isBlocked: false, blockReason: undefined, dailyCount: 0, maxDaily: 5, entries: [],
   };
 
-  const handleResolve = (opId: string, result: 'WIN' | 'LOSS' | 'CASHOUT') => {
-    resolveHybridOperation(opId, result);
-    setForceUpdate(n => n + 1);
+  const pendingOps = perf.entries?.filter(e => e.result === 'PENDING') || [];
+  const allOps = perf.entries || [];
+
+  const handleEntry = async (signal: HybridSignal) => {
+    await registerSignal(signal);
+  };
+
+  const handleResolve = async (opId: string, result: 'WIN' | 'LOSS' | 'CASHOUT') => {
+    await resolve(opId, result);
   };
 
   if (!modoSniper) return null;

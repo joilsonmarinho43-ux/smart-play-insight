@@ -35,44 +35,7 @@ export interface HybridSignal {
 }
 
 // ═══════════════════════════════════════
-// RISK MANAGEMENT (shared state via localStorage)
-// ═══════════════════════════════════════
-const HYBRID_KEYS = {
-  DAILY_COUNT: 'hybrid_daily_count',
-  DAILY_DATE: 'hybrid_daily_date',
-  CONSECUTIVE_LOSSES: 'hybrid_consecutive_losses',
-  OPERATIONS: 'hybrid_operations',
-};
-
-function getTodayStr(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-function getDailyCount(): number {
-  const savedDate = localStorage.getItem(HYBRID_KEYS.DAILY_DATE);
-  if (savedDate !== getTodayStr()) {
-    localStorage.setItem(HYBRID_KEYS.DAILY_DATE, getTodayStr());
-    localStorage.setItem(HYBRID_KEYS.DAILY_COUNT, '0');
-    localStorage.setItem(HYBRID_KEYS.CONSECUTIVE_LOSSES, '0');
-    return 0;
-  }
-  return Number(localStorage.getItem(HYBRID_KEYS.DAILY_COUNT) || '0');
-}
-
-function getConsecutiveLosses(): number {
-  return Number(localStorage.getItem(HYBRID_KEYS.CONSECUTIVE_LOSSES) || '0');
-}
-
-export function isHybridBlocked(): { blocked: boolean; reason: string } {
-  const losses = getConsecutiveLosses();
-  const daily = getDailyCount();
-  if (losses >= 2) return { blocked: true, reason: 'STOP: 2 losses consecutivos' };
-  if (daily >= 5) return { blocked: true, reason: 'Máximo 5 entradas/dia atingido' };
-  return { blocked: false, reason: '' };
-}
-
-// ═══════════════════════════════════════
-// OPERATIONS PERSISTENCE
+// LEGACY TYPES (kept for compatibility — actual persistence is in hybridStore.ts / Supabase)
 // ═══════════════════════════════════════
 export interface HybridOperation {
   id: string;
@@ -85,106 +48,6 @@ export interface HybridOperation {
   entryTime: number;
   result: 'PENDING' | 'WIN' | 'LOSS' | 'CASHOUT';
   exitMinute?: number;
-}
-
-function loadOps(): HybridOperation[] {
-  try {
-    return JSON.parse(localStorage.getItem(HYBRID_KEYS.OPERATIONS) || '[]');
-  } catch { return []; }
-}
-
-function saveOps(ops: HybridOperation[]) {
-  localStorage.setItem(HYBRID_KEYS.OPERATIONS, JSON.stringify(ops.slice(-100)));
-}
-
-export function registerHybridEntry(signal: HybridSignal): HybridOperation | null {
-  if (!signal.canExecute) return null;
-  const op: HybridOperation = {
-    id: `hybrid_${Date.now()}`,
-    matchId: signal.matchId,
-    match: signal.match,
-    tier: signal.tier,
-    minute: signal.minute,
-    market: signal.market,
-    pressure: signal.pressure,
-    entryTime: Date.now(),
-    result: 'PENDING',
-  };
-  const ops = loadOps();
-  ops.push(op);
-  saveOps(ops);
-  const count = getDailyCount() + 1;
-  localStorage.setItem(HYBRID_KEYS.DAILY_COUNT, String(count));
-  localStorage.setItem(HYBRID_KEYS.DAILY_DATE, getTodayStr());
-  return op;
-}
-
-export function resolveHybridOperation(opId: string, result: 'WIN' | 'LOSS' | 'CASHOUT', exitMinute?: number) {
-  const ops = loadOps();
-  const op = ops.find(o => o.id === opId);
-  if (!op || op.result !== 'PENDING') return;
-  op.result = result;
-  op.exitMinute = exitMinute;
-  saveOps(ops);
-  if (result === 'LOSS') {
-    const l = getConsecutiveLosses() + 1;
-    localStorage.setItem(HYBRID_KEYS.CONSECUTIVE_LOSSES, String(l));
-  } else if (result === 'WIN') {
-    localStorage.setItem(HYBRID_KEYS.CONSECUTIVE_LOSSES, '0');
-  }
-}
-
-export function getHybridPendingOps(): HybridOperation[] {
-  return loadOps().filter(o => o.result === 'PENDING');
-}
-
-export function getAllHybridOps(): HybridOperation[] {
-  return loadOps();
-}
-
-export interface HybridPerformance {
-  totalEntries: number;
-  wins: number;
-  losses: number;
-  cashouts: number;
-  winrate: number;
-  roi: number;
-  last10: ('W' | 'L' | 'C')[];
-  dayStatus: 'positivo' | 'negativo' | 'neutro';
-  isBlocked: boolean;
-  blockReason?: string;
-  dailyCount: number;
-  maxDaily: number;
-}
-
-export function getHybridPerformance(): HybridPerformance {
-  const ops = loadOps();
-  const resolved = ops.filter(o => o.result !== 'PENDING');
-  const wins = resolved.filter(o => o.result === 'WIN').length;
-  const losses = resolved.filter(o => o.result === 'LOSS').length;
-  const cashouts = resolved.filter(o => o.result === 'CASHOUT').length;
-  const total = resolved.length;
-  const winrate = total > 0 ? Math.round((wins / total) * 100) : 0;
-  const avgOdd = 1.35;
-  const profit = wins * (avgOdd - 1) - losses * 1 - cashouts * 0.3;
-  const roi = total > 0 ? Math.round((profit / total) * 100) : 0;
-  const last10 = resolved.slice(-10).map(o =>
-    o.result === 'WIN' ? 'W' as const : o.result === 'LOSS' ? 'L' as const : 'C' as const
-  );
-  const { blocked, reason } = isHybridBlocked();
-  const todayOps = resolved.filter(o => new Date(o.entryTime).toISOString().split('T')[0] === getTodayStr());
-  const dayProfit = todayOps.reduce((acc, o) => {
-    if (o.result === 'WIN') return acc + (avgOdd - 1);
-    if (o.result === 'LOSS') return acc - 1;
-    return acc - 0.3;
-  }, 0);
-
-  return {
-    totalEntries: total, wins, losses, cashouts, winrate, roi, last10,
-    dayStatus: dayProfit > 0 ? 'positivo' : dayProfit < 0 ? 'negativo' : 'neutro',
-    isBlocked: blocked, blockReason: reason || undefined,
-    dailyCount: getDailyCount(), maxDaily: 5,
-  };
 }
 
 // ═══════════════════════════════════════
@@ -301,9 +164,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
   const s = extractStats(match);
   if (!s.hasStats) return null;
 
-  const { blocked } = isHybridBlocked();
-  const ops = loadOps();
-  const alreadyEntered = ops.some(o => o.matchId === s.matchId && o.result === 'PENDING');
+  // NOTE: blocking/duplicate checks are now handled by useHybridPerformance hook (Supabase).
+  // classifyHybridSignal is now a PURE classifier — canExecute defaults to true for eligible tiers.
 
   // 🛡️ TRAVA DE SEGURANÇA: precisa de ≥1 chute OU escanteio NOVO nos últimos 10 min.
   const recentEvent = hasRecentEvent(s.matchId, s.minute);
@@ -321,8 +183,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     label = 'SNIPER 🔥';
     confidence = 'alta';
     market = 'Over 0.5 HT';
-    canExecute = !blocked && !alreadyEntered;
-    executionReason = blocked ? isHybridBlocked().reason : alreadyEntered ? 'Já entrou neste jogo' : '✅ Pronto para entrada';
+    canExecute = true;
+    executionReason = '✅ Pronto para entrada';
   } else if (trySemi(s)) {
     if (!recentEvent && s.minute >= 15) return null;
     tier = 'SEMI';
@@ -330,10 +192,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     confidence = 'média';
     market = s.homeGoals + s.awayGoals === 0 ? 'Over 0.5' : 'Over 1.5';
     const inWindow = s.minute >= 10 && s.minute <= 30;
-    canExecute = inWindow && !blocked && !alreadyEntered;
-    executionReason = !inWindow ? `Fora da janela (10-30'), atual: ${s.minute}'`
-      : blocked ? isHybridBlocked().reason
-      : alreadyEntered ? 'Já entrou neste jogo' : '✅ Pronto para entrada';
+    canExecute = inWindow;
+    executionReason = !inWindow ? `Fora da janela (10-30'), atual: ${s.minute}'` : '✅ Pronto para entrada';
   } else if (tryNormal(s)) {
     tier = 'NORMAL';
     label = 'NORMAL 🔍';

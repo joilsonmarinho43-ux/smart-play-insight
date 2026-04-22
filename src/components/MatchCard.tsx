@@ -219,7 +219,7 @@ function StatsTab({ match }: { match: MatchData }) {
 
 // ─── TAB: Poisson ───
 function PoissonTab({ match }: { match: MatchData }) {
-  const md = match.modelData as any;
+  const md = match.modelData;
   const hGF = md?.homeGoalsAvg || 0;
   const aGF = md?.awayGoalsAvg || 0;
   const hGA = md?.homeGoalsAgainstAvg || 0;

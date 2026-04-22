@@ -173,7 +173,7 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
           Modo Híbrido
         </h2>
         <div className="ml-auto flex items-center gap-1.5">
-          {performance.isBlocked && (
+          {perf.isBlocked && (
             <Badge className="bg-red-500/20 text-red-300 border-red-500/30 text-[10px]">🚫 STOP</Badge>
           )}
           {sniperSignals.length > 0 && (
@@ -194,42 +194,42 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
           <div>
             <p className="text-[9px] text-gray-500">Win Rate</p>
             <p className={`text-sm font-black ${perf.winrate >= 60 ? 'text-emerald-400' : perf.winrate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {performance.winrate}%
+              {perf.winrate}%
             </p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">Entradas</p>
-            <p className="text-sm font-black text-white">{performance.dailyCount}/{performance.maxDaily}</p>
+            <p className="text-sm font-black text-white">{perf.dailyCount}/{perf.maxDaily}</p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">W/L</p>
             <p className="text-sm font-black">
-              <span className="text-emerald-400">{performance.wins}</span>
+              <span className="text-emerald-400">{perf.wins}</span>
               <span className="text-gray-600">/</span>
-              <span className="text-red-400">{performance.losses}</span>
+              <span className="text-red-400">{perf.losses}</span>
             </p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">ROI</p>
-            <p className={`text-sm font-black ${performance.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {performance.roi > 0 ? '+' : ''}{performance.roi}%
+            <p className={`text-sm font-black ${perf.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {perf.roi > 0 ? '+' : ''}{perf.roi}%
             </p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">Status</p>
             <p className={`text-sm font-black ${
-              performance.dayStatus === 'positivo' ? 'text-emerald-400' :
-              performance.dayStatus === 'negativo' ? 'text-red-400' : 'text-gray-400'
+              perf.dayStatus === 'positivo' ? 'text-emerald-400' :
+              perf.dayStatus === 'negativo' ? 'text-red-400' : 'text-gray-400'
             }`}>
-              {performance.dayStatus === 'positivo' ? '📈' : performance.dayStatus === 'negativo' ? '📉' : '➖'}
+              {perf.dayStatus === 'positivo' ? '📈' : perf.dayStatus === 'negativo' ? '📉' : '➖'}
             </p>
           </div>
         </div>
 
-        {performance.last10.length > 0 && (
+        {perf.last10.length > 0 && (
           <div className="flex items-center gap-1 mt-2 justify-center">
             <span className="text-[9px] text-gray-500 mr-1">Últimos:</span>
-            {performance.last10.map((r, i) => (
+            {perf.last10.map((r, i) => (
               <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
                 r === 'W' ? 'bg-emerald-500/20 text-emerald-400' :
                 r === 'L' ? 'bg-red-500/20 text-red-400' :
@@ -239,10 +239,10 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
           </div>
         )}
 
-        {performance.isBlocked && (
+        {perf.isBlocked && (
           <div className="mt-2 px-3 py-1.5 bg-red-500/10 rounded-lg border border-red-500/20">
             <p className="text-[10px] text-red-400 font-bold flex items-center gap-1">
-              <ShieldAlert className="w-3 h-3" /> {performance.blockReason}
+              <ShieldAlert className="w-3 h-3" /> {perf.blockReason}
             </p>
           </div>
         )}
@@ -261,7 +261,7 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge className={`${TIER_STYLES[op.tier].badgeBg} ${TIER_STYLES[op.tier].text} ${TIER_STYLES[op.tier].border} text-[9px]`}>{op.tier}</Badge>
-                  <span className="text-xs font-bold text-white">{op.match}</span>
+                  <span className="text-xs font-bold text-white">{op.match_name}</span>
                   <span className="text-[10px] text-gray-500">{op.minute}'</span>
                 </div>
                 <div className="flex gap-1">
@@ -345,7 +345,7 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
               <div key={op.id} className="px-4 py-1.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge className={`${TIER_STYLES[op.tier].badgeBg} ${TIER_STYLES[op.tier].text} ${TIER_STYLES[op.tier].border} text-[9px]`}>{op.tier}</Badge>
-                  <span className="text-[10px] text-gray-400">{op.match}</span>
+                  <span className="text-[10px] text-gray-400">{op.match_name}</span>
                   <span className="text-[9px] text-gray-600">{op.minute}'</span>
                 </div>
                 <ResultBadge result={op.result} />

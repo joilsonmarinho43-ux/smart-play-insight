@@ -3,17 +3,13 @@ import { MatchData } from '@/types/match';
 import { Badge } from '@/components/ui/badge';
 import {
   classifyHybridSignal,
-  registerHybridEntry,
-  resolveHybridOperation,
-  getHybridPerformance,
-  getHybridPendingOps,
-  getAllHybridOps,
   shouldNotify,
   markNotified,
   buildNotificationText,
   type HybridSignal,
   type HybridTier,
 } from '@/lib/hybridEngine';
+import { useHybridPerformance } from '@/hooks/useHybridPerformance';
 import {
   Crosshair, Flame, Target, ShieldAlert, Zap, Search,
   ChevronDown, ChevronUp, AlertTriangle, Clock

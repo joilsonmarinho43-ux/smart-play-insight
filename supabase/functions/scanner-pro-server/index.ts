@@ -195,8 +195,8 @@ function sniperScan(match: any): SniperSignal | null {
   // OVER 0.5 HT — PRIORIDADE 2
   // ═══════════════════════════════════════
   const isFirstHalf = minute <= 45;
-  if (isFirstHalf && totalGoals === 0 && minute >= 10 && minute <= 30) {
-    // Only in first half, 0-0, minute 10-30
+  if (isFirstHalf && totalGoals === 0 && minute >= 10 && minute <= 25) {
+    // Only in first half, 0-0, minute 10-25 (hard filter)
     const remainingHT = Math.max(1, 45 - minute);
     const htLambda = totalLambda * (remainingHT / 90);
     const rawProbHT = Math.round(poissonOver(htLambda, 1) * 100);

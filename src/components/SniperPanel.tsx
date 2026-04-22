@@ -3,17 +3,13 @@ import { MatchData } from '@/types/match';
 import { Badge } from '@/components/ui/badge';
 import {
   classifyHybridSignal,
-  registerHybridEntry,
-  resolveHybridOperation,
-  getHybridPerformance,
-  getHybridPendingOps,
-  getAllHybridOps,
   shouldNotify,
   markNotified,
   buildNotificationText,
   type HybridSignal,
   type HybridTier,
 } from '@/lib/hybridEngine';
+import { useHybridPerformance } from '@/hooks/useHybridPerformance';
 import {
   Crosshair, Flame, Target, ShieldAlert, Zap, Search,
   ChevronDown, ChevronUp, AlertTriangle, Clock
@@ -103,8 +99,8 @@ function SignalCard({ signal, modoLucroReal, onEntry }: { signal: HybridSignal; 
 export default function SniperPanel({ matches, modoSniper = true, modoLucroReal = true }: SniperPanelProps) {
   const [showNormal, setShowNormal] = useState(false);
   const [showOperations, setShowOperations] = useState(false);
-  const [, setForceUpdate] = useState(0);
   const notifiedRef = useRef<Set<string>>(new Set());
+  const { performance, loading, registerSignal, resolve } = useHybridPerformance();
 
   const signals = useMemo(() => {
     if (!modoSniper) return [];
@@ -114,7 +110,6 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
       const signal = classifyHybridSignal(match);
       if (signal) results.push(signal);
     }
-    // Sort: SNIPER > SEMI > NORMAL, then by pressure
     const tierOrder: Record<HybridTier, number> = { SNIPER: 0, SEMI: 1, NORMAL: 2 };
     return results.sort((a, b) => {
       const td = tierOrder[a.tier] - tierOrder[b.tier];
@@ -123,18 +118,15 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
     });
   }, [matches, modoSniper]);
 
-  // Smart notifications
   useEffect(() => {
     for (const signal of signals) {
       if (shouldNotify(signal) && !notifiedRef.current.has(signal.matchId)) {
         notifiedRef.current.add(signal.matchId);
         markNotified(signal.matchId);
-        const style = TIER_STYLES[signal.tier];
         toast({
           title: signal.label,
           description: `${signal.match} - ${signal.minute}' | P:${signal.pressure} SoG:${signal.shotsOnGoal} C:${signal.corners}`,
         });
-        // Browser notification
         if ('Notification' in window && Notification.permission === 'granted') {
           try { new Notification(signal.label, { body: buildNotificationText(signal), icon: '/favicon.ico' }); } catch {}
         }
@@ -142,7 +134,6 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
     }
   }, [signals]);
 
-  // Request notification permission
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {});
@@ -152,18 +143,23 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
   const sniperSignals = signals.filter(s => s.tier === 'SNIPER');
   const semiSignals = signals.filter(s => s.tier === 'SEMI');
   const normalSignals = signals.filter(s => s.tier === 'NORMAL');
-  const performance = getHybridPerformance();
-  const pendingOps = getHybridPendingOps();
-  const allOps = getAllHybridOps();
 
-  const handleEntry = (signal: HybridSignal) => {
-    const op = registerHybridEntry(signal);
-    if (op) setForceUpdate(n => n + 1);
+  // Use Supabase-backed performance; fallback while loading
+  const perf = performance || {
+    totalEntries: 0, wins: 0, losses: 0, cashouts: 0, winrate: 0, roi: 0,
+    last10: [] as ('W' | 'L' | 'C')[], dayStatus: 'neutro' as const,
+    isBlocked: false, blockReason: undefined, dailyCount: 0, maxDaily: 5, entries: [],
   };
 
-  const handleResolve = (opId: string, result: 'WIN' | 'LOSS' | 'CASHOUT') => {
-    resolveHybridOperation(opId, result);
-    setForceUpdate(n => n + 1);
+  const pendingOps = perf.entries?.filter(e => e.result === 'PENDING') || [];
+  const allOps = perf.entries || [];
+
+  const handleEntry = async (signal: HybridSignal) => {
+    await registerSignal(signal);
+  };
+
+  const handleResolve = async (opId: string, result: 'WIN' | 'LOSS' | 'CASHOUT') => {
+    await resolve(opId, result);
   };
 
   if (!modoSniper) return null;
@@ -177,7 +173,7 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
           Modo Híbrido
         </h2>
         <div className="ml-auto flex items-center gap-1.5">
-          {performance.isBlocked && (
+          {perf.isBlocked && (
             <Badge className="bg-red-500/20 text-red-300 border-red-500/30 text-[10px]">🚫 STOP</Badge>
           )}
           {sniperSignals.length > 0 && (
@@ -197,43 +193,43 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
         <div className="grid grid-cols-5 gap-2 text-center">
           <div>
             <p className="text-[9px] text-gray-500">Win Rate</p>
-            <p className={`text-sm font-black ${performance.winrate >= 60 ? 'text-emerald-400' : performance.winrate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-              {performance.winrate}%
+            <p className={`text-sm font-black ${perf.winrate >= 60 ? 'text-emerald-400' : perf.winrate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+              {perf.winrate}%
             </p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">Entradas</p>
-            <p className="text-sm font-black text-white">{performance.dailyCount}/{performance.maxDaily}</p>
+            <p className="text-sm font-black text-white">{perf.dailyCount}/{perf.maxDaily}</p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">W/L</p>
             <p className="text-sm font-black">
-              <span className="text-emerald-400">{performance.wins}</span>
+              <span className="text-emerald-400">{perf.wins}</span>
               <span className="text-gray-600">/</span>
-              <span className="text-red-400">{performance.losses}</span>
+              <span className="text-red-400">{perf.losses}</span>
             </p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">ROI</p>
-            <p className={`text-sm font-black ${performance.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {performance.roi > 0 ? '+' : ''}{performance.roi}%
+            <p className={`text-sm font-black ${perf.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {perf.roi > 0 ? '+' : ''}{perf.roi}%
             </p>
           </div>
           <div>
             <p className="text-[9px] text-gray-500">Status</p>
             <p className={`text-sm font-black ${
-              performance.dayStatus === 'positivo' ? 'text-emerald-400' :
-              performance.dayStatus === 'negativo' ? 'text-red-400' : 'text-gray-400'
+              perf.dayStatus === 'positivo' ? 'text-emerald-400' :
+              perf.dayStatus === 'negativo' ? 'text-red-400' : 'text-gray-400'
             }`}>
-              {performance.dayStatus === 'positivo' ? '📈' : performance.dayStatus === 'negativo' ? '📉' : '➖'}
+              {perf.dayStatus === 'positivo' ? '📈' : perf.dayStatus === 'negativo' ? '📉' : '➖'}
             </p>
           </div>
         </div>
 
-        {performance.last10.length > 0 && (
+        {perf.last10.length > 0 && (
           <div className="flex items-center gap-1 mt-2 justify-center">
             <span className="text-[9px] text-gray-500 mr-1">Últimos:</span>
-            {performance.last10.map((r, i) => (
+            {perf.last10.map((r, i) => (
               <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
                 r === 'W' ? 'bg-emerald-500/20 text-emerald-400' :
                 r === 'L' ? 'bg-red-500/20 text-red-400' :
@@ -243,10 +239,10 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
           </div>
         )}
 
-        {performance.isBlocked && (
+        {perf.isBlocked && (
           <div className="mt-2 px-3 py-1.5 bg-red-500/10 rounded-lg border border-red-500/20">
             <p className="text-[10px] text-red-400 font-bold flex items-center gap-1">
-              <ShieldAlert className="w-3 h-3" /> {performance.blockReason}
+              <ShieldAlert className="w-3 h-3" /> {perf.blockReason}
             </p>
           </div>
         )}
@@ -265,7 +261,7 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge className={`${TIER_STYLES[op.tier].badgeBg} ${TIER_STYLES[op.tier].text} ${TIER_STYLES[op.tier].border} text-[9px]`}>{op.tier}</Badge>
-                  <span className="text-xs font-bold text-white">{op.match}</span>
+                  <span className="text-xs font-bold text-white">{op.match_name}</span>
                   <span className="text-[10px] text-gray-500">{op.minute}'</span>
                 </div>
                 <div className="flex gap-1">
@@ -349,7 +345,7 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
               <div key={op.id} className="px-4 py-1.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge className={`${TIER_STYLES[op.tier].badgeBg} ${TIER_STYLES[op.tier].text} ${TIER_STYLES[op.tier].border} text-[9px]`}>{op.tier}</Badge>
-                  <span className="text-[10px] text-gray-400">{op.match}</span>
+                  <span className="text-[10px] text-gray-400">{op.match_name}</span>
                   <span className="text-[9px] text-gray-600">{op.minute}'</span>
                 </div>
                 <ResultBadge result={op.result} />

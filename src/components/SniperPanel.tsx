@@ -193,7 +193,7 @@ export default function SniperPanel({ matches, modoSniper = true, modoLucroReal 
         <div className="grid grid-cols-5 gap-2 text-center">
           <div>
             <p className="text-[9px] text-gray-500">Win Rate</p>
-            <p className={`text-sm font-black ${performance.winrate >= 60 ? 'text-emerald-400' : performance.winrate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+            <p className={`text-sm font-black ${perf.winrate >= 60 ? 'text-emerald-400' : perf.winrate >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
               {performance.winrate}%
             </p>
           </div>

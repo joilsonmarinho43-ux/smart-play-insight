@@ -98,6 +98,18 @@ interface SignalDecision {
   reason: string;
 }
 
+interface FilterItem { label: string; ok: boolean; detail: string; }
+
+interface AnalysisData {
+  id: string; minute: number; homeGoals: number; awayGoals: number;
+  homeName: string; awayName: string; homeStats: any; awayStats: any;
+  pressure: PressureData | null; history: PISnapshot[]; strategies: LiveStrategy[];
+  apWindows: AttackPressureWindows | null; oddsDev: OddsDeviation | null;
+  hybrid: HybridSignal | null; sniper: SniperSignal | null;
+  poisson: PoissonProbs; decision: SignalDecision; totalGoals: number;
+  cornerData: CornerPeriod[]; filters: FilterItem[];
+  filtersValidated: number; filtersOk: boolean; pressureDataValid: boolean;
+}
 /** Texto descritivo coerente com os dados de pressão reais */
 function buildPressureNarrative(homePI: number, awayPI: number, homeName: string, awayName: string): string {
   const total = homePI + awayPI;

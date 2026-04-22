@@ -891,8 +891,8 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
 }
 
 function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: AnalysisData; sensitivity: string; setSensitivity: (v: string) => void }) {
-  const filters = analysis.filters as { label: string; ok: boolean; detail: string }[];
-  const validated = analysis.filtersValidated as number;
+  const filters = analysis.filters;
+  const validated = analysis.filtersValidated;
   const modes = [
     { key: 'conservador', label: '🛡️ Conservador', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
     { key: 'moderado', label: '⚖️ Moderado', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },

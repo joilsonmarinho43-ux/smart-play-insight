@@ -29,27 +29,6 @@ function poissonOver(lambda: number, k: number): number {
 }
 
 // ═══════════════════════════════════════
-// SCANNER ENGINE (server-side)
-// ═══════════════════════════════════════
-
-interface ScannerOpp {
-  matchId: string;
-  match: string;
-  league: string;
-  minute: number;
-  market: string;
-  probability: number;
-  ev: number;
-  pressure: number;
-  score: number;
-  signal: string | null;
-  homeGoals: number;
-  awayGoals: number;
-  rmaVerdict?: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO';
-  rmaScore?: number;
-}
-
-// ═══════════════════════════════════════
 // RMA ENGINE (inline for edge function)
 // ═══════════════════════════════════════
 function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number; blockReason: string | null } {
@@ -60,10 +39,8 @@ function evaluateRMAServer(minute: number, pressure: number, da: number, shots: 
 
   let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
 
-  // Hard-block only obvious fake pressure
   if (pressure > 60 && da === 0 && sot === 0) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake: pressão alta sem atividade' };
 
-  // Classification — thresholds calibrados para dados reais (pressure 10-30 típico)
   const verdict = rma_score > 15 ? 'CONFIRMADO' as const : rma_score >= 8 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
   return { verdict, score: Math.round(rma_score * 100) / 100, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 8` : null };
 }
@@ -82,47 +59,38 @@ function calculatePressure(h: any, a: any): number {
 }
 
 // ═══════════════════════════════════════
-// Confidence cap — nunca 100%, penalidade por tempo baixo
+// Confidence cap
 // ═══════════════════════════════════════
 function capConfidence(rawProb: number, minute: number, totalGoals: number): number {
-  // Hard cap at 95%
   let conf = Math.min(rawProb, 95);
-
-  // Penalidade por jogo cedo (< 25 min): -15% proporcional
   if (minute < 25) {
-    const earlyPenalty = (25 - minute) / 25 * 15;
-    conf = conf - earlyPenalty;
+    conf = conf - (25 - minute) / 25 * 15;
   }
-
-  // Penalidade se 0-0 e minuto < 30
   if (totalGoals === 0 && minute < 30) {
     conf = conf - 8;
   }
-
   return Math.max(50, Math.round(conf));
 }
 
 // ═══════════════════════════════════════
-// EV real — baseado em odd de mercado estimada via Poisson
+// EV + Odd estimation
 // ═══════════════════════════════════════
-function estimateEV(probability: number, market: string, minute: number): number {
-  if (probability <= 0) return -1;
+function estimateOddAndEV(probability: number, market: string): { odd: number; ev: number } {
+  if (probability <= 0) return { odd: 1, ev: -1 };
   const p = probability / 100;
 
-  // Margem da casa varia por mercado
   const margins: Record<string, number> = {
+    'Over 0.5 HT': 0.90,
     'Over 0.5 Gols': 0.92,
     'Over 1.5 Gols': 0.90,
     'Over 2.5 Gols': 0.87,
     'Ambas Marcam': 0.88,
   };
   const margin = margins[market] || 0.88;
-
-  // Odd estimada do mercado (com margem da casa)
   const marketOdd = 1 / (p * margin);
 
-  // Odd mínima realista por mercado
   const minOdds: Record<string, number> = {
+    'Over 0.5 HT': 1.10,
     'Over 0.5 Gols': 1.05,
     'Over 1.5 Gols': 1.20,
     'Over 2.5 Gols': 1.50,
@@ -130,10 +98,8 @@ function estimateEV(probability: number, market: string, minute: number): number
   };
   const minOdd = minOdds[market] || 1.20;
   const finalOdd = Math.max(marketOdd, minOdd);
-
-  // EV = (prob * odd) - 1
-  const ev = p * finalOdd - 1;
-  return Math.round(ev * 100) / 100;
+  const ev = Math.round((p * finalOdd - 1) * 100) / 100;
+  return { odd: Math.round(finalOdd * 100) / 100, ev };
 }
 
 function oppScore(prob: number, ev: number, pressure: number): number {
@@ -143,25 +109,55 @@ function oppScore(prob: number, ev: number, pressure: number): number {
   return normP * 0.5 + normEV * 0.3 + normPr * 0.2;
 }
 
-function scanMatch(match: any): ScannerOpp[] {
+// ═══════════════════════════════════════
+// SNIPER SIGNAL INTERFACE
+// ═══════════════════════════════════════
+interface SniperSignal {
+  matchId: string;
+  match: string;
+  league: string;
+  minute: number;
+  market: string;          // 'Over 1.5 Gols' or 'Over 0.5 HT'
+  probability: number;
+  ev: number;
+  odd: number;
+  pressure: number;
+  score: number;           // opportunity score
+  homeGoals: number;
+  awayGoals: number;
+  rmaVerdict?: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO';
+  rmaScore?: number;
+  dangerousAttacks: number;
+  totalShots: number;
+  shotsOnGoal: number;
+  ritmo: string;
+  leitura: string;
+  stake: number;
+}
+
+// ═══════════════════════════════════════
+// SNIPER DUAL MODE SCANNER
+// ═══════════════════════════════════════
+function sniperScan(match: any): SniperSignal | null {
   const lH = match.stats?.home || {};
   const lA = match.stats?.away || {};
   const minute = match.fixture?.status?.elapsed || 0;
+  if (minute <= 0) return null;
+
   const homeGoals = match.goals?.home ?? 0;
   const awayGoals = match.goals?.away ?? 0;
+  const totalGoals = homeGoals + awayGoals;
   const homeTeam = match.teams?.home?.name || 'Casa';
   const awayTeam = match.teams?.away?.name || 'Fora';
   const league = match.league || '';
   const matchId = String(match.id || match.fixture?.id);
 
-  // Need some stats
-  const totalSoG = (lH.shotsOnGoal || 0) + (lA.shotsOnGoal || 0);
-  const totalDA = safeDangerousAttacks(lH) + safeDangerousAttacks(lA);
-  if (totalSoG < 1 && totalDA < 3) return [];
-
   const pressure = calculatePressure(lH, lA);
+  const totalDA = safeDangerousAttacks(lH) + safeDangerousAttacks(lA);
+  const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
+  const totalSoG = (lH.shotsOnGoal || 0) + (lA.shotsOnGoal || 0);
 
-  // Estimate lambdas from live stats (xG proxy)
+  // ─── Lambdas
   const hSoG = lH.shotsOnGoal || 0;
   const aSoG = lA.shotsOnGoal || 0;
   const adjustedMin = Math.max(minute, 10);
@@ -169,86 +165,149 @@ function scanMatch(match: any): ScannerOpp[] {
   const awayLambda = Math.max(0.3, (awayGoals + aSoG * 0.22) * (90 / adjustedMin));
   const totalLambda = homeLambda + awayLambda;
 
-  const results: ScannerOpp[] = [];
-  const totalGoals = homeGoals + awayGoals;
+  // ─── Ritmo classification
+  const activityPerMin = (totalDA + totalShots + totalSoG) / Math.max(minute, 1);
+  const ritmo = activityPerMin > 3 ? 'Acelerado 🔥' : activityPerMin > 1.5 ? 'Moderado ⚡' : 'Lento 🐌';
 
-  // Markets to evaluate
-  const markets = [
-    { name: 'Over 0.5 Gols', k: 1, adjust: totalGoals },
-    { name: 'Over 1.5 Gols', k: 2, adjust: totalGoals },
-    { name: 'Over 2.5 Gols', k: 3, adjust: totalGoals },
-  ];
+  // ─── RMA
+  const rma = evaluateRMAServer(minute, pressure, totalDA, totalShots, totalSoG);
 
-  for (const m of markets) {
-    // If already over this threshold, skip
-    if (totalGoals >= m.k) continue;
+  const baseInfo = {
+    matchId,
+    match: `${homeTeam} vs ${awayTeam}`,
+    league,
+    minute,
+    homeGoals,
+    awayGoals,
+    pressure: Math.round(pressure),
+    dangerousAttacks: Math.round(totalDA),
+    totalShots,
+    shotsOnGoal: totalSoG,
+    ritmo,
+    rmaVerdict: rma.verdict,
+    rmaScore: rma.score,
+  };
 
-    const remainingNeeded = m.k - totalGoals;
+  let htSignal: SniperSignal | null = null;
+  let ftSignal: SniperSignal | null = null;
+
+  // ═══════════════════════════════════════
+  // OVER 0.5 HT — PRIORIDADE 2
+  // ═══════════════════════════════════════
+  const isFirstHalf = minute <= 45;
+  if (isFirstHalf && totalGoals === 0 && minute >= 10 && minute <= 30) {
+    // Only in first half, 0-0, minute 10-30
+    const remainingHT = Math.max(1, 45 - minute);
+    const htLambda = totalLambda * (remainingHT / 90);
+    const rawProbHT = Math.round(poissonOver(htLambda, 1) * 100);
+    const probHT = capConfidence(rawProbHT, minute, totalGoals);
+
+    const { odd: oddHT, ev: evHT } = estimateOddAndEV(probHT, 'Over 0.5 HT');
+
+    // HT rules — muito exigentes
+    const htValid =
+      probHT >= 82 &&
+      pressure >= 55 &&       // pressão MUITO alta
+      totalDA >= 8 &&         // ataques perigosos consistentes
+      ritmo !== 'Lento 🐌' &&  // jogo não pode ser lento
+      oddHT >= 1.30 &&
+      evHT > 0 &&
+      rma.verdict !== 'BLOQUEADO';
+
+    if (htValid) {
+      const score = oppScore(probHT, evHT, pressure);
+      htSignal = {
+        ...baseInfo,
+        market: 'Over 0.5 HT',
+        probability: probHT,
+        ev: evHT,
+        odd: oddHT,
+        score: Math.round(score * 100) / 100,
+        leitura: `1º tempo sem gols, pressão ofensiva de ${Math.round(pressure)}% com ${Math.round(totalDA)} ataques perigosos em ${minute} min. Ritmo ${ritmo.replace(/[🔥⚡🐌]/g, '').trim()}.`,
+        stake: 3,
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // OVER 1.5 FT — PRIORIDADE 1
+  // ═══════════════════════════════════════
+  if (totalGoals < 2) {
+    const remainingNeeded = 2 - totalGoals;
     const remainingMin = Math.max(1, 90 - minute);
     const remainingLambda = totalLambda * (remainingMin / 90);
-    const rawProb = Math.round(poissonOver(remainingLambda, remainingNeeded) * 100);
+    const rawProbFT = Math.round(poissonOver(remainingLambda, remainingNeeded) * 100);
+    const probFT = capConfidence(rawProbFT, minute, totalGoals);
 
-    // Apply confidence cap
-    const prob = capConfidence(rawProb, minute, totalGoals);
+    const { odd: oddFT, ev: evFT } = estimateOddAndEV(probFT, 'Over 1.5 Gols');
 
-    if (prob < 60) continue;
-    const ev = estimateEV(prob, m.name, minute);
-    if (ev <= 0) continue;
+    // FT rules — padrão alto
+    const ftValid =
+      probFT >= 80 &&
+      pressure >= 40 &&
+      totalDA >= 5 &&
+      totalLambda >= 2.0 &&
+      oddFT >= 1.25 && oddFT <= 1.60 &&
+      evFT > 0 &&
+      rma.verdict !== 'BLOQUEADO';
 
-    const score = oppScore(prob, ev, pressure);
-    const isGoalImminent = pressure > 70 && totalSoG >= 4 && minute >= 20;
-
-    results.push({
-      matchId,
-      match: `${homeTeam} vs ${awayTeam}`,
-      league,
-      minute,
-      market: m.name,
-      probability: prob,
-      ev,
-      pressure: Math.round(pressure),
-      score: Math.round(score * 100) / 100,
-      signal: isGoalImminent ? '🔥 GOL IMINENTE' : null,
-      homeGoals,
-      awayGoals,
-    });
-  }
-
-  // BTTS
-  if (homeGoals === 0 || awayGoals === 0) {
-    const bttsProbH = 1 - poissonProb(homeLambda, 0);
-    const bttsProbA = 1 - poissonProb(awayLambda, 0);
-    let rawBtts = Math.round(bttsProbH * bttsProbA * 100);
-    if (homeGoals > 0) rawBtts = Math.round(bttsProbA * 100);
-    if (awayGoals > 0) rawBtts = Math.round(bttsProbH * 100);
-
-    const bttsProb = capConfidence(rawBtts, minute, totalGoals);
-
-    if (bttsProb >= 60) {
-      const ev = estimateEV(bttsProb, 'Ambas Marcam', minute);
-      if (ev > 0) {
-        results.push({
-          matchId, match: `${homeTeam} vs ${awayTeam}`, league, minute,
-          market: 'Ambas Marcam', probability: bttsProb, ev,
-          pressure: Math.round(pressure), score: oppScore(bttsProb, ev, pressure),
-          signal: null, homeGoals, awayGoals,
-        });
-      }
+    if (ftValid) {
+      const score = oppScore(probFT, evFT, pressure);
+      ftSignal = {
+        ...baseInfo,
+        market: 'Over 1.5 Gols',
+        probability: probFT,
+        ev: evFT,
+        odd: oddFT,
+        score: Math.round(score * 100) / 100,
+        leitura: `Tendência de gols λ=${totalLambda.toFixed(1)}, pressão ${Math.round(pressure)}% com ${Math.round(totalDA)} ataques perigosos. Placar ${homeGoals}-${awayGoals}.`,
+        stake: totalGoals >= 1 ? 3 : 2,
+      };
     }
   }
 
-  // ═══ RMA VALIDATION ═══
-  if (minute > 0) {
-    const totalDA_estimated = safeDangerousAttacks(lH) + safeDangerousAttacks(lA);
-    const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
-    const rma = evaluateRMAServer(minute, pressure, totalDA_estimated, totalShots, totalSoG);
-    for (const r of results) {
-      r.rmaVerdict = rma.verdict;
-      r.rmaScore = rma.score;
+  // ═══════════════════════════════════════
+  // PRIORIDADE: HT timing perfeito (10-25 + pressão alta) → HT, senão → FT
+  // ═══════════════════════════════════════
+  if (htSignal && ftSignal) {
+    if (minute >= 10 && minute <= 25 && pressure >= 55) {
+      console.log(`[SNIPER] ⚡ HT priorizado sobre FT: ${baseInfo.match} min ${minute}`);
+      return htSignal;
     }
+    console.log(`[SNIPER] 🎯 FT priorizado: ${baseInfo.match} min ${minute}`);
+    return ftSignal;
   }
 
-  return results;
+  return htSignal || ftSignal || null;
+}
+
+// ═══════════════════════════════════════
+// SNIPER TELEGRAM MESSAGE FORMAT
+// ═══════════════════════════════════════
+function buildSniperMessage(s: SniperSignal): string {
+  const rmaIcon = s.rmaVerdict === 'CONFIRMADO' ? '🟢' : '🟡';
+  return [
+    `🚨 <b>SINAL APROVADO — MODO SNIPER</b> ${rmaIcon}`,
+    ``,
+    `🏆 <b>${s.match}</b>`,
+    `⏱️ Minuto: ${s.minute}'`,
+    ``,
+    `🎯 Mercado: <b>${s.market}</b>`,
+    `📊 Confiança: <b>${s.probability}%</b>`,
+    `💰 Odd: <b>${s.odd}</b>`,
+    ``,
+    `🧠 <i>${s.leitura}</i>`,
+    ``,
+    `🔥 <b>Contexto:</b>`,
+    `  • Pressão: ${s.pressure}%`,
+    `  • Ataques perigosos: ${s.dangerousAttacks}`,
+    `  • Ritmo: ${s.ritmo}`,
+    ``,
+    `✅ Status: <b>ENTRADA APROVADA</b>`,
+    `📌 Stake: ${s.stake}% da banca`,
+    ``,
+    `🤖 <i>Analista Joilson | Sniper Dual Mode</i>`,
+  ].join('\n');
 }
 
 // ═══════════════════════════════════════
@@ -281,7 +340,7 @@ Deno.serve(async (req) => {
     });
     const footballData = await footballRes.json();
     const matches = footballData?.matches || [];
-    console.log(`[SCANNER-PRO-SERVER] ${matches.length} jogos ao vivo`);
+    console.log(`[SNIPER-DUAL] ${matches.length} jogos ao vivo`);
 
     if (matches.length === 0) {
       return new Response(JSON.stringify({ success: true, signals: 0, message: 'Nenhum jogo ao vivo' }), {
@@ -289,34 +348,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Scan all matches
-    let allOpps: ScannerOpp[] = [];
+    // 2. Scan all matches with sniper mode
+    const sniperSignals: SniperSignal[] = [];
     for (const match of matches) {
-      const opps = scanMatch(match);
-      allOpps.push(...opps);
+      const signal = sniperScan(match);
+      if (signal) sniperSignals.push(signal);
     }
 
-    // Sort by score, deduplicate, top 5
-    allOpps.sort((a, b) => b.score - a.score);
-    const seen = new Set<string>();
-    const topOpps: ScannerOpp[] = [];
-    for (const opp of allOpps) {
-      const key = `${opp.matchId}-${opp.market}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      topOpps.push(opp);
-      if (topOpps.length >= 5) break;
-    }
+    // Sort by score
+    sniperSignals.sort((a, b) => b.score - a.score);
 
-    console.log(`[SCANNER-PRO-SERVER] ${allOpps.length} total opps, top ${topOpps.length}`);
+    console.log(`[SNIPER-DUAL] ${sniperSignals.length} sinais qualificados`);
 
-    if (topOpps.length === 0) {
-      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, message: 'Nenhuma oportunidade qualificada' }), {
+    if (sniperSignals.length === 0) {
+      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, message: 'Nenhum sinal sniper qualificado' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 3. Check for duplicates (avoid spamming same match+market today)
+    // 3. Check duplicates today
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const { data: existingSignals } = await supabase
@@ -326,116 +376,92 @@ Deno.serve(async (req) => {
       .eq('success', true);
 
     const signaledKeys = new Set((existingSignals || []).map((s: any) => `${s.match_id}-${s.market}`));
-    const newOpps = topOpps.filter(o => !signaledKeys.has(`${o.matchId}-${o.market}`));
+    const newSignals = sniperSignals.filter(s => !signaledKeys.has(`${s.matchId}-${s.market}`));
 
-    // ═══ RMA GATE: Log blocked, keep only CONFIRMADO/NEUTRO ═══
-    const blockedOpps = newOpps.filter(o => o.rmaVerdict === 'BLOQUEADO');
-    const approvedOpps = newOpps.filter(o => o.rmaVerdict !== 'BLOQUEADO');
+    // RMA gate — block BLOQUEADO
+    const blocked = newSignals.filter(s => s.rmaVerdict === 'BLOQUEADO');
+    const approved = newSignals.filter(s => s.rmaVerdict !== 'BLOQUEADO');
 
-    // Log blocked signals to shadow table
-    for (const opp of blockedOpps) {
-      console.log(`[SCANNER-PRO-SERVER] 🔴 RMA BLOQUEOU: ${opp.match} • ${opp.market} (score: ${opp.rmaScore})`);
+    // Log blocked
+    for (const s of blocked) {
+      console.log(`[SNIPER-DUAL] 🔴 BLOQUEADO: ${s.match} • ${s.market} (RMA ${s.rmaScore})`);
       await supabase.from('rma_shadow_logs').insert({
-        match_id: opp.matchId,
-        match_name: opp.match,
-        market: opp.market,
-        minute: opp.minute,
-        original_signal: `${opp.market} ${opp.probability}%`,
-        rma_verdict: 'BLOQUEADO',
-        rma_score: opp.rmaScore || 0,
-        pressure: opp.pressure,
-        block_reason: 'Scanner PRO — sinal bloqueado pelo RMA',
+        match_id: s.matchId, match_name: s.match, market: s.market,
+        minute: s.minute, original_signal: `${s.market} ${s.probability}%`,
+        rma_verdict: 'BLOQUEADO', rma_score: s.rmaScore || 0, pressure: s.pressure,
+        block_reason: 'Sniper Dual — bloqueado pelo RMA',
       });
     }
 
-    if (approvedOpps.length === 0) {
-      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, blocked: blockedOpps.length, message: 'Todos sinais bloqueados pelo RMA' }), {
+    if (approved.length === 0) {
+      return new Response(JSON.stringify({ success: true, signals: 0, analyzed: matches.length, blocked: blocked.length, message: 'Todos sinais bloqueados pelo RMA' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 4. Build and send consolidated Telegram message
-    const oppLines = approvedOpps.map((o, i) => {
-      const priorityEmoji = o.score > 0.75 ? '🔥' : o.score >= 0.65 ? '⚡' : '📊';
-      const confBar = '🟢'.repeat(Math.round(o.probability / 20)) + '⚪'.repeat(5 - Math.round(o.probability / 20));
-      const rmaIcon = o.rmaVerdict === 'CONFIRMADO' ? '🟢' : '🟡';
-      return [
-        `${priorityEmoji} <b>${o.market}</b> ${rmaIcon}`,
-        `⚽ ${o.match} • ${o.minute}'`,
-        `📊 ${o.homeGoals}-${o.awayGoals} ${confBar} <b>${o.probability}%</b>`,
-        o.signal ? `${o.signal}` : null,
-      ].filter(Boolean).join('\n');
-    }).join('\n\n');
+    // 4. Send each approved signal as individual sniper message
+    let sentCount = 0;
+    for (const signal of approved) {
+      const text = buildSniperMessage(signal);
 
-    const text = [
-      `🎯 <b>SCANNER PRO</b> • ${approvedOpps.length} sinais`,
-      ``,
-      oppLines,
-      ``,
-      `🤖 <i>Analista Joilson</i>`,
-    ].join('\n');
+      const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'X-Connection-Api-Key': TELEGRAM_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+      });
 
-    const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
-    });
+      const tgData = await tgRes.json();
+      const telegramMessageId = tgData.result?.message_id ?? null;
 
-    const tgData = await tgRes.json();
-    const telegramMessageId = tgData.result?.message_id ?? null;
-
-    // 5. Log approved signals to DB
-    for (const opp of approvedOpps) {
+      // Log to DB
       await supabase.from('telegram_signals').insert({
-        match_name: opp.match,
-        match_id: opp.matchId,
-        market: opp.market,
-        confidence: opp.probability,
-        filters_validated: `Score ${opp.score}`,
-        sensitivity: 'scanner-pro',
-        minute: opp.minute,
-        score: `${opp.homeGoals}-${opp.awayGoals}`,
-        reason: `Scanner PRO Server • EV ${opp.ev > 0 ? '+' : ''}${opp.ev} • Pressão ${opp.pressure} • RMA ${opp.rmaVerdict}`,
+        match_name: signal.match,
+        match_id: signal.matchId,
+        market: signal.market,
+        confidence: signal.probability,
+        filters_validated: `Sniper Dual • Score ${signal.score}`,
+        sensitivity: 'sniper-dual',
+        minute: signal.minute,
+        score: `${signal.homeGoals}-${signal.awayGoals}`,
+        odd_min: String(signal.odd),
+        reason: `Sniper Dual Mode • EV ${signal.ev > 0 ? '+' : ''}${signal.ev} • Odd ${signal.odd} • Pressão ${signal.pressure}% • ${signal.ritmo} • RMA ${signal.rmaVerdict}`,
         success: tgRes.ok,
         error_message: tgRes.ok ? null : JSON.stringify(tgData),
         telegram_message_id: telegramMessageId,
         status: 'pendente',
-        rma_verdict: opp.rmaVerdict || null,
-        rma_score: opp.rmaScore || null,
+        rma_verdict: signal.rmaVerdict || null,
+        rma_score: signal.rmaScore || null,
       });
 
-      if (opp.rmaVerdict) {
+      if (signal.rmaVerdict) {
         await supabase.from('rma_shadow_logs').insert({
-          match_id: opp.matchId,
-          match_name: opp.match,
-          market: opp.market,
-          minute: opp.minute,
-          original_signal: `${opp.market} ${opp.probability}%`,
-          rma_verdict: opp.rmaVerdict,
-          rma_score: opp.rmaScore || 0,
-          pressure: opp.pressure,
+          match_id: signal.matchId, match_name: signal.match, market: signal.market,
+          minute: signal.minute, original_signal: `${signal.market} ${signal.probability}%`,
+          rma_verdict: signal.rmaVerdict, rma_score: signal.rmaScore || 0, pressure: signal.pressure,
         });
       }
+
+      if (tgRes.ok) sentCount++;
     }
 
-    console.log(`[SCANNER-PRO-SERVER] ${tgRes.ok ? '✅' : '❌'} ${approvedOpps.length} enviadas, ${blockedOpps.length} bloqueadas pelo RMA`);
+    console.log(`[SNIPER-DUAL] ✅ ${sentCount} enviados, ${blocked.length} bloqueados`);
 
     return new Response(
-      JSON.stringify({ success: true, signals: approvedOpps.length, analyzed: matches.length, blocked: blockedOpps.length, total_opps: allOpps.length }),
+      JSON.stringify({ success: true, signals: sentCount, analyzed: matches.length, blocked: blocked.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (err) {
-    console.error('[SCANNER-PRO-SERVER] Erro:', err);
+    console.error('[SNIPER-DUAL] Erro:', err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : 'Erro desconhecido' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

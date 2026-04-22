@@ -164,9 +164,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
   const s = extractStats(match);
   if (!s.hasStats) return null;
 
-  const { blocked } = isHybridBlocked();
-  const ops = loadOps();
-  const alreadyEntered = ops.some(o => o.matchId === s.matchId && o.result === 'PENDING');
+  // NOTE: blocking/duplicate checks are now handled by useHybridPerformance hook (Supabase).
+  // classifyHybridSignal is now a PURE classifier — canExecute defaults to true for eligible tiers.
 
   // 🛡️ TRAVA DE SEGURANÇA: precisa de ≥1 chute OU escanteio NOVO nos últimos 10 min.
   const recentEvent = hasRecentEvent(s.matchId, s.minute);
@@ -184,8 +183,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     label = 'SNIPER 🔥';
     confidence = 'alta';
     market = 'Over 0.5 HT';
-    canExecute = !blocked && !alreadyEntered;
-    executionReason = blocked ? isHybridBlocked().reason : alreadyEntered ? 'Já entrou neste jogo' : '✅ Pronto para entrada';
+    canExecute = true;
+    executionReason = '✅ Pronto para entrada';
   } else if (trySemi(s)) {
     if (!recentEvent && s.minute >= 15) return null;
     tier = 'SEMI';
@@ -193,10 +192,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     confidence = 'média';
     market = s.homeGoals + s.awayGoals === 0 ? 'Over 0.5' : 'Over 1.5';
     const inWindow = s.minute >= 10 && s.minute <= 30;
-    canExecute = inWindow && !blocked && !alreadyEntered;
-    executionReason = !inWindow ? `Fora da janela (10-30'), atual: ${s.minute}'`
-      : blocked ? isHybridBlocked().reason
-      : alreadyEntered ? 'Já entrou neste jogo' : '✅ Pronto para entrada';
+    canExecute = inWindow;
+    executionReason = !inWindow ? `Fora da janela (10-30'), atual: ${s.minute}'` : '✅ Pronto para entrada';
   } else if (tryNormal(s)) {
     tier = 'NORMAL';
     label = 'NORMAL 🔍';

@@ -37,7 +37,22 @@ export const CATEGORY_META: Record<string, { icon: string; label: string; color:
   htft: { icon: '⏱️', label: 'HT/FT', color: 'emerald' },
 };
 
-export function generatePreGameBingo(match: MatchData) {
+export interface BingoResult {
+  over15: number;
+  over25: number;
+  btts: number;
+  markets: MarketAnalysis[];
+  allMarkets: MarketAnalysis[];
+  avgConfidence: number;
+}
+
+/** Tipo exportado para componentes */
+export interface BingoMatchData extends MatchData {
+  selectedMarkets: MarketAnalysis[];
+  avgConfidence: number;
+}
+
+export function generatePreGameBingo(match: MatchData): BingoResult | null {
   if (!isStableLeague(match)) return null;
   if (!hasReliableData(match)) return null;
 
@@ -58,7 +73,6 @@ export function generatePreGameBingo(match: MatchData) {
       .sort((a, b) => b.probability - a.probability);
     if (catMarkets.length > 0) {
       bestByCategory.push(catMarkets[0]);
-      // Add second market if high enough confidence
       if (catMarkets.length > 1 && catMarkets[1].probability >= 78) {
         bestByCategory.push(catMarkets[1]);
       }
@@ -72,12 +86,15 @@ export function generatePreGameBingo(match: MatchData) {
 
   if (selected.length === 0) return null;
 
+  const avgConfidence = selected.reduce((sum, m) => sum + m.probability, 0) / selected.length;
+
   return {
     over15: findProb(allMarkets, 'Over 1.5 Gols'),
     over25: findProb(allMarkets, 'Over 2.5 Gols'),
     btts: findProb(allMarkets, 'Ambas Marcam'),
     markets: selected,
     allMarkets: highValueMarkets,
+    avgConfidence,
   };
 }
 
@@ -86,57 +103,17 @@ function findProb(markets: MarketAnalysis[], name: string): number {
   return found ? found.probability : 0;
 }
 
-export function generateSmartBets(matches: any[]) {
-  const allPicks: any[] = [];
-
-  for (const match of matches) {
-    if (!isStableLeague(match)) continue;
-    if (!hasReliableData(match)) continue;
-
-    const result = generatePreGameBingo(match);
-    if (!result || !result.markets.length) continue;
-
-    const best = result.markets[0];
-    if (best.probability < 78) continue;
-
-    allPicks.push({
-      match,
-      market: best.market,
-      probability: best.probability,
-    });
-  }
-
-  if (allPicks.length < 2) return [];
-
-  const sorted = allPicks.sort((a, b) => b.probability - a.probability);
-  const tickets: any[] = [];
-
-  const t1 = sorted.slice(0, 3);
-  if (t1.length >= 2) {
-    const prob = t1.reduce((acc, p) => acc * (p.probability / 100), 1) * 100;
-    tickets.push({ picks: t1, probability: parseFloat(prob.toFixed(1)) });
-  }
-
-  const t2 = sorted.slice(3, 6);
-  if (t2.length >= 2) {
-    const prob = t2.reduce((acc, p) => acc * (p.probability / 100), 1) * 100;
-    tickets.push({ picks: t2, probability: parseFloat(prob.toFixed(1)) });
-  }
-
-  return tickets;
-}
-
-export function formatBingoWhatsApp(bingoMatches: any[]): string {
+export function formatBingoWhatsApp(bingoMatches: BingoMatchData[]): string {
   const header = `🎯 *BINGO VIP — ANALISTA JOILSON*\n*Trade Esportivo Profissional*\n${'─'.repeat(30)}\n\n`;
 
   const body = bingoMatches.map(bm => {
     const matchHeader = `⚽ *${bm.homeTeam} vs ${bm.awayTeam}*\n`;
     const details = `🏆 ${bm.league || 'Liga'} • ⏰ ${bm.time || 'A definir'}\n`;
-    const tips = (bm.selectedMarkets || bm.mercados || []).map((m: any) => {
-      const prob = m.probability || m.confianca;
+    const tips = bm.selectedMarkets.map((m) => {
+      const prob = m.probability;
       const catMeta = CATEGORY_META[m.category] || { icon: '📌' };
       const emoji = prob >= 90 ? '🟢🔥' : prob >= 85 ? '🟢' : prob >= 78 ? '🟡' : '⚪';
-      return `${emoji} ${catMeta.icon} *${m.market || m.mercado}* → _${prob}%_`;
+      return `${emoji} ${catMeta.icon} *${m.market}* → _${prob}%_`;
     }).join('\n');
     return `${matchHeader}${details}${tips}\n`;
   }).join('\n');

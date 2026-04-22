@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { MatchData } from '@/types/match';
-import { generatePreGameBingo, formatBingoWhatsApp, CATEGORY_META } from '@/lib/bingoEngine';
+import { MatchData, MarketAnalysis } from '@/types/match';
+import { generatePreGameBingo, formatBingoWhatsApp, CATEGORY_META, BingoMatchData } from '@/lib/bingoEngine';
 import { Trophy, Copy, ChevronDown, ChevronUp, MessageCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,16 +34,21 @@ function getProbColor(prob: number): string {
 const BingoSuggestion = ({ matches }: Props) => {
   const [expanded, setExpanded] = useState(true);
 
-  const bingoData = useMemo(() => {
+  const bingoData = useMemo<BingoMatchData[]>(() => {
     if (!matches || matches.length === 0) return [];
 
     return matches
       .map(match => {
         const result = generatePreGameBingo(match);
         if (!result || !result.markets.length) return null;
-        return { ...match, selectedMarkets: result.markets };
+        return {
+          ...match,
+          selectedMarkets: result.markets,
+          avgConfidence: result.avgConfidence,
+        } as BingoMatchData;
       })
-      .filter((m): m is NonNullable<typeof m> => m !== null)
+      .filter((m): m is BingoMatchData => m !== null)
+      .sort((a, b) => b.avgConfidence - a.avgConfidence)
       .slice(0, 12);
   }, [matches]);
 
@@ -101,10 +106,13 @@ const BingoSuggestion = ({ matches }: Props) => {
                   </h3>
                   <p className="text-[10px] text-muted-foreground mt-0.5">{bm.league} • {bm.time}</p>
                 </div>
-                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] text-muted-foreground font-medium">{Math.round(bm.avgConfidence)}%</span>
+                  <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                </div>
               </div>
               <div className="space-y-1.5">
-                {bm.selectedMarkets.map((m: any, i: number) => {
+                {bm.selectedMarkets.map((m: MarketAnalysis, i: number) => {
                   const catMeta = CATEGORY_META[m.category] || { icon: '📌', label: '' };
                   const catColor = CATEGORY_COLORS[m.category] || 'border-white/10 bg-white/5';
                   const probColor = getProbColor(m.probability);

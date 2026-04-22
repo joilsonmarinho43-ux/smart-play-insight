@@ -20,7 +20,7 @@ import {
 const navItems = [
   { title: "Pré-Jogo", url: "/", icon: Home },
   { title: "Live Trader", url: "/live", icon: Zap },
-  { title: "Live PRO", url: "/live-pro", icon: Target },
+  
   { title: "Scanner PRO", url: "/scanner", icon: Crosshair },
   { title: "Favoritos", url: "/favorites", icon: Star },
 ];

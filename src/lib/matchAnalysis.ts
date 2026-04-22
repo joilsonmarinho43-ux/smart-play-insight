@@ -125,8 +125,8 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
 
   const hGF = match.modelData?.homeGoalsAvg || (match as any).homeStats?.goalsFor || 0;
   const aGF = match.modelData?.awayGoalsAvg || (match as any).awayStats?.goalsFor || 0;
-  const hGA = (match as any).modelData?.homeGoalsAgainstAvg || (match as any).homeStats?.goalsAgainst || 0;
-  const aGA = (match as any).modelData?.awayGoalsAgainstAvg || (match as any).awayStats?.goalsAgainst || 0;
+  const hGA = match.modelData?.homeGoalsAgainstAvg || (match as any).homeStats?.goalsAgainst || 0;
+  const aGA = match.modelData?.awayGoalsAgainstAvg || (match as any).awayStats?.goalsAgainst || 0;
 
   // Dynamic league average from backend, fallback to conservative estimate
   const leagueAvg = (match as any).homeStats?.leagueAvg || (match as any).awayStats?.leagueAvg || 1.30;

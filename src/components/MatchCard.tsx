@@ -115,7 +115,7 @@ function ApmXgIndicator({ match }: { match: MatchData }) {
   const aXG = as_.bigChances || as_.expectedGoals || 0;
   let totalXG = hXG + aXG;
   if (totalXG === 0 && (hSoG > 0 || aSoG > 0)) {
-    totalXG = (hSoG + aSoG) * 0.32;
+    totalXG = (hSoG + aSoG) * 0.22;
   }
 
   const hasData = hShots > 0 || aShots > 0 || hSoG > 0 || aSoG > 0;
@@ -219,7 +219,7 @@ function StatsTab({ match }: { match: MatchData }) {
 
 // ─── TAB: Poisson ───
 function PoissonTab({ match }: { match: MatchData }) {
-  const md = match.modelData as any;
+  const md = match.modelData;
   const hGF = md?.homeGoalsAvg || 0;
   const aGF = md?.awayGoalsAvg || 0;
   const hGA = md?.homeGoalsAgainstAvg || 0;
@@ -229,7 +229,7 @@ function PoissonTab({ match }: { match: MatchData }) {
     return <div className="text-center py-6 text-muted-foreground text-sm">Dados insuficientes para Poisson</div>;
   }
 
-  const leagueAvg = 1.35;
+  const leagueAvg = (match as any).homeStats?.leagueAvg || (match as any).awayStats?.leagueAvg || 1.30;
   const homeLambda = hGF > 0 && aGA > 0
     ? (hGF / leagueAvg) * (aGA / leagueAvg) * leagueAvg
     : hGF || 1.2;

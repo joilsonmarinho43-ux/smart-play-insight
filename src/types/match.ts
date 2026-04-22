@@ -13,6 +13,8 @@ export interface MatchMetrics {
 export interface ModelData {
   homeGoalsAvg: number | null;
   awayGoalsAvg: number | null;
+  homeGoalsAgainstAvg?: number | null;
+  awayGoalsAgainstAvg?: number | null;
   homeCornersAvg: number | null;
   awayCornersAvg: number | null;
   homeCardsAvg: number | null;

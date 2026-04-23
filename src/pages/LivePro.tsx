@@ -893,7 +893,7 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
 function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: AnalysisData; sensitivity: string; setSensitivity: (v: 'conservador' | 'moderado' | 'agressivo') => void }) {
   const filters = analysis.filters;
   const validated = analysis.filtersValidated;
-  const modes = [
+  const modes: { key: 'conservador' | 'moderado' | 'agressivo'; label: string; color: string }[] = [
     { key: 'conservador', label: '🛡️ Conservador', color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
     { key: 'moderado', label: '⚖️ Moderado', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },
     { key: 'agressivo', label: '🔥 Agressivo', color: 'bg-red-500/20 text-red-400 border-red-500/40' },

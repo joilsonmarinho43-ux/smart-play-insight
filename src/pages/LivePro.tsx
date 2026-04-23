@@ -890,7 +890,7 @@ function SuggestField({ label, value, accent = 'text-white' }: any) {
   );
 }
 
-function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: AnalysisData; sensitivity: string; setSensitivity: (v: string) => void }) {
+function SmartFilters({ analysis, sensitivity, setSensitivity }: { analysis: AnalysisData; sensitivity: string; setSensitivity: (v: 'conservador' | 'moderado' | 'agressivo') => void }) {
   const filters = analysis.filters;
   const validated = analysis.filtersValidated;
   const modes = [

@@ -563,7 +563,10 @@ serve(async (req) => {
     console.log(`Returning ${matches.length} matches. API calls used: ${apiCallCount}`);
     const responseData = { matches };
     memSet(`date_v14_${date}`, responseData);
-    await dbCacheSet(preCk, responseData, "PRE");
+    // Only cache non-empty results to avoid locking out matches added later
+    if (matches.length > 0) {
+      await dbCacheSet(preCk, responseData, "PRE");
+    }
     return new Response(JSON.stringify(responseData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {

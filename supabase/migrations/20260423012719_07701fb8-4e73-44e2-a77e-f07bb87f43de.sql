@@ -1,0 +1,1 @@
+DELETE FROM public.cache_api WHERE cache_key IN ('date_2026-04-23', 'date_2026-04-24', 'date_2026-04-25') AND dados_json::text = '{"matches": []}';

@@ -19,7 +19,7 @@ function evaluateRMAServer(minute: number, pressure: number, da: number, shots: 
   if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score };
   if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score };
   if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score };
-  const verdict = rma_score > 65 ? 'CONFIRMADO' as const : rma_score >= 50 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
+  const verdict = rma_score > 40 ? 'CONFIRMADO' as const : rma_score >= 20 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
   return { verdict, score: Math.round(rma_score * 100) / 100 };
 }
 

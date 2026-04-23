@@ -12,7 +12,6 @@ function checkMarketResult(market: string, homeGoals: number, awayGoals: number,
   const totalGoals = homeGoals + awayGoals;
   const marketLower = market.toLowerCase();
 
-  // Over goals markets
   const overMatch = marketLower.match(/over\s*(\d+\.?\d*)\s*(?:gols|goals)?/);
   if (overMatch) {
     const threshold = parseFloat(overMatch[1]);
@@ -21,23 +20,20 @@ function checkMarketResult(market: string, homeGoals: number, awayGoals: number,
     return 'pendente';
   }
 
-  // Under goals markets
   const underMatch = marketLower.match(/under\s*(\d+\.?\d*)\s*(?:gols|goals)?/);
   if (underMatch) {
     const threshold = parseFloat(underMatch[1]);
-    if (totalGoals >= threshold) return 'loss'; // already exceeded
+    if (totalGoals >= threshold) return 'loss';
     if (matchFinished) return 'green';
     return 'pendente';
   }
 
-  // BTTS / Ambas Marcam
   if (marketLower.includes('btts') || marketLower.includes('ambas marcam')) {
     if (homeGoals > 0 && awayGoals > 0) return 'green';
     if (matchFinished) return 'loss';
     return 'pendente';
   }
 
-  // Over corners
   const cornerMatch = marketLower.match(/over\s*(\d+\.?\d*)\s*(?:escanteios|corners)/);
   if (cornerMatch) {
     const threshold = parseFloat(cornerMatch[1]);
@@ -46,18 +42,20 @@ function checkMarketResult(market: string, homeGoals: number, awayGoals: number,
     return 'pendente';
   }
 
-  // Gol no 2T / Second half goal
   if (marketLower.includes('gol no 2t') || marketLower.includes('gol 2t')) {
-    // We can't distinguish 1st/2nd half goals easily from total score alone
-    // If match finished and total goals > score at HT, that would be green
-    // For simplicity: if match finished, check if goals happened (heuristic)
     if (matchFinished) {
       return totalGoals > 0 ? 'green' : 'loss';
     }
     return 'pendente';
   }
 
-  // If we can't parse the market, only resolve when finished
+  // Over 0.5 HT — special handling
+  if (marketLower.includes('over 0.5 ht') || marketLower.includes('over 0.5 1t')) {
+    if (totalGoals > 0) return 'green';
+    if (matchFinished) return 'loss';
+    return 'pendente';
+  }
+
   if (matchFinished) return 'loss';
   return 'pendente';
 }
@@ -81,9 +79,6 @@ Deno.serve(async (req) => {
     const CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     if (!CHAT_ID) throw new Error('TELEGRAM_CHAT_ID not configured');
 
-    const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
-    if (!API_KEY) throw new Error('API_FUTEBOL_KEY not configured');
-
     // Fetch pending signals + signals that resolved but Telegram edit failed
     const { data: pendingSignals, error: fetchErr } = await sb
       .from('telegram_signals')
@@ -100,35 +95,110 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Group by match_id to minimize API calls
+    // ═══════════════════════════════════════
+    // USE football-api EDGE FUNCTION (cached) instead of direct API calls
+    // This reuses the 2-min LIVE cache, saving ~1400 API calls/day
+    // ═══════════════════════════════════════
     const matchIds = [...new Set(pendingSignals.map(s => s.match_id).filter(Boolean))];
     const matchData: Record<string, any> = {};
 
-    for (const matchId of matchIds) {
-      try {
-        const resp = await fetch(`https://v3.football.api-sports.io/fixtures?id=${matchId}`, {
-          headers: { 'x-apisports-key': API_KEY },
-        });
-        const json = await resp.json();
-        const fixture = json.response?.[0];
-        if (fixture) {
-          matchData[matchId] = {
-            homeGoals: fixture.goals?.home ?? 0,
-            awayGoals: fixture.goals?.away ?? 0,
-            corners: (fixture.statistics || []).reduce((sum: number, team: any) => {
-              const cornerStat = team.statistics?.find((s: any) => s.type === 'Corner Kicks');
-              return sum + (cornerStat?.value ?? 0);
-            }, 0),
-            finished: ['FT', 'AET', 'PEN'].includes(fixture.fixture?.status?.short),
-            status: fixture.fixture?.status?.short,
+    // Fetch live matches from cached football-api
+    const liveRes = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ live: true }),
+    });
+    const liveData = await liveRes.json();
+    const liveMatches = liveData?.matches || [];
+
+    // Build lookup from live matches
+    for (const m of liveMatches) {
+      const mId = String(m.id || m.fixture?.id);
+      if (matchIds.includes(mId)) {
+        const status = m.fixture?.status?.short || '';
+        const finished = ['FT', 'AET', 'PEN'].includes(status);
+        
+        // Get corners from stats if available
+        let corners = 0;
+        if (m.stats?.home?.corners != null || m.stats?.away?.corners != null) {
+          corners = (m.stats?.home?.corners || 0) + (m.stats?.away?.corners || 0);
+        }
+
+        matchData[mId] = {
+          homeGoals: m.goals?.home ?? 0,
+          awayGoals: m.goals?.away ?? 0,
+          corners,
+          finished,
+          status,
+        };
+      }
+    }
+
+    // For match IDs not found in live (already finished), check DB cache
+    const missingIds = matchIds.filter(id => !matchData[id]);
+    if (missingIds.length > 0) {
+      // Try to get from cache_api (finished matches stay cached)
+      for (const mId of missingIds) {
+        const { data: cached } = await sb
+          .from('cache_api')
+          .select('dados_json')
+          .eq('cache_key', `stats_${mId}`)
+          .maybeSingle();
+
+        if (cached?.dados_json) {
+          const resArr = cached.dados_json.response || [];
+          let corners = 0;
+          for (const team of resArr) {
+            const cornerStat = (team.statistics || []).find((s: any) => s.type === 'Corner Kicks');
+            corners += (cornerStat?.value ?? 0);
+          }
+          // If we have cached stats, the match is likely finished
+          matchData[mId] = {
+            homeGoals: 0, awayGoals: 0, corners, finished: true, status: 'FT',
           };
         }
-      } catch (e) {
-        console.error(`Failed to fetch match ${matchId}:`, e);
       }
-      // Small delay between API calls
-      await new Promise(r => setTimeout(r, 200));
+
+      // For truly missing matches that need score, use a SINGLE bulk check via API
+      const stillMissing = missingIds.filter(id => !matchData[id]);
+      if (stillMissing.length > 0) {
+        const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
+        if (API_KEY) {
+          // Batch: fetch up to 20 fixtures in one API call using ids parameter
+          const batchSize = 20;
+          for (let i = 0; i < stillMissing.length; i += batchSize) {
+            const batch = stillMissing.slice(i, i + batchSize);
+            const idsParam = batch.join('-');
+            try {
+              const resp = await fetch(`https://v3.football.api-sports.io/fixtures?ids=${idsParam}`, {
+                headers: { 'x-apisports-key': API_KEY },
+              });
+              const json = await resp.json();
+              for (const fixture of (json.response || [])) {
+                const fId = String(fixture.fixture?.id);
+                matchData[fId] = {
+                  homeGoals: fixture.goals?.home ?? 0,
+                  awayGoals: fixture.goals?.away ?? 0,
+                  corners: (fixture.statistics || []).reduce((sum: number, team: any) => {
+                    const cs = team.statistics?.find((s: any) => s.type === 'Corner Kicks');
+                    return sum + (cs?.value ?? 0);
+                  }, 0),
+                  finished: ['FT', 'AET', 'PEN'].includes(fixture.fixture?.status?.short),
+                  status: fixture.fixture?.status?.short,
+                };
+              }
+            } catch (e) {
+              console.error(`Batch fetch failed for ids ${idsParam}:`, e);
+            }
+          }
+        }
+      }
     }
+
+    console.log(`[CHECK-RESULTS] ${Object.keys(matchData).length}/${matchIds.length} matches resolved (${liveMatches.length} from cache)`);
 
     let processed = 0;
     const results: Array<{ id: string; status: string }> = [];
@@ -137,7 +207,6 @@ Deno.serve(async (req) => {
       const data = matchData[signal.match_id];
       if (!data) continue;
 
-      // Determine the resolved status
       let newStatus = signal.status;
       if (signal.status === 'pendente') {
         const signalAge = Date.now() - new Date(signal.created_at).getTime();
@@ -154,7 +223,7 @@ Deno.serve(async (req) => {
         if (newStatus === 'pendente') continue;
       }
 
-      // Edit Telegram message FIRST (before DB update)
+      // Edit Telegram message
       let telegramEdited = false;
       if (signal.telegram_message_id) {
         try {
@@ -192,29 +261,22 @@ Deno.serve(async (req) => {
           });
 
           const tgResult = await tgResp.json();
-          // "message is not modified" means it was already edited successfully before
           const alreadyEdited = tgResult.description?.includes('message is not modified');
           telegramEdited = tgResult.ok === true || tgResp.ok || alreadyEdited;
           if (!telegramEdited) {
-            // If rate limited, skip remaining to avoid more 429s
             if (tgResult.error_code === 429) {
               console.error(`Rate limited, stopping. Retry after ${tgResult.parameters?.retry_after}s`);
-              // Still update this signal's DB status
               await sb.from('telegram_signals').update({ status: newStatus, telegram_edited: false }).eq('id', signal.id);
               break;
             }
             console.error(`Telegram edit failed for signal ${signal.id}:`, JSON.stringify(tgResult));
-          } else {
-            console.log(`Telegram edit OK for signal ${signal.id}, message ${signal.telegram_message_id}`);
           }
         } catch (e) {
           console.error(`Failed to edit Telegram message for signal ${signal.id}:`, e);
         }
-        // Delay between Telegram edits to avoid rate limiting
         await new Promise(r => setTimeout(r, 1500));
       }
 
-      // Update status + telegram_edited flag in DB
       const { error: updateErr } = await sb
         .from('telegram_signals')
         .update({ status: newStatus, telegram_edited: telegramEdited })

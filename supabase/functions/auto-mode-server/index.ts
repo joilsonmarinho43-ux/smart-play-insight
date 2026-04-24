@@ -106,7 +106,7 @@ function classifyServer(match: any): HybridSignal | null {
   if (isSemi && s.minute > 45) return null;
 
   const tier: HybridTier = isSniper ? 'SNIPER' : 'SEMI';
-  const market = isSniper ? 'Over 0.5 HT' : (s.homeGoals + s.awayGoals === 0 ? 'Over 0.5' : 'Over 1.5');
+  const market = 'Over 1.5';
 
   // Count validated filters
   const filters = [

@@ -90,20 +90,20 @@ function classifyServer(match: any): HybridSignal | null {
   const s = extractStats(match);
   if (!s.hasStats) return null;
 
-  // SNIPER criteria
-  const isSniper = s.minute >= 5 && s.minute <= 30 &&
+  // SNIPER criteria — high-pressure 0x0 early window
+  const isSniper = s.minute >= 5 && s.minute <= 35 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
     s.sog >= 2 && s.dominantPoss >= 55 && s.da >= 6 && s.corners >= 2 && s.pressure >= 50;
 
-  // SEMI criteria
-  const validScore = (s.homeGoals === 0 && s.awayGoals === 0) || (s.homeGoals + s.awayGoals === 1);
-  const isSemi = !isSniper && s.minute >= 5 && s.minute <= 45 &&
-    validScore && s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 35;
+  // SEMI criteria — accepts 0x0 OR 1 goal, extended window up to min 60
+  const validScore = (s.homeGoals + s.awayGoals) <= 1;
+  const isSemi = !isSniper && s.minute >= 5 && s.minute <= 60 &&
+    validScore && s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 30;
 
   if (!isSniper && !isSemi) return null;
 
-  // Execution window for market selection
-  if (isSemi && s.minute > 45) return null;
+  // Execution window for market selection (extended to 60 for Over 1.5 in 0x0/0x1)
+  if (isSemi && s.minute > 60) return null;
 
   const tier: HybridTier = isSniper ? 'SNIPER' : 'SEMI';
   const market = 'Over 1.5';

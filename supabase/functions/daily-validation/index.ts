@@ -177,11 +177,23 @@ Deno.serve(async (req) => {
     const resolved = greens + losses;
     const winRate = resolved > 0 ? ((greens / resolved) * 100).toFixed(1) : '-';
 
+    // Normalize market labels (Over X.5 / Over X.5 Gols → unified "Over X.5")
+    const normalizeMarket = (m: string): string => {
+      const t = m.trim();
+      const overMatch = t.match(/^Over\s+(\d+\.\d+)(\s+HT)?(\s+Gols?)?$/i);
+      if (overMatch) {
+        const num = overMatch[1];
+        const ht = overMatch[2] ? ' HT' : '';
+        return `Over ${num}${ht}`;
+      }
+      return t;
+    };
+
     // Breakdown by market
     const marketStats: Record<string, { g: number; l: number }> = {};
     for (const s of signals) {
       if (s.status !== 'green' && s.status !== 'loss') continue;
-      const key = s.market;
+      const key = normalizeMarket(s.market);
       if (!marketStats[key]) marketStats[key] = { g: 0, l: 0 };
       if (s.status === 'green') marketStats[key].g++;
       else marketStats[key].l++;

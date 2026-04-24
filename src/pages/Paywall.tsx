@@ -25,12 +25,12 @@ const Paywall = () => {
 
           <div className="space-y-2">
             <h2 className="text-xl font-semibold text-foreground">
-              {expiryDate ? 'Acesso Expirado' : 'Acesso Pendente'}
+              {expiryDate ? 'Seu período de teste acabou' : 'Acesso Pendente'}
             </h2>
             <p className="text-muted-foreground text-sm">
               {expiryDate
-                ? `Sua assinatura expirou em ${expiryDate}.`
-                : 'Sua conta ainda não foi liberada pelo administrador.'}
+                ? `Seu acesso gratuito expirou em ${expiryDate}. Renove agora pelo WhatsApp para continuar recebendo os sinais VIP.`
+                : 'Sua conta ainda não foi liberada. Fale conosco no WhatsApp para ativar seu acesso.'}
             </p>
           </div>
 

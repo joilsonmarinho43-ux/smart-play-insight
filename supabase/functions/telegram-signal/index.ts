@@ -120,31 +120,51 @@ Deno.serve(async (req) => {
     let telegramError = '';
     let telegramMessageId: number | null = null;
 
-    try {
-      const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'X-Connection-Api-Key': TELEGRAM_API_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: CHAT_ID,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-        }),
-      });
+    // Retry with exponential backoff on transient gateway errors (502/503/504/network)
+    const MAX_ATTEMPTS = 4;
+    const RETRY_DELAYS = [500, 1500, 3500]; // ms before attempts 2, 3, 4
 
-      const data = await response.json();
-      if (!response.ok) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'X-Connection-Api-Key': TELEGRAM_API_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: CHAT_ID,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          telegramSuccess = true;
+          telegramMessageId = data.result?.message_id ?? null;
+          telegramError = '';
+          if (attempt > 1) console.log(`[TELEGRAM-SIGNAL] ✅ Sucesso na tentativa ${attempt}`);
+          break;
+        }
+
         telegramError = `Telegram API failed [${response.status}]: ${JSON.stringify(data)}`;
-      } else {
-        telegramSuccess = true;
-        telegramMessageId = data.result?.message_id ?? null;
+
+        // Only retry on transient errors (502/503/504 or 429 rate limit)
+        const isTransient = response.status === 502 || response.status === 503 || response.status === 504 || response.status === 429;
+        if (!isTransient || attempt === MAX_ATTEMPTS) break;
+
+        console.log(`[TELEGRAM-SIGNAL] ⚠️ Tentativa ${attempt} falhou (${response.status}), retry em ${RETRY_DELAYS[attempt - 1]}ms`);
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt - 1]));
+      } catch (e) {
+        telegramError = e instanceof Error ? e.message : 'Unknown Telegram error';
+        if (attempt === MAX_ATTEMPTS) break;
+        console.log(`[TELEGRAM-SIGNAL] ⚠️ Tentativa ${attempt} erro de rede, retry em ${RETRY_DELAYS[attempt - 1]}ms`);
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt - 1]));
       }
-    } catch (e) {
-      telegramError = e instanceof Error ? e.message : 'Unknown Telegram error';
     }
 
     // Log signal to database

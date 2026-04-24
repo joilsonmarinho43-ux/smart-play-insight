@@ -521,8 +521,8 @@ serve(async (req) => {
     const leaguePools = new Map<number, any[]>();
     for (const leagueId of neededLeagues) {
       if (!canCallAPI()) break;
-      const pool = await fetchLeagueRecentFixtures(leagueId, apiKey);
-      leaguePools.set(leagueId, pool);
+      const pool = await fetchLeagueRecentFixtures(leagueId as number, apiKey);
+      leaguePools.set(leagueId as number, pool);
       await delay(200);
     }
 

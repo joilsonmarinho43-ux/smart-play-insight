@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
       }
 
       signalsToSend.push(signal);
-      if (signalsToSend.length + dailyCount >= 15) break;
+      if (signalsToSend.length + dailyCount >= 25) break;
     }
 
     console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} aprovados, ${rmaBlocked} bloqueados pelo RMA`);

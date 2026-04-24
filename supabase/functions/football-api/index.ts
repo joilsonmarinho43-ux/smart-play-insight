@@ -36,7 +36,7 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 // SUPABASE DB CACHE LAYER
 // ========================
 const CACHE_TTL = {
-  LIVE: 2 * 60 * 1000,        // 2 minutes
+  LIVE: 4 * 60 * 1000,        // 4 minutes (was 2) — covers 5min cron with overlap
   PRE: 12 * 60 * 60 * 1000,   // 12 hours
   FINISHED: Infinity,          // Never expires
   STATS: 24 * 60 * 60 * 1000, // 24 hours for fixture stats

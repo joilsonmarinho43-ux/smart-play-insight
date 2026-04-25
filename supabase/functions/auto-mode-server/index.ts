@@ -95,12 +95,12 @@ function classifyServer(match: any): HybridSignal | null {
     s.homeGoals === 0 && s.awayGoals === 0 &&
     s.sog >= 2 && s.dominantPoss >= 55 && s.da >= 6 && s.corners >= 2 && s.pressure >= 50;
 
-  // SEMI criteria — janela apertada por placar para preservar assertividade do Over 1.5
-  // 0x0: até min 35 (precisa tempo p/ 2 gols) | 1x0 ou 0x1: até min 50 (precisa tempo p/ 1 gol)
+  // SEMI criteria — janela vencedora do simulador (histórico 14d): 92.3% em 1x0/0x1 até min 45
+  // 0x0: 5-40min (tempo p/ 2 gols) | 1x0 ou 0x1: 5-45min (janela ótima validada)
   const totalGoals = s.homeGoals + s.awayGoals;
   const semiWindowOk =
-    (totalGoals === 0 && s.minute >= 5 && s.minute <= 35) ||
-    (totalGoals === 1 && s.minute >= 5 && s.minute <= 50);
+    (totalGoals === 0 && s.minute >= 5 && s.minute <= 40) ||
+    (totalGoals === 1 && s.minute >= 5 && s.minute <= 45);
   const isSemi = !isSniper && semiWindowOk &&
     s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 30;
 

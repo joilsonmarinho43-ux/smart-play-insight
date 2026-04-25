@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Live from "./pages/Live";
+import MatchDetails from "./pages/MatchDetails";
 
 import Favorites from "./pages/Favorites";
 import Scanner from "./pages/Scanner";

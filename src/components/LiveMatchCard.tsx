@@ -115,7 +115,7 @@ const LiveMatchCard = ({ match }: Props) => {
         </div>
 
       </div>
-    </div>
+    </Link>
   );
 };
 

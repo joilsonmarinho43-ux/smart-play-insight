@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import Live from "./pages/Live";
+import MatchDetails from "./pages/MatchDetails";
 
 import Favorites from "./pages/Favorites";
 import Scanner from "./pages/Scanner";
@@ -79,6 +80,7 @@ const App = () => {
             {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}
             <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
             <Route path="/live" element={<ProtectedRoute><AppLayout><Live /></AppLayout></ProtectedRoute>} />
+            <Route path="/match/:id" element={<ProtectedRoute><AppLayout><MatchDetails /></AppLayout></ProtectedRoute>} />
             
             <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
             <Route path="/elite" element={<ProtectedRoute><AppLayout><Elite /></AppLayout></ProtectedRoute>} />

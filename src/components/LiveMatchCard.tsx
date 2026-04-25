@@ -1,5 +1,6 @@
 import { MatchData } from '@/types/match';
 import { Trophy, Activity, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface Props {
   match: MatchData;
@@ -21,7 +22,10 @@ const LiveMatchCard = ({ match }: Props) => {
   };
 
   return (
-    <div className="bg-card rounded-2xl border border-primary/30 overflow-hidden animate-pulse-subtle border-l-4 border-l-primary">
+    <Link
+      to={`/match/${match.id}`}
+      className="block bg-card rounded-2xl border border-primary/30 overflow-hidden animate-pulse-subtle border-l-4 border-l-primary hover:border-primary transition-colors"
+    >
       
       {/* Header Live */}
       <div className="bg-secondary/50 px-4 py-2 flex items-center justify-between border-b border-border">
@@ -111,7 +115,7 @@ const LiveMatchCard = ({ match }: Props) => {
         </div>
 
       </div>
-    </div>
+    </Link>
   );
 };
 

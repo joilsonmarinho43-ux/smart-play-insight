@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { fetchLiveMatches } from '@/services/footballApi';
-import LiveFieldAnimation from '@/components/LiveFieldAnimation';
 
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -45,22 +44,15 @@ const MatchDetails = () => {
 
       {match && (
         <div className="space-y-4">
-          <LiveFieldAnimation
-            homeTeam={match.homeTeam}
-            awayTeam={match.awayTeam}
-            homeScore={match.liveScore?.home ?? 0}
-            awayScore={match.liveScore?.away ?? 0}
-            minute={match.minute ?? 0}
-            status={match.status ?? 'LIVE'}
-            stats={{
-              shotsOnGoalHome: match.metrics?.shotsOnTarget?.[0],
-              shotsOnGoalAway: match.metrics?.shotsOnTarget?.[1],
-              cornersHome: match.liveStats?.corners?.[0],
-              cornersAway: match.liveStats?.corners?.[1],
-              dangerousAttacksHome: match.liveStats?.dangerousAttacks?.[0],
-              dangerousAttacksAway: match.liveStats?.dangerousAttacks?.[1],
-            }}
-          />
+          <div className="bg-secondary/40 border border-border rounded-xl p-4 text-center">
+            <div className="text-xs text-muted-foreground mb-1">{match.league}</div>
+            <div className="font-display text-lg">
+              {match.homeTeam} <span className="text-primary">{match.liveScore?.home ?? 0} - {match.liveScore?.away ?? 0}</span> {match.awayTeam}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {match.status ?? 'LIVE'} · {match.minute ?? 0}'
+            </div>
+          </div>
 
           {/* Stats rápidas */}
           <div className="grid grid-cols-2 gap-3">

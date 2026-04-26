@@ -11,7 +11,9 @@ const MatchDetails = () => {
   const { data: matches, isLoading } = useQuery({
     queryKey: ['liveMatches'],
     queryFn: fetchLiveMatches,
-    refetchInterval: 60_000,
+    refetchInterval: 120_000,
+    staleTime: 240_000,
+    refetchOnWindowFocus: false,
   });
 
   const match = useMemo(

@@ -269,9 +269,9 @@ const Live = () => {
   } = useQuery({
     queryKey: ['live-matches'],
     queryFn: () => fetchLiveMatches(),
-    refetchInterval: 60000,
-    staleTime: 55000,
-    refetchOnWindowFocus: true,
+    refetchInterval: 120000,
+    staleTime: 240000,
+    refetchOnWindowFocus: false,
   });
 
   // Refetch when app returns from background (mobile)

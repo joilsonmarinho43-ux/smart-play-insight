@@ -90,16 +90,16 @@ function classifyServer(match: any): HybridSignal | null {
   const s = extractStats(match);
   if (!s.hasStats) return null;
 
-  // SNIPER criteria — high-pressure 0x0 early window
-  const isSniper = s.minute >= 5 && s.minute <= 35 &&
+  // SNIPER (agressivo) — auditoria 24h: 40% em min 31-40 → reduzir janela p/ 5-30 e exigir mais pressão
+  const isSniper = s.minute >= 5 && s.minute <= 30 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
-    s.sog >= 2 && s.dominantPoss >= 55 && s.da >= 6 && s.corners >= 2 && s.pressure >= 50;
+    s.sog >= 3 && s.dominantPoss >= 55 && s.da >= 8 && s.corners >= 2 && s.pressure >= 60;
 
-  // SEMI criteria — janela vencedora do simulador (histórico 14d): 92.3% em 1x0/0x1 até min 45
-  // 0x0: 5-40min (tempo p/ 2 gols) | 1x0 ou 0x1: 5-45min (janela ótima validada)
+  // SEMI — auditoria 24h: 0x0 entre min 31-40 perdeu 5/11. Janela 0x0 cai p/ 5-30.
+  // Placar 1x0/0x1 mantém 5-45 (já tem 1 gol → Over 1.5 vira Over 0.5 restante, baixo risco)
   const totalGoals = s.homeGoals + s.awayGoals;
   const semiWindowOk =
-    (totalGoals === 0 && s.minute >= 5 && s.minute <= 40) ||
+    (totalGoals === 0 && s.minute >= 5 && s.minute <= 30) ||
     (totalGoals === 1 && s.minute >= 5 && s.minute <= 45);
   const isSemi = !isSniper && semiWindowOk &&
     s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 30;

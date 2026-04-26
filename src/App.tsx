@@ -71,6 +71,7 @@ const AdminRoute = ({ children }: { children: ReactNode }) => {
 };
 
 const App = () => {
+  useApiKeyValidator();
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

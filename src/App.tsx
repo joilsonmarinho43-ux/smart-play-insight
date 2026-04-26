@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useSessionGuard } from "@/hooks/useSessionGuard";
+import { useApiKeyValidator } from "@/hooks/useApiKeyValidator";
 import { ReactNode } from "react";
 
 import Index from "./pages/Index";

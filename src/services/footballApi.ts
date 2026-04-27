@@ -14,6 +14,34 @@ const CACHE_KEYS = {
 const PRE_MATCH_COOLDOWN = 1000 * 60 * 60 * 24; // 24h - Pré-Jogo carrega 1x por dia (economiza cota)
 const LIVE_MATCH_COOLDOWN = 1000 * 55;     // 55 segundos para Live
 
+// =============================
+// MODO OFFLINE (cache expirado servido como fallback)
+// =============================
+const OFFLINE_FLAG_KEY = 'football_offline_mode';
+const OFFLINE_SINCE_KEY = 'football_offline_since';
+
+function setOfflineMode(active: boolean) {
+  if (active) {
+    localStorage.setItem(OFFLINE_FLAG_KEY, '1');
+    if (!localStorage.getItem(OFFLINE_SINCE_KEY)) {
+      localStorage.setItem(OFFLINE_SINCE_KEY, String(Date.now()));
+    }
+  } else {
+    localStorage.removeItem(OFFLINE_FLAG_KEY);
+    localStorage.removeItem(OFFLINE_SINCE_KEY);
+  }
+  try { window.dispatchEvent(new CustomEvent('football-offline-change')); } catch {}
+}
+
+export function isOfflineMode(): boolean {
+  return localStorage.getItem(OFFLINE_FLAG_KEY) === '1';
+}
+
+export function getOfflineSince(): number | null {
+  const t = localStorage.getItem(OFFLINE_SINCE_KEY);
+  return t ? Number(t) : null;
+}
+
 function getStorageCache(key: string, timeKey: string, cooldown: number) {
   const data = localStorage.getItem(key);
   const time = localStorage.getItem(timeKey);

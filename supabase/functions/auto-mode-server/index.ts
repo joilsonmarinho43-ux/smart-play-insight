@@ -8,14 +8,24 @@ const corsHeaders = {
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // ═══════════════════════════════════════
-// RMA ENGINE (inline)
+// RMA ENGINE (inline) — pesos rebalanceados + league_weight + momentum
 // ═══════════════════════════════════════
-function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number } {
+function evaluateRMAServer(
+  minute: number,
+  pressure: number,
+  da: number,
+  shots: number,
+  sot: number,
+  leagueWeight = 0,
+  momentumDelta = 0,
+): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number } {
   const safeMin = Math.max(minute, 1);
   const ap_norm = (da / safeMin) * 10;
   const f_norm = (shots / safeMin) * 10;
   const sot_norm = (sot / safeMin) * 10;
-  let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
+  // Pesos novos: pressão 0.30, ap 0.35, f 0.15, sot 0.20
+  let rma_score = (pressure * 0.30) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.20);
+  rma_score += leagueWeight + momentumDelta;
   if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score };
   if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score };
   if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score };
@@ -24,10 +34,72 @@ function evaluateRMAServer(minute: number, pressure: number, da: number, shots: 
 }
 
 // ═══════════════════════════════════════
+// LEAGUE WEIGHT — qualidade estatística da liga
+// ═══════════════════════════════════════
+const ELITE_LEAGUES = [
+  'premier league', 'la liga', 'laliga', 'serie a', 'bundesliga', 'ligue 1',
+  'champions league', 'uefa champions',
+];
+const UNSTABLE_PATTERNS = [
+  'friendly', 'amistoso', 'reserve', 'reservas', 'u20', 'u-20', 'u19', 'u-19',
+  'u18', 'u-18', 'u17', 'u-17', 'sub-20', 'sub20', 'sub-19', 'sub19', 'sub-17',
+  'youth', 'juvenil', 'women', 'feminin', 'feminina', 'wom', ' w ', ' w.', 'amateur',
+];
+function getLeagueWeight(league: string): number {
+  const l = (league || '').toLowerCase();
+  if (!l) return 0;
+  if (ELITE_LEAGUES.some((k) => l.includes(k))) return 5;
+  if (UNSTABLE_PATTERNS.some((k) => l.includes(k))) return -5;
+  return 0;
+}
+
+// ═══════════════════════════════════════
+// MOMENTUM CACHE — leitura dos últimos ~5 min por jogo
+// ═══════════════════════════════════════
+interface MomentumSnapshot {
+  minute: number;
+  sog: number;
+  da: number;
+  corners: number;
+  pressure: number;
+  ts: number;
+}
+const momentumCache = new Map<string, MomentumSnapshot[]>();
+
+function pushMomentum(matchId: string, snap: MomentumSnapshot) {
+  const arr = momentumCache.get(matchId) || [];
+  arr.push(snap);
+  // mantém apenas últimos 10 min de leituras
+  const cutoff = snap.minute - 10;
+  const trimmed = arr.filter((x) => x.minute >= cutoff);
+  momentumCache.set(matchId, trimmed);
+}
+
+function getMomentumDelta(matchId: string, current: MomentumSnapshot): number {
+  const arr = momentumCache.get(matchId) || [];
+  // procura snapshot ~5 min atrás
+  const past = [...arr].reverse().find((x) => current.minute - x.minute >= 4 && current.minute - x.minute <= 7);
+  if (!past) return 0;
+  const dSog = current.sog - past.sog;
+  const dDa = current.da - past.da;
+  const dCorners = current.corners - past.corners;
+  const dPressure = current.pressure - past.pressure;
+  // score de momentum
+  let m = dSog * 2 + dCorners * 1.5 + dDa * 0.25 + dPressure * 0.05;
+  // clamp
+  if (m > 6) m = 6;
+  if (m < -6) m = -6;
+  if (m > 0 && m < 3) m = 3; // mínimo positivo relevante
+  if (m < 0 && m > -3) m = -3; // mínimo penalidade
+  if (Math.abs(m) < 1) return 0;
+  return Math.round(m);
+}
+
+// ═══════════════════════════════════════
 // HYBRID ENGINE (server-side, no localStorage)
 // ═══════════════════════════════════════
 
-type HybridTier = 'SNIPER' | 'SEMI';
+type HybridTier = 'SUPER_SNIPER' | 'SNIPER' | 'SEMI';
 
 interface HybridSignal {
   matchId: string;
@@ -70,7 +142,6 @@ function extractStats(match: any) {
   const homePoss = Number(lH.possession || 0);
   const awayPoss = Number(lA.possession || 0);
   const dominantPoss = Math.max(homePoss, awayPoss);
-  // Pressure: weighted sum without /5 divisor to produce realistic 0-100 values
   const pressure = Math.min(100, Math.max(0, da * 2 + corners * 4 + sog * 8));
   const homeTeam = match.teams?.home?.name || 'Casa';
   const awayTeam = match.teams?.away?.name || 'Fora';
@@ -81,7 +152,7 @@ function extractStats(match: any) {
   return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats };
 }
 
-function classifyServer(match: any): HybridSignal | null {
+function classifyServer(match: any, rmaScorePreview: number): HybridSignal | null {
   const liveStatuses = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE'];
   const status = String(match?.fixture?.status?.short || '').toUpperCase();
   const isLive = match?.isLive === true || liveStatuses.includes(status);
@@ -90,38 +161,54 @@ function classifyServer(match: any): HybridSignal | null {
   const s = extractStats(match);
   if (!s.hasStats) return null;
 
-  // SNIPER (agressivo) — auditoria 24h: 40% em min 31-40 → reduzir janela p/ 5-30 e exigir mais pressão
-  const isSniper = s.minute >= 5 && s.minute <= 30 &&
+  // 💀 SUPER SNIPER — premium, raro
+  const isSuperSniper =
+    s.homeGoals === 0 && s.awayGoals === 0 &&
+    s.minute >= 12 && s.minute <= 28 &&
+    s.sog >= 4 && s.da >= 12 && s.corners >= 3 &&
+    s.dominantPoss >= 58 && s.pressure >= 75 &&
+    rmaScorePreview >= 28;
+
+  // SNIPER (agressivo)
+  const isSniper = !isSuperSniper && s.minute >= 5 && s.minute <= 30 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
     s.sog >= 3 && s.dominantPoss >= 55 && s.da >= 8 && s.corners >= 2 && s.pressure >= 60;
 
-  // SEMI — auditoria 24h: 0x0 entre min 31-40 perdeu 5/11. Janela 0x0 cai p/ 5-30.
-  // Placar 1x0/0x1 mantém 5-45 (já tem 1 gol → Over 1.5 vira Over 0.5 restante, baixo risco)
+  // SEMI
   const totalGoals = s.homeGoals + s.awayGoals;
   const semiWindowOk =
     (totalGoals === 0 && s.minute >= 5 && s.minute <= 30) ||
     (totalGoals === 1 && s.minute >= 5 && s.minute <= 45);
-  const isSemi = !isSniper && semiWindowOk &&
+  const isSemi = !isSuperSniper && !isSniper && semiWindowOk &&
     s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 30;
 
-  if (!isSniper && !isSemi) return null;
+  if (!isSuperSniper && !isSniper && !isSemi) return null;
 
-  const tier: HybridTier = isSniper ? 'SNIPER' : 'SEMI';
+  const tier: HybridTier = isSuperSniper ? 'SUPER_SNIPER' : isSniper ? 'SNIPER' : 'SEMI';
   const market = 'Over 1.5';
 
-  // Count validated filters
+  // Filtros validados (escala por tier)
+  const filterThresholds = isSuperSniper
+    ? { sog: 3, poss: 58, da: 10, crn: 3, prs: 75 }
+    : isSniper
+      ? { sog: 2, poss: 60, da: 6, crn: 2, prs: 70 }
+      : { sog: 1, poss: 55, da: 4, crn: 1, prs: 60 };
   const filters = [
-    s.sog >= (isSniper ? 2 : 1),
-    s.dominantPoss >= (isSniper ? 60 : 55),
-    s.da >= (isSniper ? 6 : 4),
-    s.corners >= (isSniper ? 2 : 1),
-    s.pressure >= (isSniper ? 70 : 60),
+    s.sog >= filterThresholds.sog,
+    s.dominantPoss >= filterThresholds.poss,
+    s.da >= filterThresholds.da,
+    s.corners >= filterThresholds.crn,
+    s.pressure >= filterThresholds.prs,
   ];
   const validated = filters.filter(Boolean).length;
 
-  const confidence = isSniper
-    ? Math.min(95, 70 + Math.round(s.pressure / 10) + validated * 2)
-    : Math.min(85, 60 + Math.round(s.pressure / 15) + validated * 2);
+  const confidence = isSuperSniper
+    ? Math.min(98, 82 + Math.round(s.pressure / 8) + validated * 2)
+    : isSniper
+      ? Math.min(95, 70 + Math.round(s.pressure / 10) + validated * 2)
+      : Math.min(85, 60 + Math.round(s.pressure / 15) + validated * 2);
+
+  const label = isSuperSniper ? 'SUPER SNIPER 💀' : isSniper ? 'SNIPER 🔥' : 'SEMI ⚡';
 
   return {
     matchId: s.matchId,
@@ -129,7 +216,7 @@ function classifyServer(match: any): HybridSignal | null {
     league: s.league,
     minute: s.minute,
     tier,
-    label: isSniper ? 'SNIPER 🔥' : 'SEMI ⚡',
+    label,
     market,
     confidence,
     shotsOnGoal: s.sog,
@@ -148,7 +235,6 @@ function classifyServer(match: any): HybridSignal | null {
 // ═══════════════════════════════════════
 // MAIN HANDLER
 // ═══════════════════════════════════════
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -168,7 +254,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Fetch live matches via football-api edge function
+    // 1. Fetch live matches
     const footballRes = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
       method: 'POST',
       headers: {
@@ -188,7 +274,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Get today's already-signaled match IDs to avoid duplicates
+    // 2. Anti-spam: 1 sinal por jogo/dia
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -200,7 +286,7 @@ Deno.serve(async (req) => {
 
     const signaledIds = new Set((existingSignals || []).map((s: any) => s.match_id).filter(Boolean));
 
-    // 3. Daily limit: max 25 signals/day
+    // 3. Limite diário: 25 sinais
     const dailyCount = existingSignals?.length || 0;
     if (dailyCount >= 25) {
       console.log('[AUTO-MODE-SERVER] Limite diário de 25 sinais atingido');
@@ -209,22 +295,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4. Classify each match + RMA gate
+    // 4. Classify each match + RMA gate (com momentum e league_weight)
     const signalsToSend: HybridSignal[] = [];
     let rmaBlocked = 0;
+    const nowTs = Date.now();
     for (const match of matches) {
       const s = extractStats(match);
       if (s.hasStats) {
         console.log(`[AUTO-MODE-SERVER] ${s.homeTeam} vs ${s.awayTeam} | min:${s.minute} sog:${s.sog} da:${s.da}${s.daEstimated?'≈':''} crn:${s.corners} poss:${s.dominantPoss} prs:${Math.round(s.pressure)} score:${s.homeGoals}-${s.awayGoals}`);
       }
-      const signal = classifyServer(match);
+      if (!s.hasStats || !s.matchId) continue;
+
+      // Momentum: snapshot atual + delta vs ~5 min atrás
+      const snap: MomentumSnapshot = { minute: s.minute, sog: s.sog, da: s.da, corners: s.corners, pressure: s.pressure, ts: nowTs };
+      const momentumDelta = getMomentumDelta(s.matchId, snap);
+      pushMomentum(s.matchId, snap);
+
+      // League weight
+      const leagueWeight = getLeagueWeight(s.league);
+
+      // RMA com ajustes (usado também como preview para SUPER SNIPER)
+      const rma = evaluateRMAServer(s.minute, s.pressure, s.da, s.totalShots, s.sog, leagueWeight, momentumDelta);
+
+      const signal = classifyServer(match, rma.score);
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;
 
-      // ═══ RMA GATE ═══
-      const rma = evaluateRMAServer(signal.minute, signal.pressure, signal.dangerousAttacks, signal.totalShots, signal.shotsOnGoal);
       if (rma.verdict === 'BLOQUEADO') {
-        console.log(`[AUTO-MODE-SERVER] 🔴 RMA BLOQUEOU: ${signal.match} • ${signal.market} (score: ${rma.score})`);
+        console.log(`[AUTO-MODE-SERVER] 🔴 RMA BLOQUEOU: ${signal.match} • ${signal.market} (score:${rma.score} lw:${leagueWeight} mom:${momentumDelta})`);
         await supabase.from('rma_shadow_logs').insert({
           match_id: signal.matchId,
           match_name: signal.match,
@@ -234,11 +332,15 @@ Deno.serve(async (req) => {
           rma_verdict: 'BLOQUEADO',
           rma_score: rma.score,
           pressure: signal.pressure,
-          block_reason: 'Auto-Mode — sinal bloqueado pelo RMA',
+          block_reason: `Auto-Mode — RMA bloqueou (lw:${leagueWeight}, mom:${momentumDelta})`,
         });
         rmaBlocked++;
         continue;
       }
+
+      // Aplica league_weight + momentum também na confiança final
+      signal.confidence = Math.max(0, Math.min(99, signal.confidence + leagueWeight + momentumDelta));
+      signal.filtersValidated = `${signal.filtersValidated} • lw${leagueWeight >= 0 ? '+' : ''}${leagueWeight} • mom${momentumDelta >= 0 ? '+' : ''}${momentumDelta}`;
 
       signalsToSend.push(signal);
       if (signalsToSend.length + dailyCount >= 25) break;
@@ -258,7 +360,7 @@ Deno.serve(async (req) => {
           market: signal.market,
           confidence: signal.confidence,
           filtersValidated: signal.filtersValidated,
-          sensitivity: signal.tier === 'SNIPER' ? 'agressivo' : 'moderado',
+          sensitivity: signal.tier === 'SUPER_SNIPER' ? 'premium' : signal.tier === 'SNIPER' ? 'agressivo' : 'moderado',
           minute: signal.minute,
           score,
           reason: `Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,

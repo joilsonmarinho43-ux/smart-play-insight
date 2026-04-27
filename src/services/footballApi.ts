@@ -167,15 +167,17 @@ export async function fetchLiveMatches(): Promise<MatchData[]> {
     if (deduped.length > 0) {
       localStorage.setItem(CACHE_KEYS.LIVE, JSON.stringify(deduped));
       localStorage.setItem(CACHE_KEYS.TIME_LIVE, String(Date.now()));
+      setOfflineMode(false);
     }
 
     return deduped;
   } catch (err) {
     console.error('Erro LIVE:', err);
-    // Fallback: stale cache
+    // Fallback: stale cache → modo offline
     const staleData = localStorage.getItem(CACHE_KEYS.LIVE);
     if (staleData) {
-      console.warn('Usando cache live expirado como fallback');
+      console.warn('[OFFLINE] Servindo cache live expirado');
+      setOfflineMode(true);
       return JSON.parse(staleData);
     }
     return [];

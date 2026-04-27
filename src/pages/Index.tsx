@@ -176,7 +176,17 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Day Selector */}
+        {/* Banner Modo Offline */}
+        {offline && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200">
+            <WifiOff className="w-4 h-4 shrink-0" />
+            <div className="text-xs leading-tight">
+              <strong className="font-bold">Modo offline</strong> — exibindo último pré-jogo salvo
+              {getOfflineSince() && ` (desde ${new Date(getOfflineSince()!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`}.
+              API de futebol indisponível ou sem cota.
+            </div>
+          </div>
+        )}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {dayOptions.map(day => {
             const count = safeMatches.filter((m: any) => {

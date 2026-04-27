@@ -91,15 +91,17 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
     if (result.length > 0) {
       localStorage.setItem(cacheKey, JSON.stringify(result));
       localStorage.setItem(cacheTimeKey, String(Date.now()));
+      setOfflineMode(false); // API ok → sai do offline
     }
 
     return result;
   } catch (err) {
     console.error('Erro PRE:', err);
-    // Fallback: return stale cache if available
+    // Fallback: cache expirado → ativa modo offline
     const staleData = localStorage.getItem(cacheKey);
     if (staleData) {
-      console.warn('Usando cache expirado como fallback');
+      console.warn('[OFFLINE] Servindo cache expirado para', date);
+      setOfflineMode(true);
       return JSON.parse(staleData);
     }
     return [];

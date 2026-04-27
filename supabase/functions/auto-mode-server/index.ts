@@ -8,19 +8,91 @@ const corsHeaders = {
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // ═══════════════════════════════════════
-// RMA ENGINE (inline)
+// RMA ENGINE (inline) — pesos rebalanceados + league_weight + momentum
 // ═══════════════════════════════════════
-function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number } {
+function evaluateRMAServer(
+  minute: number,
+  pressure: number,
+  da: number,
+  shots: number,
+  sot: number,
+  leagueWeight = 0,
+  momentumDelta = 0,
+): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number } {
   const safeMin = Math.max(minute, 1);
   const ap_norm = (da / safeMin) * 10;
   const f_norm = (shots / safeMin) * 10;
   const sot_norm = (sot / safeMin) * 10;
-  let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
+  // Pesos novos: pressão 0.30, ap 0.35, f 0.15, sot 0.20
+  let rma_score = (pressure * 0.30) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.20);
+  rma_score += leagueWeight + momentumDelta;
   if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score };
   if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score };
   if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score };
   const verdict = rma_score > 40 ? 'CONFIRMADO' as const : rma_score >= 20 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
   return { verdict, score: Math.round(rma_score * 100) / 100 };
+}
+
+// ═══════════════════════════════════════
+// LEAGUE WEIGHT — qualidade estatística da liga
+// ═══════════════════════════════════════
+const ELITE_LEAGUES = [
+  'premier league', 'la liga', 'laliga', 'serie a', 'bundesliga', 'ligue 1',
+  'champions league', 'uefa champions',
+];
+const UNSTABLE_PATTERNS = [
+  'friendly', 'amistoso', 'reserve', 'reservas', 'u20', 'u-20', 'u19', 'u-19',
+  'u18', 'u-18', 'u17', 'u-17', 'sub-20', 'sub20', 'sub-19', 'sub19', 'sub-17',
+  'youth', 'juvenil', 'women', 'feminin', 'feminina', 'wom', ' w ', ' w.', 'amateur',
+];
+function getLeagueWeight(league: string): number {
+  const l = (league || '').toLowerCase();
+  if (!l) return 0;
+  if (ELITE_LEAGUES.some((k) => l.includes(k))) return 5;
+  if (UNSTABLE_PATTERNS.some((k) => l.includes(k))) return -5;
+  return 0;
+}
+
+// ═══════════════════════════════════════
+// MOMENTUM CACHE — leitura dos últimos ~5 min por jogo
+// ═══════════════════════════════════════
+interface MomentumSnapshot {
+  minute: number;
+  sog: number;
+  da: number;
+  corners: number;
+  pressure: number;
+  ts: number;
+}
+const momentumCache = new Map<string, MomentumSnapshot[]>();
+
+function pushMomentum(matchId: string, snap: MomentumSnapshot) {
+  const arr = momentumCache.get(matchId) || [];
+  arr.push(snap);
+  // mantém apenas últimos 10 min de leituras
+  const cutoff = snap.minute - 10;
+  const trimmed = arr.filter((x) => x.minute >= cutoff);
+  momentumCache.set(matchId, trimmed);
+}
+
+function getMomentumDelta(matchId: string, current: MomentumSnapshot): number {
+  const arr = momentumCache.get(matchId) || [];
+  // procura snapshot ~5 min atrás
+  const past = [...arr].reverse().find((x) => current.minute - x.minute >= 4 && current.minute - x.minute <= 7);
+  if (!past) return 0;
+  const dSog = current.sog - past.sog;
+  const dDa = current.da - past.da;
+  const dCorners = current.corners - past.corners;
+  const dPressure = current.pressure - past.pressure;
+  // score de momentum
+  let m = dSog * 2 + dCorners * 1.5 + dDa * 0.25 + dPressure * 0.05;
+  // clamp
+  if (m > 6) m = 6;
+  if (m < -6) m = -6;
+  if (m > 0 && m < 3) m = 3; // mínimo positivo relevante
+  if (m < 0 && m > -3) m = -3; // mínimo penalidade
+  if (Math.abs(m) < 1) return 0;
+  return Math.round(m);
 }
 
 // ═══════════════════════════════════════

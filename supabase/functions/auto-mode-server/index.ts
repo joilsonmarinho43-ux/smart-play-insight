@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
       const leagueWeight = getLeagueWeight(s.league);
 
       // RMA com ajustes (usado também como preview para SUPER SNIPER)
-      const rma = evaluateRMAServer(s.minute, s.pressure, s.da, s.totalShots, s.sog, leagueWeight, momentumDelta);
+      const rma = evaluateRMAServer(s.minute, s.pressure, s.da, s.totalShots, s.sog, leagueWeight, momentumDelta, s.daEstimated);
 
       const signal = classifyServer(match, rma.score);
       if (!signal) continue;

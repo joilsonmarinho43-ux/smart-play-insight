@@ -30,8 +30,11 @@ const Index = () => {
   const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches-multiday'],
     queryFn: () => fetchMultiDayMatches(6),
-    staleTime: 1000 * 60 * 10,
-    gcTime: 1000 * 60 * 30,
+    staleTime: 1000 * 60 * 60 * 24, // 24h — pré-jogo carrega 1x por dia
+    gcTime: 1000 * 60 * 60 * 24,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Generate day labels

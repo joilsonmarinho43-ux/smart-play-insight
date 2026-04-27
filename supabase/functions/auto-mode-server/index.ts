@@ -297,7 +297,7 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
           market: signal.market,
           confidence: signal.confidence,
           filtersValidated: signal.filtersValidated,
-          sensitivity: signal.tier === 'SNIPER' ? 'agressivo' : 'moderado',
+          sensitivity: signal.tier === 'SUPER_SNIPER' ? 'premium' : signal.tier === 'SNIPER' ? 'agressivo' : 'moderado',
           minute: signal.minute,
           score,
           reason: `Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,

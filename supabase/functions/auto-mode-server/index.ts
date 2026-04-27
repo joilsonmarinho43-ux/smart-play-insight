@@ -232,6 +232,69 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
   };
 }
 
+// ═══════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
+    const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const API_FUTEBOL_KEY = Deno.env.get('API_FUTEBOL_KEY');
+
+    if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY || !TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_FUTEBOL_KEY) {
+      throw new Error('Variáveis de ambiente não configuradas');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 1. Fetch live matches
+    const footballRes = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ live: true }),
+    });
+
+    const footballData = await footballRes.json();
+    const matches = footballData?.matches || [];
+    console.log(`[AUTO-MODE-SERVER] ${matches.length} jogos ao vivo encontrados`);
+
+    if (matches.length === 0) {
+      return new Response(JSON.stringify({ success: true, signals: 0, message: 'Nenhum jogo ao vivo' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 2. Anti-spam: 1 sinal por jogo/dia
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { data: existingSignals } = await supabase
+      .from('telegram_signals')
+      .select('match_id')
+      .gte('created_at', todayStart.toISOString())
+      .eq('success', true);
+
+    const signaledIds = new Set((existingSignals || []).map((s: any) => s.match_id).filter(Boolean));
+
+    // 3. Limite diário: 25 sinais
+    const dailyCount = existingSignals?.length || 0;
+    if (dailyCount >= 25) {
+      console.log('[AUTO-MODE-SERVER] Limite diário de 25 sinais atingido');
+      return new Response(JSON.stringify({ success: true, signals: 0, message: 'Limite diário atingido (25/25)' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // 4. Classify each match + RMA gate (com momentum e league_weight)
     const signalsToSend: HybridSignal[] = [];
     let rmaBlocked = 0;

@@ -99,7 +99,7 @@ function getMomentumDelta(matchId: string, current: MomentumSnapshot): number {
 // HYBRID ENGINE (server-side, no localStorage)
 // ═══════════════════════════════════════
 
-type HybridTier = 'SNIPER' | 'SEMI';
+type HybridTier = 'SUPER_SNIPER' | 'SNIPER' | 'SEMI';
 
 interface HybridSignal {
   matchId: string;
@@ -142,7 +142,6 @@ function extractStats(match: any) {
   const homePoss = Number(lH.possession || 0);
   const awayPoss = Number(lA.possession || 0);
   const dominantPoss = Math.max(homePoss, awayPoss);
-  // Pressure: weighted sum without /5 divisor to produce realistic 0-100 values
   const pressure = Math.min(100, Math.max(0, da * 2 + corners * 4 + sog * 8));
   const homeTeam = match.teams?.home?.name || 'Casa';
   const awayTeam = match.teams?.away?.name || 'Fora';
@@ -153,7 +152,7 @@ function extractStats(match: any) {
   return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats };
 }
 
-function classifyServer(match: any): HybridSignal | null {
+function classifyServer(match: any, rmaScorePreview: number): HybridSignal | null {
   const liveStatuses = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE'];
   const status = String(match?.fixture?.status?.short || '').toUpperCase();
   const isLive = match?.isLive === true || liveStatuses.includes(status);
@@ -162,38 +161,54 @@ function classifyServer(match: any): HybridSignal | null {
   const s = extractStats(match);
   if (!s.hasStats) return null;
 
-  // SNIPER (agressivo) — auditoria 24h: 40% em min 31-40 → reduzir janela p/ 5-30 e exigir mais pressão
-  const isSniper = s.minute >= 5 && s.minute <= 30 &&
+  // 💀 SUPER SNIPER — premium, raro
+  const isSuperSniper =
+    s.homeGoals === 0 && s.awayGoals === 0 &&
+    s.minute >= 12 && s.minute <= 28 &&
+    s.sog >= 4 && s.da >= 12 && s.corners >= 3 &&
+    s.dominantPoss >= 58 && s.pressure >= 75 &&
+    rmaScorePreview >= 28;
+
+  // SNIPER (agressivo)
+  const isSniper = !isSuperSniper && s.minute >= 5 && s.minute <= 30 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
     s.sog >= 3 && s.dominantPoss >= 55 && s.da >= 8 && s.corners >= 2 && s.pressure >= 60;
 
-  // SEMI — auditoria 24h: 0x0 entre min 31-40 perdeu 5/11. Janela 0x0 cai p/ 5-30.
-  // Placar 1x0/0x1 mantém 5-45 (já tem 1 gol → Over 1.5 vira Over 0.5 restante, baixo risco)
+  // SEMI
   const totalGoals = s.homeGoals + s.awayGoals;
   const semiWindowOk =
     (totalGoals === 0 && s.minute >= 5 && s.minute <= 30) ||
     (totalGoals === 1 && s.minute >= 5 && s.minute <= 45);
-  const isSemi = !isSniper && semiWindowOk &&
+  const isSemi = !isSuperSniper && !isSniper && semiWindowOk &&
     s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 30;
 
-  if (!isSniper && !isSemi) return null;
+  if (!isSuperSniper && !isSniper && !isSemi) return null;
 
-  const tier: HybridTier = isSniper ? 'SNIPER' : 'SEMI';
+  const tier: HybridTier = isSuperSniper ? 'SUPER_SNIPER' : isSniper ? 'SNIPER' : 'SEMI';
   const market = 'Over 1.5';
 
-  // Count validated filters
+  // Filtros validados (escala por tier)
+  const filterThresholds = isSuperSniper
+    ? { sog: 3, poss: 58, da: 10, crn: 3, prs: 75 }
+    : isSniper
+      ? { sog: 2, poss: 60, da: 6, crn: 2, prs: 70 }
+      : { sog: 1, poss: 55, da: 4, crn: 1, prs: 60 };
   const filters = [
-    s.sog >= (isSniper ? 2 : 1),
-    s.dominantPoss >= (isSniper ? 60 : 55),
-    s.da >= (isSniper ? 6 : 4),
-    s.corners >= (isSniper ? 2 : 1),
-    s.pressure >= (isSniper ? 70 : 60),
+    s.sog >= filterThresholds.sog,
+    s.dominantPoss >= filterThresholds.poss,
+    s.da >= filterThresholds.da,
+    s.corners >= filterThresholds.crn,
+    s.pressure >= filterThresholds.prs,
   ];
   const validated = filters.filter(Boolean).length;
 
-  const confidence = isSniper
-    ? Math.min(95, 70 + Math.round(s.pressure / 10) + validated * 2)
-    : Math.min(85, 60 + Math.round(s.pressure / 15) + validated * 2);
+  const confidence = isSuperSniper
+    ? Math.min(98, 82 + Math.round(s.pressure / 8) + validated * 2)
+    : isSniper
+      ? Math.min(95, 70 + Math.round(s.pressure / 10) + validated * 2)
+      : Math.min(85, 60 + Math.round(s.pressure / 15) + validated * 2);
+
+  const label = isSuperSniper ? 'SUPER SNIPER 💀' : isSniper ? 'SNIPER 🔥' : 'SEMI ⚡';
 
   return {
     matchId: s.matchId,
@@ -201,7 +216,7 @@ function classifyServer(match: any): HybridSignal | null {
     league: s.league,
     minute: s.minute,
     tier,
-    label: isSniper ? 'SNIPER 🔥' : 'SEMI ⚡',
+    label,
     market,
     confidence,
     shotsOnGoal: s.sog,
@@ -216,77 +231,6 @@ function classifyServer(match: any): HybridSignal | null {
     filtersValidated: `${validated}/5`,
   };
 }
-
-// ═══════════════════════════════════════
-// MAIN HANDLER
-// ═══════════════════════════════════════
-
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
-    const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const API_FUTEBOL_KEY = Deno.env.get('API_FUTEBOL_KEY');
-
-    if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY || !TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_FUTEBOL_KEY) {
-      throw new Error('Variáveis de ambiente não configuradas');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // 1. Fetch live matches via football-api edge function
-    const footballRes = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ live: true }),
-    });
-
-    const footballData = await footballRes.json();
-    const matches = footballData?.matches || [];
-    console.log(`[AUTO-MODE-SERVER] ${matches.length} jogos ao vivo encontrados`);
-
-    if (matches.length === 0) {
-      return new Response(JSON.stringify({ success: true, signals: 0, message: 'Nenhum jogo ao vivo' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 2. Get today's already-signaled match IDs to avoid duplicates
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const { data: existingSignals } = await supabase
-      .from('telegram_signals')
-      .select('match_id')
-      .gte('created_at', todayStart.toISOString())
-      .eq('success', true);
-
-    const signaledIds = new Set((existingSignals || []).map((s: any) => s.match_id).filter(Boolean));
-
-    // 3. Daily limit: max 25 signals/day
-    const dailyCount = existingSignals?.length || 0;
-    if (dailyCount >= 25) {
-      console.log('[AUTO-MODE-SERVER] Limite diário de 25 sinais atingido');
-      return new Response(JSON.stringify({ success: true, signals: 0, message: 'Limite diário atingido (25/25)' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 4. Classify each match + RMA gate
-    const signalsToSend: HybridSignal[] = [];
-    let rmaBlocked = 0;
-    for (const match of matches) {
-      const s = extractStats(match);
-      if (s.hasStats) {
         console.log(`[AUTO-MODE-SERVER] ${s.homeTeam} vs ${s.awayTeam} | min:${s.minute} sog:${s.sog} da:${s.da}${s.daEstimated?'≈':''} crn:${s.corners} poss:${s.dominantPoss} prs:${Math.round(s.pressure)} score:${s.homeGoals}-${s.awayGoals}`);
       }
       const signal = classifyServer(match);

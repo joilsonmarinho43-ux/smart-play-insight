@@ -25,6 +25,13 @@ const Index = () => {
   const { profile } = useProfile();
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<number>(0);
+  const [offline, setOffline] = useState<boolean>(isOfflineMode());
+
+  useEffect(() => {
+    const handler = () => setOffline(isOfflineMode());
+    window.addEventListener('football-offline-change', handler);
+    return () => window.removeEventListener('football-offline-change', handler);
+  }, []);
 
   // Fetch 6 days (today + 5)
   const { data: rawMatches, isFetching, refetch } = useQuery({

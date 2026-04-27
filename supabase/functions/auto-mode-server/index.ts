@@ -231,16 +231,35 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
     filtersValidated: `${validated}/5`,
   };
 }
+
+    // 4. Classify each match + RMA gate (com momentum e league_weight)
+    const signalsToSend: HybridSignal[] = [];
+    let rmaBlocked = 0;
+    const nowTs = Date.now();
+    for (const match of matches) {
+      const s = extractStats(match);
+      if (s.hasStats) {
         console.log(`[AUTO-MODE-SERVER] ${s.homeTeam} vs ${s.awayTeam} | min:${s.minute} sog:${s.sog} da:${s.da}${s.daEstimated?'≈':''} crn:${s.corners} poss:${s.dominantPoss} prs:${Math.round(s.pressure)} score:${s.homeGoals}-${s.awayGoals}`);
       }
-      const signal = classifyServer(match);
+      if (!s.hasStats || !s.matchId) continue;
+
+      // Momentum: snapshot atual + delta vs ~5 min atrás
+      const snap: MomentumSnapshot = { minute: s.minute, sog: s.sog, da: s.da, corners: s.corners, pressure: s.pressure, ts: nowTs };
+      const momentumDelta = getMomentumDelta(s.matchId, snap);
+      pushMomentum(s.matchId, snap);
+
+      // League weight
+      const leagueWeight = getLeagueWeight(s.league);
+
+      // RMA com ajustes (usado também como preview para SUPER SNIPER)
+      const rma = evaluateRMAServer(s.minute, s.pressure, s.da, s.totalShots, s.sog, leagueWeight, momentumDelta);
+
+      const signal = classifyServer(match, rma.score);
       if (!signal) continue;
       if (signaledIds.has(signal.matchId)) continue;
 
-      // ═══ RMA GATE ═══
-      const rma = evaluateRMAServer(signal.minute, signal.pressure, signal.dangerousAttacks, signal.totalShots, signal.shotsOnGoal);
       if (rma.verdict === 'BLOQUEADO') {
-        console.log(`[AUTO-MODE-SERVER] 🔴 RMA BLOQUEOU: ${signal.match} • ${signal.market} (score: ${rma.score})`);
+        console.log(`[AUTO-MODE-SERVER] 🔴 RMA BLOQUEOU: ${signal.match} • ${signal.market} (score:${rma.score} lw:${leagueWeight} mom:${momentumDelta})`);
         await supabase.from('rma_shadow_logs').insert({
           match_id: signal.matchId,
           match_name: signal.match,
@@ -250,11 +269,15 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
           rma_verdict: 'BLOQUEADO',
           rma_score: rma.score,
           pressure: signal.pressure,
-          block_reason: 'Auto-Mode — sinal bloqueado pelo RMA',
+          block_reason: `Auto-Mode — RMA bloqueou (lw:${leagueWeight}, mom:${momentumDelta})`,
         });
         rmaBlocked++;
         continue;
       }
+
+      // Aplica league_weight + momentum também na confiança final
+      signal.confidence = Math.max(0, Math.min(99, signal.confidence + leagueWeight + momentumDelta));
+      signal.filtersValidated = `${signal.filtersValidated} • lw${leagueWeight >= 0 ? '+' : ''}${leagueWeight} • mom${momentumDelta >= 0 ? '+' : ''}${momentumDelta}`;
 
       signalsToSend.push(signal);
       if (signalsToSend.length + dailyCount >= 25) break;

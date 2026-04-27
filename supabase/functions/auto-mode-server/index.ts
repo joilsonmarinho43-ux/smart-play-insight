@@ -340,7 +340,7 @@ Deno.serve(async (req) => {
           rma_verdict: 'BLOQUEADO',
           rma_score: rma.score,
           pressure: signal.pressure,
-          block_reason: `Auto-Mode — RMA bloqueou (lw:${leagueWeight}, mom:${momentumDelta})`,
+          block_reason: rma.blockReason || `Auto-Mode — RMA bloqueou (lw:${leagueWeight}, mom:${momentumDelta})`,
         });
         rmaBlocked++;
         continue;

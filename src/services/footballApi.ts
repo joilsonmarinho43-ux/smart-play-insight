@@ -11,7 +11,7 @@ const CACHE_KEYS = {
   TIME_LIVE: 'football_cache_live_time'
 };
 
-const PRE_MATCH_COOLDOWN = 1000 * 60 * 10; // 10 minutos para Pré-Jogo
+const PRE_MATCH_COOLDOWN = 1000 * 60 * 60 * 24; // 24h - Pré-Jogo carrega 1x por dia (economiza cota)
 const LIVE_MATCH_COOLDOWN = 1000 * 55;     // 55 segundos para Live
 
 function getStorageCache(key: string, timeKey: string, cooldown: number) {

@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchMultiDayMatches } from '@/services/footballApi';
+import { fetchMultiDayMatches, isOfflineMode, getOfflineSince } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, WifiOff } from 'lucide-react';
 import bannerImg from "@/assets/banner-hero.jpg";
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
 
@@ -25,6 +25,13 @@ const Index = () => {
   const { profile } = useProfile();
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<number>(0);
+  const [offline, setOffline] = useState<boolean>(isOfflineMode());
+
+  useEffect(() => {
+    const handler = () => setOffline(isOfflineMode());
+    window.addEventListener('football-offline-change', handler);
+    return () => window.removeEventListener('football-offline-change', handler);
+  }, []);
 
   // Fetch 6 days (today + 5)
   const { data: rawMatches, isFetching, refetch } = useQuery({
@@ -169,7 +176,17 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Day Selector */}
+        {/* Banner Modo Offline */}
+        {offline && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200">
+            <WifiOff className="w-4 h-4 shrink-0" />
+            <div className="text-xs leading-tight">
+              <strong className="font-bold">Modo offline</strong> — exibindo último pré-jogo salvo
+              {getOfflineSince() && ` (desde ${new Date(getOfflineSince()!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`}.
+              API de futebol indisponível ou sem cota.
+            </div>
+          </div>
+        )}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {dayOptions.map(day => {
             const count = safeMatches.filter((m: any) => {

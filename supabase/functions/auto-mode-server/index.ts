@@ -28,10 +28,15 @@ function evaluateRMAServer(
   let rma_score = (pressure * 0.30) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.20);
   rma_score += leagueWeight + momentumDelta;
 
-  // ── HARD BLOCK: pressão fake premium ──
-  // pressão alta + quase nenhum chute no gol + DA estimado = ilusão estatística
-  if (pressure > 75 && sot <= 1 && daEstimated) {
-    return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake premium (prs>75, SoG≤1, DA estimado)' };
+  // ── HARD BLOCK 1: pressão fake premium (endurecido) ──
+  // pressão alta + DA estimado + SoG fraco = ilusão estatística
+  if (pressure > 70 && sot <= 2 && daEstimated) {
+    return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake premium (prs>70, SoG≤2, DA estimado)' };
+  }
+
+  // ── HARD BLOCK 2: SoG por minuto muito baixo (sem finalização real) ──
+  if (sot_norm < 0.6) {
+    return { verdict: 'BLOQUEADO', score: rma_score, blockReason: `sot_norm baixo (${sot_norm.toFixed(2)})` };
   }
 
   if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'ap_norm < 1.5' };
@@ -177,18 +182,19 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
     s.dominantPoss >= 58 && s.pressure >= 75 &&
     rmaScorePreview >= 28;
 
-  // SNIPER (agressivo)
-  const isSniper = !isSuperSniper && s.minute >= 5 && s.minute <= 30 &&
+  // SNIPER (agressivo) — janela 8-28 (evita início ruidoso e min 29-30 instável)
+  const isSniper = !isSuperSniper && s.minute >= 8 && s.minute <= 28 &&
     s.homeGoals === 0 && s.awayGoals === 0 &&
     s.sog >= 3 && s.dominantPoss >= 55 && s.da >= 8 && s.corners >= 2 && s.pressure >= 60;
 
-  // SEMI
+  // SEMI — janela endurecida: 8-35 (não aceita HT min 38-45 nem 2º tempo)
+  // Histórico: min ≥ 38 = 56% acerto, min 45 = 67%, min ≥ 50 = 38%. Zona dourada: 8-35.
   const totalGoals = s.homeGoals + s.awayGoals;
   const semiWindowOk =
-    (totalGoals === 0 && s.minute >= 5 && s.minute <= 30) ||
-    (totalGoals === 1 && s.minute >= 5 && s.minute <= 45);
+    (totalGoals === 0 && s.minute >= 8 && s.minute <= 35) ||
+    (totalGoals === 1 && s.minute >= 8 && s.minute <= 35);
   const isSemi = !isSuperSniper && !isSniper && semiWindowOk &&
-    s.sog >= 1 && s.dominantPoss >= 50 && s.da >= 4 && s.corners >= 1 && s.pressure >= 30;
+    s.sog >= 2 && s.dominantPoss >= 52 && s.da >= 5 && s.corners >= 1 && s.pressure >= 35;
 
   if (!isSuperSniper && !isSniper && !isSemi) return null;
 
@@ -346,9 +352,11 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Aplica league_weight + momentum também na confiança final
-      signal.confidence = Math.max(0, Math.min(99, signal.confidence + leagueWeight + momentumDelta));
-      signal.filtersValidated = `${signal.filtersValidated} • lw${leagueWeight >= 0 ? '+' : ''}${leagueWeight} • mom${momentumDelta >= 0 ? '+' : ''}${momentumDelta}`;
+      // Aplica league_weight + momentum na confiança final (boost reduzido p/ evitar inflação)
+      // Só permite boost positivo de momentum se houver SoG real (não inflar com pressão)
+      const safeMomentum = signal.shotsOnGoal >= 3 ? momentumDelta : Math.min(momentumDelta, 0);
+      signal.confidence = Math.max(0, Math.min(95, signal.confidence + leagueWeight + safeMomentum));
+      signal.filtersValidated = `${signal.filtersValidated} • lw${leagueWeight >= 0 ? '+' : ''}${leagueWeight} • mom${safeMomentum >= 0 ? '+' : ''}${safeMomentum}`;
 
       signalsToSend.push(signal);
       if (signalsToSend.length + dailyCount >= 25) break;

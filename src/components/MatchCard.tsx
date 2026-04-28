@@ -451,8 +451,6 @@ const MatchCard = ({ match }: Props) => {
       </div>
     </div>
   );
-    </div>
-  );
 };
 
 export default MatchCard;

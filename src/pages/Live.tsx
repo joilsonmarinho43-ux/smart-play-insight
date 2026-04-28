@@ -503,7 +503,7 @@ const Live = () => {
         </div>
       </div>
 
-      <main className="container max-w-3xl lg:max-w-5xl mx-auto px-4 sm:px-6 py-4 space-y-5">
+      <main className="container max-w-3xl lg:max-w-5xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-5">
         {/* ═══ AUDIT PANEL ═══ */}
         {showAudit && !isLoading && auditEntries.length > 0 && (
           <AuditPanel entries={auditEntries} />
@@ -539,6 +539,7 @@ const Live = () => {
           </div>
         )}
 
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
         {rankedMatches.map(({ match, analysis, id }, rankIndex) => {
           const { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter, htft, scannerScore } = analysis;
           const homeName = match?.teams?.home?.name || 'Casa';
@@ -572,7 +573,7 @@ const Live = () => {
           const rankBg = rankIndex === 0 ? 'bg-orange-500/5' : '';
 
           return (
-            <div key={id} className={`${rankBg} border rounded-2xl overflow-hidden shadow-lg shadow-black/20 ${isFav ? 'border-yellow-500/50' : rankBorderColor}`}>
+            <div key={id} className={`${rankBg} border rounded-2xl overflow-hidden shadow-lg shadow-black/20 flex flex-col h-full ${isFav ? 'border-yellow-500/50' : rankBorderColor}`}>
 
               {/* ═══ RANKING BADGE + ALERT ═══ */}
               <div className={`flex items-center justify-between px-4 py-2 border-b ${
@@ -990,6 +991,7 @@ const Live = () => {
             </div>
           );
         })}
+        </div>
       </main>
     </div>
   );

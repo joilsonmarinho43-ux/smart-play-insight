@@ -991,6 +991,7 @@ const Live = () => {
             </div>
           );
         })}
+        </div>
       </main>
     </div>
   );

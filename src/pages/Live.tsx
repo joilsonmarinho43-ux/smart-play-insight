@@ -503,7 +503,7 @@ const Live = () => {
         </div>
       </div>
 
-      <main className="container max-w-3xl lg:max-w-5xl mx-auto px-4 sm:px-6 py-4 space-y-5">
+      <main className="container max-w-3xl lg:max-w-5xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-5">
         {/* ═══ AUDIT PANEL ═══ */}
         {showAudit && !isLoading && auditEntries.length > 0 && (
           <AuditPanel entries={auditEntries} />

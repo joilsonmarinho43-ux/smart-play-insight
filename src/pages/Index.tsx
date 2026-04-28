@@ -267,7 +267,7 @@ const Index = () => {
             A Home é dedicada exclusivamente às análises de Pré-Jogo. */}
 
         {/* Match Cards */}
-        <div className="mt-8 space-y-6">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredMatches.map((match: any) => (
             <MatchCard key={match.id} match={match} />
           ))}

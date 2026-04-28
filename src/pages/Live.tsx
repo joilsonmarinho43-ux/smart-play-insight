@@ -573,7 +573,7 @@ const Live = () => {
           const rankBg = rankIndex === 0 ? 'bg-orange-500/5' : '';
 
           return (
-            <div key={id} className={`${rankBg} border rounded-2xl overflow-hidden shadow-lg shadow-black/20 ${isFav ? 'border-yellow-500/50' : rankBorderColor}`}>
+            <div key={id} className={`${rankBg} border rounded-2xl overflow-hidden shadow-lg shadow-black/20 flex flex-col h-full ${isFav ? 'border-yellow-500/50' : rankBorderColor}`}>
 
               {/* ═══ RANKING BADGE + ALERT ═══ */}
               <div className={`flex items-center justify-between px-4 py-2 border-b ${

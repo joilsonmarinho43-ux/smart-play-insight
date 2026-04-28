@@ -1,32 +1,41 @@
 ---
 name: Auto-Mode Server
-description: Edge function auto-mode-server — classificação live Over 1.5 FT com tiers SUPER_SNIPER/SNIPER/SEMI, RMA rebalanceado, league_weight e momentum
+description: Edge function auto-mode-server — classificação live Over 1.5 FT com tiers SUPER_SNIPER/SNIPER/SEMI, RMA rebalanceado, hard blocks endurecidos, janelas reduzidas
 type: feature
 ---
 
 Edge function `auto-mode-server` envia sinais Over 1.5 FT ao Telegram.
 
 ## Tiers (prioridade SUPER > SNIPER > SEMI)
-- **SUPER_SNIPER 💀**: 0x0, min 12-28, SoG≥4, DA≥12, corners≥3, posse≥58%, pressão≥75, RMA score≥28. Confidence: `min(98, 82 + pressão/8 + filtros×2)`. Sensitivity: `premium`.
-- **SNIPER 🔥**: 0x0, min 5-30, SoG≥3, posse≥55, DA≥8, corners≥2, pressão≥60. Sensitivity: `agressivo`.
-- **SEMI ⚡**: 0x0 min 5-30 OU 1x0/0x1 min 5-45, SoG≥1, posse≥50, DA≥4, corners≥1, pressão≥30. Sensitivity: `moderado`.
+- **SUPER_SNIPER 💀**: 0x0, min 12-28, SoG≥4, DA≥12, corners≥3, posse≥58%, pressão≥75, RMA≥28. Sensitivity: `premium`.
+- **SNIPER 🔥**: 0x0, min **8-28**, SoG≥3, posse≥55, DA≥8, corners≥2, pressão≥60. Sensitivity: `agressivo`.
+- **SEMI ⚡**: 0x0 ou 1x0/0x1, min **8-35** (não aceita HT/2ºT), SoG≥**2**, posse≥**52**, DA≥**5**, corners≥1, pressão≥**35**. Sensitivity: `moderado`.
 
-## RMA (rebalanceado)
+## RMA + Hard Blocks
 `score = pressão×0.30 + ap_norm×0.35 + f_norm×0.15 + sot_norm×0.20 + leagueWeight + momentumDelta`
-Bloqueia se `ap_norm<1.5`, `pressão>60 && da=0`. NEUTRO se `sot_norm=0`. CONFIRMADO se score>40.
+
+Hard blocks (em ordem):
+1. `pressure>70 && SoG≤2 && daEstimated` → BLOQUEADO (pressão fake premium endurecida)
+2. `sot_norm < 0.6` → BLOQUEADO (sem finalização real por minuto)
+3. `ap_norm<1.5` → BLOQUEADO
+4. `pressure>60 && da=0` → BLOQUEADO
+5. `sot_norm=0` → NEUTRO
+
+Verdict final: score>40 CONFIRMADO, ≥20 NEUTRO, <20 BLOQUEADO.
 
 ## League weight
 - Elite (Premier, La Liga, Serie A, Bundesliga, Ligue 1, Champions): **+5**
 - Instáveis (amistoso, reservas, sub-XX, youth, women, amateur): **−5**
-- Demais: 0
 
-## Momentum (últimos ~5 min)
-Cache em memória (`momentumCache`) por matchId. Delta = `dSog×2 + dCorners×1.5 + dDa×0.25 + dPressure×0.05`, clamp ±6, mínimo ±3 quando relevante. Aplicado tanto no RMA score quanto na confidence final.
+## Momentum
+Cache em memória, delta vs ~5 min atrás. **Boost positivo só conta se SoG≥3** (evita inflar confidence com pressão fake). Confidence cap em 95.
+
+## Calibração baseada em histórico real
+- min 45 (HT) e min ≥ 38 → 56-67% acerto → **excluídos do SEMI**
+- min ≥ 50 (2º tempo) → 38% acerto → **excluídos**
+- min 8-35 → ~78% acerto → **zona dourada**
 
 ## Mantido (NÃO alterar)
-- Mercado fixo Over 1.5 FT
-- 1 sinal por jogo/dia
-- Máximo 25 sinais/dia
+- Mercado fixo Over 1.5 FT, 1 sinal/jogo/dia, máx 25/dia
 - Fallback DA estimado (`totalShots×1.5 + corners×2`)
-- Logs em `rma_shadow_logs`
-- Integração `telegram-signal` + `calibrationEngine`
+- Logs em `rma_shadow_logs`, integração `telegram-signal` + `calibrationEngine`

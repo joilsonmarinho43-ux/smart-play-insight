@@ -379,43 +379,43 @@ const MatchCard = ({ match }: Props) => {
   ];
 
   return (
-    <div className="bg-card rounded-3xl border border-border overflow-hidden animate-slide-in shadow-2xl shadow-black/20">
+    <div className="bg-card rounded-2xl sm:rounded-3xl border border-border overflow-hidden animate-slide-in shadow-2xl shadow-black/20 flex flex-col h-full">
       {/* HEADER */}
-      <div className="bg-secondary/50 px-5 sm:px-7 py-4 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Trophy className="w-4 h-4 text-primary" />
-          <span className="text-xs sm:text-sm font-medium">{match.league}</span>
+      <div className="bg-secondary/50 px-4 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between border-b border-border">
+        <div className="flex items-center gap-2 text-muted-foreground min-w-0">
+          <Trophy className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-xs sm:text-sm font-medium truncate">{match.league}</span>
         </div>
-        <div className="flex items-center gap-1.5 text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
           <Clock className="w-3.5 h-3.5" />
           <span className="text-xs sm:text-sm">{match.time}</span>
         </div>
       </div>
 
       {/* CONFIANÇA */}
-      <div className="px-5 sm:px-7 pt-4">
+      <div className="px-4 sm:px-5 pt-3 sm:pt-4">
         <SampleSizeBadge match={match} />
         <ApmXgIndicator match={match} />
       </div>
 
       {/* TIMES */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-8 px-5 sm:px-10 py-6 sm:py-8">
-        <div className="text-right">
-          <h2 className="font-display text-2xl sm:text-4xl text-foreground leading-tight font-black">{match.homeTeam}</h2>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5 px-4 sm:px-6 py-5 sm:py-6">
+        <div className="text-right min-w-0">
+          <h2 className="font-display text-xl sm:text-2xl lg:text-3xl text-foreground leading-tight font-black break-words">{match.homeTeam}</h2>
           <span className="text-sm text-[hsl(170,55%,42%)] font-bold mt-1 inline-block">{match.predictions?.homeWin}%</span>
         </div>
-        <div className="flex flex-col items-center">
-          <span className="font-display text-3xl sm:text-5xl text-muted-foreground">VS</span>
+        <div className="flex flex-col items-center shrink-0">
+          <span className="font-display text-2xl sm:text-3xl lg:text-4xl text-muted-foreground">VS</span>
           <span className="text-[11px] text-muted-foreground mt-1">E {match.predictions?.draw}%</span>
         </div>
-        <div className="text-left">
-          <h2 className="font-display text-2xl sm:text-4xl text-foreground leading-tight font-black">{match.awayTeam}</h2>
+        <div className="text-left min-w-0">
+          <h2 className="font-display text-xl sm:text-2xl lg:text-3xl text-foreground leading-tight font-black break-words">{match.awayTeam}</h2>
           <span className="text-sm text-primary font-bold mt-1 inline-block">{match.predictions?.awayWin}%</span>
         </div>
       </div>
 
       {/* TAB BUTTONS */}
-      <div className="px-5 sm:px-7 flex gap-2">
+      <div className="px-4 sm:px-5 flex gap-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -430,25 +430,27 @@ const MatchCard = ({ match }: Props) => {
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
-              {tab.label}
+              <span className="hidden xs:inline sm:inline">{tab.label}</span>
             </button>
           );
         })}
       </div>
 
       {/* TAB CONTENT */}
-      <div className="px-5 sm:px-7 py-5">
+      <div className="px-4 sm:px-5 py-4 sm:py-5 flex-1">
         {activeTab === 'stats' && <StatsTab match={match} />}
         {activeTab === 'poisson' && <PoissonTab match={match} />}
         {activeTab === 'ticket' && <TicketSuggestionCard match={match} />}
       </div>
 
       {/* RODAPÉ */}
-      <div className="text-center py-2 border-t border-border/30">
+      <div className="text-center py-2 border-t border-border/30 mt-auto">
         <span className="text-[8px] text-muted-foreground/50 uppercase tracking-widest">
           Dados reais · API-Sports · Últimos 5 jogos
         </span>
       </div>
+    </div>
+  );
     </div>
   );
 };

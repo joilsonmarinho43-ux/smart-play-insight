@@ -210,7 +210,7 @@ const Index = () => {
         </div>
 
         {/* Identity Banner */}
-        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-primary/10">
+        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-primary/10 max-w-3xl mx-auto">
           <img
             src={bannerImg}
             alt="Analista Joilson"

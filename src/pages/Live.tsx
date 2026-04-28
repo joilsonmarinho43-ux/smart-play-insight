@@ -539,6 +539,7 @@ const Live = () => {
           </div>
         )}
 
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
         {rankedMatches.map(({ match, analysis, id }, rankIndex) => {
           const { pressure, history, strategies, apWindows, periculosity, imminentHome, imminentAway, oddsDeviation, smartFilter, htft, scannerScore } = analysis;
           const homeName = match?.teams?.home?.name || 'Casa';

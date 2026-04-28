@@ -162,7 +162,7 @@ const Index = () => {
       />
       <div className="fixed inset-0 z-0 bg-black/40" />
 
-      <main className="container max-w-3xl mx-auto px-4 relative z-10">
+      <main className="container max-w-3xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Controls Bar */}
         <div className="flex items-center justify-between pt-4 pb-2">
           <h1 className="text-lg font-bold">PRÉ-JOGO</h1>

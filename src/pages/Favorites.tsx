@@ -57,7 +57,7 @@ const Favorites = () => {
     <div className="min-h-screen bg-[#0D1117] text-[#e6edf3]">
       {/* HEADER */}
       <header className="border-b border-[#30363D] bg-[#161B22]/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="container max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="container max-w-3xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/live" className="p-2 hover:bg-white/5 rounded-full transition-colors">
               <ArrowLeft className="w-5 h-5" />
@@ -92,7 +92,7 @@ const Favorites = () => {
         </div>
       </header>
 
-      <main className="container max-w-3xl mx-auto px-4 py-4 space-y-4">
+      <main className="container max-w-3xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />

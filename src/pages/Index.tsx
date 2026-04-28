@@ -162,7 +162,7 @@ const Index = () => {
       />
       <div className="fixed inset-0 z-0 bg-black/40" />
 
-      <main className="container max-w-3xl mx-auto px-4 relative z-10">
+      <main className="container max-w-3xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Controls Bar */}
         <div className="flex items-center justify-between pt-4 pb-2">
           <h1 className="text-lg font-bold">PRÉ-JOGO</h1>
@@ -210,7 +210,7 @@ const Index = () => {
         </div>
 
         {/* Identity Banner */}
-        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-primary/10">
+        <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-primary/10 max-w-3xl mx-auto">
           <img
             src={bannerImg}
             alt="Analista Joilson"
@@ -267,7 +267,7 @@ const Index = () => {
             A Home é dedicada exclusivamente às análises de Pré-Jogo. */}
 
         {/* Match Cards */}
-        <div className="mt-8 space-y-6">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredMatches.map((match: any) => (
             <MatchCard key={match.id} match={match} />
           ))}

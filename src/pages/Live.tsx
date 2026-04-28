@@ -450,7 +450,7 @@ const Live = () => {
   return (
     <div className="min-h-screen bg-[#0D1117] text-[#e6edf3]">
       {/* ═══ CONTROLS BAR ═══ */}
-      <div className="container max-w-3xl mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
+      <div className="container max-w-3xl lg:max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-2 flex items-center justify-between">
         <h1 className="font-bold text-lg tracking-tight text-white">SCANNER PRO</h1>
         <div className="flex items-center gap-2">
           <button
@@ -483,7 +483,7 @@ const Live = () => {
       </div>
 
       {/* ═══ SCANNER STATUS BAR ═══ */}
-      <div className="container max-w-3xl mx-auto px-4 pt-3">
+      <div className="container max-w-3xl lg:max-w-5xl mx-auto px-4 sm:px-6 pt-3">
         <div className="bg-[#161B22] border border-[#30363D] rounded-xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
@@ -503,7 +503,7 @@ const Live = () => {
         </div>
       </div>
 
-      <main className="container max-w-3xl mx-auto px-4 py-4 space-y-5">
+      <main className="container max-w-3xl lg:max-w-5xl mx-auto px-4 sm:px-6 py-4 space-y-5">
         {/* ═══ AUDIT PANEL ═══ */}
         {showAudit && !isLoading && auditEntries.length > 0 && (
           <AuditPanel entries={auditEntries} />

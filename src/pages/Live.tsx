@@ -573,7 +573,8 @@ const Live = () => {
           const rankBg = rankIndex === 0 ? 'bg-orange-500/5' : '';
 
           return (
-            <div key={id} className={`${rankBg} border rounded-2xl overflow-hidden shadow-lg shadow-black/20 flex flex-col h-full ${isFav ? 'border-yellow-500/50' : rankBorderColor}`}>
+            <div key={id} className={`${rankBg} border rounded-2xl overflow-hidden shadow-lg shadow-black/20 flex flex-col xl:h-[820px] ${isFav ? 'border-yellow-500/50' : rankBorderColor}`}>
+            <div className="flex flex-col xl:flex-1 xl:min-h-0 xl:overflow-y-auto live-card-scroll">
 
               {/* ═══ RANKING BADGE + ALERT ═══ */}
               <div className={`flex items-center justify-between px-4 py-2 border-b ${

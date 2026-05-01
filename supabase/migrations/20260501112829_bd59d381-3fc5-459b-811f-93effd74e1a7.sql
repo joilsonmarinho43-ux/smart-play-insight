@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cache_api_cache_key ON public.cache_api (cache_key);
+CREATE INDEX IF NOT EXISTS idx_cache_api_status_atualizacao ON public.cache_api (status_jogo, ultima_atualizacao DESC);

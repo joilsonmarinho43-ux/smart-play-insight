@@ -4,67 +4,83 @@ import { useAuth } from './useAuth';
 import { useProfile } from './useProfile';
 import { toast } from 'sonner';
 
-// Persist session token in sessionStorage (per-tab) so HMR reloads don't generate new tokens
-const getSessionToken = (): string => {
-  let token = sessionStorage.getItem('device_session_token');
+/**
+ * Device-level session token.
+ * Stored in localStorage so ALL tabs of the same browser/device share it.
+ * This avoids the multi-tab logout loop: opening a 2nd tab no longer
+ * generates a new token and kicks the original tab.
+ */
+const DEVICE_TOKEN_KEY = 'aj_device_session_token';
+
+const getDeviceToken = (): string => {
+  let token = localStorage.getItem(DEVICE_TOKEN_KEY);
   if (!token) {
-    // Also check localStorage for backward compat, then migrate
-    token = localStorage.getItem('device_session_token');
-    if (!token) {
-      token = crypto.randomUUID();
-    }
-    sessionStorage.setItem('device_session_token', token);
+    token = crypto.randomUUID();
+    localStorage.setItem(DEVICE_TOKEN_KEY, token);
   }
-  // Keep localStorage in sync for the register-session check
-  localStorage.setItem('device_session_token', token);
   return token;
 };
 
 const getDeviceInfo = (): string => {
   const ua = navigator.userAgent;
   const platform = navigator.platform || 'unknown';
-  return `${platform} | ${ua.slice(0, 100)}`;
+  return `${platform} | ${ua.slice(0, 120)}`;
 };
 
-// Module-level flags survive HMR better than refs
-let moduleRegistered = false;
-let moduleRegisteredForUser = '';
+// Module-level state survives HMR & remounts within the same tab
+let moduleRegisteredForUser: string | null = null;
+let registrationInFlight: Promise<void> | null = null;
+let consecutiveMismatches = 0;
+
+const POLL_INTERVAL_MS = 45_000;
+const FIRST_CHECK_DELAY_MS = 10_000;
+const MISMATCH_THRESHOLD = 2; // require 2 consecutive mismatches before logout
 
 export const useSessionGuard = () => {
   const { session, signOut } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const registrationDoneRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userId = session?.user?.id;
   const accessToken = session?.access_token;
-  const isAdmin = profile?.is_admin;
+  const isAdmin = profile?.is_admin === true;
 
-  const registerSession = useCallback(async () => {
-    if (!accessToken) return;
+  const registerSession = useCallback(async (): Promise<void> => {
+    if (!accessToken || !userId) return;
+    if (registrationInFlight) return registrationInFlight;
 
-    const sessionToken = getSessionToken();
-    const deviceInfo = getDeviceInfo();
-
-    try {
-      const { error } = await supabase.functions.invoke('register-session', {
-        body: { session_token: sessionToken, device_info: deviceInfo },
-      });
-      if (!error) {
-        registrationDoneRef.current = true;
-      } else {
-        console.error('Failed to register session:', error);
+    registrationInFlight = (async () => {
+      const sessionToken = getDeviceToken();
+      const deviceInfo = getDeviceInfo();
+      try {
+        const { error } = await supabase.functions.invoke('register-session', {
+          body: { session_token: sessionToken, device_info: deviceInfo },
+        });
+        if (error) {
+          console.error('[SessionGuard] register-session error:', error);
+          // Do NOT mark as registered — allow retry on next effect run
+          moduleRegisteredForUser = null;
+        } else {
+          moduleRegisteredForUser = userId;
+          consecutiveMismatches = 0;
+        }
+      } catch (err) {
+        console.error('[SessionGuard] register-session exception:', err);
+        moduleRegisteredForUser = null;
+      } finally {
+        registrationInFlight = null;
       }
-    } catch (err) {
-      console.error('Failed to register session:', err);
-    }
-  }, [accessToken]);
+    })();
+
+    return registrationInFlight;
+  }, [accessToken, userId]);
 
   const checkSession = useCallback(async () => {
     if (!userId) return;
-    if (!registrationDoneRef.current) return;
+    if (moduleRegisteredForUser !== userId) return; // not registered yet
 
-    const sessionToken = getSessionToken();
+    const sessionToken = getDeviceToken();
 
     const { data, error } = await supabase
       .from('active_sessions')
@@ -73,56 +89,69 @@ export const useSessionGuard = () => {
       .maybeSingle();
 
     if (error) {
-      console.error('Session check error:', error);
+      // Network/transient issue — never logout silently
+      console.warn('[SessionGuard] check error (ignored):', error.message);
       return;
     }
 
-    if (data && data.session_token !== sessionToken) {
-      toast.error('Sua conta foi acessada em outro dispositivo. Você foi desconectado.', {
-        duration: 8000,
-      });
-      await signOut();
+    // No row yet — try to (re)register, do not logout
+    if (!data) {
+      moduleRegisteredForUser = null;
+      registerSession();
+      return;
     }
-  }, [userId, signOut]);
 
-  // Register on first login — wait for profile to load first
-  useEffect(() => {
-    if (!accessToken || profileLoading) return;
-    // Admins skip session guard
-    if (isAdmin) return;
-    // Already registered for this user (survives HMR)
-    if (moduleRegistered && moduleRegisteredForUser === userId) return;
+    if (data.session_token === sessionToken) {
+      consecutiveMismatches = 0;
+      return;
+    }
 
-    moduleRegistered = true;
-    moduleRegisteredForUser = userId || '';
-    registrationDoneRef.current = false;
-    registerSession();
-  }, [accessToken, profileLoading, isAdmin, userId, registerSession]);
+    // Mismatch — require N consecutive checks to avoid race conditions during login on another tab
+    consecutiveMismatches += 1;
+    if (consecutiveMismatches < MISMATCH_THRESHOLD) {
+      console.warn(`[SessionGuard] mismatch ${consecutiveMismatches}/${MISMATCH_THRESHOLD} — waiting before logout`);
+      return;
+    }
 
-  // Reset module flags when user changes (logout/login)
+    toast.error('Sua conta foi acessada em outro dispositivo. Você foi desconectado.', {
+      duration: 8000,
+    });
+    consecutiveMismatches = 0;
+    moduleRegisteredForUser = null;
+    await signOut();
+  }, [userId, signOut, registerSession]);
+
+  // Reset module state on logout / user change
   useEffect(() => {
     if (!accessToken) {
-      moduleRegistered = false;
-      moduleRegisteredForUser = '';
-      registrationDoneRef.current = false;
+      moduleRegisteredForUser = null;
+      consecutiveMismatches = 0;
     }
   }, [accessToken]);
 
-  // Poll every 30s to check if this device is still the active one
+  // Register once per user (admins skip)
+  useEffect(() => {
+    if (!accessToken || profileLoading || !userId) return;
+    if (isAdmin) return;
+    if (moduleRegisteredForUser === userId) return;
+    registerSession();
+  }, [accessToken, profileLoading, isAdmin, userId, registerSession]);
+
+  // Poll
   useEffect(() => {
     if (!userId || profileLoading || isAdmin) {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       return;
     }
 
-    // Delay first check to give registration time to complete
-    const timeout = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       checkSession();
-      intervalRef.current = setInterval(checkSession, 30000);
-    }, 8000);
+      intervalRef.current = setInterval(checkSession, POLL_INTERVAL_MS);
+    }, FIRST_CHECK_DELAY_MS);
 
     return () => {
-      clearTimeout(timeout);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [userId, profileLoading, isAdmin, checkSession]);

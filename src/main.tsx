@@ -12,7 +12,33 @@ const isPreview =
 
 if ("serviceWorker" in navigator && !isInIframe && !isPreview) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+    navigator.serviceWorker.register("/service-worker.js").then((reg) => {
+      // Listen for updates and trigger immediate activation
+      reg.addEventListener("updatefound", () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            newWorker.postMessage({ type: "SKIP_WAITING" });
+          }
+        });
+      });
+    }).catch(() => {});
+
+    // Reload once when the new SW takes control (after activate)
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    });
+
+    // React to SW broadcast messages
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "SW_UPDATED") {
+        // Already handled by controllerchange in most cases; no-op fallback
+      }
+    });
   });
 } else if (isInIframe || isPreview) {
   navigator.serviceWorker?.getRegistrations().then((regs) =>

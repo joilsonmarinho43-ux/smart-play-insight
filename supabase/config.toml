@@ -2,3 +2,24 @@ project_id = "yeyctdphzrmyxgskehru"
 
 [functions.football-api]
 verify_jwt = false
+
+[functions.telegram-signal]
+verify_jwt = false
+
+[functions.telegram-weekly-report]
+verify_jwt = false
+
+[functions.check-signal-results]
+verify_jwt = false
+
+[functions.daily-validation]
+verify_jwt = false
+
+[functions.auto-mode-server]
+verify_jwt = false
+
+[functions.scanner-pro-server]
+verify_jwt = false
+
+[functions.semi-window-simulator]
+verify_jwt = false

@@ -89,6 +89,22 @@ async function dbCacheSet(cacheKey: string, dados: any, statusJogo: string): Pro
 }
 
 // ========================
+// MUTEX — pg_advisory_xact_lock por cache_key
+// Evita thundering herd: só 1 requester faz fetch externo por chave.
+// Os demais aguardam, depois leem do cache populado.
+// O lock é liberado automaticamente ao final da transação RPC.
+// ========================
+async function acquireCacheLock(cacheKey: string): Promise<void> {
+  try {
+    const sb = getSupabaseAdmin();
+    await sb.rpc('acquire_cache_lock', { _cache_key: cacheKey });
+  } catch (e) {
+    console.error(`[mutex] acquire_cache_lock failed for ${cacheKey}:`, e);
+    // fail-open: prossegue sem lock para não travar
+  }
+}
+
+// ========================
 // LEAGUE CONFIG
 // ========================
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61, 13, 2];

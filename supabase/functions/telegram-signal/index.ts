@@ -72,24 +72,36 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    // ═══ IDEMPOTÊNCIA ═══
-    // Evita duplicar o MESMO sinal (match + market + minuto) em janela de 90s
+    // ═══ IDEMPOTÊNCIA ATÔMICA ═══
+    // INSERT ... ON CONFLICT DO NOTHING via RPC. Sem SELECT-then-INSERT.
+    // Se outra invocação já reservou o slot (match_id, market, minute), retorna NULL.
+    let claimedSignalId: string | null = null;
     if (payload.matchId) {
-      const since = new Date(Date.now() - 90_000).toISOString();
-      const { data: dup } = await sb
-        .from('telegram_signals')
-        .select('id, telegram_message_id, success')
-        .eq('match_id', payload.matchId)
-        .eq('market', payload.market)
-        .eq('minute', payload.minute)
-        .eq('success', true)
-        .gte('created_at', since)
-        .maybeSingle();
-      if (dup) {
-        console.log(`[TELEGRAM-SIGNAL] ⏭️ Duplicado ignorado (idempotência): ${payload.match} • ${payload.market} • ${payload.minute}'`);
-        return new Response(JSON.stringify({ success: true, deduped: true, messageId: dup.telegram_message_id }), {
+      const { data: claimed, error: claimErr } = await sb.rpc('try_claim_telegram_slot', {
+        _match_id: payload.matchId,
+        _match_name: payload.match,
+        _market: payload.market,
+        _minute: payload.minute,
+        _confidence: payload.confidence,
+        _filters_validated: payload.filtersValidated ?? null,
+        _sensitivity: payload.sensitivity ?? null,
+        _score: payload.score ?? null,
+        _poisson: payload.poisson ?? null,
+        _odd_min: payload.oddMin ?? null,
+        _janela: payload.janela ?? null,
+        _reason: payload.reason ?? null,
+      });
+
+      if (claimErr) {
+        console.error('[TELEGRAM-SIGNAL] try_claim_telegram_slot error:', claimErr);
+        // fail-open: continua para tentar enviar (legado)
+      } else if (!claimed) {
+        console.log(`[TELEGRAM-SIGNAL] ⏭️ Duplicado bloqueado (slot já reservado): ${payload.match} • ${payload.market} • ${payload.minute}'`);
+        return new Response(JSON.stringify({ success: true, deduped: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      } else {
+        claimedSignalId = claimed as unknown as string;
       }
     }
 
@@ -117,6 +129,15 @@ Deno.serve(async (req) => {
             block_reason: 'telegram-signal — sinal bloqueado pelo RMA',
           });
         } catch (e) { console.error('Failed to log RMA block:', e); }
+        // Libera o slot atomicamente reservado para permitir reenvio futuro válido
+        if (claimedSignalId) {
+          try {
+            await sb.rpc('mark_telegram_signal_failed', {
+              _signal_id: claimedSignalId,
+              _error: `RMA_BLOCKED score=${rma.score}`,
+            });
+          } catch (e) { console.error('Failed to release slot after RMA block:', e); }
+        }
         return new Response(JSON.stringify({ success: false, blocked: true, rma_verdict: 'BLOQUEADO', rma_score: rma.score }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -173,24 +194,40 @@ Deno.serve(async (req) => {
     }
 
     try {
-      await sb.from('telegram_signals').insert({
-        match_name: payload.match,
-        match_id: payload.matchId || null,
-        market: payload.market,
-        confidence: payload.confidence,
-        filters_validated: payload.filtersValidated,
-        sensitivity: payload.sensitivity,
-        minute: payload.minute,
-        score: payload.score,
-        poisson: payload.poisson || null,
-        odd_min: payload.oddMin || null,
-        janela: payload.janela || null,
-        reason: payload.reason || null,
-        success: telegramSuccess,
-        error_message: telegramError || null,
-        telegram_message_id: telegramMessageId,
-        status: 'pendente',
-      });
+      if (claimedSignalId) {
+        // Slot já reservado via try_claim_telegram_slot — apenas finalizar.
+        if (telegramSuccess) {
+          await sb.rpc('mark_telegram_signal_sent', {
+            _signal_id: claimedSignalId,
+            _message_id: telegramMessageId,
+          });
+        } else {
+          await sb.rpc('mark_telegram_signal_failed', {
+            _signal_id: claimedSignalId,
+            _error: telegramError || 'unknown',
+          });
+        }
+      } else {
+        // Sem matchId (legado) — log direto sem dedupe atômico.
+        await sb.from('telegram_signals').insert({
+          match_name: payload.match,
+          match_id: payload.matchId || null,
+          market: payload.market,
+          confidence: payload.confidence,
+          filters_validated: payload.filtersValidated,
+          sensitivity: payload.sensitivity,
+          minute: payload.minute,
+          score: payload.score,
+          poisson: payload.poisson || null,
+          odd_min: payload.oddMin || null,
+          janela: payload.janela || null,
+          reason: payload.reason || null,
+          success: telegramSuccess,
+          error_message: telegramError || null,
+          telegram_message_id: telegramMessageId,
+          status: 'pendente',
+        });
+      }
     } catch (logErr) {
       console.error('Failed to log signal:', logErr);
     }

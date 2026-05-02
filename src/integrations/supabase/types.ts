@@ -164,6 +164,33 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          id: string
+          subject: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          id?: string
+          subject: string
+          updated_at?: string
+          window_start?: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          id?: string
+          subject?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       rma_shadow_logs: {
         Row: {
           acceleration: number | null
@@ -334,8 +361,44 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_cache_lock: { Args: { _cache_key: string }; Returns: undefined }
+      check_rate_limit: {
+        Args: {
+          _bucket: string
+          _max_calls: number
+          _subject: string
+          _window_seconds: number
+        }
+        Returns: boolean
+      }
       cleanup_cache_api: { Args: never; Returns: undefined }
+      cleanup_rate_limits: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      mark_telegram_signal_failed: {
+        Args: { _error: string; _signal_id: string }
+        Returns: undefined
+      }
+      mark_telegram_signal_sent: {
+        Args: { _message_id: number; _signal_id: string }
+        Returns: undefined
+      }
+      try_claim_telegram_slot: {
+        Args: {
+          _confidence: number
+          _filters_validated: string
+          _janela: string
+          _market: string
+          _match_id: string
+          _match_name: string
+          _minute: number
+          _odd_min: string
+          _poisson: string
+          _reason: string
+          _score: string
+          _sensitivity: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

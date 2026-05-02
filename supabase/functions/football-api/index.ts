@@ -89,6 +89,22 @@ async function dbCacheSet(cacheKey: string, dados: any, statusJogo: string): Pro
 }
 
 // ========================
+// MUTEX — pg_advisory_xact_lock por cache_key
+// Evita thundering herd: só 1 requester faz fetch externo por chave.
+// Os demais aguardam, depois leem do cache populado.
+// O lock é liberado automaticamente ao final da transação RPC.
+// ========================
+async function acquireCacheLock(cacheKey: string): Promise<void> {
+  try {
+    const sb = getSupabaseAdmin();
+    await sb.rpc('acquire_cache_lock', { _cache_key: cacheKey });
+  } catch (e) {
+    console.error(`[mutex] acquire_cache_lock failed for ${cacheKey}:`, e);
+    // fail-open: prossegue sem lock para não travar
+  }
+}
+
+// ========================
 // LEAGUE CONFIG
 // ========================
 const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61, 13, 2];
@@ -409,6 +425,14 @@ serve(async (req) => {
         return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // MUTEX: aguarda outros requesters do mesmo fixture e re-checa cache
+      await acquireCacheLock(dbCk);
+      const dbCachedAfterLock = await dbCacheGet(dbCk, "STATS");
+      if (dbCachedAfterLock) {
+        memSet(dbCk, dbCachedAfterLock);
+        return new Response(JSON.stringify(dbCachedAfterLock), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
       const responseData = { response: sData?.response || [] };
       memSet(dbCk, responseData);
@@ -433,6 +457,14 @@ serve(async (req) => {
       if (dbCached) {
         memSet("live_v3", dbCached);
         return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // MUTEX: serializa fetch externo concorrente para o snapshot live
+      await acquireCacheLock(liveCk);
+      const dbCachedAfterLock = await dbCacheGet(liveCk, "LIVE");
+      if (dbCachedAfterLock) {
+        memSet("live_v3", dbCachedAfterLock);
+        return new Response(JSON.stringify(dbCachedAfterLock), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const fixturesData = await fetchWithAuth("fixtures?live=all", apiKey);
@@ -504,6 +536,15 @@ serve(async (req) => {
       console.log("DB cache hit (pre)");
       memSet(`date_v14_${date}`, dbCached);
       return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // MUTEX: evita N requesters batendo na API por causa de cache miss simultâneo
+    await acquireCacheLock(preCk);
+    const dbCachedAfterLock = await dbCacheGet(preCk, "PRE");
+    if (dbCachedAfterLock) {
+      console.log("DB cache hit (pre, post-lock)");
+      memSet(`date_v14_${date}`, dbCachedAfterLock);
+      return new Response(JSON.stringify(dbCachedAfterLock), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const fixturesData = await fetchWithAuth(`fixtures?date=${date}`, apiKey);

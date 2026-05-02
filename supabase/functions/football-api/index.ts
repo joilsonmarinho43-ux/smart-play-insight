@@ -459,6 +459,14 @@ serve(async (req) => {
         return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // MUTEX: serializa fetch externo concorrente para o snapshot live
+      await acquireCacheLock(liveCk);
+      const dbCachedAfterLock = await dbCacheGet(liveCk, "LIVE");
+      if (dbCachedAfterLock) {
+        memSet("live_v3", dbCachedAfterLock);
+        return new Response(JSON.stringify(dbCachedAfterLock), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       const fixturesData = await fetchWithAuth("fixtures?live=all", apiKey);
       const fixtures = fixturesData?.response || [];
       console.log(`Live: ${fixtures.length} fixtures found`);

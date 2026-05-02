@@ -50,6 +50,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ═══ RATE LIMIT ═══
+    // 5 chamadas por minuto por usuário. Atômico via advisory lock + UPSERT no DB.
+    const { data: allowed, error: rlErr } = await admin.rpc('check_rate_limit', {
+      _bucket: 'register-session',
+      _subject: user.id,
+      _max_calls: 5,
+      _window_seconds: 60,
+    });
+    if (rlErr) {
+      console.error('[register-session] rate_limit error:', rlErr);
+      // fail-open: nunca bloquear usuário legítimo por falha de infra
+    } else if (allowed === false) {
+      return new Response(
+        JSON.stringify({
+          error: 'Too many session registrations. Tente novamente em 1 minuto.',
+          code: 'RATE_LIMITED',
+        }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': '60',
+          },
+        },
+      );
+    }
+
     // Check existing session
     const { data: existing } = await admin
       .from("active_sessions")

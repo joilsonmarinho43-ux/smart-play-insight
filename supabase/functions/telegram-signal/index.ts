@@ -72,24 +72,36 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    // ═══ IDEMPOTÊNCIA ═══
-    // Evita duplicar o MESMO sinal (match + market + minuto) em janela de 90s
+    // ═══ IDEMPOTÊNCIA ATÔMICA ═══
+    // INSERT ... ON CONFLICT DO NOTHING via RPC. Sem SELECT-then-INSERT.
+    // Se outra invocação já reservou o slot (match_id, market, minute), retorna NULL.
+    let claimedSignalId: string | null = null;
     if (payload.matchId) {
-      const since = new Date(Date.now() - 90_000).toISOString();
-      const { data: dup } = await sb
-        .from('telegram_signals')
-        .select('id, telegram_message_id, success')
-        .eq('match_id', payload.matchId)
-        .eq('market', payload.market)
-        .eq('minute', payload.minute)
-        .eq('success', true)
-        .gte('created_at', since)
-        .maybeSingle();
-      if (dup) {
-        console.log(`[TELEGRAM-SIGNAL] ⏭️ Duplicado ignorado (idempotência): ${payload.match} • ${payload.market} • ${payload.minute}'`);
-        return new Response(JSON.stringify({ success: true, deduped: true, messageId: dup.telegram_message_id }), {
+      const { data: claimed, error: claimErr } = await sb.rpc('try_claim_telegram_slot', {
+        _match_id: payload.matchId,
+        _match_name: payload.match,
+        _market: payload.market,
+        _minute: payload.minute,
+        _confidence: payload.confidence,
+        _filters_validated: payload.filtersValidated ?? null,
+        _sensitivity: payload.sensitivity ?? null,
+        _score: payload.score ?? null,
+        _poisson: payload.poisson ?? null,
+        _odd_min: payload.oddMin ?? null,
+        _janela: payload.janela ?? null,
+        _reason: payload.reason ?? null,
+      });
+
+      if (claimErr) {
+        console.error('[TELEGRAM-SIGNAL] try_claim_telegram_slot error:', claimErr);
+        // fail-open: continua para tentar enviar (legado)
+      } else if (!claimed) {
+        console.log(`[TELEGRAM-SIGNAL] ⏭️ Duplicado bloqueado (slot já reservado): ${payload.match} • ${payload.market} • ${payload.minute}'`);
+        return new Response(JSON.stringify({ success: true, deduped: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      } else {
+        claimedSignalId = claimed as unknown as string;
       }
     }
 

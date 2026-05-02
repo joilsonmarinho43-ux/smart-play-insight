@@ -129,6 +129,15 @@ Deno.serve(async (req) => {
             block_reason: 'telegram-signal — sinal bloqueado pelo RMA',
           });
         } catch (e) { console.error('Failed to log RMA block:', e); }
+        // Libera o slot atomicamente reservado para permitir reenvio futuro válido
+        if (claimedSignalId) {
+          try {
+            await sb.rpc('mark_telegram_signal_failed', {
+              _signal_id: claimedSignalId,
+              _error: `RMA_BLOCKED score=${rma.score}`,
+            });
+          } catch (e) { console.error('Failed to release slot after RMA block:', e); }
+        }
         return new Response(JSON.stringify({ success: false, blocked: true, rma_verdict: 'BLOQUEADO', rma_score: rma.score }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

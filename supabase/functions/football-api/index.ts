@@ -425,6 +425,14 @@ serve(async (req) => {
         return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // MUTEX: aguarda outros requesters do mesmo fixture e re-checa cache
+      await acquireCacheLock(dbCk);
+      const dbCachedAfterLock = await dbCacheGet(dbCk, "STATS");
+      if (dbCachedAfterLock) {
+        memSet(dbCk, dbCachedAfterLock);
+        return new Response(JSON.stringify(dbCachedAfterLock), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fixtureId}`, apiKey);
       const responseData = { response: sData?.response || [] };
       memSet(dbCk, responseData);

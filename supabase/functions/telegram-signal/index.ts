@@ -185,24 +185,40 @@ Deno.serve(async (req) => {
     }
 
     try {
-      await sb.from('telegram_signals').insert({
-        match_name: payload.match,
-        match_id: payload.matchId || null,
-        market: payload.market,
-        confidence: payload.confidence,
-        filters_validated: payload.filtersValidated,
-        sensitivity: payload.sensitivity,
-        minute: payload.minute,
-        score: payload.score,
-        poisson: payload.poisson || null,
-        odd_min: payload.oddMin || null,
-        janela: payload.janela || null,
-        reason: payload.reason || null,
-        success: telegramSuccess,
-        error_message: telegramError || null,
-        telegram_message_id: telegramMessageId,
-        status: 'pendente',
-      });
+      if (claimedSignalId) {
+        // Slot já reservado via try_claim_telegram_slot — apenas finalizar.
+        if (telegramSuccess) {
+          await sb.rpc('mark_telegram_signal_sent', {
+            _signal_id: claimedSignalId,
+            _message_id: telegramMessageId,
+          });
+        } else {
+          await sb.rpc('mark_telegram_signal_failed', {
+            _signal_id: claimedSignalId,
+            _error: telegramError || 'unknown',
+          });
+        }
+      } else {
+        // Sem matchId (legado) — log direto sem dedupe atômico.
+        await sb.from('telegram_signals').insert({
+          match_name: payload.match,
+          match_id: payload.matchId || null,
+          market: payload.market,
+          confidence: payload.confidence,
+          filters_validated: payload.filtersValidated,
+          sensitivity: payload.sensitivity,
+          minute: payload.minute,
+          score: payload.score,
+          poisson: payload.poisson || null,
+          odd_min: payload.oddMin || null,
+          janela: payload.janela || null,
+          reason: payload.reason || null,
+          success: telegramSuccess,
+          error_message: telegramError || null,
+          telegram_message_id: telegramMessageId,
+          status: 'pendente',
+        });
+      }
     } catch (logErr) {
       console.error('Failed to log signal:', logErr);
     }

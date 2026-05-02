@@ -538,6 +538,15 @@ serve(async (req) => {
       return new Response(JSON.stringify(dbCached), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // MUTEX: evita N requesters batendo na API por causa de cache miss simultâneo
+    await acquireCacheLock(preCk);
+    const dbCachedAfterLock = await dbCacheGet(preCk, "PRE");
+    if (dbCachedAfterLock) {
+      console.log("DB cache hit (pre, post-lock)");
+      memSet(`date_v14_${date}`, dbCachedAfterLock);
+      return new Response(JSON.stringify(dbCachedAfterLock), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const fixturesData = await fetchWithAuth(`fixtures?date=${date}`, apiKey);
     let fixtures = fixturesData?.response || [];
     console.log(`Got ${fixtures.length} total fixtures`);

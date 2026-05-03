@@ -1,11 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // Market verification logic
 function checkMarketResult(market: string, homeGoals: number, awayGoals: number, corners: number, matchFinished: boolean): 'green' | 'loss' | 'pendente' {

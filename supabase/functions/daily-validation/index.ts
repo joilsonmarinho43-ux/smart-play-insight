@@ -235,22 +235,11 @@ Deno.serve(async (req) => {
     ].join('\n');
 
     // Send to Telegram
-    const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
+    const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, message, {
+      botToken: TELEGRAM_BOT_TOKEN,
+      tag: 'DAILY-VALIDATION',
     });
-
-    const tgData = await tgRes.json();
+    const tgData = tgRes.data ?? {};
     if (!tgRes.ok) console.error('[DAILY-VALIDATION] Telegram error:', JSON.stringify(tgData));
 
     return new Response(JSON.stringify({

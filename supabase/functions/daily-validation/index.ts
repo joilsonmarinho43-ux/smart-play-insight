@@ -1,11 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendTelegramMessage, editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // ═══════════════════════════════════════
 // Market verification (same logic as check-signal-results)

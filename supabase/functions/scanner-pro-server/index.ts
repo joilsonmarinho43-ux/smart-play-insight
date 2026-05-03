@@ -402,22 +402,11 @@ Deno.serve(async (req) => {
     for (const signal of approved) {
       const text = buildSniperMessage(signal);
 
-      const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'X-Connection-Api-Key': TELEGRAM_API_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-        }),
+      const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, {
+        botToken: TELEGRAM_BOT_TOKEN,
+        tag: 'SNIPER-DUAL',
       });
-
-      const tgData = await tgRes.json();
+      const tgData = tgRes.data ?? {};
       const telegramMessageId = tgData.result?.message_id ?? null;
 
       // Log to DB

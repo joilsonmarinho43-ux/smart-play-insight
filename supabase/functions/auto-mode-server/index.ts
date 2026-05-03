@@ -5,8 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
-
 // ═══════════════════════════════════════
 // RMA ENGINE (inline) — pesos rebalanceados + league_weight + momentum
 // ═══════════════════════════════════════

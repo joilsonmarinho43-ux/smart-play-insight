@@ -53,14 +53,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
+    const TELEGRAM_BOT_TOKEN = getTelegramBotToken();
     const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
 
-    if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY || !TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_KEY) {
+    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_KEY) {
       throw new Error('Variáveis de ambiente não configuradas');
     }
 

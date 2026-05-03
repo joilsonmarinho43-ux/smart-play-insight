@@ -69,11 +69,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
-
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
-    if (!TELEGRAM_API_KEY) throw new Error('TELEGRAM_API_KEY not configured');
+    const TELEGRAM_BOT_TOKEN = getTelegramBotToken();
 
     const CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     if (!CHAT_ID) throw new Error('TELEGRAM_CHAT_ID not configured');

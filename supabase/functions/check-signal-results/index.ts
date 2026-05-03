@@ -239,25 +239,12 @@ Deno.serve(async (req) => {
             `🤖 <i>Analista Joilson</i>`,
           ].join('\n');
 
-          const tgResp = await fetch(`${GATEWAY_URL}/editMessageText`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'X-Connection-Api-Key': TELEGRAM_API_KEY,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              chat_id: CHAT_ID,
-              message_id: signal.telegram_message_id,
-              text: updatedText,
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-            }),
+          const tgResp = await editTelegramMessage(CHAT_ID, signal.telegram_message_id, updatedText, {
+            botToken: TELEGRAM_BOT_TOKEN,
+            tag: 'CHECK-RESULTS',
           });
-
-          const tgResult = await tgResp.json();
-          const alreadyEdited = tgResult.description?.includes('message is not modified');
-          telegramEdited = tgResult.ok === true || tgResp.ok || alreadyEdited;
+          const tgResult = tgResp.data ?? {};
+          telegramEdited = tgResp.ok;
           if (!telegramEdited) {
             if (tgResult.error_code === 429) {
               console.error(`Rate limited, stopping. Retry after ${tgResult.parameters?.retry_after}s`);

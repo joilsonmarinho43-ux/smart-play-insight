@@ -90,24 +90,14 @@ ${lucroEmoji} <b>ESTIMATIVA FINANCEIRA</b>
 🤖 <i>Analista Joilson — Relatório Automático</i>
     `.trim();
 
-    const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: 'HTML',
-      }),
+    const tg = await sendTelegramMessage(TELEGRAM_CHAT_ID, message, {
+      botToken: TELEGRAM_BOT_TOKEN,
+      tag: 'WEEKLY-REPORT',
     });
+    const result = tg.data ?? {};
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(`Telegram API error: ${JSON.stringify(result)}`);
+    if (!tg.ok) {
+      throw new Error(`Telegram API error [${tg.status}]: ${JSON.stringify(result)}`);
     }
 
     return new Response(

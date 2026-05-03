@@ -136,20 +136,9 @@ Deno.serve(async (req) => {
               `🤖 <i>Analista Joilson</i>`,
             ].join('\n');
 
-            await fetch(`${GATEWAY_URL}/editMessageText`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'X-Connection-Api-Key': TELEGRAM_API_KEY,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                chat_id: TELEGRAM_CHAT_ID,
-                message_id: signal.telegram_message_id,
-                text: updatedText,
-                parse_mode: 'HTML',
-                disable_web_page_preview: true,
-              }),
+            await editTelegramMessage(TELEGRAM_CHAT_ID, signal.telegram_message_id, updatedText, {
+              botToken: TELEGRAM_BOT_TOKEN,
+              tag: 'DAILY-VALIDATION',
             });
           } catch (_) { /* ignore edit errors */ }
         }

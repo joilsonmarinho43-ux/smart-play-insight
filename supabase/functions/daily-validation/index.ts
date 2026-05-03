@@ -1,11 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendTelegramMessage, editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // ═══════════════════════════════════════
 // Market verification (same logic as check-signal-results)
@@ -54,14 +53,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
+    const TELEGRAM_BOT_TOKEN = getTelegramBotToken();
     const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
 
-    if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY || !TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_KEY) {
+    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_KEY) {
       throw new Error('Variáveis de ambiente não configuradas');
     }
 
@@ -138,20 +136,9 @@ Deno.serve(async (req) => {
               `🤖 <i>Analista Joilson</i>`,
             ].join('\n');
 
-            await fetch(`${GATEWAY_URL}/editMessageText`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'X-Connection-Api-Key': TELEGRAM_API_KEY,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                chat_id: TELEGRAM_CHAT_ID,
-                message_id: signal.telegram_message_id,
-                text: updatedText,
-                parse_mode: 'HTML',
-                disable_web_page_preview: true,
-              }),
+            await editTelegramMessage(TELEGRAM_CHAT_ID, signal.telegram_message_id, updatedText, {
+              botToken: TELEGRAM_BOT_TOKEN,
+              tag: 'DAILY-VALIDATION',
             });
           } catch (_) { /* ignore edit errors */ }
         }
@@ -248,22 +235,11 @@ Deno.serve(async (req) => {
     ].join('\n');
 
     // Send to Telegram
-    const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
+    const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, message, {
+      botToken: TELEGRAM_BOT_TOKEN,
+      tag: 'DAILY-VALIDATION',
     });
-
-    const tgData = await tgRes.json();
+    const tgData = tgRes.data ?? {};
     if (!tgRes.ok) console.error('[DAILY-VALIDATION] Telegram error:', JSON.stringify(tgData));
 
     return new Response(JSON.stringify({

@@ -1,11 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // Market verification logic
 function checkMarketResult(market: string, homeGoals: number, awayGoals: number, corners: number, matchFinished: boolean): 'green' | 'loss' | 'pendente' {
@@ -70,11 +69,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
-
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
-    if (!TELEGRAM_API_KEY) throw new Error('TELEGRAM_API_KEY not configured');
+    const TELEGRAM_BOT_TOKEN = getTelegramBotToken();
 
     const CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     if (!CHAT_ID) throw new Error('TELEGRAM_CHAT_ID not configured');
@@ -244,25 +239,12 @@ Deno.serve(async (req) => {
             `🤖 <i>Analista Joilson</i>`,
           ].join('\n');
 
-          const tgResp = await fetch(`${GATEWAY_URL}/editMessageText`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'X-Connection-Api-Key': TELEGRAM_API_KEY,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              chat_id: CHAT_ID,
-              message_id: signal.telegram_message_id,
-              text: updatedText,
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-            }),
+          const tgResp = await editTelegramMessage(CHAT_ID, signal.telegram_message_id, updatedText, {
+            botToken: TELEGRAM_BOT_TOKEN,
+            tag: 'CHECK-RESULTS',
           });
-
-          const tgResult = await tgResp.json();
-          const alreadyEdited = tgResult.description?.includes('message is not modified');
-          telegramEdited = tgResult.ok === true || tgResp.ok || alreadyEdited;
+          const tgResult = tgResp.data ?? {};
+          telegramEdited = tgResp.ok;
           if (!telegramEdited) {
             if (tgResult.error_code === 429) {
               console.error(`Rate limited, stopping. Retry after ${tgResult.parameters?.retry_after}s`);

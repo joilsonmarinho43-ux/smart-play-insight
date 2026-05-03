@@ -1,11 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 
 // ═══════════════════════════════════════
 // MATH HELPERS (Poisson)
@@ -320,13 +319,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
+    const TELEGRAM_BOT_TOKEN = getTelegramBotToken();
     const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY || !TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey) {
+    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey) {
       throw new Error('Variáveis de ambiente não configuradas');
     }
 
@@ -404,22 +402,11 @@ Deno.serve(async (req) => {
     for (const signal of approved) {
       const text = buildSniperMessage(signal);
 
-      const tgRes = await fetch(`${GATEWAY_URL}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'X-Connection-Api-Key': TELEGRAM_API_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-        }),
+      const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, {
+        botToken: TELEGRAM_BOT_TOKEN,
+        tag: 'SNIPER-DUAL',
       });
-
-      const tgData = await tgRes.json();
+      const tgData = tgRes.data ?? {};
       const telegramMessageId = tgData.result?.message_id ?? null;
 
       // Log to DB

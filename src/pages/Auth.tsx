@@ -21,7 +21,10 @@ const Auth = () => {
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          console.error('[AUTH] signIn error:', error);
+          throw error;
+        }
         navigate('/');
       } else {
         const { error } = await supabase.auth.signUp({
@@ -29,13 +32,20 @@ const Auth = () => {
           password,
           options: { emailRedirectTo: window.location.origin },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[AUTH] signUp error:', error);
+          throw error;
+        }
         navigate('/');
       }
     } catch (err: any) {
       let msg = err.message || 'Erro inesperado';
       if (err.message === 'Invalid login credentials') {
         msg = 'E-mail ou senha incorretos.';
+      } else if (err.message?.includes('User already registered')) {
+        msg = 'E-mail já cadastrado. Faça login.';
+      } else if (err.message?.includes('Password should be')) {
+        msg = 'Senha muito curta (mínimo 6 caracteres).';
       }
       setError(msg);
     } finally {

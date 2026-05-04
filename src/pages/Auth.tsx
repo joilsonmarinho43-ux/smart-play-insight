@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Brain, Loader2, Mail, Lock } from 'lucide-react';
+import { Brain, Loader2, Mail, Lock, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Auth = () => {

@@ -372,6 +372,7 @@ export type Database = {
         Returns: boolean
       }
       cleanup_cache_api: { Args: never; Returns: undefined }
+      cleanup_live_cache: { Args: never; Returns: undefined }
       cleanup_rate_limits: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       mark_telegram_signal_failed: {

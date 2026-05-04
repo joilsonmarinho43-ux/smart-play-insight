@@ -11,8 +11,9 @@ const CACHE_KEYS = {
   TIME_LIVE: 'football_cache_live_time'
 };
 
-const PRE_MATCH_COOLDOWN = 1000 * 60 * 60 * 24; // 24h - Pré-Jogo carrega 1x por dia (economiza cota)
-const LIVE_MATCH_COOLDOWN = 1000 * 55;     // 55 segundos para Live
+const PRE_MATCH_COOLDOWN = 1000 * 60 * 60 * 24; // 24h
+const LIVE_MATCH_COOLDOWN = 1000 * 55;     // 55s
+const LIVE_STALE_HARD_MS = 1000 * 60 * 10; // 10min — força reset
 
 // =============================
 // MODO OFFLINE (cache expirado servido como fallback)

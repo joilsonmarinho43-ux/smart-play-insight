@@ -127,22 +127,78 @@ function getLeagueDisplayName(leagueId: number, fallbackName: string): string {
   return LEAGUE_DISPLAY_NAMES[leagueId] || fallbackName;
 }
 
+const API_TIMEOUT_MS = 8000;
+const API_DAILY_LIMIT = Number(Deno.env.get('API_FUTEBOL_DAILY_LIMIT') || 7000);
+
+async function cbCheck(): Promise<{ allow: boolean; state: string; retry_after?: number }> {
+  try {
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb.rpc('cb_check', { _service: 'api_football' });
+    if (error) { console.error('[CB] check error:', error); return { allow: true, state: 'CLOSED' }; }
+    return data as any;
+  } catch (e) { console.error('[CB] check exception:', e); return { allow: true, state: 'CLOSED' }; }
+}
+async function cbSuccess(): Promise<void> {
+  try { await getSupabaseAdmin().rpc('cb_record_success', { _service: 'api_football' }); } catch (e) { console.error('[CB] success err:', e); }
+}
+async function cbFailure(err: string): Promise<void> {
+  try { await getSupabaseAdmin().rpc('cb_record_failure', { _service: 'api_football', _error: err }); } catch (e) { console.error('[CB] failure err:', e); }
+}
+async function quotaIncrement(): Promise<{ allow: boolean; count: number; limit: number }> {
+  try {
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb.rpc('api_usage_increment', {
+      _service: 'api_football', _max_per_day: API_DAILY_LIMIT, _amount: 1,
+    });
+    if (error) { console.error('[QUOTA] err:', error); return { allow: true, count: 0, limit: API_DAILY_LIMIT }; }
+    return data as any;
+  } catch (e) { console.error('[QUOTA] exc:', e); return { allow: true, count: 0, limit: API_DAILY_LIMIT }; }
+}
+
 async function fetchWithAuth(endpoint: string, apiKey: string): Promise<any> {
   if (!canCallAPI()) {
     console.warn(`API LIMIT REACHED (${apiCallCount}/${API_CALL_LIMIT}). Blocking: ${endpoint}`);
     return { response: [] };
   }
-  apiCallCount++;
-  console.log(`API call #${apiCallCount}: ${endpoint}`);
-  const res = await fetch(`${BASE_URL}/${endpoint}`, {
-    headers: { "x-apisports-key": apiKey },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`API error ${res.status}: ${text}`);
-    throw new Error(`API ${res.status}`);
+
+  const cb = await cbCheck();
+  if (!cb.allow) {
+    console.warn(`[CB] BLOCKED state=${cb.state} retry_after=${cb.retry_after}s : ${endpoint}`);
+    return { response: [], _cb_blocked: true };
   }
-  return res.json();
+
+  const q = await quotaIncrement();
+  if (!q.allow) {
+    console.warn(`[QUOTA] EXCEEDED ${q.count}/${q.limit} blocking ${endpoint}`);
+    return { response: [], _quota_exceeded: true };
+  }
+
+  apiCallCount++;
+  console.log(`API call #${apiCallCount} (daily ${q.count}/${q.limit}): ${endpoint}`);
+
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE_URL}/${endpoint}`, {
+      headers: { "x-apisports-key": apiKey },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`API error ${res.status}: ${text}`);
+      await cbFailure(`HTTP ${res.status}`);
+      throw new Error(`API ${res.status}`);
+    }
+    const json = await res.json();
+    await cbSuccess();
+    return json;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await cbFailure(msg);
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 function extractStats(stats: any[]) {

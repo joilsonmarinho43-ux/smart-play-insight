@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // Telegram Bot API direto — sem connector-gateway.
 // Helper compartilhado por todas edge functions.
+// Inclui retry exponencial e fallback para outbox (DLQ).
 // ═══════════════════════════════════════════════════════════════
 
 const MAX_ATTEMPTS = 4;
@@ -23,33 +24,37 @@ export function getTelegramBotToken(): string {
   return token;
 }
 
-/** Detecta erros permanentes do Telegram (não vale a pena tentar de novo). */
+/** Detecta erros permanentes do Telegram. */
 function isPermanentTelegramError(status: number, data: any): boolean {
   if (status === 400 || status === 401 || status === 403 || status === 404) return true;
   const desc = (data?.description || '').toString().toLowerCase();
   if (desc.includes('bot was blocked')) return true;
   if (desc.includes('chat not found')) return true;
   if (desc.includes('user is deactivated')) return true;
-  if (desc.includes('message is not modified')) return true; // tratado como sucesso pelo caller
+  if (desc.includes('message is not modified')) return true;
   return false;
 }
 
-async function callTelegram(method: string, botToken: string, body: Record<string, unknown>): Promise<TelegramResult> {
+async function callTelegram(method: string, botToken: string, body: Record<string, unknown>, timeoutMs = 10_000): Promise<TelegramResult> {
   const url = `https://api.telegram.org/bot${botToken}/${method}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: ctrl.signal,
     });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok && data?.ok === true, status: res.status, data };
   } catch (e) {
     return { ok: false, status: 0, data: null, error: e instanceof Error ? e.message : 'network error' };
+  } finally {
+    clearTimeout(t);
   }
 }
 
-/** Wrapper genérico com retry exponencial + respeito a retry_after. */
 export async function telegramRequest(
   method: 'sendMessage' | 'editMessageText',
   body: Record<string, unknown>,
@@ -66,7 +71,6 @@ export async function telegramRequest(
       return last;
     }
 
-    // "message is not modified" → tratamos como sucesso lógico para edits
     const desc = (last.data?.description || '').toString();
     if (method === 'editMessageText' && desc.toLowerCase().includes('message is not modified')) {
       return { ok: true, status: last.status, data: { ...last.data, ok: true, _notModified: true } };
@@ -125,4 +129,37 @@ export async function editTelegramMessage(
     parse_mode: opts?.parseMode ?? 'HTML',
     disable_web_page_preview: opts?.disablePreview ?? true,
   }, { botToken: opts?.botToken, tag: opts?.tag });
+}
+
+/**
+ * Enfileira mensagem na DLQ (telegram_outbox) para retry assíncrono.
+ * Usado quando sendTelegramMessage falha definitivamente em runtime.
+ */
+export async function enqueueTelegramOutbox(
+  sb: any,
+  payload: {
+    chat_id: string | number;
+    text: string;
+    parse_mode?: string;
+    source?: string;
+    signal_id?: string | null;
+    last_error?: string;
+  },
+): Promise<void> {
+  try {
+    await sb.from('telegram_outbox').insert({
+      chat_id: String(payload.chat_id),
+      text: payload.text,
+      parse_mode: payload.parse_mode || 'HTML',
+      source: payload.source || null,
+      signal_id: payload.signal_id || null,
+      last_error: payload.last_error || null,
+      attempts: 0,
+      max_attempts: 3,
+      next_retry_at: new Date(Date.now() + 30_000).toISOString(),
+      status: 'pending',
+    });
+  } catch (e) {
+    console.error('[OUTBOX] Failed to enqueue:', e);
+  }
 }

@@ -11,8 +11,9 @@ const CACHE_KEYS = {
   TIME_LIVE: 'football_cache_live_time'
 };
 
-const PRE_MATCH_COOLDOWN = 1000 * 60 * 60 * 24; // 24h - Pré-Jogo carrega 1x por dia (economiza cota)
-const LIVE_MATCH_COOLDOWN = 1000 * 55;     // 55 segundos para Live
+const PRE_MATCH_COOLDOWN = 1000 * 60 * 60 * 24; // 24h
+const LIVE_MATCH_COOLDOWN = 1000 * 55;     // 55s
+const LIVE_STALE_HARD_MS = 1000 * 60 * 10; // 10min — força reset
 
 // =============================
 // MODO OFFLINE (cache expirado servido como fallback)
@@ -142,6 +143,14 @@ export async function fetchMultiDayMatches(days: number = 3): Promise<MatchData[
 // LIVE REAL
 // =============================
 export async function fetchLiveMatches(): Promise<MatchData[]> {
+  // Hard-reset: se cache live tem >10min, descarta para forçar refetch
+  const liveTime = Number(localStorage.getItem(CACHE_KEYS.TIME_LIVE) || 0);
+  if (liveTime && Date.now() - liveTime > LIVE_STALE_HARD_MS) {
+    console.warn('[LIVE] cache >10min — descartando para refetch forçado');
+    localStorage.removeItem(CACHE_KEYS.LIVE);
+    localStorage.removeItem(CACHE_KEYS.TIME_LIVE);
+  }
+
   const cached = getStorageCache(CACHE_KEYS.LIVE, CACHE_KEYS.TIME_LIVE, LIVE_MATCH_COOLDOWN);
   if (cached) return cached;
 

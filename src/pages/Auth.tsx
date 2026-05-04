@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Brain, Loader2, Mail, Lock } from 'lucide-react';
+import { Brain, Loader2, Mail, Lock, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Auth = () => {
@@ -21,7 +21,10 @@ const Auth = () => {
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          console.error('[AUTH] signIn error:', error);
+          throw error;
+        }
         navigate('/');
       } else {
         const { error } = await supabase.auth.signUp({
@@ -29,13 +32,20 @@ const Auth = () => {
           password,
           options: { emailRedirectTo: window.location.origin },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[AUTH] signUp error:', error);
+          throw error;
+        }
         navigate('/');
       }
     } catch (err: any) {
       let msg = err.message || 'Erro inesperado';
       if (err.message === 'Invalid login credentials') {
         msg = 'E-mail ou senha incorretos.';
+      } else if (err.message?.includes('User already registered')) {
+        msg = 'E-mail já cadastrado. Faça login.';
+      } else if (err.message?.includes('Password should be')) {
+        msg = 'Senha muito curta (mínimo 6 caracteres).';
       }
       setError(msg);
     } finally {
@@ -106,6 +116,16 @@ const Auth = () => {
             </button>
           </p>
         </form>
+
+        <a
+          href="https://wa.me/5591986215730?text=Olá,%20preciso%20de%20suporte%20no%20Analista%20Joilson."
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Falar com suporte no WhatsApp
+        </a>
       </div>
     </div>
   );

@@ -23,3 +23,12 @@ verify_jwt = false
 
 [functions.semi-window-simulator]
 verify_jwt = false
+
+[functions.healthcheck]
+verify_jwt = false
+
+[functions.telegram-outbox-retry]
+verify_jwt = false
+
+[functions.telegram-test]
+verify_jwt = false

@@ -232,7 +232,27 @@ Deno.serve(async (req) => {
       console.error('Failed to log signal:', logErr);
     }
 
-    if (!telegramSuccess) throw new Error(telegramError);
+    // DLQ: se falhou após retries, enfileira para retry assíncrono
+    if (!telegramSuccess) {
+      try {
+        await sb.from('telegram_outbox').insert({
+          chat_id: String(CHAT_ID),
+          text,
+          parse_mode: 'HTML',
+          source: 'telegram-signal',
+          signal_id: claimedSignalId,
+          last_error: telegramError || 'unknown',
+          attempts: 0,
+          max_attempts: 3,
+          next_retry_at: new Date(Date.now() + 30_000).toISOString(),
+          status: 'pending',
+        });
+        console.log('[TELEGRAM-SIGNAL] 📬 Enfileirado em telegram_outbox para retry');
+      } catch (qe) {
+        console.error('[TELEGRAM-SIGNAL] Falha ao enfileirar outbox:', qe);
+      }
+      throw new Error(telegramError);
+    }
 
     return new Response(JSON.stringify({ success: true, messageId: telegramMessageId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

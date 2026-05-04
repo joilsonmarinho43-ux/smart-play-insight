@@ -116,6 +116,16 @@ const Auth = () => {
             </button>
           </p>
         </form>
+
+        <a
+          href="https://wa.me/5591986215730?text=Olá,%20preciso%20de%20suporte%20no%20Analista%20Joilson."
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Falar com suporte no WhatsApp
+        </a>
       </div>
     </div>
   );

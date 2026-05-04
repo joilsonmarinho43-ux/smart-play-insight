@@ -41,6 +41,57 @@ export type Database = {
         }
         Relationships: []
       }
+      api_circuit_state: {
+        Row: {
+          failure_count: number
+          last_error: string | null
+          next_attempt_at: string | null
+          opened_at: string | null
+          service: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          failure_count?: number
+          last_error?: string | null
+          next_attempt_at?: string | null
+          opened_at?: string | null
+          service: string
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          failure_count?: number
+          last_error?: string | null
+          next_attempt_at?: string | null
+          opened_at?: string | null
+          service?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_usage_daily: {
+        Row: {
+          call_count: number
+          day: string
+          service: string
+          updated_at: string
+        }
+        Insert: {
+          call_count?: number
+          day?: string
+          service: string
+          updated_at?: string
+        }
+        Update: {
+          call_count?: number
+          day?: string
+          service?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cache_api: {
         Row: {
           cache_key: string
@@ -284,6 +335,57 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_outbox: {
+        Row: {
+          attempts: number
+          chat_id: string
+          created_at: string
+          delivered_at: string | null
+          id: string
+          last_error: string | null
+          max_attempts: number
+          next_retry_at: string
+          parse_mode: string
+          signal_id: string | null
+          source: string | null
+          status: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          chat_id: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_retry_at?: string
+          parse_mode?: string
+          signal_id?: string | null
+          source?: string | null
+          status?: string
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          chat_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          next_retry_at?: string
+          parse_mode?: string
+          signal_id?: string | null
+          source?: string | null
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       telegram_signals: {
         Row: {
           confidence: number
@@ -362,6 +464,16 @@ export type Database = {
     }
     Functions: {
       acquire_cache_lock: { Args: { _cache_key: string }; Returns: undefined }
+      api_usage_increment: {
+        Args: { _amount?: number; _max_per_day: number; _service: string }
+        Returns: Json
+      }
+      cb_check: { Args: { _service: string }; Returns: Json }
+      cb_record_failure: {
+        Args: { _error: string; _service: string }
+        Returns: Json
+      }
+      cb_record_success: { Args: { _service: string }; Returns: undefined }
       check_rate_limit: {
         Args: {
           _bucket: string

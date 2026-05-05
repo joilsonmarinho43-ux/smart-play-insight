@@ -335,6 +335,57 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_alert_state: {
+        Row: {
+          alert_key: string
+          last_fired_at: string
+          last_payload: Json | null
+        }
+        Insert: {
+          alert_key: string
+          last_fired_at?: string
+          last_payload?: Json | null
+        }
+        Update: {
+          alert_key?: string
+          last_fired_at?: string
+          last_payload?: Json | null
+        }
+        Relationships: []
+      }
+      telegram_metrics: {
+        Row: {
+          created_at: string
+          id: string
+          outbox_pending: number
+          total_dead: number
+          total_failed: number
+          total_retried: number
+          total_sent: number
+          window_label: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          outbox_pending?: number
+          total_dead?: number
+          total_failed?: number
+          total_retried?: number
+          total_sent?: number
+          window_label: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          outbox_pending?: number
+          total_dead?: number
+          total_failed?: number
+          total_retried?: number
+          total_sent?: number
+          window_label?: string
+        }
+        Relationships: []
+      }
       telegram_outbox: {
         Row: {
           attempts: number
@@ -464,6 +515,11 @@ export type Database = {
     }
     Functions: {
       acquire_cache_lock: { Args: { _cache_key: string }; Returns: undefined }
+      aggregate_telegram_metrics: { Args: { _window?: string }; Returns: Json }
+      alert_should_fire: {
+        Args: { _alert_key: string; _cooldown_minutes?: number }
+        Returns: boolean
+      }
       api_usage_increment: {
         Args: { _amount?: number; _max_per_day: number; _service: string }
         Returns: Json
@@ -495,6 +551,7 @@ export type Database = {
         Args: { _message_id: number; _signal_id: string }
         Returns: undefined
       }
+      retry_telegram_outbox_message: { Args: { _id: string }; Returns: Json }
       try_claim_telegram_slot: {
         Args: {
           _confidence: number

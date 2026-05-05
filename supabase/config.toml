@@ -32,3 +32,12 @@ verify_jwt = false
 
 [functions.telegram-test]
 verify_jwt = false
+
+[functions.telegram-retry]
+verify_jwt = false
+
+[functions.telegram-metrics-aggregate]
+verify_jwt = false
+
+[functions.telegram-alerts-monitor]
+verify_jwt = false

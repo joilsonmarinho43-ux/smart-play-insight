@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.telegram-alerts-monitor]
 verify_jwt = false
+
+[functions.daily-bingo-broadcast]
+verify_jwt = false

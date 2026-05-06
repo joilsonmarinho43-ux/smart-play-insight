@@ -5,7 +5,7 @@ import MatchCard from '@/components/MatchCard';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, RefreshCw, Trash2, WifiOff } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, WifiOff, Send } from 'lucide-react';
 import bannerImg from "@/assets/banner-hero.jpg";
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
 
@@ -221,6 +221,17 @@ const Index = () => {
             <span className="text-[10px] text-muted-foreground ml-1.5">jogos</span>
           </div>
         </div>
+
+        {/* Telegram Group CTA */}
+        <a
+          href="https://t.me/sinais_joilson"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex items-center justify-center gap-2 w-full max-w-3xl mx-auto bg-gradient-to-r from-[#229ED9] to-[#1d8bbf] hover:from-[#1d8bbf] hover:to-[#1879a8] text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-[#229ED9]/30 transition-all"
+        >
+          <Send className="w-5 h-5" fill="currentColor" />
+          <span className="text-sm tracking-wide">ENTRAR NO GRUPO DE SINAIS NO TELEGRAM</span>
+        </a>
 
         {/* League Filter */}
         {availableLeagues.length > 1 && (

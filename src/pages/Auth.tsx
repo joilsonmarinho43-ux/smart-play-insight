@@ -118,6 +118,16 @@ const Auth = () => {
         </form>
 
         <a
+          href="https://t.me/sinais_joilson"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-[#229ED9] to-[#1d8bbf] hover:from-[#1d8bbf] hover:to-[#1879a8] text-white font-bold py-2.5 rounded-lg shadow-lg shadow-[#229ED9]/30 transition-all text-sm"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Entrar no grupo do Telegram
+        </a>
+
+        <a
           href="https://wa.me/5591986215730?text=Olá,%20preciso%20de%20suporte%20no%20Analista%20Joilson."
           target="_blank"
           rel="noopener noreferrer"

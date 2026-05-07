@@ -441,69 +441,99 @@ export type Database = {
         Row: {
           confidence: number
           created_at: string
+          edited_message: boolean
           error_message: string | null
+          expected_value: number | null
           filters_validated: string | null
           id: string
+          implied_probability: number | null
           janela: string | null
           market: string
+          market_type: string | null
           match_id: string | null
           match_name: string
           minute: number
+          model_probability: number | null
+          odd: number | null
           odd_min: string | null
           poisson: string | null
+          premium_score: number | null
           reason: string | null
+          result: string | null
           rma_score: number | null
           rma_verdict: string | null
+          roi: number | null
           score: string | null
           sensitivity: string | null
+          settled_at: string | null
           status: string
-          success: boolean
+          success: boolean | null
           telegram_edited: boolean
           telegram_message_id: number | null
         }
         Insert: {
           confidence?: number
           created_at?: string
+          edited_message?: boolean
           error_message?: string | null
+          expected_value?: number | null
           filters_validated?: string | null
           id?: string
+          implied_probability?: number | null
           janela?: string | null
           market: string
+          market_type?: string | null
           match_id?: string | null
           match_name: string
           minute?: number
+          model_probability?: number | null
+          odd?: number | null
           odd_min?: string | null
           poisson?: string | null
+          premium_score?: number | null
           reason?: string | null
+          result?: string | null
           rma_score?: number | null
           rma_verdict?: string | null
+          roi?: number | null
           score?: string | null
           sensitivity?: string | null
+          settled_at?: string | null
           status?: string
-          success?: boolean
+          success?: boolean | null
           telegram_edited?: boolean
           telegram_message_id?: number | null
         }
         Update: {
           confidence?: number
           created_at?: string
+          edited_message?: boolean
           error_message?: string | null
+          expected_value?: number | null
           filters_validated?: string | null
           id?: string
+          implied_probability?: number | null
           janela?: string | null
           market?: string
+          market_type?: string | null
           match_id?: string | null
           match_name?: string
           minute?: number
+          model_probability?: number | null
+          odd?: number | null
           odd_min?: string | null
           poisson?: string | null
+          premium_score?: number | null
           reason?: string | null
+          result?: string | null
           rma_score?: number | null
           rma_verdict?: string | null
+          roi?: number | null
           score?: string | null
           sensitivity?: string | null
+          settled_at?: string | null
           status?: string
-          success?: boolean
+          success?: boolean | null
           telegram_edited?: boolean
           telegram_message_id?: number | null
         }

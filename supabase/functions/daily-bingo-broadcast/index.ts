@@ -1,7 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-// daily-bingo-broadcast — envia ENTRADAS PREMIUM do dia
-// para o grupo do Telegram (1x por dia via pg_cron).
-// Formato: mensagem premium por jogo (template Analista Joilson).
+// daily-bingo-broadcast — ENTRADAS PREMIUM PRÉ-JOGO (manhã)
+// Poisson + xG, ranking por premiumScore, EV+ e persistência completa.
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, escapeHtml, enqueueTelegramOutbox } from '../_shared/telegram.ts';
@@ -12,21 +11,39 @@ const corsHeaders = {
 };
 
 const APP_URL = Deno.env.get('APP_PUBLIC_URL') || 'https://analista.funecob.com.br';
+const SEP = '━━━━━━━━━━━━━━━━━━━';
 
 // ── Poisson helpers
 function fact(n: number) { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
 function pProb(l: number, k: number) { return (Math.exp(-l) * Math.pow(l, k)) / fact(k); }
 function pOver(l: number, k: number) { let c = 0; for (let i = 0; i < k; i++) c += pProb(l, i); return Math.max(0, Math.min(1, 1 - c)); }
 
-const UNSTABLE = ['friendly','friendlies','u17','u19','u20','u21','u23','sub-','reserve','reserva','youth','juvenil','amateur','amador','women','feminino'];
-
-const SEP = '━━━━━━━━━━━━━━━━━━━';
+const UNSTABLE = [
+  'friendly','friendlies','amistos',
+  'u15','u16','u17','u18','u19','u20','u21','u23',
+  'sub-15','sub-16','sub-17','sub-18','sub-19','sub-20','sub-21','sub-23',
+  'reserve','reserva','youth','juvenil','amateur','amador',
+  'pre-season','pré-temporada','pre season',
+  'women','feminino','féminin','femenino','frauen',
+  'regional','third division','terceira',
+];
 
 function probEmoji(p: number): string | null {
   if (p >= 90) return '🔒';
   if (p >= 80) return '🔥';
   if (p >= 70) return '🤝';
   return null;
+}
+
+function impliedProb(odd: number): number {
+  return odd > 1 ? Math.round((1 / odd) * 100) : 0;
+}
+
+/** odd justa estimada a partir da probabilidade do modelo + margem 8% */
+function fairOdd(probPct: number): number {
+  if (probPct <= 0) return 0;
+  const fair = 100 / probPct;
+  return Math.max(1.05, +(fair * 0.92).toFixed(2)); // 8% margem do book
 }
 
 const CTAS = [
@@ -37,6 +54,20 @@ const CTAS = [
   'Janela de oportunidade aberta',
 ];
 
+const CENARIOS = {
+  ofensivo: 'Equipes com tendência ofensiva consistente, cenário propício a múltiplos gols.',
+  btts: 'Confronto equilibrado com alto poder de finalização de ambos os lados.',
+  favorito: 'Favoritismo técnico evidente, leveza de produção contra defesa frágil.',
+  intenso: 'Cenário propício para intensidade ofensiva e bom volume de finalizações.',
+  cauteloso: 'Jogo tático com leve vantagem para o mandante, gestão recomendada.',
+};
+
+interface MarketRow {
+  name: string;
+  type: string;
+  prob: number;
+}
+
 interface MatchAnalysis {
   matchId: string;
   homeTeam: string;
@@ -44,88 +75,89 @@ interface MatchAnalysis {
   league: string;
   time: string;
   date: string;
-  topProb: number;
+  premiumScore: number;
+  cenario: string;
   // markets
-  over15: number;
-  over25: number;
-  btts: number;
-  winnerName: string;
-  winnerProb: number;
-  doubleLabel: string;
-  doubleProb: number;
-  handicapLine: string;
-  handicapProb: number;
-  cornersLine: number;
-  cornersProb: number;
-  cardsLine: number;
-  cardsProb: number;
-  htGoal: number;
-  ftGoal: number;
+  over15: number; over25: number; btts: number;
+  winnerName: string; winnerProb: number;
+  doubleLabel: string; doubleProb: number;
+  handicapLine: string; handicapProb: number;
+  cornersLine: number; cornersProb: number;
+  cardsLine: number; cardsProb: number;
+  htGoal: number; ftGoal: number;
+  formWeight: number;
+}
+
+function safeNum(v: any, def = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
 }
 
 function analyzeMatch(m: any): MatchAnalysis | null {
   const league = (m.league?.name || m.league || '').toString();
+  if (!league) return null;
   if (UNSTABLE.some(t => league.toLowerCase().includes(t))) return null;
 
   const hStats = m.homeStats || {};
   const aStats = m.awayStats || {};
-  const hGames = hStats.gamesCount || 0;
-  const aGames = aStats.gamesCount || 0;
+  const hGames = safeNum(hStats.gamesCount);
+  const aGames = safeNum(aStats.gamesCount);
   if (hGames < 3 || aGames < 3) return null;
 
-  const leagueAvg = hStats.leagueAvg || aStats.leagueAvg || 1.30;
+  const leagueAvg = safeNum(hStats.leagueAvg || aStats.leagueAvg, 1.30);
   const k = 3;
   const adj = (g: number, v: number) => (g * v + k * leagueAvg) / (g + k);
-  const adjHGF = adj(hGames, hStats.goalsFor || 0);
-  const adjAGF = adj(aGames, aStats.goalsFor || 0);
-  const adjHGA = adj(hGames, hStats.goalsAgainst || 0);
-  const adjAGA = adj(aGames, aStats.goalsAgainst || 0);
+
+  const adjHGF = adj(hGames, safeNum(hStats.goalsFor));
+  const adjAGF = adj(aGames, safeNum(aStats.goalsFor));
+  const adjHGA = adj(hGames, safeNum(hStats.goalsAgainst));
+  const adjAGA = adj(aGames, safeNum(aStats.goalsAgainst));
 
   const homeLambda = (adjHGF / leagueAvg) * (adjAGA / leagueAvg) * leagueAvg;
   const awayLambda = (adjAGF / leagueAvg) * (adjHGA / leagueAvg) * leagueAvg;
   const total = homeLambda + awayLambda;
 
-  // Gols
   const over15 = Math.round(pOver(total, 2) * 100);
   const over25 = Math.round(pOver(total, 3) * 100);
   const btts = Math.round((1 - Math.exp(-homeLambda)) * (1 - Math.exp(-awayLambda)) * 100);
 
-  // 1x2 simples via Poisson grid 0..6
   let pHome = 0, pDraw = 0, pAway = 0;
   for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) {
     const p = pProb(homeLambda, i) * pProb(awayLambda, j);
     if (i > j) pHome += p; else if (i === j) pDraw += p; else pAway += p;
   }
+
   const homeName = m.teams?.home?.name || m.homeTeam || 'Casa';
   const awayName = m.teams?.away?.name || m.awayTeam || 'Fora';
   let winnerName = homeName, winnerProb = Math.round(pHome * 100);
   if (pAway > pHome && pAway > pDraw) { winnerName = awayName; winnerProb = Math.round(pAway * 100); }
 
-  // Chance dupla — favorito + empate
-  let doubleLabel = `${homeName} ou Empate`, doubleProb = Math.round((pHome + pDraw) * 100);
+  let doubleLabel = `${homeName} ou Empate`;
+  let doubleProb = Math.round((pHome + pDraw) * 100);
   if (pAway > pHome) { doubleLabel = `${awayName} ou Empate`; doubleProb = Math.round((pAway + pDraw) * 100); }
 
-  // Handicap -0.5 favorito = vitória
   const handicapLine = pHome >= pAway ? `${homeName} -0.5` : `${awayName} -0.5`;
   const handicapProb = winnerProb;
 
-  // Escanteios — média estimada
-  const cornersAvg = ((hStats.cornersFor || 5) + (aStats.cornersFor || 5));
+  const cornersAvg = safeNum(hStats.cornersFor, 5) + safeNum(aStats.cornersFor, 5);
   const cornersLine = 8.5;
   const cornersLambda = Math.max(6, cornersAvg);
   const cornersProb = Math.round(pOver(cornersLambda, 9) * 100);
 
-  // Cartões — média estimada
-  const cardsAvg = ((hStats.cardsFor || 2) + (aStats.cardsFor || 2));
+  const cardsAvg = safeNum(hStats.cardsFor, 2) + safeNum(aStats.cardsFor, 2);
   const cardsLine = 3.5;
   const cardsLambda = Math.max(2.5, cardsAvg);
   const cardsProb = Math.round(pOver(cardsLambda, 4) * 100);
 
-  // HT / FT goal (≥1 gol em cada tempo)
   const htLambda = total * 0.45;
   const ftLambda = total * 0.55;
   const htGoal = Math.round((1 - Math.exp(-htLambda)) * 100);
   const ftGoal = Math.round((1 - Math.exp(-ftLambda)) * 100);
+
+  // forma simples (pontos por jogo, normalizado 0..100)
+  const hPpg = safeNum(hStats.ppg, 1.3);
+  const aPpg = safeNum(aStats.ppg, 1.3);
+  const formWeight = Math.round(((hPpg + aPpg) / 6) * 100); // máx 3 ppg cada
 
   const time = m.fixture?.date
     ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -134,17 +166,28 @@ function analyzeMatch(m: any): MatchAnalysis | null {
     ? new Date(m.fixture.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
     : '';
 
-  const topProb = Math.max(over15, over25, btts, winnerProb, doubleProb, handicapProb, cornersProb, cardsProb, htGoal, ftGoal);
-
-  // só joga se tem ao menos um mercado >=70
+  const topProb = Math.max(over15, over25, btts, winnerProb, doubleProb, cornersProb, htGoal, ftGoal);
   if (topProb < 70) return null;
+
+  const premiumScore =
+    (over15 * 0.20) + (over25 * 0.20) + (btts * 0.15) +
+    (winnerProb * 0.15) + (cornersProb * 0.10) +
+    (htGoal * 0.10) + (formWeight * 0.10);
+
+  let cenario = CENARIOS.intenso;
+  if (over25 >= 80 && btts >= 70) cenario = CENARIOS.ofensivo;
+  else if (btts >= 75) cenario = CENARIOS.btts;
+  else if (winnerProb >= 65) cenario = CENARIOS.favorito;
+  else if (over25 < 60) cenario = CENARIOS.cauteloso;
 
   return {
     matchId: String(m.fixture?.id || m.id || `${homeName}-${awayName}`),
-    homeTeam: homeName, awayTeam: awayName, league, time, date, topProb,
+    homeTeam: homeName, awayTeam: awayName, league, time, date,
+    premiumScore, cenario,
     over15, over25, btts, winnerName, winnerProb,
     doubleLabel, doubleProb, handicapLine, handicapProb,
-    cornersLine, cornersProb, cardsLine, cardsProb, htGoal, ftGoal,
+    cornersLine, cornersProb, cardsLine, cardsProb,
+    htGoal, ftGoal, formWeight,
   };
 }
 
@@ -161,22 +204,15 @@ function buildPremiumMessage(a: MatchAnalysis): string {
   lines.push(`⏰ ${escapeHtml(a.time)}`);
   lines.push('');
   lines.push('📊 <b>Cenário do Jogo:</b>');
-  const cenario = a.over25 >= 75
-    ? 'Confronto com forte tendência ofensiva e bom volume de gols esperado.'
-    : a.btts >= 70
-      ? 'Equilíbrio ofensivo, ambos times com poder de finalização.'
-      : `Favoritismo claro do ${a.winnerName}, com superioridade técnica.`;
-  lines.push(cenario);
+  lines.push(escapeHtml(a.cenario));
   lines.push('');
   lines.push(SEP);
   lines.push('');
 
-  // MERCADOS PRINCIPAIS — só >=70
   const principais: string[] = [];
   if (probEmoji(a.over15)) principais.push(`${probEmoji(a.over15)} Over 1.5 Gols → <b>${a.over15}%</b>`);
   if (probEmoji(a.over25)) principais.push(`${probEmoji(a.over25)} Over 2.5 Gols → <b>${a.over25}%</b>`);
   if (probEmoji(a.btts)) principais.push(`${probEmoji(a.btts)} Ambas Marcam → <b>${a.btts}%</b>`);
-
   if (principais.length > 0) {
     lines.push('🎯 <b>MERCADOS PRINCIPAIS:</b>');
     lines.push('');
@@ -186,7 +222,6 @@ function buildPremiumMessage(a: MatchAnalysis): string {
     lines.push('');
   }
 
-  // MERCADOS AVANÇADOS — TOP 5
   const avancados: { label: string; prob: number }[] = [];
   if (probEmoji(a.winnerProb)) avancados.push({ label: `${probEmoji(a.winnerProb)} Vitória ${escapeHtml(a.winnerName)}`, prob: a.winnerProb });
   if (probEmoji(a.doubleProb)) avancados.push({ label: `${probEmoji(a.doubleProb)} Chance Dupla (${escapeHtml(a.doubleLabel)})`, prob: a.doubleProb });
@@ -195,7 +230,6 @@ function buildPremiumMessage(a: MatchAnalysis): string {
   if (probEmoji(a.cardsProb)) avancados.push({ label: `${probEmoji(a.cardsProb)} Over ${a.cardsLine} Cartões`, prob: a.cardsProb });
   if (probEmoji(a.htGoal)) avancados.push({ label: `${probEmoji(a.htGoal)} Gol no 1º Tempo`, prob: a.htGoal });
   if (probEmoji(a.ftGoal)) avancados.push({ label: `${probEmoji(a.ftGoal)} Gol no 2º Tempo`, prob: a.ftGoal });
-
   const top5 = avancados.sort((x, y) => y.prob - x.prob).slice(0, 5);
   if (top5.length > 0) {
     lines.push('📈 <b>MERCADOS AVANÇADOS:</b>');
@@ -214,13 +248,12 @@ function buildPremiumMessage(a: MatchAnalysis): string {
     { name: `Vitória ${a.winnerName}`, p: a.winnerProb },
     { name: `Chance Dupla (${a.doubleLabel})`, p: a.doubleProb },
   ].filter(x => x.p >= 70).sort((x, y) => y.p - x.p);
-
   if (all.length > 0) {
     const seguro = all[0];
-    const agressivo = all.slice().sort((x, y) => x.p - y.p)[0];
+    const agressivo = all[all.length - 1];
     lines.push('⚠️ <b>Gestão de Risco:</b>');
-    lines.push(`Entrada segura: ${escapeHtml(seguro.name)}`);
-    lines.push(`Entrada agressiva: ${escapeHtml(agressivo.name)}`);
+    lines.push(`Entrada segura: ${escapeHtml(seguro.name)} (${seguro.p}%)`);
+    lines.push(`Entrada agressiva: ${escapeHtml(agressivo.name)} (${agressivo.p}%)`);
     lines.push('');
     lines.push(SEP);
     lines.push('');
@@ -239,12 +272,26 @@ function buildPremiumMessage(a: MatchAnalysis): string {
   lines.push('');
   lines.push('🤖 <b>Analista Joilson</b>');
   lines.push('📌 Modelo Híbrido Ponderado');
-
   return lines.join('\n');
+}
+
+/** Mercados que serão persistidos para validação posterior */
+function buildPersistableMarkets(a: MatchAnalysis): MarketRow[] {
+  const m: MarketRow[] = [
+    { name: 'Over 1.5 Gols', type: 'over_goals', prob: a.over15 },
+    { name: 'Over 2.5 Gols', type: 'over_goals', prob: a.over25 },
+    { name: 'Ambas Marcam', type: 'btts', prob: a.btts },
+    { name: `Over ${a.cornersLine} Escanteios`, type: 'corners', prob: a.cornersProb },
+    { name: `Over ${a.cardsLine} Cartões`, type: 'cards', prob: a.cardsProb },
+    { name: 'Gol no 1º Tempo', type: 'ht_goal', prob: a.htGoal },
+    { name: 'Gol no 2º Tempo', type: 'ft_goal', prob: a.ftGoal },
+  ];
+  return m.filter(x => x.prob >= 70);
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const t0 = Date.now();
 
   try {
     const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
@@ -265,61 +312,84 @@ Deno.serve(async (req) => {
     const fb = await fbRes.json();
     const matches: any[] = Array.isArray(fb?.matches) ? fb.matches : [];
 
-    console.log(`[BINGO-BROADCAST] ${matches.length} jogos para ${date}`);
+    console.log(`[BINGO-BROADCAST] date=${date} matches=${matches.length}`);
 
     const analyses: MatchAnalysis[] = [];
     for (const m of matches) {
-      const a = analyzeMatch(m);
-      if (a) analyses.push(a);
+      try {
+        const a = analyzeMatch(m);
+        if (a) analyses.push(a);
+      } catch (e) {
+        console.warn('[BINGO-BROADCAST] analyze error:', e instanceof Error ? e.message : e);
+      }
     }
 
-    // FILTRO: apenas jogos da MANHÃ (00:00 até 11:59 BRT)
+    // Filtro: jogos da MANHÃ (00:00 → 11:59 BRT)
     const morning = analyses.filter(a => {
-      const h = parseInt((a.time || '').split(':')[0] || '99', 10);
-      return h >= 0 && h < 12;
+      const [hourStr] = (a.time || '99:99').split(':');
+      const h = Number(hourStr);
+      return Number.isFinite(h) && h >= 0 && h < 12;
     });
-    morning.sort((a, b) => b.topProb - a.topProb);
-    const top = morning.slice(0, 8); // limita a 8 entradas premium/dia
-    console.log(`[BINGO-BROADCAST] morning=${morning.length} top=${top.length}`);
+
+    morning.sort((a, b) => b.premiumScore - a.premiumScore);
+    const top = morning.slice(0, 8);
+    console.log(`[BINGO-BROADCAST] qualified=${analyses.length} morning=${morning.length} top=${top.length}`);
 
     if (top.length === 0) {
-      console.log('[BINGO-BROADCAST] Nenhuma entrada qualificada hoje');
       return new Response(JSON.stringify({ ok: true, picks: 0, message: 'no qualified picks' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    let sent = 0;
+    let sent = 0, signalsSaved = 0;
     for (const a of top) {
+      // dedup por jogo no dia: se já existe sinal premium para este matchId, pula
+      const { data: existing } = await sb
+        .from('telegram_signals')
+        .select('id')
+        .eq('match_id', a.matchId)
+        .eq('reason', 'daily-bingo-premium')
+        .limit(1);
+      if (existing && existing.length > 0) {
+        console.log(`[BINGO-BROADCAST] skip dup match=${a.matchId}`);
+        continue;
+      }
+
       const text = buildPremiumMessage(a);
       const r = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, { tag: 'BINGO-PREMIUM' });
+
       if (r.ok) {
         sent++;
         const msgId = r.data?.result?.message_id ?? null;
-        // Persiste cada mercado >=70% como sinal pendente para validação automática
-        const markets: { name: string; prob: number }[] = [
-          { name: 'Over 1.5 Gols', prob: a.over15 },
-          { name: 'Over 2.5 Gols', prob: a.over25 },
-          { name: 'Ambas Marcam', prob: a.btts },
-          { name: `Over ${a.cornersLine} Escanteios`, prob: a.cornersProb },
-          { name: `Over ${a.cardsLine} Cartões`, prob: a.cardsProb },
-        ].filter(x => x.prob >= 70);
+        const markets = buildPersistableMarkets(a);
         for (const mk of markets) {
+          const odd = fairOdd(mk.prob);
+          const implied = impliedProb(odd);
+          const ev = mk.prob - implied; // EV+ em pontos %
+
           await sb.from('telegram_signals').insert({
             match_id: a.matchId,
             match_name: `${a.homeTeam} vs ${a.awayTeam}`,
             market: mk.name,
+            market_type: mk.type,
             minute: 0,
             confidence: mk.prob,
             score: '0-0',
             reason: 'daily-bingo-premium',
             sensitivity: 'PRE',
-            success: true,
+            success: null,            // pendente até validar
             status: 'pendente',
             telegram_message_id: msgId,
+            odd,
+            implied_probability: implied,
+            expected_value: ev,
+            model_probability: mk.prob,
+            premium_score: a.premiumScore,
           });
+          signalsSaved++;
         }
       } else {
+        console.error('[BINGO-BROADCAST] tg fail:', r.status, r.error || JSON.stringify(r.data || {}));
         await enqueueTelegramOutbox(sb, {
           chat_id: TELEGRAM_CHAT_ID, text, source: 'daily-bingo-broadcast',
           last_error: r.error || JSON.stringify(r.data || {}),
@@ -328,16 +398,16 @@ Deno.serve(async (req) => {
       await new Promise(res => setTimeout(res, 350));
     }
 
-    console.log(`[BINGO-BROADCAST] picks=${top.length} sent=${sent}`);
+    const elapsed = Date.now() - t0;
+    console.log(`[BINGO-BROADCAST] picks=${top.length} sent=${sent} signals=${signalsSaved} elapsed=${elapsed}ms`);
 
-    return new Response(JSON.stringify({ ok: true, picks: top.length, sent }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({
+      ok: true, picks: top.length, sent, signals: signalsSaved, elapsed_ms: elapsed,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error('[BINGO-BROADCAST] error:', e);
     return new Response(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

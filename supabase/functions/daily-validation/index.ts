@@ -1,56 +1,96 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendTelegramMessage, editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
+import { sendTelegramMessage, editTelegramMessage, getTelegramBotToken, escapeHtml } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ═══════════════════════════════════════
-// Market verification (same logic as check-signal-results)
-// ═══════════════════════════════════════
-function checkMarketResult(market: string, homeGoals: number, awayGoals: number, corners: number, matchFinished: boolean): 'green' | 'loss' | 'pendente' {
-  const totalGoals = homeGoals + awayGoals;
-  const ml = market.toLowerCase();
+type Verdict = 'green' | 'loss' | 'pendente' | 'void';
 
-  const overMatch = ml.match(/over\s*(\d+\.?\d*)\s*(?:gols|goals)?/);
-  if (overMatch) {
-    const t = parseFloat(overMatch[1]);
-    if (totalGoals > t) return 'green';
-    if (matchFinished) return 'loss';
-    return 'pendente';
+interface MatchData {
+  homeGoals: number; awayGoals: number;
+  htHomeGoals: number; htAwayGoals: number;
+  corners: number; cards: number;
+  finished: boolean;
+  homeName?: string; awayName?: string;
+}
+
+function checkMarketResult(market: string, marketType: string | null, d: MatchData): Verdict {
+  const total = d.homeGoals + d.awayGoals;
+  const ml = (market || '').toLowerCase();
+  const t = (marketType || '').toLowerCase();
+
+  // OVER GOLS
+  const overGoals = ml.match(/over\s*(\d+\.?\d*)\s*(?:gols|goals)?\s*$/);
+  if (t === 'over_goals' || (overGoals && !ml.includes('escanteios') && !ml.includes('cartões') && !ml.includes('corners') && !ml.includes('cards'))) {
+    const m = ml.match(/(\d+\.\d+)/);
+    if (!m) return d.finished ? 'void' : 'pendente';
+    const th = parseFloat(m[1]);
+    if (total > th) return 'green';
+    return d.finished ? 'loss' : 'pendente';
   }
 
-  const underMatch = ml.match(/under\s*(\d+\.?\d*)\s*(?:gols|goals)?/);
-  if (underMatch) {
-    const t = parseFloat(underMatch[1]);
-    if (totalGoals >= t) return 'loss';
-    if (matchFinished) return 'green';
-    return 'pendente';
+  // BTTS
+  if (t === 'btts' || ml.includes('ambas marcam') || ml.includes('btts')) {
+    if (d.homeGoals > 0 && d.awayGoals > 0) return 'green';
+    return d.finished ? 'loss' : 'pendente';
   }
 
-  if (ml.includes('btts') || ml.includes('ambas marcam')) {
-    if (homeGoals > 0 && awayGoals > 0) return 'green';
-    if (matchFinished) return 'loss';
-    return 'pendente';
+  // Escanteios
+  if (t === 'corners' || ml.includes('escanteio') || ml.includes('corner')) {
+    const m = ml.match(/(\d+\.\d+)/);
+    if (!m) return d.finished ? 'void' : 'pendente';
+    const th = parseFloat(m[1]);
+    if (d.corners > th) return 'green';
+    return d.finished ? 'loss' : 'pendente';
   }
 
-  const cornerMatch = ml.match(/over\s*(\d+\.?\d*)\s*(?:escanteios|corners)/);
-  if (cornerMatch) {
-    const t = parseFloat(cornerMatch[1]);
-    if (corners > t) return 'green';
-    if (matchFinished) return 'loss';
-    return 'pendente';
+  // Cartões
+  if (t === 'cards' || ml.includes('cartões') || ml.includes('cards') || ml.includes('cartoes')) {
+    const m = ml.match(/(\d+\.\d+)/);
+    if (!m) return d.finished ? 'void' : 'pendente';
+    const th = parseFloat(m[1]);
+    if (d.cards > th) return 'green';
+    return d.finished ? 'loss' : 'pendente';
   }
 
-  if (matchFinished) return 'loss';
-  return 'pendente';
+  // Gol HT
+  if (t === 'ht_goal' || ml.includes('1º tempo') || ml.includes('1o tempo') || ml.includes('1t')) {
+    const ht = d.htHomeGoals + d.htAwayGoals;
+    if (ht > 0) return 'green';
+    return d.finished ? 'loss' : 'pendente';
+  }
+
+  // Gol FT (2º tempo)
+  if (t === 'ft_goal' || ml.includes('2º tempo') || ml.includes('2o tempo') || ml.includes('2t')) {
+    if (!d.finished) return 'pendente';
+    const ft2 = total - (d.htHomeGoals + d.htAwayGoals);
+    return ft2 > 0 ? 'green' : 'loss';
+  }
+
+  // Vitória
+  if (ml.startsWith('vitória') || ml.startsWith('vitoria')) {
+    if (!d.finished) return 'pendente';
+    const isHomeWin = d.homeGoals > d.awayGoals;
+    const team = ml.replace(/vit[óo]ria/, '').trim();
+    if (d.homeName && team.includes(d.homeName.toLowerCase())) return isHomeWin ? 'green' : 'loss';
+    if (d.awayName && team.includes(d.awayName.toLowerCase())) return d.awayGoals > d.homeGoals ? 'green' : 'loss';
+    return 'void';
+  }
+
+  return d.finished ? 'void' : 'pendente';
+}
+
+function calcRoi(odd: number | null, status: 'green' | 'loss' | 'void'): number {
+  if (!odd || status === 'void') return 0;
+  if (status === 'green') return +(odd - 1).toFixed(3);
+  return -1;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const t0 = Date.now();
 
   try {
     const TELEGRAM_BOT_TOKEN = getTelegramBotToken();
@@ -58,202 +98,187 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
+    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_KEY) throw new Error('env missing');
 
-    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_KEY) {
-      throw new Error('Variáveis de ambiente não configuradas');
-    }
+    const sb = createClient(supabaseUrl, supabaseKey);
+    const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // ─── STEP 1: Validate all pending signals from last 24h ───
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-    const { data: pendingSignals } = await supabase
+    const { data: pending } = await sb
       .from('telegram_signals')
       .select('*')
       .eq('status', 'pendente')
       .not('match_id', 'is', null)
       .gte('created_at', since);
 
-    let validated = 0;
+    let validated = 0, greens = 0, losses = 0, voids = 0;
+    const fixtures: Record<string, MatchData> = {};
 
-    if (pendingSignals && pendingSignals.length > 0) {
-      const matchIds = [...new Set(pendingSignals.map(s => s.match_id).filter(Boolean))];
-      const matchData: Record<string, any> = {};
-
-      for (const matchId of matchIds) {
+    if (pending && pending.length > 0) {
+      const ids = [...new Set(pending.map(s => s.match_id).filter(Boolean))];
+      for (const id of ids) {
         try {
-          const resp = await fetch(`https://v3.football.api-sports.io/fixtures?id=${matchId}`, {
+          const r = await fetch(`https://v3.football.api-sports.io/fixtures?id=${id}`, {
             headers: { 'x-apisports-key': API_KEY },
           });
-          const json = await resp.json();
-          const fixture = json.response?.[0];
-          if (fixture) {
-            matchData[matchId] = {
-              homeGoals: fixture.goals?.home ?? 0,
-              awayGoals: fixture.goals?.away ?? 0,
-              corners: (fixture.statistics || []).reduce((sum: number, team: any) => {
-                const c = team.statistics?.find((s: any) => s.type === 'Corner Kicks');
-                return sum + (c?.value ?? 0);
-              }, 0),
-              finished: ['FT', 'AET', 'PEN'].includes(fixture.fixture?.status?.short),
-            };
-          }
+          const j = await r.json();
+          const f = j.response?.[0];
+          if (!f) continue;
+          const stats = f.statistics || [];
+          const corners = stats.reduce((s: number, t: any) =>
+            s + (t.statistics?.find((x: any) => x.type === 'Corner Kicks')?.value ?? 0), 0);
+          const yellows = stats.reduce((s: number, t: any) =>
+            s + (t.statistics?.find((x: any) => x.type === 'Yellow Cards')?.value ?? 0), 0);
+          const reds = stats.reduce((s: number, t: any) =>
+            s + (t.statistics?.find((x: any) => x.type === 'Red Cards')?.value ?? 0), 0);
+          fixtures[id] = {
+            homeGoals: f.goals?.home ?? 0,
+            awayGoals: f.goals?.away ?? 0,
+            htHomeGoals: f.score?.halftime?.home ?? 0,
+            htAwayGoals: f.score?.halftime?.away ?? 0,
+            corners, cards: yellows + reds,
+            finished: ['FT', 'AET', 'PEN'].includes(f.fixture?.status?.short),
+            homeName: f.teams?.home?.name,
+            awayName: f.teams?.away?.name,
+          };
         } catch (e) {
-          console.error(`Fetch match ${matchId} failed:`, e);
+          console.error(`[VAL] fetch ${id}`, e);
         }
         await new Promise(r => setTimeout(r, 200));
       }
 
-      for (const signal of pendingSignals) {
-        const data = matchData[signal.match_id];
+      // group signals by match for editing once
+      const byMatch: Record<string, any[]> = {};
+      for (const s of pending) {
+        const data = fixtures[s.match_id];
         if (!data) continue;
+        const age = Date.now() - new Date(s.created_at).getTime();
+        const timeout = age > 6 * 60 * 60 * 1000;
+        const v = checkMarketResult(s.market, s.market_type, { ...data, finished: data.finished || timeout });
+        if (v === 'pendente') continue;
 
-        const signalAge = Date.now() - new Date(signal.created_at).getTime();
-        const timedOut = signalAge > 3 * 60 * 60 * 1000;
+        const odd = s.odd ? Number(s.odd) : null;
+        const finalStatus = v;
+        const success = v === 'green' ? true : v === 'loss' ? false : null;
+        const roi = calcRoi(odd, v);
 
-        const newStatus = checkMarketResult(signal.market, data.homeGoals, data.awayGoals, data.corners, data.finished || timedOut);
-        if (newStatus === 'pendente') continue;
-
-        await supabase.from('telegram_signals').update({ status: newStatus }).eq('id', signal.id);
-
-        // Edit Telegram message
-        if (signal.telegram_message_id) {
-          try {
-            const emoji = signal.confidence >= 80 ? '🔥' : signal.confidence >= 70 ? '⚡' : '📊';
-            const confBar = '🟢'.repeat(Math.round(signal.confidence / 20)) + '⚪'.repeat(5 - Math.round(signal.confidence / 20));
-            const resultEmoji = newStatus === 'green' ? '✅' : '❌';
-            const resultLabel = newStatus === 'green' ? 'GREEN' : 'LOSS';
-
-            const updatedText = [
-              `${emoji} <b>${signal.market}</b>`,
-              ``,
-              `⚽ ${signal.match_name} • ${signal.minute}'`,
-              `📊 ${signal.score} ${confBar} ${signal.confidence}%`,
-              ``,
-              `${resultEmoji} <b>${resultLabel}</b> • Final: <b>${data.homeGoals} x ${data.awayGoals}</b>`,
-              ``,
-              `🤖 <i>Analista Joilson</i>`,
-            ].join('\n');
-
-            await editTelegramMessage(TELEGRAM_CHAT_ID, signal.telegram_message_id, updatedText, {
-              botToken: TELEGRAM_BOT_TOKEN,
-              tag: 'DAILY-VALIDATION',
-            });
-          } catch (_) { /* ignore edit errors */ }
-        }
+        await sb.from('telegram_signals').update({
+          status: v, result: v, success, roi, settled_at: new Date().toISOString(),
+        }).eq('id', s.id);
 
         validated++;
+        if (v === 'green') greens++;
+        else if (v === 'loss') losses++;
+        else voids++;
+
+        (byMatch[s.match_id] ||= []).push({ ...s, _verdict: v });
+      }
+
+      // edit telegram message once per match (with all market verdicts)
+      for (const [mid, group] of Object.entries(byMatch)) {
+        const data = fixtures[mid];
+        const msgId = group.find(g => g.telegram_message_id)?.telegram_message_id;
+        if (!msgId || group.some(g => g.edited_message)) continue;
+
+        const allGreen = group.every(g => g._verdict === 'green');
+        const anyLoss = group.some(g => g._verdict === 'loss');
+        const header = allGreen ? '✅ <b>GREEN CONFIRMADO</b>' : anyLoss ? '❌ <b>LOSS REGISTRADO</b>' : '⚪ <b>VOID</b>';
+        const matchName = group[0].match_name;
+
+        const lines = group.map(g => {
+          const ico = g._verdict === 'green' ? '✅' : g._verdict === 'loss' ? '❌' : '⚪';
+          return `${ico} ${escapeHtml(g.market)} (${g.confidence}%)`;
+        });
+
+        const text = [
+          header,
+          '',
+          `⚔️ ${escapeHtml(matchName)}`,
+          `📊 Placar final: <b>${data.homeGoals} x ${data.awayGoals}</b>`,
+          '',
+          '🎯 <b>Mercados validados:</b>',
+          ...lines,
+          '',
+          '🤖 <i>Analista Joilson — Validação automática</i>',
+        ].join('\n');
+
+        const er = await editTelegramMessage(TELEGRAM_CHAT_ID, msgId, text, {
+          botToken: TELEGRAM_BOT_TOKEN, tag: 'DAILY-VAL',
+        });
+        if (er.ok) {
+          await sb.from('telegram_signals').update({ edited_message: true })
+            .in('id', group.map(g => g.id));
+        }
       }
     }
 
-    console.log(`[DAILY-VALIDATION] ${validated} sinais validados`);
-
-    // ─── STEP 2: Generate 24h summary ───
-    const { data: allSignals } = await supabase
+    // ── 24h summary + ROI
+    const { data: all } = await sb
       .from('telegram_signals')
-      .select('*')
-      .gte('created_at', since)
-      .eq('success', true);
+      .select('status, success, odd, roi, market_type, market')
+      .gte('created_at', since);
 
-    const signals = allSignals || [];
-    const total = signals.length;
-    const greens = signals.filter(s => s.status === 'green').length;
-    const losses = signals.filter(s => s.status === 'loss').length;
-    const pending = signals.filter(s => s.status === 'pendente').length;
-    const resolved = greens + losses;
-    const winRate = resolved > 0 ? ((greens / resolved) * 100).toFixed(1) : '-';
+    const sigs = all || [];
+    const total = sigs.length;
+    const tg = sigs.filter(s => s.status === 'green').length;
+    const tl = sigs.filter(s => s.status === 'loss').length;
+    const tp = sigs.filter(s => s.status === 'pendente').length;
+    const resolved = tg + tl;
+    const winRate = resolved > 0 ? ((tg / resolved) * 100).toFixed(1) : '-';
+    const totalRoi = sigs.reduce((sum, s) => sum + (Number(s.roi) || 0), 0);
+    const roiPct = resolved > 0 ? ((totalRoi / resolved) * 100).toFixed(1) : '0';
 
-    // Normalize market labels (Over X.5 / Over X.5 Gols → unified "Over X.5")
-    const normalizeMarket = (m: string): string => {
-      const t = m.trim();
-      const overMatch = t.match(/^Over\s+(\d+\.\d+)(\s+HT)?(\s+Gols?)?$/i);
-      if (overMatch) {
-        const num = overMatch[1];
-        const ht = overMatch[2] ? ' HT' : '';
-        return `Over ${num}${ht}`;
-      }
-      return t;
-    };
-
-    // Breakdown by market
-    const marketStats: Record<string, { g: number; l: number }> = {};
-    for (const s of signals) {
+    // ROI por tipo de mercado
+    const byType: Record<string, { g: number; l: number; roi: number }> = {};
+    for (const s of sigs) {
       if (s.status !== 'green' && s.status !== 'loss') continue;
-      const key = normalizeMarket(s.market);
-      if (!marketStats[key]) marketStats[key] = { g: 0, l: 0 };
-      if (s.status === 'green') marketStats[key].g++;
-      else marketStats[key].l++;
+      const k = s.market_type || 'outros';
+      const r = byType[k] ||= { g: 0, l: 0, roi: 0 };
+      if (s.status === 'green') r.g++; else r.l++;
+      r.roi += Number(s.roi) || 0;
     }
-
-    const marketLines = Object.entries(marketStats)
+    const typeLines = Object.entries(byType)
       .sort((a, b) => (b[1].g + b[1].l) - (a[1].g + a[1].l))
-      .map(([market, { g, l }]) => {
-        const wr = ((g / (g + l)) * 100).toFixed(0);
-        return `  ${market}: ${g}✅ ${l}❌ (${wr}%)`;
+      .map(([k, v]) => {
+        const r = v.g + v.l;
+        const wr = r ? ((v.g / r) * 100).toFixed(0) : '-';
+        const rp = r ? ((v.roi / r) * 100).toFixed(1) : '0';
+        return `  ${k}: ${v.g}✅ ${v.l}❌ (${wr}% • ROI ${rp}%)`;
       });
 
-    // Confidence accuracy analysis
-    const highConf = signals.filter(s => s.confidence >= 80 && (s.status === 'green' || s.status === 'loss'));
-    const highConfGreens = highConf.filter(s => s.status === 'green').length;
-    const highConfRate = highConf.length > 0 ? ((highConfGreens / highConf.length) * 100).toFixed(0) : '-';
-
-    const lowConf = signals.filter(s => s.confidence < 70 && (s.status === 'green' || s.status === 'loss'));
-    const lowConfGreens = lowConf.filter(s => s.status === 'green').length;
-    const lowConfRate = lowConf.length > 0 ? ((lowConfGreens / lowConf.length) * 100).toFixed(0) : '-';
-
-    // Financial estimate
-    const stake = 20;
-    const oddMedia = 1.75;
-    const profit = greens * stake * (oddMedia - 1) - losses * stake;
-    const roi = resolved > 0 ? ((profit / (resolved * stake)) * 100).toFixed(1) : '0';
-
-    // Win rate bar
     const barLen = 10;
-    const gBars = resolved > 0 ? Math.round((greens / resolved) * barLen) : 0;
+    const gBars = resolved > 0 ? Math.round((tg / resolved) * barLen) : 0;
     const bar = '🟢'.repeat(gBars) + '🔴'.repeat(barLen - gBars);
+    const perfEmoji = parseFloat(winRate || '0') >= 65 ? '🏆' : parseFloat(winRate || '0') >= 50 ? '📊' : '⚠️';
 
-    const perfEmoji = parseFloat(winRate) >= 65 ? '🏆' : parseFloat(winRate) >= 50 ? '📊' : '⚠️';
-
-    const message = [
+    const summary = [
       `${perfEmoji} <b>RESUMO 24H</b>`,
-      ``,
-      `${bar}`,
-      `✅ ${greens} GREEN  ❌ ${losses} LOSS  ⏳ ${pending}`,
+      '',
+      bar,
+      `✅ ${tg} GREEN  ❌ ${tl} LOSS  ⏳ ${tp}`,
       `🎯 Win Rate: <b>${winRate}%</b> (${resolved} resolvidos)`,
-      ``,
-      `<b>Por mercado:</b>`,
-      ...marketLines,
-      ``,
-      `<b>Por confiança:</b>`,
-      `  Alta (≥80%): ${highConfRate}% acerto (${highConf.length} sinais)`,
-      `  Baixa (&lt;70%): ${lowConfRate}% acerto (${lowConf.length} sinais)`,
-      ``,
-      `💰 Lucro est.: <b>R$ ${profit.toFixed(2)}</b> • ROI: <b>${roi}%</b>`,
-      ``,
-      `🤖 <i>Analista Joilson • Relatório Diário</i>`,
+      `💹 ROI: <b>${roiPct}%</b>`,
+      '',
+      '<b>Por tipo de mercado:</b>',
+      ...typeLines,
+      '',
+      '🤖 <i>Analista Joilson • Relatório Automático</i>',
     ].join('\n');
 
-    // Send to Telegram
-    const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, message, {
-      botToken: TELEGRAM_BOT_TOKEN,
-      tag: 'DAILY-VALIDATION',
+    const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, summary, {
+      botToken: TELEGRAM_BOT_TOKEN, tag: 'DAILY-VAL',
     });
-    const tgData = tgRes.data ?? {};
-    if (!tgRes.ok) console.error('[DAILY-VALIDATION] Telegram error:', JSON.stringify(tgData));
+
+    const elapsed = Date.now() - t0;
+    console.log(`[DAILY-VAL] validated=${validated} greens=${greens} losses=${losses} voids=${voids} elapsed=${elapsed}ms`);
 
     return new Response(JSON.stringify({
-      success: true,
-      validated,
-      summary: { total, greens, losses, pending, winRate, profit: profit.toFixed(2), roi },
-      telegram_ok: tgRes.ok,
+      ok: true, validated, greens, losses, voids,
+      summary: { total, tg, tl, tp, winRate, roi: roiPct },
+      telegram_ok: tgRes.ok, elapsed_ms: elapsed,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-  } catch (err) {
-    console.error('[DAILY-VALIDATION] Error:', err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : 'Erro' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  } catch (e) {
+    console.error('[DAILY-VAL] error:', e);
+    return new Response(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

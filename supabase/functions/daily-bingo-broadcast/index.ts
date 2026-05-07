@@ -273,8 +273,14 @@ Deno.serve(async (req) => {
       if (a) analyses.push(a);
     }
 
-    analyses.sort((a, b) => b.topProb - a.topProb);
-    const top = analyses.slice(0, 8); // limita a 8 entradas premium/dia
+    // FILTRO: apenas jogos da MANHÃ (00:00 até 11:59 BRT)
+    const morning = analyses.filter(a => {
+      const h = parseInt((a.time || '').split(':')[0] || '99', 10);
+      return h >= 0 && h < 12;
+    });
+    morning.sort((a, b) => b.topProb - a.topProb);
+    const top = morning.slice(0, 8); // limita a 8 entradas premium/dia
+    console.log(`[BINGO-BROADCAST] morning=${morning.length} top=${top.length}`);
 
     if (top.length === 0) {
       console.log('[BINGO-BROADCAST] Nenhuma entrada qualificada hoje');
@@ -289,13 +295,36 @@ Deno.serve(async (req) => {
       const r = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, { tag: 'BINGO-PREMIUM' });
       if (r.ok) {
         sent++;
+        const msgId = r.data?.result?.message_id ?? null;
+        // Persiste cada mercado >=70% como sinal pendente para validação automática
+        const markets: { name: string; prob: number }[] = [
+          { name: 'Over 1.5 Gols', prob: a.over15 },
+          { name: 'Over 2.5 Gols', prob: a.over25 },
+          { name: 'Ambas Marcam', prob: a.btts },
+          { name: `Over ${a.cornersLine} Escanteios`, prob: a.cornersProb },
+          { name: `Over ${a.cardsLine} Cartões`, prob: a.cardsProb },
+        ].filter(x => x.prob >= 70);
+        for (const mk of markets) {
+          await sb.from('telegram_signals').insert({
+            match_id: a.matchId,
+            match_name: `${a.homeTeam} vs ${a.awayTeam}`,
+            market: mk.name,
+            minute: 0,
+            confidence: mk.prob,
+            score: '0-0',
+            reason: 'daily-bingo-premium',
+            sensitivity: 'PRE',
+            success: true,
+            status: 'pendente',
+            telegram_message_id: msgId,
+          });
+        }
       } else {
         await enqueueTelegramOutbox(sb, {
           chat_id: TELEGRAM_CHAT_ID, text, source: 'daily-bingo-broadcast',
           last_error: r.error || JSON.stringify(r.data || {}),
         });
       }
-      // delay leve para evitar rate limit Telegram
       await new Promise(res => setTimeout(res, 350));
     }
 

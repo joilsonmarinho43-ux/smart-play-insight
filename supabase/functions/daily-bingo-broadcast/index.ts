@@ -295,13 +295,36 @@ Deno.serve(async (req) => {
       const r = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, { tag: 'BINGO-PREMIUM' });
       if (r.ok) {
         sent++;
+        const msgId = r.data?.result?.message_id ?? null;
+        // Persiste cada mercado >=70% como sinal pendente para validação automática
+        const markets: { name: string; prob: number }[] = [
+          { name: 'Over 1.5 Gols', prob: a.over15 },
+          { name: 'Over 2.5 Gols', prob: a.over25 },
+          { name: 'Ambas Marcam', prob: a.btts },
+          { name: `Over ${a.cornersLine} Escanteios`, prob: a.cornersProb },
+          { name: `Over ${a.cardsLine} Cartões`, prob: a.cardsProb },
+        ].filter(x => x.prob >= 70);
+        for (const mk of markets) {
+          await sb.from('telegram_signals').insert({
+            match_id: a.matchId,
+            match_name: `${a.homeTeam} vs ${a.awayTeam}`,
+            market: mk.name,
+            minute: 0,
+            confidence: mk.prob,
+            score: '0-0',
+            reason: 'daily-bingo-premium',
+            sensitivity: 'PRE',
+            success: true,
+            status: 'pendente',
+            telegram_message_id: msgId,
+          });
+        }
       } else {
         await enqueueTelegramOutbox(sb, {
           chat_id: TELEGRAM_CHAT_ID, text, source: 'daily-bingo-broadcast',
           last_error: r.error || JSON.stringify(r.data || {}),
         });
       }
-      // delay leve para evitar rate limit Telegram
       await new Promise(res => setTimeout(res, 350));
     }
 

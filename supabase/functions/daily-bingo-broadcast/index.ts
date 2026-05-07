@@ -273,8 +273,14 @@ Deno.serve(async (req) => {
       if (a) analyses.push(a);
     }
 
-    analyses.sort((a, b) => b.topProb - a.topProb);
-    const top = analyses.slice(0, 8); // limita a 8 entradas premium/dia
+    // FILTRO: apenas jogos da MANHÃ (00:00 até 11:59 BRT)
+    const morning = analyses.filter(a => {
+      const h = parseInt((a.time || '').split(':')[0] || '99', 10);
+      return h >= 0 && h < 12;
+    });
+    morning.sort((a, b) => b.topProb - a.topProb);
+    const top = morning.slice(0, 8); // limita a 8 entradas premium/dia
+    console.log(`[BINGO-BROADCAST] morning=${morning.length} top=${top.length}`);
 
     if (top.length === 0) {
       console.log('[BINGO-BROADCAST] Nenhuma entrada qualificada hoje');

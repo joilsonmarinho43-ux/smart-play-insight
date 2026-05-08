@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // daily-bingo-broadcast — ENTRADAS PREMIUM PRÉ-JOGO (manhã)
-// Poisson + xG, ranking por premiumScore, EV+ e persistência completa.
+// Poisson + xG, ranking por premiumScore, EV+, aprendizado por histórico,
+// dedup 24h, filtros de qualidade reais e logs profissionais.
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, escapeHtml, enqueueTelegramOutbox } from '../_shared/telegram.ts';
@@ -13,13 +14,27 @@ const corsHeaders = {
 const APP_URL = Deno.env.get('APP_PUBLIC_URL') || 'https://analista.funecob.com.br';
 const SEP = '━━━━━━━━━━━━━━━━━━━';
 
-// ── Poisson helpers
-function fact(n: number) { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
-function pProb(l: number, k: number) { return (Math.exp(-l) * Math.pow(l, k)) / fact(k); }
-function pOver(l: number, k: number) { let c = 0; for (let i = 0; i < k; i++) c += pProb(l, i); return Math.max(0, Math.min(1, 1 - c)); }
+// ── Poisson helpers (com guards numéricos)
+function fact(n: number): number {
+  if (!Number.isFinite(n) || n < 0) return 1;
+  let r = 1;
+  for (let i = 2; i <= n; i++) r *= i;
+  return r;
+}
+function pProb(l: number, k: number): number {
+  if (!Number.isFinite(l) || l <= 0) return 0;
+  const v = (Math.exp(-l) * Math.pow(l, k)) / fact(k);
+  return Number.isFinite(v) ? v : 0;
+}
+function pOver(l: number, k: number): number {
+  if (!Number.isFinite(l) || l <= 0) return 0;
+  let c = 0;
+  for (let i = 0; i < k; i++) c += pProb(l, i);
+  return Math.max(0, Math.min(1, 1 - c));
+}
 
 const UNSTABLE = [
-  'friendly','friendlies','amistos',
+  'friendly','friendlies','amistos','amistoso',
   'u15','u16','u17','u18','u19','u20','u21','u23',
   'sub-15','sub-16','sub-17','sub-18','sub-19','sub-20','sub-21','sub-23',
   'reserve','reserva','youth','juvenil','amateur','amador',
@@ -39,11 +54,13 @@ function impliedProb(odd: number): number {
   return odd > 1 ? Math.round((1 / odd) * 100) : 0;
 }
 
-/** odd justa estimada a partir da probabilidade do modelo + margem 8% */
+/** odd justa estimada a partir da probabilidade do modelo + margem 8% do book */
 function fairOdd(probPct: number): number {
   if (probPct <= 0) return 0;
   const fair = 100 / probPct;
-  return Math.max(1.05, +(fair * 0.92).toFixed(2)); // 8% margem do book
+  const withMargin = fair * 0.92;
+  if (!Number.isFinite(withMargin)) return 0;
+  return Math.max(1.05, +withMargin.toFixed(2));
 }
 
 const CTAS = [
@@ -77,7 +94,6 @@ interface MatchAnalysis {
   date: string;
   premiumScore: number;
   cenario: string;
-  // markets
   over15: number; over25: number; btts: number;
   winnerName: string; winnerProb: number;
   doubleLabel: string; doubleProb: number;
@@ -93,6 +109,35 @@ function safeNum(v: any, def = 0): number {
   return Number.isFinite(n) ? n : def;
 }
 
+/** Ajustes de aprendizado por histórico de market_type (ROI nos últimos 30 dias). */
+type LearnAdjust = Record<string, number>; // market_type → multiplicador 0.85..1.15
+
+async function fetchLearningAdjustments(sb: any): Promise<LearnAdjust> {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from('telegram_signals')
+    .select('market_type, status, roi')
+    .gte('created_at', since)
+    .in('status', ['green', 'loss']);
+  if (error || !data) return {};
+  const agg: Record<string, { n: number; r: number }> = {};
+  for (const s of data) {
+    const k = s.market_type || 'outros';
+    const a = agg[k] ||= { n: 0, r: 0 };
+    a.n++;
+    a.r += Number(s.roi) || 0;
+  }
+  const adj: LearnAdjust = {};
+  for (const [k, v] of Object.entries(agg)) {
+    if (v.n < 8) { adj[k] = 1; continue; }
+    const roiAvg = v.r / v.n; // ex: -0.2..+0.3
+    // mapeia roiAvg para multiplicador 0.85..1.15
+    const mult = Math.max(0.85, Math.min(1.15, 1 + roiAvg * 0.5));
+    adj[k] = +mult.toFixed(3);
+  }
+  return adj;
+}
+
 function analyzeMatch(m: any): MatchAnalysis | null {
   const league = (m.league?.name || m.league || '').toString();
   if (!league) return null;
@@ -106,25 +151,36 @@ function analyzeMatch(m: any): MatchAnalysis | null {
 
   const leagueAvg = safeNum(hStats.leagueAvg || aStats.leagueAvg, 1.30);
   const k = 3;
-  const adj = (g: number, v: number) => (g * v + k * leagueAvg) / (g + k);
+  const adj = (g: number, v: number) => {
+    const den = g + k;
+    if (den <= 0) return leagueAvg;
+    return (g * v + k * leagueAvg) / den;
+  };
 
   const adjHGF = adj(hGames, safeNum(hStats.goalsFor));
   const adjAGF = adj(aGames, safeNum(aStats.goalsFor));
   const adjHGA = adj(hGames, safeNum(hStats.goalsAgainst));
   const adjAGA = adj(aGames, safeNum(aStats.goalsAgainst));
 
-  const homeLambda = (adjHGF / leagueAvg) * (adjAGA / leagueAvg) * leagueAvg;
-  const awayLambda = (adjAGF / leagueAvg) * (adjHGA / leagueAvg) * leagueAvg;
+  const safeLA = leagueAvg > 0 ? leagueAvg : 1.30;
+  const homeLambda = (adjHGF / safeLA) * (adjAGA / safeLA) * safeLA;
+  const awayLambda = (adjAGF / safeLA) * (adjHGA / safeLA) * safeLA;
+  if (!Number.isFinite(homeLambda) || !Number.isFinite(awayLambda)) return null;
   const total = homeLambda + awayLambda;
+  if (total <= 0.5) return null;
 
   const over15 = Math.round(pOver(total, 2) * 100);
   const over25 = Math.round(pOver(total, 3) * 100);
   const btts = Math.round((1 - Math.exp(-homeLambda)) * (1 - Math.exp(-awayLambda)) * 100);
 
   let pHome = 0, pDraw = 0, pAway = 0;
-  for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) {
-    const p = pProb(homeLambda, i) * pProb(awayLambda, j);
-    if (i > j) pHome += p; else if (i === j) pDraw += p; else pAway += p;
+  for (let i = 0; i <= 6; i++) {
+    for (let j = 0; j <= 6; j++) {
+      const p = pProb(homeLambda, i) * pProb(awayLambda, j);
+      if (i > j) pHome += p;
+      else if (i === j) pDraw += p;
+      else pAway += p;
+    }
   }
 
   const homeName = m.teams?.home?.name || m.homeTeam || 'Casa';
@@ -154,10 +210,9 @@ function analyzeMatch(m: any): MatchAnalysis | null {
   const htGoal = Math.round((1 - Math.exp(-htLambda)) * 100);
   const ftGoal = Math.round((1 - Math.exp(-ftLambda)) * 100);
 
-  // forma simples (pontos por jogo, normalizado 0..100)
   const hPpg = safeNum(hStats.ppg, 1.3);
   const aPpg = safeNum(aStats.ppg, 1.3);
-  const formWeight = Math.round(((hPpg + aPpg) / 6) * 100); // máx 3 ppg cada
+  const formWeight = Math.round(((hPpg + aPpg) / 6) * 100);
 
   const time = m.fixture?.date
     ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -166,8 +221,13 @@ function analyzeMatch(m: any): MatchAnalysis | null {
     ? new Date(m.fixture.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
     : '';
 
+  // ── FILTROS DE QUALIDADE REAIS
   const topProb = Math.max(over15, over25, btts, winnerProb, doubleProb, cornersProb, htGoal, ftGoal);
   if (topProb < 70) return null;
+  // baixa média ofensiva → não interessa pré-jogo
+  if (total < 2.0 && over15 < 75) return null;
+  // over 2.5 muito baixo + sem dominância clara → bloqueia
+  if (over25 < 55 && winnerProb < 60 && btts < 70) return null;
 
   const premiumScore =
     (over15 * 0.20) + (over25 * 0.20) + (btts * 0.15) +
@@ -240,7 +300,6 @@ function buildPremiumMessage(a: MatchAnalysis): string {
     lines.push('');
   }
 
-  // Gestão de risco
   const all = [
     { name: 'Over 1.5 Gols', p: a.over15 },
     { name: 'Over 2.5 Gols', p: a.over25 },
@@ -275,7 +334,7 @@ function buildPremiumMessage(a: MatchAnalysis): string {
   return lines.join('\n');
 }
 
-/** Mercados que serão persistidos para validação posterior */
+/** Mercados que serão persistidos (com filtro EV+ aplicado depois). */
 function buildPersistableMarkets(a: MatchAnalysis): MarketRow[] {
   const m: MarketRow[] = [
     { name: 'Over 1.5 Gols', type: 'over_goals', prob: a.over15 },
@@ -304,15 +363,19 @@ Deno.serve(async (req) => {
     const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const date = today.toISOString().split('T')[0];
 
-    const fbRes = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date }),
-    });
+    // ── busca jogos + aprendizado em paralelo
+    const [fbRes, learn] = await Promise.all([
+      fetch(`${supabaseUrl}/functions/v1/football-api`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date }),
+      }),
+      fetchLearningAdjustments(sb),
+    ]);
     const fb = await fbRes.json();
     const matches: any[] = Array.isArray(fb?.matches) ? fb.matches : [];
 
-    console.log(`[BINGO-BROADCAST] date=${date} matches=${matches.length}`);
+    console.log(`[BINGO] date=${date} matches=${matches.length} learn_keys=${Object.keys(learn).length}`);
 
     const analyses: MatchAnalysis[] = [];
     for (const m of matches) {
@@ -320,11 +383,11 @@ Deno.serve(async (req) => {
         const a = analyzeMatch(m);
         if (a) analyses.push(a);
       } catch (e) {
-        console.warn('[BINGO-BROADCAST] analyze error:', e instanceof Error ? e.message : e);
+        console.warn('[BINGO] analyze error:', e instanceof Error ? e.message : e);
       }
     }
 
-    // Filtro: jogos da MANHÃ (00:00 → 11:59 BRT)
+    // Manhã (00:00 → 11:59 BRT)
     const morning = analyses.filter(a => {
       const [hourStr] = (a.time || '99:99').split(':');
       const h = Number(hourStr);
@@ -333,7 +396,7 @@ Deno.serve(async (req) => {
 
     morning.sort((a, b) => b.premiumScore - a.premiumScore);
     const top = morning.slice(0, 8);
-    console.log(`[BINGO-BROADCAST] qualified=${analyses.length} morning=${morning.length} top=${top.length}`);
+    console.log(`[BINGO] qualified=${analyses.length} morning=${morning.length} top=${top.length}`);
 
     if (top.length === 0) {
       return new Response(JSON.stringify({ ok: true, picks: 0, message: 'no qualified picks' }), {
@@ -341,17 +404,42 @@ Deno.serve(async (req) => {
       });
     }
 
-    let sent = 0, signalsSaved = 0;
+    // ── DEDUP: jogos enviados nas últimas 24h
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const ids = top.map(t => t.matchId);
+    const { data: dupRows } = await sb
+      .from('telegram_signals')
+      .select('match_id')
+      .in('match_id', ids)
+      .eq('reason', 'daily-bingo-premium')
+      .gte('created_at', since24h);
+    const dupSet = new Set((dupRows || []).map(r => r.match_id));
+
+    let sent = 0, signalsSaved = 0, skippedDup = 0, skippedEv = 0;
+
     for (const a of top) {
-      // dedup por jogo no dia: se já existe sinal premium para este matchId, pula
-      const { data: existing } = await sb
-        .from('telegram_signals')
-        .select('id')
-        .eq('match_id', a.matchId)
-        .eq('reason', 'daily-bingo-premium')
-        .limit(1);
-      if (existing && existing.length > 0) {
-        console.log(`[BINGO-BROADCAST] skip dup match=${a.matchId}`);
+      if (dupSet.has(a.matchId)) {
+        skippedDup++;
+        console.log(`[BINGO] skip dup match=${a.matchId}`);
+        continue;
+      }
+
+      // ── Filtra mercados por EV+ e aplica aprendizado
+      const allMarkets = buildPersistableMarkets(a);
+      const evMarkets = allMarkets
+        .map(mk => {
+          const mult = learn[mk.type] ?? 1;
+          const adjustedProb = Math.max(0, Math.min(100, mk.prob * mult));
+          const odd = fairOdd(adjustedProb);
+          const implied = impliedProb(odd);
+          const ev = +(adjustedProb - implied).toFixed(2);
+          return { ...mk, odd, implied, ev, adjustedProb };
+        })
+        .filter(mk => mk.ev > 0 && mk.odd >= 1.10);
+
+      if (evMarkets.length === 0) {
+        skippedEv++;
+        console.log(`[BINGO] skip EV-neg match=${a.matchId}`);
         continue;
       }
 
@@ -361,35 +449,34 @@ Deno.serve(async (req) => {
       if (r.ok) {
         sent++;
         const msgId = r.data?.result?.message_id ?? null;
-        const markets = buildPersistableMarkets(a);
-        for (const mk of markets) {
-          const odd = fairOdd(mk.prob);
-          const implied = impliedProb(odd);
-          const ev = mk.prob - implied; // EV+ em pontos %
 
-          await sb.from('telegram_signals').insert({
-            match_id: a.matchId,
-            match_name: `${a.homeTeam} vs ${a.awayTeam}`,
-            market: mk.name,
-            market_type: mk.type,
-            minute: 0,
-            confidence: mk.prob,
-            score: '0-0',
-            reason: 'daily-bingo-premium',
-            sensitivity: 'PRE',
-            success: null,            // pendente até validar
-            status: 'pendente',
-            telegram_message_id: msgId,
-            odd,
-            implied_probability: implied,
-            expected_value: ev,
-            model_probability: mk.prob,
-            premium_score: a.premiumScore,
-          });
-          signalsSaved++;
+        const rows = evMarkets.map(mk => ({
+          match_id: a.matchId,
+          match_name: `${a.homeTeam} vs ${a.awayTeam}`,
+          market: mk.name,
+          market_type: mk.type,
+          minute: 0,
+          confidence: Math.round(mk.adjustedProb),
+          score: '0-0',
+          reason: 'daily-bingo-premium',
+          sensitivity: 'PRE',
+          success: null,
+          status: 'pendente',
+          telegram_message_id: msgId,
+          odd: mk.odd,
+          implied_probability: mk.implied,
+          expected_value: mk.ev,
+          model_probability: mk.prob,
+          premium_score: a.premiumScore,
+        }));
+        const { error: insErr } = await sb.from('telegram_signals').insert(rows);
+        if (insErr) {
+          console.error('[BINGO] insert signals failed:', insErr.message);
+        } else {
+          signalsSaved += rows.length;
         }
       } else {
-        console.error('[BINGO-BROADCAST] tg fail:', r.status, r.error || JSON.stringify(r.data || {}));
+        console.error('[TELEGRAM] fail:', r.status, r.error || JSON.stringify(r.data || {}));
         await enqueueTelegramOutbox(sb, {
           chat_id: TELEGRAM_CHAT_ID, text, source: 'daily-bingo-broadcast',
           last_error: r.error || JSON.stringify(r.data || {}),
@@ -399,13 +486,19 @@ Deno.serve(async (req) => {
     }
 
     const elapsed = Date.now() - t0;
-    console.log(`[BINGO-BROADCAST] picks=${top.length} sent=${sent} signals=${signalsSaved} elapsed=${elapsed}ms`);
+    console.log(`[BINGO] picks=${top.length} sent=${sent} signals=${signalsSaved} dup=${skippedDup} ev_neg=${skippedEv} elapsed=${elapsed}ms`);
 
     return new Response(JSON.stringify({
-      ok: true, picks: top.length, sent, signals: signalsSaved, elapsed_ms: elapsed,
+      ok: true,
+      picks: top.length,
+      sent,
+      signals: signalsSaved,
+      skipped_duplicate: skippedDup,
+      skipped_ev_negative: skippedEv,
+      elapsed_ms: elapsed,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
-    console.error('[BINGO-BROADCAST] error:', e);
+    console.error('[BINGO] error:', e);
     return new Response(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

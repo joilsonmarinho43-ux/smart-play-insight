@@ -364,13 +364,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3. Check duplicates today
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // 3. Check duplicates today (BRT)
+    const brtDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const todayStartIso = `${brtDay}T03:00:00.000Z`;
+    console.log(`[TIMEZONE] scanner day_brt=${brtDay} startIso=${todayStartIso}`);
     const { data: existingSignals } = await supabase
       .from('telegram_signals')
       .select('match_id, market')
-      .gte('created_at', todayStart.toISOString())
+      .gte('created_at', todayStartIso)
       .eq('success', true);
 
     const signaledKeys = new Set((existingSignals || []).map((s: any) => `${s.match_id}-${s.market}`));

@@ -464,7 +464,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const isLive = body?.live === true;
     const fixtureId = body?.fixture;
-    const date = body?.date || new Date().toISOString().split("T")[0];
+    const date = body?.date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
     // ========== STATS for a specific fixture ==========
     if (fixtureId) {

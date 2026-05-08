@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, escapeHtml, enqueueTelegramOutbox } from '../_shared/telegram.ts';
+import { brTodayDate, brTime, brDate, brHour, APP_TZ } from '../_shared/timezone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -214,12 +215,8 @@ function analyzeMatch(m: any): MatchAnalysis | null {
   const aPpg = safeNum(aStats.ppg, 1.3);
   const formWeight = Math.round(((hPpg + aPpg) / 6) * 100);
 
-  const time = m.fixture?.date
-    ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
-    : '';
-  const date = m.fixture?.date
-    ? new Date(m.fixture.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
-    : '';
+  const time = m.fixture?.date ? brTime(m.fixture.date) : '';
+  const date = m.fixture?.date ? brDate(m.fixture.date) : '';
 
   // ── FILTROS DE QUALIDADE REAIS
   const topProb = Math.max(over15, over25, btts, winnerProb, doubleProb, cornersProb, htGoal, ftGoal);
@@ -360,8 +357,8 @@ Deno.serve(async (req) => {
 
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-    const date = today.toISOString().split('T')[0];
+    const date = brTodayDate();
+    console.log(`[TIMEZONE] tz=${APP_TZ} date_brt=${date}`);
 
     // ── busca jogos + aprendizado em paralelo
     const [fbRes, learn] = await Promise.all([

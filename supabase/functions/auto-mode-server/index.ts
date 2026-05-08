@@ -284,14 +284,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Anti-spam: 1 sinal por jogo/dia
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // 2. Anti-spam: 1 sinal por jogo/dia (BRT — 00:00 São Paulo)
+    const brtDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const todayStartIso = `${brtDay}T03:00:00.000Z`;
+    console.log(`[TIMEZONE] auto-mode day_brt=${brtDay} startIso=${todayStartIso}`);
 
     const { data: existingSignals } = await supabase
       .from('telegram_signals')
       .select('match_id')
-      .gte('created_at', todayStart.toISOString())
+      .gte('created_at', todayStartIso)
       .eq('success', true);
 
     const signaledIds = new Set((existingSignals || []).map((s: any) => s.match_id).filter(Boolean));

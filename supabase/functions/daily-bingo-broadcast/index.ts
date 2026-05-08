@@ -215,12 +215,8 @@ function analyzeMatch(m: any): MatchAnalysis | null {
   const aPpg = safeNum(aStats.ppg, 1.3);
   const formWeight = Math.round(((hPpg + aPpg) / 6) * 100);
 
-  const time = m.fixture?.date
-    ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
-    : '';
-  const date = m.fixture?.date
-    ? new Date(m.fixture.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
-    : '';
+  const time = m.fixture?.date ? brTime(m.fixture.date) : '';
+  const date = m.fixture?.date ? brDate(m.fixture.date) : '';
 
   // ── FILTROS DE QUALIDADE REAIS
   const topProb = Math.max(over15, over25, btts, winnerProb, doubleProb, cornersProb, htGoal, ftGoal);

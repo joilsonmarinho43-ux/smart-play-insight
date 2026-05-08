@@ -357,8 +357,8 @@ Deno.serve(async (req) => {
 
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-    const date = today.toISOString().split('T')[0];
+    const date = brTodayDate();
+    console.log(`[TIMEZONE] tz=${APP_TZ} date_brt=${date}`);
 
     // ── busca jogos + aprendizado em paralelo
     const [fbRes, learn] = await Promise.all([

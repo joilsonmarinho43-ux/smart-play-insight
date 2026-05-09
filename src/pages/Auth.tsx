@@ -13,6 +13,28 @@ const Auth = () => {
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
+  const handleForgotPassword = async () => {
+    setError('');
+    setMessage('');
+    if (!email) {
+      setError('Digite seu e-mail acima para receber o link de recuperação.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setMessage('Enviamos um link de recuperação para seu e-mail. Verifique sua caixa de entrada e spam.');
+    } catch (err: any) {
+      console.error('[AUTH] resetPassword error:', err);
+      setError(err.message || 'Não foi possível enviar o e-mail de recuperação.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -113,6 +135,17 @@ const Auth = () => {
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {isLogin ? 'Entrar' : 'Cadastrar'}
           </button>
+
+          {isLogin && (
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={loading}
+              className="block w-full text-center text-xs text-primary hover:underline disabled:opacity-50"
+            >
+              Esqueci minha senha
+            </button>
+          )}
 
           <p className="text-center text-sm text-muted-foreground">
             {isLogin ? 'Não tem conta?' : 'Já tem conta?'}{' '}

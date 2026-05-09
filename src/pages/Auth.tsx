@@ -136,6 +136,17 @@ const Auth = () => {
             {isLogin ? 'Entrar' : 'Cadastrar'}
           </button>
 
+          {isLogin && (
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={loading}
+              className="block w-full text-center text-xs text-primary hover:underline disabled:opacity-50"
+            >
+              Esqueci minha senha
+            </button>
+          )}
+
           <p className="text-center text-sm text-muted-foreground">
             {isLogin ? 'Não tem conta?' : 'Já tem conta?'}{' '}
             <button

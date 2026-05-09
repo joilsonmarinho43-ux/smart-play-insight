@@ -19,6 +19,7 @@ import Scanner from "./pages/Scanner";
 import Elite from "./pages/Elite";
 import Bingo from "./pages/Bingo";
 import Paywall from "./pages/Paywall";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { AppLayout } from "./components/AppLayout";
 
@@ -95,6 +96,7 @@ const App = () => {
             {/* Rotas de Fluxo de Usuário */}
             <Route path="/expired" element={<Paywall />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

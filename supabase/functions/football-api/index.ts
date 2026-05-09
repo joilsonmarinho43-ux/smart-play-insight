@@ -434,20 +434,22 @@ serve(async (req) => {
       });
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace('Bearer ', '').trim();
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const isServiceRole = token === serviceRoleKey;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const isServiceRole = !!serviceRoleKey && token === serviceRoleKey;
+    const isAnonKey = !!anonKey && token === anonKey;
 
-    if (!isServiceRole) {
+    if (!isServiceRole && !isAnonKey) {
       // Validate as user JWT
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      const authClient = createClient(supabaseUrl, anonKey!, {
         global: { headers: { Authorization: authHeader } },
       });
 
       const { data: claimsData, error: claimsError } = await authClient.auth.getUser(token);
       if (claimsError || !claimsData?.user) {
+        console.warn('[AUTH] Invalid token:', claimsError?.message);
         return new Response(JSON.stringify({ error: 'Invalid token', matches: [] }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

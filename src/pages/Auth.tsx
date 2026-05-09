@@ -13,6 +13,28 @@ const Auth = () => {
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
+  const handleForgotPassword = async () => {
+    setError('');
+    setMessage('');
+    if (!email) {
+      setError('Digite seu e-mail acima para receber o link de recuperação.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setMessage('Enviamos um link de recuperação para seu e-mail. Verifique sua caixa de entrada e spam.');
+    } catch (err: any) {
+      console.error('[AUTH] resetPassword error:', err);
+      setError(err.message || 'Não foi possível enviar o e-mail de recuperação.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

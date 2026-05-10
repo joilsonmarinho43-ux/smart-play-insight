@@ -507,7 +507,7 @@ serve(async (req) => {
     if (isLive) {
       const liveCk = "live_all";
 
-      const memCached = memGet("live_v3", 30000);
+      const memCached = memGet("live_v3", 90000); // 30s → 90s
       if (memCached) {
         const allHaveStats = memCached.matches.every((m: any) => m.stats?.home !== null || m.stats?.away !== null);
         if (allHaveStats) {

@@ -384,16 +384,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Manhã (00:00 → 11:59 BRT)
-    const morning = analyses.filter(a => {
-      const [hourStr] = (a.time || '99:99').split(':');
-      const h = Number(hourStr);
-      return Number.isFinite(h) && h >= 0 && h < 12;
+    // Considera todos os jogos do dia que ainda não começaram (kickoff > agora BRT).
+    // Antes filtrava só hora < 12, o que descartava quase todos os jogos.
+    const nowMs = Date.now();
+    const upcoming = analyses.filter(a => {
+      const ko = (a as any)._kickoffMs as number | undefined;
+      if (typeof ko === 'number') return ko > nowMs;
+      // fallback: usa hora BRT >= hora atual BRT
+      const [hStr, mStr] = (a.time || '99:99').split(':');
+      const h = Number(hStr), mn = Number(mStr);
+      if (!Number.isFinite(h)) return false;
+      const nowBrtH = Number(brHour(new Date().toISOString()));
+      return h > nowBrtH || (h === nowBrtH && Number.isFinite(mn) && mn >= 0);
     });
 
-    morning.sort((a, b) => b.premiumScore - a.premiumScore);
-    const top = morning.slice(0, 8);
-    console.log(`[BINGO] qualified=${analyses.length} morning=${morning.length} top=${top.length}`);
+    upcoming.sort((a, b) => b.premiumScore - a.premiumScore);
+    const top = upcoming.slice(0, 8);
+    console.log(`[BINGO] qualified=${analyses.length} upcoming=${upcoming.length} top=${top.length}`);
 
     if (top.length === 0) {
       return new Response(JSON.stringify({ ok: true, picks: 0, message: 'no qualified picks' }), {

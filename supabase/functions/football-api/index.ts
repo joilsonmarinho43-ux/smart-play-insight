@@ -229,18 +229,19 @@ function shouldFetchLiveStats(
   leagueId: number
 ): boolean {
   const minute = match?.fixture?.status?.elapsed || 0;
-  if (minute < 8) return false; // Too early, no useful data
+  // Mais cedo = pouca informação útil + custo alto. Sobe limite mínimo.
+  if (minute < 12) return false;
 
-  // Priority leagues always get stats
+  // Ligas prioritárias: a partir de 12'
   if (LEAGUES_WITH_STATS.has(leagueId)) return true;
 
-  // For other leagues, fetch if enough time has passed (API may have data)
-  if (minute >= 15) return true;
+  // Demais ligas: somente após 25' (antes era 15') para economizar quota
+  if (minute >= 25) return true;
 
-  // Also fetch if there are goals (interesting game)
+  // Ou se já saiu gol (jogo interessante) e passou de 15'
   const homeGoals = match?.goals?.home ?? 0;
   const awayGoals = match?.goals?.away ?? 0;
-  if (homeGoals + awayGoals > 0) return true;
+  if (minute >= 15 && homeGoals + awayGoals > 0) return true;
 
   return false;
 }

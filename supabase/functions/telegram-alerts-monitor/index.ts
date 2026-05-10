@@ -21,8 +21,11 @@ const QUOTA_LIMIT = 7000;
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
-    const adminChat = Deno.env.get('TELEGRAM_ADMIN_CHAT_ID') || Deno.env.get('TELEGRAM_CHAT_ID');
-    if (!adminChat) throw new Error('TELEGRAM_ADMIN_CHAT_ID/TELEGRAM_CHAT_ID not configured');
+    // ⚠️ Alertas operacionais SOMENTE para admin (nunca para o grupo de sinais).
+    // Exige TELEGRAM_ADMIN_CHAT_ID explicitamente; se não houver, apenas loga.
+    const adminChat = Deno.env.get('TELEGRAM_ADMIN_CHAT_ID');
+    const groupChat = Deno.env.get('TELEGRAM_CHAT_ID');
+    const canSendToAdmin = !!adminChat && adminChat !== groupChat;
 
     const sb = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -62,7 +65,7 @@ Deno.serve(async (req) => {
       console.error(`[CIRCUIT_OPEN] ${services}`);
     }
 
-    // 3) API quota high
+    // 3) API quota high — APENAS LOG (não envia ao Telegram para não poluir o grupo)
     const today = new Date().toISOString().slice(0, 10);
     const { data: quota } = await sb
       .from('api_usage_daily')
@@ -71,25 +74,25 @@ Deno.serve(async (req) => {
     if (quota) {
       for (const q of quota as any[]) {
         if (q.call_count >= QUOTA_LIMIT * QUOTA_PCT) {
-          alerts.push({
-            key: `quota_${q.service}`,
-            text: `🟠 <b>API_QUOTA_HIGH</b>\n${q.service}: ${q.call_count}/${QUOTA_LIMIT}`,
-          });
-          console.error(`[API_QUOTA_HIGH] ${q.service}=${q.call_count}/${QUOTA_LIMIT}`);
+          console.warn(`[API_QUOTA_HIGH] ${q.service}=${q.call_count}/${QUOTA_LIMIT}`);
         }
       }
     }
 
     let fired = 0;
-    for (const a of alerts) {
-      const { data: should } = await sb.rpc('alert_should_fire', { _alert_key: a.key, _cooldown_minutes: 10 });
-      if (should === true) {
-        await sendTelegramMessage(adminChat, a.text, { tag: 'TG-ALERT' });
-        fired++;
+    if (canSendToAdmin) {
+      for (const a of alerts) {
+        const { data: should } = await sb.rpc('alert_should_fire', { _alert_key: a.key, _cooldown_minutes: 10 });
+        if (should === true) {
+          await sendTelegramMessage(adminChat!, a.text, { tag: 'TG-ALERT' });
+          fired++;
+        }
       }
+    } else {
+      for (const a of alerts) console.warn(`[TG-ALERT-SUPPRESSED] ${a.key}: ${a.text.replace(/\n/g, ' | ')}`);
     }
 
-    return new Response(JSON.stringify({ ok: true, detected: alerts.length, fired }), {
+    return new Response(JSON.stringify({ ok: true, detected: alerts.length, fired, sent_to_admin: canSendToAdmin }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {

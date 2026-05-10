@@ -245,7 +245,8 @@ function analyzeMatch(m: any): MatchAnalysis | null {
     doubleLabel, doubleProb, handicapLine, handicapProb,
     cornersLine, cornersProb, cardsLine, cardsProb,
     htGoal, ftGoal, formWeight,
-  };
+    _kickoffMs: m.fixture?.date ? new Date(m.fixture.date).getTime() : undefined,
+  } as MatchAnalysis & { _kickoffMs?: number };
 }
 
 function buildPremiumMessage(a: MatchAnalysis): string {

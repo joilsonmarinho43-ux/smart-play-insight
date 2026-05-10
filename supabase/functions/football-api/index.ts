@@ -545,7 +545,7 @@ serve(async (req) => {
         // Smart filter: only fetch stats for relevant games
         if (shouldFetchLiveStats(j, leagueId)) {
           const fStatsCk = `live_fstats_${fId}`;
-          const cachedFStats = memGet(fStatsCk, 4 * 60 * 1000) || await dbCacheGet(fStatsCk, "LIVE");
+          const cachedFStats = memGet(fStatsCk, 8 * 60 * 1000) || await dbCacheGet(fStatsCk, "LIVE"); // 4min → 8min
 
           if (cachedFStats) {
             stats = cachedFStats;

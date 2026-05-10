@@ -229,18 +229,19 @@ function shouldFetchLiveStats(
   leagueId: number
 ): boolean {
   const minute = match?.fixture?.status?.elapsed || 0;
-  if (minute < 8) return false; // Too early, no useful data
+  // Mais cedo = pouca informação útil + custo alto. Sobe limite mínimo.
+  if (minute < 12) return false;
 
-  // Priority leagues always get stats
+  // Ligas prioritárias: a partir de 12'
   if (LEAGUES_WITH_STATS.has(leagueId)) return true;
 
-  // For other leagues, fetch if enough time has passed (API may have data)
-  if (minute >= 15) return true;
+  // Demais ligas: somente após 25' (antes era 15') para economizar quota
+  if (minute >= 25) return true;
 
-  // Also fetch if there are goals (interesting game)
+  // Ou se já saiu gol (jogo interessante) e passou de 15'
   const homeGoals = match?.goals?.home ?? 0;
   const awayGoals = match?.goals?.away ?? 0;
-  if (homeGoals + awayGoals > 0) return true;
+  if (minute >= 15 && homeGoals + awayGoals > 0) return true;
 
   return false;
 }
@@ -506,7 +507,7 @@ serve(async (req) => {
     if (isLive) {
       const liveCk = "live_all";
 
-      const memCached = memGet("live_v3", 30000);
+      const memCached = memGet("live_v3", 90000); // 30s → 90s
       if (memCached) {
         const allHaveStats = memCached.matches.every((m: any) => m.stats?.home !== null || m.stats?.away !== null);
         if (allHaveStats) {
@@ -544,7 +545,7 @@ serve(async (req) => {
         // Smart filter: only fetch stats for relevant games
         if (shouldFetchLiveStats(j, leagueId)) {
           const fStatsCk = `live_fstats_${fId}`;
-          const cachedFStats = memGet(fStatsCk, 4 * 60 * 1000) || await dbCacheGet(fStatsCk, "LIVE");
+          const cachedFStats = memGet(fStatsCk, 8 * 60 * 1000) || await dbCacheGet(fStatsCk, "LIVE"); // 4min → 8min
 
           if (cachedFStats) {
             stats = cachedFStats;

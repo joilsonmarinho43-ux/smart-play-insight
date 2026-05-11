@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { fetchLiveMatches } from '@/services/footballApi';
+import { fetchLiveMatches, fetchMultiDayMatches } from '@/services/footballApi';
 
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();
 
-  const { data: matches, isLoading } = useQuery({
+  const { data: live, isLoading: loadingLive } = useQuery({
     queryKey: ['liveMatches'],
     queryFn: fetchLiveMatches,
     refetchInterval: 120_000,
@@ -15,10 +15,42 @@ const MatchDetails = () => {
     refetchOnWindowFocus: false,
   });
 
-  const match = useMemo(
-    () => matches?.find((m) => m.id === id),
-    [matches, id],
-  );
+  const { data: multi, isLoading: loadingMulti } = useQuery({
+    queryKey: ['multi-day-matches-detail'],
+    queryFn: () => fetchMultiDayMatches(6),
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
+  });
+
+  const isLoading = loadingLive || loadingMulti;
+
+  const match: any = useMemo(() => {
+    const sid = String(id || '');
+    const findIn = (arr: any[] | undefined) =>
+      arr?.find((m) => String(m?.id ?? m?.fixture?.id) === sid);
+    return findIn(live) || findIn(multi);
+  }, [live, multi, id]);
+
+  // Normalização: pré-jogo vem com m.fixture / m.teams; live vem com flat fields
+  const view = useMemo(() => {
+    if (!match) return null;
+    const homeTeam = match.homeTeam || match.teams?.home?.name || 'Casa';
+    const awayTeam = match.awayTeam || match.teams?.away?.name || 'Fora';
+    const league = match.league?.name || match.league || '';
+    const isLive = !!(match.minute || match.liveScore || match.liveStats);
+    const dateIso = match.fixture?.date || match.date || null;
+    const kickoff = dateIso
+      ? new Intl.DateTimeFormat('pt-BR', {
+          timeZone: 'America/Belem',
+          day: '2-digit',
+          month: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).format(new Date(dateIso))
+      : null;
+    return { homeTeam, awayTeam, league, isLive, kickoff };
+  }, [match]);
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
@@ -27,7 +59,7 @@ const MatchDetails = () => {
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Voltar para Live
+        Voltar
       </Link>
 
       {isLoading && (
@@ -42,45 +74,76 @@ const MatchDetails = () => {
         </div>
       )}
 
-      {match && (
+      {match && view && (
         <div className="space-y-4">
           <div className="bg-secondary/40 border border-border rounded-xl p-4 text-center">
-            <div className="text-xs text-muted-foreground mb-1">{match.league}</div>
+            <div className="text-xs text-muted-foreground mb-1">{view.league}</div>
             <div className="font-display text-lg">
-              {match.homeTeam} <span className="text-primary">{match.liveScore?.home ?? 0} - {match.liveScore?.away ?? 0}</span> {match.awayTeam}
+              {view.isLive ? (
+                <>
+                  {view.homeTeam}{' '}
+                  <span className="text-primary">
+                    {match.liveScore?.home ?? 0} - {match.liveScore?.away ?? 0}
+                  </span>{' '}
+                  {view.awayTeam}
+                </>
+              ) : (
+                <>
+                  {view.homeTeam} <span className="text-muted-foreground">vs</span> {view.awayTeam}
+                </>
+              )}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {match.status ?? 'LIVE'} · {match.minute ?? 0}'
+              {view.isLive
+                ? `${match.status ?? 'LIVE'} · ${match.minute ?? 0}'`
+                : view.kickoff
+                ? `Início: ${view.kickoff}`
+                : 'Pré-jogo'}
             </div>
           </div>
 
-          {/* Stats rápidas */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatBox
-              label="Posse de bola"
-              home={match.liveStats?.possession?.[0] ?? 0}
-              away={match.liveStats?.possession?.[1] ?? 0}
-              suffix="%"
-            />
-            <StatBox
-              label="Escanteios"
-              home={match.liveStats?.corners?.[0] ?? 0}
-              away={match.liveStats?.corners?.[1] ?? 0}
-            />
-            <StatBox
-              label="Ataques perigosos"
-              home={match.liveStats?.dangerousAttacks?.[0] ?? 0}
-              away={match.liveStats?.dangerousAttacks?.[1] ?? 0}
-            />
-            <StatBox
-              label="Pressão (PI)"
-              home={match.liveStats?.pressureIndex?.[0] ?? 0}
-              away={match.liveStats?.pressureIndex?.[1] ?? 0}
-            />
-          </div>
+          {view.isLive && (
+            <div className="grid grid-cols-2 gap-3">
+              <StatBox
+                label="Posse de bola"
+                home={match.liveStats?.possession?.[0] ?? 0}
+                away={match.liveStats?.possession?.[1] ?? 0}
+                suffix="%"
+              />
+              <StatBox
+                label="Escanteios"
+                home={match.liveStats?.corners?.[0] ?? 0}
+                away={match.liveStats?.corners?.[1] ?? 0}
+              />
+              <StatBox
+                label="Ataques perigosos"
+                home={match.liveStats?.dangerousAttacks?.[0] ?? 0}
+                away={match.liveStats?.dangerousAttacks?.[1] ?? 0}
+              />
+              <StatBox
+                label="Pressão (PI)"
+                home={match.liveStats?.pressureIndex?.[0] ?? 0}
+                away={match.liveStats?.pressureIndex?.[1] ?? 0}
+              />
+            </div>
+          )}
+
+          {!view.isLive && (
+            <div className="bg-secondary/30 border border-border rounded-xl p-4 text-center text-sm text-muted-foreground">
+              Confira a análise completa deste jogo no Bingo VIP PRO ou no Scanner PRO.
+              <div className="mt-3 flex gap-2 justify-center">
+                <Link to="/bingo" className="px-3 py-1.5 rounded-lg bg-primary/15 text-primary text-xs font-bold">
+                  Abrir Bingo
+                </Link>
+                <Link to="/scanner" className="px-3 py-1.5 rounded-lg bg-primary/15 text-primary text-xs font-bold">
+                  Abrir Scanner
+                </Link>
+              </div>
+            </div>
+          )}
 
           <div className="text-center text-xs text-muted-foreground py-2">
-            🏆 {match.league}
+            🏆 {view.league}
           </div>
         </div>
       )}

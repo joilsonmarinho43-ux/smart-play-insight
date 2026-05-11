@@ -178,8 +178,33 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
   const opportunities: ScannerOpportunity[] = [];
   addLog('info', `Scanner iniciado: ${matches.length} jogos para análise`);
 
+  const now = Date.now();
+  const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', 'AWD', 'WO']);
+  const PRE_STATUSES = new Set(['NS', 'TBD']);
+
   for (const match of matches) {
     const isLive = !!match.isLive;
+
+    // Filtro de status: ignorar jogos finalizados, cancelados ou já iniciados (não-live)
+    const statusShort: string = (match as any).fixture?.status?.short || (match as any).status?.short || '';
+    const fixtureDate = (match as any).fixture?.date ? new Date((match as any).fixture.date).getTime() : null;
+
+    if (FINISHED_STATUSES.has(statusShort)) {
+      addLog('info', `Jogo descartado (finalizado: ${statusShort})`, match.id);
+      continue;
+    }
+
+    if (!isLive) {
+      // Pré-jogo: deve estar agendado e ainda não ter começado
+      if (statusShort && !PRE_STATUSES.has(statusShort)) {
+        addLog('info', `Jogo descartado (status não pré-jogo: ${statusShort})`, match.id);
+        continue;
+      }
+      if (fixtureDate && fixtureDate <= now) {
+        addLog('info', `Jogo descartado (kickoff já passou)`, match.id);
+        continue;
+      }
+    }
 
     // Live stats
     const lH = (match as any).stats?.home || {};

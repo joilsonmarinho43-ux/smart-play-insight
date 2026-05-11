@@ -356,6 +356,16 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey) throw new Error('env missing');
 
+    // Flag de teste manual: bypassa EV+/dedup. NÃO afeta cron padrão.
+    let forceSend = false;
+    try {
+      if (req.method === 'POST') {
+        const body = await req.clone().json().catch(() => ({}));
+        forceSend = body?.force_send === true;
+      }
+    } catch { /* ignore */ }
+    if (forceSend) console.log('[BINGO] ⚠️ force_send=true (modo teste manual)');
+
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const date = brTodayDate();

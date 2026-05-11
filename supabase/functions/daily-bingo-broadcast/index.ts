@@ -356,6 +356,16 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey) throw new Error('env missing');
 
+    // Flag de teste manual: bypassa EV+/dedup. NÃO afeta cron padrão.
+    let forceSend = false;
+    try {
+      if (req.method === 'POST') {
+        const body = await req.clone().json().catch(() => ({}));
+        forceSend = body?.force_send === true;
+      }
+    } catch { /* ignore */ }
+    if (forceSend) console.log('[BINGO] ⚠️ force_send=true (modo teste manual)');
+
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const date = brTodayDate();
@@ -423,7 +433,7 @@ Deno.serve(async (req) => {
     let sent = 0, signalsSaved = 0, skippedDup = 0, skippedEv = 0;
 
     for (const a of top) {
-      if (dupSet.has(a.matchId)) {
+      if (dupSet.has(a.matchId) && !forceSend) {
         skippedDup++;
         console.log(`[BINGO] skip dup match=${a.matchId}`);
         continue;
@@ -431,7 +441,7 @@ Deno.serve(async (req) => {
 
       // ── Filtra mercados por EV+ e aplica aprendizado
       const allMarkets = buildPersistableMarkets(a);
-      const evMarkets = allMarkets
+      const evMarketsRaw = allMarkets
         .map(mk => {
           const mult = learn[mk.type] ?? 1;
           const adjustedProb = Math.max(0, Math.min(100, mk.prob * mult));
@@ -439,8 +449,10 @@ Deno.serve(async (req) => {
           const implied = impliedProb(odd);
           const ev = +(adjustedProb - implied).toFixed(2);
           return { ...mk, odd, implied, ev, adjustedProb };
-        })
-        .filter(mk => mk.ev > 0 && mk.odd >= 1.10);
+        });
+      const evMarkets = forceSend
+        ? evMarketsRaw.filter(mk => mk.odd >= 1.10)
+        : evMarketsRaw.filter(mk => mk.ev > 0 && mk.odd >= 1.10);
 
       if (evMarkets.length === 0) {
         skippedEv++;

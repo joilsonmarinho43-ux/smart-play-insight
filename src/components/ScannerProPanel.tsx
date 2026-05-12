@@ -90,14 +90,19 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
                 )}
               </div>
 
-              {/* Row 2: League + Minute + Live badge */}
-              <div className="flex items-center gap-2 mt-1">
+              {/* Row 2: League + Minute + Live badge / Kickoff for pré-jogo */}
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-[10px] text-gray-500">{opp.league}</span>
                 {opp.isLive && (
                   <span className="text-[9px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">LIVE</span>
                 )}
                 {opp.minute != null && (
                   <span className="text-[10px] text-green-400 font-mono">{opp.minute}'</span>
+                )}
+                {!opp.isLive && opp.kickoff && (
+                  <span className="flex items-center gap-1 text-[10px] text-orange-300/80 font-mono">
+                    <Clock className="w-3 h-3" /> {formatDateTimePara(opp.kickoff)}
+                  </span>
                 )}
               </div>
 

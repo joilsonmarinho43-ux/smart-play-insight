@@ -15,6 +15,7 @@ export interface ScannerOpportunity {
   signal: string | null;
   isLive: boolean;
   dataQuality: 'high' | 'medium' | 'low';
+  kickoff?: string | null;
   rmaVerdict?: RMAVerdict;
   rmaScore?: number;
 }

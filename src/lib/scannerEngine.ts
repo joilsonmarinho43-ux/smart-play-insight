@@ -15,6 +15,7 @@ export interface ScannerOpportunity {
   signal: string | null;
   isLive: boolean;
   dataQuality: 'high' | 'medium' | 'low';
+  kickoff?: string | null;
   rmaVerdict?: RMAVerdict;
   rmaScore?: number;
 }
@@ -273,6 +274,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         signal: hasGoalSignal ? '🔥 GOL IMINENTE' : null,
         isLive,
         dataQuality,
+        kickoff: (match as any).fixture?.date || null,
       });
     }
 

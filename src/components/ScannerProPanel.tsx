@@ -3,7 +3,8 @@ import { ScannerOpportunity, getScannerLogs } from '@/lib/scannerEngine';
 import { scanMatches } from '@/lib/scannerEngine';
 import { MatchData } from '@/types/match';
 import { Badge } from '@/components/ui/badge';
-import { Crosshair, Flame, Zap, TrendingUp, ShieldCheck, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Crosshair, Flame, Zap, TrendingUp, ShieldCheck, AlertTriangle, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { formatDateTimePara } from '@/lib/timezone';
 
 interface ScannerProPanelProps {
   matches: MatchData[];

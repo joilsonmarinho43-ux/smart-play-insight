@@ -274,6 +274,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         signal: hasGoalSignal ? '🔥 GOL IMINENTE' : null,
         isLive,
         dataQuality,
+        kickoff: (match as any).fixture?.date || null,
       });
     }
 

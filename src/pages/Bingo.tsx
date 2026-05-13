@@ -10,6 +10,18 @@ const Bingo = () => {
     staleTime: 1000 * 60 * 10,
   });
 
+  const safeMatches = (matches || []).map((m: any) => ({
+    ...m,
+    homeTeam: m.teams?.home?.name || m.homeTeam || 'Casa',
+    awayTeam: m.teams?.away?.name || m.awayTeam || 'Fora',
+    homeLogo: m.teams?.home?.logo,
+    awayLogo: m.teams?.away?.logo,
+    league: m.league?.name || m.league || '',
+    time: m.fixture?.date
+      ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
+      : m.time || '',
+  }));
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
       <div className="container max-w-3xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -34,7 +46,7 @@ const Bingo = () => {
             Nenhum jogo elegível encontrado.
           </div>
         ) : (
-          <BingoSuggestion matches={matches} />
+          <BingoSuggestion matches={safeMatches} />
         )}
       </div>
     </div>

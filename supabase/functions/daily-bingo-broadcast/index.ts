@@ -369,21 +369,28 @@ Deno.serve(async (req) => {
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const date = brTodayDate();
-    console.log(`[TIMEZONE] tz=${APP_TZ} date_brt=${date}`);
+    // Amanhã BRT (yyyy-mm-dd)
+    const tomorrow = new Date(date + 'T00:00:00-03:00');
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateTomorrow = tomorrow.toISOString().slice(0, 10);
+    console.log(`[TIMEZONE] tz=${APP_TZ} date_brt=${date} tomorrow=${dateTomorrow}`);
 
-    // ── busca jogos + aprendizado em paralelo
-    const [fbRes, learn] = await Promise.all([
+    // ── busca jogos (hoje + amanhã) + aprendizado em paralelo
+    const fbHeaders = { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' };
+    const [fbToday, fbTomorrow, learn] = await Promise.all([
       fetch(`${supabaseUrl}/functions/v1/football-api`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date }),
-      }),
+        method: 'POST', headers: fbHeaders, body: JSON.stringify({ date }),
+      }).then(r => r.json()).catch(() => ({ matches: [] })),
+      fetch(`${supabaseUrl}/functions/v1/football-api`, {
+        method: 'POST', headers: fbHeaders, body: JSON.stringify({ date: dateTomorrow }),
+      }).then(r => r.json()).catch(() => ({ matches: [] })),
       fetchLearningAdjustments(sb),
     ]);
-    const fb = await fbRes.json();
-    const matches: any[] = Array.isArray(fb?.matches) ? fb.matches : [];
+    const matchesToday: any[] = Array.isArray(fbToday?.matches) ? fbToday.matches : [];
+    const matchesTomorrow: any[] = Array.isArray(fbTomorrow?.matches) ? fbTomorrow.matches : [];
+    const matches = [...matchesToday, ...matchesTomorrow];
 
-    console.log(`[BINGO] date=${date} matches=${matches.length} learn_keys=${Object.keys(learn).length}`);
+    console.log(`[BINGO] today=${matchesToday.length} tomorrow=${matchesTomorrow.length} total=${matches.length} learn_keys=${Object.keys(learn).length}`);
 
     const analyses: MatchAnalysis[] = [];
     for (const m of matches) {

@@ -115,7 +115,7 @@ const Index = () => {
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',
         time: m.fixture?.date
-          ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          ? formatTimePara(m.fixture.date)
           : m.time || '',
         modelData: {
           homeGoalsAvg: hGF,

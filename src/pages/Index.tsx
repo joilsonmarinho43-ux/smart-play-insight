@@ -8,6 +8,15 @@ import { useProfile } from '@/hooks/useProfile';
 import { Loader2, RefreshCw, Trash2, WifiOff, Send } from 'lucide-react';
 import bannerImg from "@/assets/banner-hero.jpg";
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
+import { APP_TIMEZONE, formatTimePara, getTodayInPara } from "@/lib/timezone";
+
+/** YYYY-MM-DD em UTC-3 (Belém) para uma data arbitrária. */
+function paraDateString(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d);
+}
 
 const LEAGUE_LABELS: Record<string, string> = {
   'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier',
@@ -44,14 +53,18 @@ const Index = () => {
     refetchOnReconnect: false,
   });
 
-  // Generate day labels
+  // Generate day labels (BRT/Pará)
   const dayOptions = useMemo(() => {
     const days = [];
+    const today = getTodayInPara(); // YYYY-MM-DD in BRT
+    const base = new Date(`${today}T12:00:00-03:00`);
     for (let i = 0; i < 6; i++) {
-      const d = new Date();
+      const d = new Date(base);
       d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' });
+      const dateStr = paraDateString(d);
+      const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : new Intl.DateTimeFormat('pt-BR', {
+        timeZone: APP_TIMEZONE, weekday: 'short', day: '2-digit',
+      }).format(d);
       days.push({ index: i, date: dateStr, label });
     }
     return days;
@@ -102,7 +115,7 @@ const Index = () => {
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',
         time: m.fixture?.date
-          ? new Date(m.fixture.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          ? formatTimePara(m.fixture.date)
           : m.time || '',
         modelData: {
           homeGoalsAvg: hGF,
@@ -128,7 +141,7 @@ const Index = () => {
   const dayMatches = useMemo(() => {
     if (!selectedDate) return safeMatches;
     return safeMatches.filter((m: any) => {
-      const matchDate = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+      const matchDate = m.fixture?.date ? paraDateString(new Date(m.fixture.date)) : m.date || '';
       return matchDate === selectedDate;
     });
   }, [safeMatches, selectedDate]);
@@ -190,7 +203,7 @@ const Index = () => {
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {dayOptions.map(day => {
             const count = safeMatches.filter((m: any) => {
-              const md = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+              const md = m.fixture?.date ? paraDateString(new Date(m.fixture.date)) : m.date || '';
               return md === day.date;
             }).length;
             return (

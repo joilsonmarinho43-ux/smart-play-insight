@@ -369,28 +369,29 @@ Deno.serve(async (req) => {
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const date = brTodayDate();
-    // Amanhã BRT (yyyy-mm-dd)
-    const tomorrow = new Date(date + 'T00:00:00-03:00');
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateTomorrow = tomorrow.toISOString().slice(0, 10);
-    console.log(`[TIMEZONE] tz=${APP_TZ} date_brt=${date} tomorrow=${dateTomorrow}`);
+    // Busca janela de até 4 dias (hoje + 3) — garante que dias sem jogos
+    // das ligas-elite ainda encontrem picks no horizonte próximo.
+    const HORIZON_DAYS = 4;
+    const dates: string[] = [];
+    for (let i = 0; i < HORIZON_DAYS; i++) {
+      const d = new Date(date + 'T00:00:00-03:00');
+      d.setDate(d.getDate() + i);
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    console.log(`[TIMEZONE] tz=${APP_TZ} window=${dates.join(',')}`);
 
-    // ── busca jogos (hoje + amanhã) + aprendizado em paralelo
+    // ── busca jogos em paralelo + aprendizado
     const fbHeaders = { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' };
-    const [fbToday, fbTomorrow, learn] = await Promise.all([
+    const dayFetches = dates.map(d =>
       fetch(`${supabaseUrl}/functions/v1/football-api`, {
-        method: 'POST', headers: fbHeaders, body: JSON.stringify({ date }),
-      }).then(r => r.json()).catch(() => ({ matches: [] })),
-      fetch(`${supabaseUrl}/functions/v1/football-api`, {
-        method: 'POST', headers: fbHeaders, body: JSON.stringify({ date: dateTomorrow }),
-      }).then(r => r.json()).catch(() => ({ matches: [] })),
-      fetchLearningAdjustments(sb),
-    ]);
-    const matchesToday: any[] = Array.isArray(fbToday?.matches) ? fbToday.matches : [];
-    const matchesTomorrow: any[] = Array.isArray(fbTomorrow?.matches) ? fbTomorrow.matches : [];
-    const matches = [...matchesToday, ...matchesTomorrow];
+        method: 'POST', headers: fbHeaders, body: JSON.stringify({ date: d }),
+      }).then(r => r.json()).catch(() => ({ matches: [] }))
+    );
+    const [learn, ...dayResults] = await Promise.all([fetchLearningAdjustments(sb), ...dayFetches]);
+    const matches: any[] = dayResults.flatMap((r: any) => Array.isArray(r?.matches) ? r.matches : []);
+    const perDayCount = dayResults.map((r: any, i: number) => `${dates[i]}=${Array.isArray(r?.matches) ? r.matches.length : 0}`).join(' ');
 
-    console.log(`[BINGO] today=${matchesToday.length} tomorrow=${matchesTomorrow.length} total=${matches.length} learn_keys=${Object.keys(learn).length}`);
+    console.log(`[BINGO] ${perDayCount} total=${matches.length} learn_keys=${Object.keys(learn).length}`);
 
     const analyses: MatchAnalysis[] = [];
     for (const m of matches) {

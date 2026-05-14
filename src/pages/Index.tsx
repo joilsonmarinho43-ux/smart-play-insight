@@ -53,14 +53,18 @@ const Index = () => {
     refetchOnReconnect: false,
   });
 
-  // Generate day labels
+  // Generate day labels (BRT/Pará)
   const dayOptions = useMemo(() => {
     const days = [];
+    const today = getTodayInPara(); // YYYY-MM-DD in BRT
+    const base = new Date(`${today}T12:00:00-03:00`);
     for (let i = 0; i < 6; i++) {
-      const d = new Date();
+      const d = new Date(base);
       d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' });
+      const dateStr = paraDateString(d);
+      const label = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : new Intl.DateTimeFormat('pt-BR', {
+        timeZone: APP_TIMEZONE, weekday: 'short', day: '2-digit',
+      }).format(d);
       days.push({ index: i, date: dateStr, label });
     }
     return days;

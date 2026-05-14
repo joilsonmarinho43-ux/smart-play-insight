@@ -203,7 +203,7 @@ const Index = () => {
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {dayOptions.map(day => {
             const count = safeMatches.filter((m: any) => {
-              const md = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+              const md = m.fixture?.date ? paraDateString(new Date(m.fixture.date)) : m.date || '';
               return md === day.date;
             }).length;
             return (

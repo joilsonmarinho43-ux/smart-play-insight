@@ -8,6 +8,15 @@ import { useProfile } from '@/hooks/useProfile';
 import { Loader2, RefreshCw, Trash2, WifiOff, Send } from 'lucide-react';
 import bannerImg from "@/assets/banner-hero.jpg";
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
+import { APP_TIMEZONE, formatTimePara, getTodayInPara } from "@/lib/timezone";
+
+/** YYYY-MM-DD em UTC-3 (Belém) para uma data arbitrária. */
+function paraDateString(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d);
+}
 
 const LEAGUE_LABELS: Record<string, string> = {
   'Premier League': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier',

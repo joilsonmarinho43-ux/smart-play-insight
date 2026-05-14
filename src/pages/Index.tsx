@@ -141,7 +141,7 @@ const Index = () => {
   const dayMatches = useMemo(() => {
     if (!selectedDate) return safeMatches;
     return safeMatches.filter((m: any) => {
-      const matchDate = m.fixture?.date ? m.fixture.date.split('T')[0] : m.date || '';
+      const matchDate = m.fixture?.date ? paraDateString(new Date(m.fixture.date)) : m.date || '';
       return matchDate === selectedDate;
     });
   }, [safeMatches, selectedDate]);

@@ -215,11 +215,26 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
   ];
   const validated = filters.filter(Boolean).length;
 
-  const confidence = isSuperSniper
+  let confidence = isSuperSniper
     ? Math.min(98, 82 + Math.round(s.pressure / 8) + validated * 2)
     : isSniper
       ? Math.min(95, 70 + Math.round(s.pressure / 10) + validated * 2)
       : Math.min(85, 60 + Math.round(s.pressure / 15) + validated * 2);
+
+  if (isDynamicConfidenceEnabled()) {
+    const dyn = dynamicConfidence(confidence, {
+      minute: s.minute,
+      homeGoals: s.homeGoals,
+      awayGoals: s.awayGoals,
+      sotTotal: s.sog,
+      shotsTotal: s.totalShots,
+      daTotal: s.da,
+      pressure: s.pressure,
+      pressureRecent: s.pressure,
+    });
+    console.log(`[DYN-CONF ${tier}] ${s.homeTeam} vs ${s.awayTeam} min ${s.minute}: ${confidence}% → ${dyn.confidence}% • ${dyn.reason}`);
+    confidence = dyn.confidence;
+  }
 
   const label = isSuperSniper ? 'SUPER SNIPER 💀' : isSniper ? 'SNIPER 🔥' : 'SEMI ⚡';
 

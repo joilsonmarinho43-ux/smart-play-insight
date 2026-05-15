@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
+import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynamicConfidence.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

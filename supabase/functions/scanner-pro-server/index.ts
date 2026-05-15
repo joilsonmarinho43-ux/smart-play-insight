@@ -247,7 +247,17 @@ function sniperScan(match: any): SniperSignal | null {
     const remainingMin = Math.max(1, 90 - minute);
     const remainingLambda = totalLambda * (remainingMin / 90);
     const rawProbFT = Math.round(poissonOver(remainingLambda, remainingNeeded) * 100);
-    const probFT = capConfidence(rawProbFT, minute, totalGoals);
+    let probFT = capConfidence(rawProbFT, minute, totalGoals);
+
+    if (isDynamicConfidenceEnabled()) {
+      const dyn = dynamicConfidence(probFT, {
+        minute, homeGoals, awayGoals,
+        sotTotal: totalSoG, shotsTotal: totalShots, daTotal: totalDA,
+        pressure, pressureRecent: pressure,
+      });
+      console.log(`[DYN-CONF FT] ${baseInfo.match} min ${minute}: ${probFT}% → ${dyn.confidence}% • ${dyn.reason}`);
+      probFT = dyn.confidence;
+    }
 
     const { odd: oddFT, ev: evFT } = estimateOddAndEV(probFT, 'Over 1.5 Gols');
 

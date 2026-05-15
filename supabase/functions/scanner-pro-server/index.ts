@@ -200,7 +200,17 @@ function sniperScan(match: any): SniperSignal | null {
     const remainingHT = Math.max(1, 45 - minute);
     const htLambda = totalLambda * (remainingHT / 90);
     const rawProbHT = Math.round(poissonOver(htLambda, 1) * 100);
-    const probHT = capConfidence(rawProbHT, minute, totalGoals);
+    let probHT = capConfidence(rawProbHT, minute, totalGoals);
+
+    if (isDynamicConfidenceEnabled()) {
+      const dyn = dynamicConfidence(probHT, {
+        minute, homeGoals, awayGoals,
+        sotTotal: totalSoG, shotsTotal: totalShots, daTotal: totalDA,
+        pressure, pressureRecent: pressure,
+      });
+      console.log(`[DYN-CONF HT] ${baseInfo.match} min ${minute}: ${probHT}% → ${dyn.confidence}% • ${dyn.reason}`);
+      probHT = dyn.confidence;
+    }
 
     const { odd: oddHT, ev: evHT } = estimateOddAndEV(probHT, 'Over 0.5 HT');
 

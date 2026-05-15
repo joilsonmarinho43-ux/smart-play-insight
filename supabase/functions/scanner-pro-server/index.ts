@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
+import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynamicConfidence.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -199,7 +200,17 @@ function sniperScan(match: any): SniperSignal | null {
     const remainingHT = Math.max(1, 45 - minute);
     const htLambda = totalLambda * (remainingHT / 90);
     const rawProbHT = Math.round(poissonOver(htLambda, 1) * 100);
-    const probHT = capConfidence(rawProbHT, minute, totalGoals);
+    let probHT = capConfidence(rawProbHT, minute, totalGoals);
+
+    if (isDynamicConfidenceEnabled()) {
+      const dyn = dynamicConfidence(probHT, {
+        minute, homeGoals, awayGoals,
+        sotTotal: totalSoG, shotsTotal: totalShots, daTotal: totalDA,
+        pressure, pressureRecent: pressure,
+      });
+      console.log(`[DYN-CONF HT] ${baseInfo.match} min ${minute}: ${probHT}% → ${dyn.confidence}% • ${dyn.reason}`);
+      probHT = dyn.confidence;
+    }
 
     const { odd: oddHT, ev: evHT } = estimateOddAndEV(probHT, 'Over 0.5 HT');
 
@@ -236,7 +247,17 @@ function sniperScan(match: any): SniperSignal | null {
     const remainingMin = Math.max(1, 90 - minute);
     const remainingLambda = totalLambda * (remainingMin / 90);
     const rawProbFT = Math.round(poissonOver(remainingLambda, remainingNeeded) * 100);
-    const probFT = capConfidence(rawProbFT, minute, totalGoals);
+    let probFT = capConfidence(rawProbFT, minute, totalGoals);
+
+    if (isDynamicConfidenceEnabled()) {
+      const dyn = dynamicConfidence(probFT, {
+        minute, homeGoals, awayGoals,
+        sotTotal: totalSoG, shotsTotal: totalShots, daTotal: totalDA,
+        pressure, pressureRecent: pressure,
+      });
+      console.log(`[DYN-CONF FT] ${baseInfo.match} min ${minute}: ${probFT}% → ${dyn.confidence}% • ${dyn.reason}`);
+      probFT = dyn.confidence;
+    }
 
     const { odd: oddFT, ev: evFT } = estimateOddAndEV(probFT, 'Over 1.5 Gols');
 

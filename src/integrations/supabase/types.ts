@@ -335,6 +335,45 @@ export type Database = {
         }
         Relationships: []
       }
+      signal_suggestions: {
+        Row: {
+          acknowledged_at: string | null
+          category: string
+          created_at: string
+          id: string
+          message: string
+          metric: string
+          payload: Json
+          severity: string
+          status: string
+          subject: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          category: string
+          created_at?: string
+          id?: string
+          message: string
+          metric: string
+          payload?: Json
+          severity?: string
+          status?: string
+          subject: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metric?: string
+          payload?: Json
+          severity?: string
+          status?: string
+          subject?: string
+        }
+        Relationships: []
+      }
       telegram_alert_state: {
         Row: {
           alert_key: string
@@ -448,6 +487,7 @@ export type Database = {
           id: string
           implied_probability: number | null
           janela: string | null
+          league: string | null
           market: string
           market_type: string | null
           match_id: string | null
@@ -458,6 +498,8 @@ export type Database = {
           odd_min: string | null
           poisson: string | null
           premium_score: number | null
+          quality_breakdown: Json | null
+          quality_score: number | null
           reason: string | null
           result: string | null
           rma_score: number | null
@@ -481,6 +523,7 @@ export type Database = {
           id?: string
           implied_probability?: number | null
           janela?: string | null
+          league?: string | null
           market: string
           market_type?: string | null
           match_id?: string | null
@@ -491,6 +534,8 @@ export type Database = {
           odd_min?: string | null
           poisson?: string | null
           premium_score?: number | null
+          quality_breakdown?: Json | null
+          quality_score?: number | null
           reason?: string | null
           result?: string | null
           rma_score?: number | null
@@ -514,6 +559,7 @@ export type Database = {
           id?: string
           implied_probability?: number | null
           janela?: string | null
+          league?: string | null
           market?: string
           market_type?: string | null
           match_id?: string | null
@@ -524,6 +570,8 @@ export type Database = {
           odd_min?: string | null
           poisson?: string | null
           premium_score?: number | null
+          quality_breakdown?: Json | null
+          quality_score?: number | null
           reason?: string | null
           result?: string | null
           rma_score?: number | null
@@ -573,6 +621,8 @@ export type Database = {
       cleanup_live_cache: { Args: never; Returns: undefined }
       cleanup_old_dead_outbox: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: undefined }
+      detect_signal_degradation: { Args: never; Returns: number }
+      get_signal_analytics: { Args: { p_days?: number }; Returns: Json }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       mark_telegram_signal_failed: {
         Args: { _error: string; _signal_id: string }

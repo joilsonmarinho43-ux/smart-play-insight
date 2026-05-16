@@ -37,3 +37,4 @@ Updated: now
 - [HT/FT Strategy](mem://logic/ht-ft-strategy) — Strategy based on score, AP5/AP10 pressure, possession
 - [Match Favorites](mem://features/match-favorites) — LocalStorage favorites for Live dashboard
 - [Layout Sidebar](mem://ui/layout-sidebar) — AppSidebar branding, gold/black gradient, 'Modelo Real Pro'
+- [Quality Lab](mem://features/quality-lab) — Painel admin /quality (analytics+sugestões), RPC get_signal_analytics, detect_signal_degradation diário, nunca altera thresholds

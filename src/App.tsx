@@ -11,6 +11,7 @@ import { ReactNode } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import Quality from "./pages/Quality";
 import Live from "./pages/Live";
 import MatchDetails from "./pages/MatchDetails";
 
@@ -92,6 +93,7 @@ const App = () => {
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
             <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />
+            <Route path="/quality" element={<AdminRoute><AppLayout><Quality /></AppLayout></AdminRoute>} />
             
             {/* Rotas de Fluxo de Usuário */}
             <Route path="/expired" element={<Paywall />} />

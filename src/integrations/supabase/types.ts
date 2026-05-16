@@ -571,6 +571,7 @@ export type Database = {
       }
       cleanup_cache_api: { Args: never; Returns: undefined }
       cleanup_live_cache: { Args: never; Returns: undefined }
+      cleanup_old_dead_outbox: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       mark_telegram_signal_failed: {
@@ -581,6 +582,7 @@ export type Database = {
         Args: { _message_id: number; _signal_id: string }
         Returns: undefined
       }
+      ops_health_monitor: { Args: never; Returns: Json }
       retry_telegram_outbox_message: { Args: { _id: string }; Returns: Json }
       try_claim_telegram_slot: {
         Args: {

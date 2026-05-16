@@ -11,6 +11,7 @@ import { ReactNode } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import Quality from "./pages/Quality";
 import Live from "./pages/Live";
 import MatchDetails from "./pages/MatchDetails";
 

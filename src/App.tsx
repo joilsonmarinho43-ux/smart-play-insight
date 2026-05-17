@@ -95,6 +95,7 @@ const App = () => {
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
             <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />
             <Route path="/quality" element={<AdminRoute><AppLayout><Quality /></AppLayout></AdminRoute>} />
+            <Route path="/context" element={<AdminRoute><AppLayout><Context /></AppLayout></AdminRoute>} />
             
             {/* Rotas de Fluxo de Usuário */}
             <Route path="/expired" element={<Paywall />} />

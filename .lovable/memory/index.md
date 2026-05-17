@@ -38,3 +38,4 @@ Updated: now
 - [Match Favorites](mem://features/match-favorites) — LocalStorage favorites for Live dashboard
 - [Layout Sidebar](mem://ui/layout-sidebar) — AppSidebar branding, gold/black gradient, 'Modelo Real Pro'
 - [Quality Lab](mem://features/quality-lab) — Painel admin /quality (analytics+sugestões), RPC get_signal_analytics, detect_signal_degradation diário, nunca altera thresholds
+- [Signal Context](mem://features/signal-context) — Tracker pós-sinal /context, cron 3min lê cache_api, classifica comportamento (explosivo/fake/dead/...), sugestões estratégicas, não altera engines

@@ -374,6 +374,93 @@ export type Database = {
         }
         Relationships: []
       }
+      signal_tracking: {
+        Row: {
+          avg_pressure: number | null
+          behavior_class: string | null
+          created_at: string
+          entry_at: string
+          entry_minute: number
+          entry_pressure: number | null
+          finalized: boolean
+          finalized_at: string | null
+          first_goal_minute: number | null
+          goals_after: number
+          last_pressure: number | null
+          last_seen_at: string
+          league: string | null
+          market: string | null
+          match_id: string
+          match_name: string | null
+          min_pressure: number | null
+          peak_pressure: number | null
+          pressure_drop_pct: number | null
+          pressure_std: number | null
+          result: string | null
+          signal_id: string
+          snapshot_count: number
+          snapshots: Json
+          time_to_goal_sec: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg_pressure?: number | null
+          behavior_class?: string | null
+          created_at?: string
+          entry_at?: string
+          entry_minute?: number
+          entry_pressure?: number | null
+          finalized?: boolean
+          finalized_at?: string | null
+          first_goal_minute?: number | null
+          goals_after?: number
+          last_pressure?: number | null
+          last_seen_at?: string
+          league?: string | null
+          market?: string | null
+          match_id: string
+          match_name?: string | null
+          min_pressure?: number | null
+          peak_pressure?: number | null
+          pressure_drop_pct?: number | null
+          pressure_std?: number | null
+          result?: string | null
+          signal_id: string
+          snapshot_count?: number
+          snapshots?: Json
+          time_to_goal_sec?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg_pressure?: number | null
+          behavior_class?: string | null
+          created_at?: string
+          entry_at?: string
+          entry_minute?: number
+          entry_pressure?: number | null
+          finalized?: boolean
+          finalized_at?: string | null
+          first_goal_minute?: number | null
+          goals_after?: number
+          last_pressure?: number | null
+          last_seen_at?: string
+          league?: string | null
+          market?: string | null
+          match_id?: string
+          match_name?: string | null
+          min_pressure?: number | null
+          peak_pressure?: number | null
+          pressure_drop_pct?: number | null
+          pressure_std?: number | null
+          result?: string | null
+          signal_id?: string
+          snapshot_count?: number
+          snapshots?: Json
+          time_to_goal_sec?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       telegram_alert_state: {
         Row: {
           alert_key: string
@@ -621,8 +708,10 @@ export type Database = {
       cleanup_live_cache: { Args: never; Returns: undefined }
       cleanup_old_dead_outbox: { Args: never; Returns: number }
       cleanup_rate_limits: { Args: never; Returns: undefined }
+      detect_context_patterns: { Args: never; Returns: number }
       detect_signal_degradation: { Args: never; Returns: number }
       get_signal_analytics: { Args: { p_days?: number }; Returns: Json }
+      get_signal_context_analytics: { Args: { p_days?: number }; Returns: Json }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       mark_telegram_signal_failed: {
         Args: { _error: string; _signal_id: string }

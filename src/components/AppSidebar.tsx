@@ -1,4 +1,4 @@
-import { Home, Zap, Star, Shield, LogOut, Crosshair, Trophy, Activity } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Crosshair, Trophy, Activity, Radar } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -149,6 +149,18 @@ export function AppSidebar() {
                       >
                         <Activity className="h-5 w-5 shrink-0 text-orange-500" />
                         {!collapsed && <span className="text-sm">Quality Lab</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to="/context"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                        activeClassName="bg-orange-500/10 text-orange-500 font-bold"
+                      >
+                        <Radar className="h-5 w-5 shrink-0 text-orange-500" />
+                        {!collapsed && <span className="text-sm">Contexto</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

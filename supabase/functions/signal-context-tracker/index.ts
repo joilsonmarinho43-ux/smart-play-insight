@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
         goals_after: goalsAfter,
         first_goal_minute: firstGoalMinute,
         time_to_goal_sec: timeToGoalSec,
-        result: sig.result ?? null,
+        result: verdict || null,
         finalized: willFinalize,
         finalized_at: willFinalize ? nowIso : null,
         ...agg,

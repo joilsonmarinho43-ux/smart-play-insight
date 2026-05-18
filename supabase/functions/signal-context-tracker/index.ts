@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     const sinceIso = new Date(Date.now() - 130 * 60 * 1000).toISOString();
     const { data: signals, error: sErr } = await sb
       .from('telegram_signals')
-      .select('id, match_id, match_name, league, market, minute, created_at, result, settled_at')
+      .select('id, match_id, match_name, league, market, minute, created_at, result, status, settled_at')
       .eq('success', true)
       .gte('created_at', sinceIso)
       .not('match_id', 'is', null);

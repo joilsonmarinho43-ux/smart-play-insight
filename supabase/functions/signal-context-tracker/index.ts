@@ -126,7 +126,8 @@ Deno.serve(async (req) => {
 
       const live = liveById.get(String(sig.match_id));
       const elapsedMin = (Date.now() - new Date(sig.created_at).getTime()) / 60000;
-      const isResolved = sig.result && ['WIN', 'LOSS', 'VOID', 'GREEN', 'RED'].includes(sig.result);
+      const verdict = String(sig.result ?? sig.status ?? '').toUpperCase();
+      const isResolved = ['WIN', 'LOSS', 'VOID', 'GREEN', 'RED'].includes(verdict);
       const tooOld = elapsedMin > 125;
 
       // === Snapshot do estado atual ===

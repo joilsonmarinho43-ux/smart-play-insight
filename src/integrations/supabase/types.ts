@@ -721,6 +721,7 @@ export type Database = {
         Args: { _message_id: number; _signal_id: string }
         Returns: undefined
       }
+      normalize_market: { Args: { _m: string }; Returns: string }
       ops_health_monitor: { Args: never; Returns: Json }
       retry_telegram_outbox_message: { Args: { _id: string }; Returns: Json }
       try_claim_telegram_slot: {

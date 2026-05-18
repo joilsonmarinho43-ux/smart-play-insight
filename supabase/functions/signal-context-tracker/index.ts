@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     const sinceIso = new Date(Date.now() - 130 * 60 * 1000).toISOString();
     const { data: signals, error: sErr } = await sb
       .from('telegram_signals')
-      .select('id, match_id, match_name, league, market, minute, created_at, result, settled_at')
+      .select('id, match_id, match_name, league, market, minute, created_at, result, status, settled_at')
       .eq('success', true)
       .gte('created_at', sinceIso)
       .not('match_id', 'is', null);
@@ -126,7 +126,8 @@ Deno.serve(async (req) => {
 
       const live = liveById.get(String(sig.match_id));
       const elapsedMin = (Date.now() - new Date(sig.created_at).getTime()) / 60000;
-      const isResolved = sig.result && ['WIN', 'LOSS', 'VOID', 'GREEN', 'RED'].includes(sig.result);
+      const verdict = String(sig.result ?? sig.status ?? '').toUpperCase();
+      const isResolved = ['WIN', 'LOSS', 'VOID', 'GREEN', 'RED'].includes(verdict);
       const tooOld = elapsedMin > 125;
 
       // === Snapshot do estado atual ===
@@ -206,7 +207,7 @@ Deno.serve(async (req) => {
         goals_after: goalsAfter,
         first_goal_minute: firstGoalMinute,
         time_to_goal_sec: timeToGoalSec,
-        result: sig.result ?? null,
+        result: verdict || null,
         finalized: willFinalize,
         finalized_at: willFinalize ? nowIso : null,
         ...agg,

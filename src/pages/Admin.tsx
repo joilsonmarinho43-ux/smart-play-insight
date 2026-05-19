@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power, Shield, ChevronDown } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power, Shield, ShieldOff, ShieldCheck, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 
@@ -203,6 +203,27 @@ const Admin = () => {
 
     if (!error) {
       toast.success('Acesso removido');
+      fetchUsers();
+    }
+  };
+
+  const toggleAdmin = async (userId: string, makeAdmin: boolean, email: string) => {
+    if (userId === profile?.id) {
+      toast.error('Você não pode alterar seu próprio status de admin');
+      return;
+    }
+    const action = makeAdmin ? 'PROMOVER a admin' : 'REMOVER admin de';
+    if (!confirm(`Tem certeza que deseja ${action} ${email}?`)) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_admin: makeAdmin })
+      .eq('id', userId);
+
+    if (error) {
+      toast.error('Erro: ' + error.message);
+    } else {
+      toast.success(makeAdmin ? `${email} agora é admin` : `Admin removido de ${email}`);
       fetchUsers();
     }
   };
@@ -890,7 +911,24 @@ const Admin = () => {
                       >
                         <XCircle className="w-5 h-5" />
                       </button>
+                      <button
+                        onClick={() => toggleAdmin(user.id, true, user.email)}
+                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-all border border-primary/20"
+                        title="Tornar Admin"
+                      >
+                        <ShieldCheck className="w-5 h-5" />
+                      </button>
                     </div>
+                  )}
+                  {user.is_admin && user.id !== profile?.id && (
+                    <button
+                      onClick={() => toggleAdmin(user.id, false, user.email)}
+                      className="flex items-center gap-2 text-[10px] font-bold text-red-400 border border-red-500/30 px-3 py-2 rounded-lg hover:bg-red-500/10 transition-all"
+                      title="Remover Admin"
+                    >
+                      <ShieldOff className="w-4 h-4" />
+                      REMOVER ADMIN
+                    </button>
                   )}
                 </div>
               </div>

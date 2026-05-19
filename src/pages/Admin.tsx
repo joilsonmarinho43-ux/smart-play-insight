@@ -207,6 +207,27 @@ const Admin = () => {
     }
   };
 
+  const toggleAdmin = async (userId: string, makeAdmin: boolean, email: string) => {
+    if (userId === profile?.id) {
+      toast.error('Você não pode alterar seu próprio status de admin');
+      return;
+    }
+    const action = makeAdmin ? 'PROMOVER a admin' : 'REMOVER admin de';
+    if (!confirm(`Tem certeza que deseja ${action} ${email}?`)) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_admin: makeAdmin })
+      .eq('id', userId);
+
+    if (error) {
+      toast.error('Erro: ' + error.message);
+    } else {
+      toast.success(makeAdmin ? `${email} agora é admin` : `Admin removido de ${email}`);
+      fetchUsers();
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );

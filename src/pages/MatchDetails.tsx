@@ -54,6 +54,22 @@ const MatchDetails = () => {
     return { homeTeam, awayTeam, league, isLive, kickoff };
   }, [match]);
 
+  const [readingOpen, setReadingOpen] = useState(false);
+  const reading = useMemo(() => {
+    if (!match || !view) return null;
+    try {
+      return buildMatchReading({
+        ...(match as any),
+        id: String((match as any).id ?? id ?? ''),
+        homeTeam: view.homeTeam,
+        awayTeam: view.awayTeam,
+        league: view.league,
+      } as any);
+    } catch {
+      return null;
+    }
+  }, [match, view, id]);
+
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
       <Link

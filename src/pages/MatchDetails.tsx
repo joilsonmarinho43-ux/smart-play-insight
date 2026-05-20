@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2 } from 'lucide-react';
 import { fetchLiveMatches, fetchMultiDayMatches } from '@/services/footballApi';
+import { buildMatchReading } from '@/lib/matchReading';
+import { MatchReadingModal } from '@/components/MatchReadingModal';
 
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +53,22 @@ const MatchDetails = () => {
       : null;
     return { homeTeam, awayTeam, league, isLive, kickoff };
   }, [match]);
+
+  const [readingOpen, setReadingOpen] = useState(false);
+  const reading = useMemo(() => {
+    if (!match || !view) return null;
+    try {
+      return buildMatchReading({
+        ...(match as any),
+        id: String((match as any).id ?? id ?? ''),
+        homeTeam: view.homeTeam,
+        awayTeam: view.awayTeam,
+        league: view.league,
+      } as any);
+    } catch {
+      return null;
+    }
+  }, [match, view, id]);
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
@@ -102,6 +120,16 @@ const MatchDetails = () => {
             </div>
           </div>
 
+          <button
+            onClick={() => setReadingOpen(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary to-primary/70 text-primary-foreground font-bold text-sm shadow-lg hover:opacity-95 transition-opacity"
+          >
+            <BookOpen className="w-4 h-4" />
+            📖 Leitura do Jogo
+          </button>
+
+
+
           {view.isLive && (
             <div className="grid grid-cols-2 gap-3">
               <StatBox
@@ -147,6 +175,14 @@ const MatchDetails = () => {
           </div>
         </div>
       )}
+
+      <MatchReadingModal
+        open={readingOpen}
+        onOpenChange={setReadingOpen}
+        reading={reading}
+        homeTeam={view?.homeTeam || ''}
+        awayTeam={view?.awayTeam || ''}
+      />
     </div>
   );
 };

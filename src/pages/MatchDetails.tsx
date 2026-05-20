@@ -120,6 +120,16 @@ const MatchDetails = () => {
             </div>
           </div>
 
+          <button
+            onClick={() => setReadingOpen(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary to-primary/70 text-primary-foreground font-bold text-sm shadow-lg hover:opacity-95 transition-opacity"
+          >
+            <BookOpen className="w-4 h-4" />
+            📖 Leitura do Jogo
+          </button>
+
+
+
           {view.isLive && (
             <div className="grid grid-cols-2 gap-3">
               <StatBox

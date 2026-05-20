@@ -175,6 +175,14 @@ const MatchDetails = () => {
           </div>
         </div>
       )}
+
+      <MatchReadingModal
+        open={readingOpen}
+        onOpenChange={setReadingOpen}
+        reading={reading}
+        homeTeam={view?.homeTeam || ''}
+        awayTeam={view?.awayTeam || ''}
+      />
     </div>
   );
 };

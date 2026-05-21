@@ -42,8 +42,12 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
         </DialogHeader>
 
         {!reading && (
-          <div className="text-center text-sm text-muted-foreground py-10">
-            Sem dados suficientes para gerar a leitura.
+          <div className="text-center text-sm text-foreground/80 py-10 px-4">
+            <div className="text-foreground font-bold mb-1">Dados insuficientes</div>
+            Esta partida ainda não possui histórico estatístico suficiente para gerar uma leitura real.
+            <div className="text-xs text-muted-foreground mt-2">
+              A análise só é exibida quando há médias confirmadas de gols, escanteios e amostra de jogos.
+            </div>
           </div>
         )}
 
@@ -51,6 +55,20 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
           <div className="space-y-3 mt-2">
             <Section icon={LineChart} title="Resumo da Partida">
               <p>{reading.summary}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] uppercase tracking-wider">
+                <span className={`px-2 py-0.5 rounded-md font-bold ${
+                  reading.dataQuality.label === 'completa'
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : reading.dataQuality.label === 'parcial'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'bg-red-500/20 text-red-300'
+                }`}>
+                  Amostra {reading.dataQuality.label}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-secondary text-foreground/80 font-bold">
+                  {reading.dataQuality.homeGames} vs {reading.dataQuality.awayGames} jogos
+                </span>
+              </div>
             </Section>
 
             <Section icon={TrendingUp} title="Indicadores Encontrados">

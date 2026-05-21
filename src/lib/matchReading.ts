@@ -104,135 +104,116 @@ export function buildMatchReading(match: MatchData): MatchReading | null {
   const dqLabel: 'completa' | 'parcial' | 'limitada' =
     minSample >= 5 ? 'completa' : minSample >= 3 ? 'parcial' : 'limitada';
 
-  // ─── Summary built from real numbers ──────────────────────────
+  // ─── Summary (linguagem natural, sem jargão) ──────────────────
   const diff = homeLambda - awayLambda;
   const stronger = diff > 0.25 ? home : diff < -0.25 ? away : null;
-  const paceLabel =
+  const weaker = stronger === home ? away : stronger === away ? home : null;
+  const pace =
     totalLambda >= 2.9
-      ? 'alta produção ofensiva esperada'
+      ? 'um jogo movimentado, com chances dos dois lados'
       : totalLambda >= 2.3
-      ? 'produção ofensiva moderada'
-      : 'ritmo controlado e poucos espaços';
-  const summary = stronger
-    ? `${stronger} aparece à frente nos números (λ ${fmt(
-        stronger === home ? homeLambda : awayLambda
-      )} vs ${fmt(stronger === home ? awayLambda : homeLambda)}). Cenário aponta para ${paceLabel} — projeção total de ${fmt(totalLambda)} gols.`
-    : `Confronto equilibrado nos modelos (λ ${fmt(homeLambda)} vs ${fmt(awayLambda)}). Cenário aponta para ${paceLabel} — projeção total de ${fmt(totalLambda)} gols.`;
+      ? 'um jogo equilibrado em ritmo, com chances pontuais'
+      : 'um jogo travado, com poucos espaços e bola disputada no meio';
 
-  // ─── Indicators (every line backed by a number) ───────────────
+  const summary = stronger
+    ? `Olhando friamente para os números, o ${stronger} chega em vantagem sobre o ${weaker}. ` +
+      `A expectativa é de ${pace}, com algo em torno de ${fmt(totalLambda, 1)} gols na soma final. ` +
+      `Nada que feche a partida, mas o favoritismo está claramente de um lado.`
+    : `É um confronto bem nivelado, sem favorito evidente entre ${home} e ${away}. ` +
+      `O cenário aponta para ${pace}, com cerca de ${fmt(totalLambda, 1)} gols esperados no total. ` +
+      `Tudo indica que pequenos detalhes vão decidir.`;
+
+  // ─── Indicadores em linguagem de torcedor/analista ────────────
   const indicators: string[] = [];
   indicators.push(
-    `${home} marca ${fmt(hGF)} e sofre ${fmt(hGA)} gols/jogo em ${homeN} partidas.`
+    `O ${home} vem marcando ${fmt(hGF, 1)} e sofrendo ${fmt(hGA, 1)} gols por jogo (últimas ${homeN} partidas).`
   );
   indicators.push(
-    `${away} marca ${fmt(aGF)} e sofre ${fmt(aGA)} gols/jogo em ${awayN} partidas.`
+    `O ${away} marca ${fmt(aGF, 1)} e leva ${fmt(aGA, 1)} por jogo (últimas ${awayN} partidas).`
   );
-  indicators.push(`Média da liga: ${fmt(leagueAvg)} gols por equipe.`);
   if (totalLambda >= 2.7)
-    indicators.push(`Projeção combinada elevada: ${fmt(totalLambda)} gols esperados.`);
+    indicators.push(`Quando juntamos os dois ataques, o jogo tende a ter bastante gol — esperado ${fmt(totalLambda, 1)} no total.`);
   if (totalLambda <= 2.0)
-    indicators.push(`Projeção combinada baixa: ${fmt(totalLambda)} gols esperados.`);
-  if (hGA >= 1.5 || aGA >= 1.5)
-    indicators.push(
-      `Defesa vulnerável detectada (${home}: ${fmt(hGA)} sofridos · ${away}: ${fmt(aGA)} sofridos).`
-    );
+    indicators.push(`A soma dos ataques sugere um jogo amarrado — projeção total de apenas ${fmt(totalLambda, 1)} gols.`);
+  if (hGA >= 1.5 && aGA >= 1.5)
+    indicators.push(`As duas defesas vêm vazando bastante — isso costuma abrir o jogo.`);
+  else if (hGA >= 1.5)
+    indicators.push(`A defesa do ${home} tem falhado em casa (${fmt(hGA, 1)} sofridos por jogo).`);
+  else if (aGA >= 1.5)
+    indicators.push(`A defesa do ${away} tem dado espaços fora (${fmt(aGA, 1)} sofridos por jogo).`);
   if (hCorners != null && aCorners != null && hCorners + aCorners > 0) {
-    indicators.push(
-      `Média de escanteios: ${fmt(hCorners, 1)} (casa) + ${fmt(aCorners, 1)} (fora) = ${fmt(
-        hCorners + aCorners,
-        1
-      )}/jogo.`
-    );
+    const tot = hCorners + aCorners;
+    const tag = tot >= 10 ? ' — jogo de muita pressão lateral' : tot <= 7 ? ' — jogo mais central' : '';
+    indicators.push(`A média de escanteios soma cerca de ${fmt(tot, 1)} por partida${tag}.`);
   }
   if (hCards != null && aCards != null && hCards + aCards > 0) {
-    indicators.push(
-      `Média de cartões: ${fmt(hCards + aCards, 1)} amarelos por jogo somados.`
-    );
+    const tot = hCards + aCards;
+    const tag = tot >= 5 ? ' — partida costuma esquentar' : tot <= 3 ? ' — jogo mais limpo' : '';
+    indicators.push(`Em cartões, a média gira em ${fmt(tot, 1)} amarelos por jogo${tag}.`);
   }
 
-  // ─── Market read (driven by real probabilities) ───────────────
+  // ─── Leitura de mercado em linguagem direta ───────────────────
   const o25 = markets.find((m) => m.market === 'Over 2.5 Gols')?.probability ?? 0;
   const btts = markets.find((m) => m.market === 'Ambas Marcam')?.probability ?? 0;
   const homeWin = markets.find((m) => m.market === 'Vitória Casa')?.probability ?? 0;
   const awayWin = markets.find((m) => m.market === 'Vitória Fora')?.probability ?? 0;
   const marketBits: string[] = [];
-  if (o25 >= 65)
-    marketBits.push(
-      `Over 2.5 com ${o25}% — projeção acima da média justifica valor na linha de gols.`
-    );
-  else if (o25 > 0 && o25 <= 40)
-    marketBits.push(`Over 2.5 com apenas ${o25}% — linha de gols sem valor claro.`);
-  else if (o25 > 0)
-    marketBits.push(`Over 2.5 com ${o25}% — zona neutra, exige seletividade.`);
-  if (btts >= 60) marketBits.push(`Ambas Marcam com ${btts}% reforça o cenário de jogo aberto.`);
-  if (homeWin >= 55) marketBits.push(`${home} com ${homeWin}% de probabilidade na vitória direta.`);
-  if (awayWin >= 55) marketBits.push(`${away} com ${awayWin}% de probabilidade fora de casa.`);
-  if (marketBits.length === 0)
-    marketBits.push('Mercados sem entrada de alto valor — melhor evitar exposição direta.');
+  if (o25 >= 65) marketBits.push(`A linha de gols tem valor real — o Over 2.5 sai em ${o25}% e está acima do que o mercado costuma pagar.`);
+  else if (o25 > 0 && o25 <= 40) marketBits.push(`A linha de gols não convence (${o25}% no Over 2.5) — mais sentido pensar em Under.`);
+  else if (o25 > 0) marketBits.push(`A linha de gols está em zona neutra (${o25}% no Over 2.5) — entrar só com convicção.`);
+  if (btts >= 60) marketBits.push(`Ambas Marcam aparece forte (${btts}%) e reforça a leitura de jogo aberto.`);
+  if (homeWin >= 55) marketBits.push(`O ${home} é favorito real para vencer (${homeWin}%).`);
+  if (awayWin >= 55) marketBits.push(`O ${away} entra como favorito fora de casa (${awayWin}%).`);
+  if (marketBits.length === 0) marketBits.push('Não há um mercado óbvio com valor — em jogos assim, melhor ficar de fora ou esperar a partida começar.');
   const marketRead = marketBits.join(' ');
 
-  // ─── Top opportunities (real probabilities + real reasons) ────
+  // ─── Oportunidades com razões humanas ─────────────────────────
   const sorted = [...markets].sort((a, b) => b.probability - a.probability).slice(0, 3);
   const opportunities: ReadingOpportunity[] = sorted.map((m) => {
     const reasons: string[] = [];
     if (m.market.includes('Over') && m.market.includes('Gols')) {
-      reasons.push(`projeção total de ${fmt(totalLambda)} gols`);
-      if (hGA >= 1.3 || aGA >= 1.3)
-        reasons.push(`defesas sofrem em média ${fmt((hGA + aGA) / 2)} gols/jogo`);
+      reasons.push(`projeção combinada de ${fmt(totalLambda, 1)} gols na partida`);
+      if (hGA >= 1.3 || aGA >= 1.3) reasons.push(`as duas defesas vêm sofrendo em média ${fmt((hGA + aGA) / 2, 1)} por jogo`);
     }
     if (m.market.includes('Cantos') && hCorners != null && aCorners != null) {
-      reasons.push(`média de ${fmt(hCorners + aCorners, 1)} escanteios/jogo`);
+      reasons.push(`média de ${fmt(hCorners + aCorners, 1)} escanteios por jogo somando os dois`);
     }
     if (m.market.includes('Cartões') && hCards != null && aCards != null) {
-      reasons.push(`média de ${fmt(hCards + aCards, 1)} amarelos/jogo`);
+      reasons.push(`em média ${fmt(hCards + aCards, 1)} amarelos por jogo nas duas equipes`);
     }
     if (m.market === 'Ambas Marcam') {
-      reasons.push(`ataques somam ${fmt(hGF + aGF)} gols/jogo`);
-      if (hGA >= 1.2 && aGA >= 1.2) reasons.push('vulnerabilidade defensiva mútua');
+      reasons.push(`os ataques somados marcam ${fmt(hGF + aGF, 1)} gols por jogo`);
+      if (hGA >= 1.2 && aGA >= 1.2) reasons.push('os dois sistemas defensivos têm dado brechas');
     }
-    if (m.market === 'Vitória Casa')
-      reasons.push(`λ ${fmt(homeLambda)} vs ${fmt(awayLambda)} a favor da casa`);
-    if (m.market === 'Vitória Fora')
-      reasons.push(`λ ${fmt(awayLambda)} vs ${fmt(homeLambda)} a favor do visitante`);
-    if (m.market.startsWith('Handicap'))
-      reasons.push(`diferença de ${fmt(Math.abs(diff))} no λ esperado`);
-    if (m.market.startsWith('1X'))
-      reasons.push(`casa+empate concentra a maior fatia da probabilidade`);
-    if (m.market.startsWith('X2'))
-      reasons.push(`visitante+empate concentra a maior fatia da probabilidade`);
-    if (m.market.startsWith('Gol no 1° Tempo'))
-      reasons.push(`λ HT estimado em ${fmt(totalLambda * 0.45)}`);
-    if (m.market.startsWith('Gol no 2° Tempo'))
-      reasons.push(`λ FT estimado em ${fmt(totalLambda * 0.55)}`);
-    if (reasons.length === 0)
-      reasons.push(`probabilidade de ${m.probability}% pelo modelo Poisson+xG`);
+    if (m.market === 'Vitória Casa') reasons.push(`${home} chega em melhor fase ofensiva no confronto direto`);
+    if (m.market === 'Vitória Fora') reasons.push(`${away} chega em melhor fase ofensiva no confronto direto`);
+    if (m.market.startsWith('Handicap')) reasons.push(`favoritismo claro de um lado nos números recentes`);
+    if (m.market.startsWith('1X')) reasons.push(`casa+empate cobre o cenário mais provável`);
+    if (m.market.startsWith('X2')) reasons.push(`visitante+empate cobre o cenário mais provável`);
+    if (m.market.startsWith('Gol no 1° Tempo')) reasons.push(`primeiro tempo costuma sair com bola na rede no perfil das equipes`);
+    if (m.market.startsWith('Gol no 2° Tempo')) reasons.push(`segundo tempo concentra a maior parte dos gols nessas equipes`);
+    if (reasons.length === 0) reasons.push(`leitura combinada dos números aponta para ${m.probability}% de chance`);
     return { market: m.market, confidence: m.probability, reasons: reasons.slice(0, 3) };
   });
 
-  // ─── Alerts (only fire when a real signal triggers) ───────────
+  // ─── Alertas em linguagem natural ─────────────────────────────
   const alerts: string[] = [];
   if (dqLabel !== 'completa')
-    alerts.push(
-      `Amostra ${dqLabel} (${homeN}/${awayN} jogos) — regressão bayesiana aplicada para suavizar incerteza.`
-    );
+    alerts.push(`Atenção: a amostra ainda é ${dqLabel} (${homeN} e ${awayN} jogos). Os números servem de guia, mas pedem cautela.`);
   if (stronger && diff > 0.7)
-    alerts.push(
-      `${stronger} muito favorito (Δλ ${fmt(diff)}) — risco de controle de jogo após abrir vantagem.`
-    );
+    alerts.push(`${stronger} entra como favoritão. Se abrir o placar cedo, costuma administrar — cuidado com Over no segundo tempo.`);
   if (totalLambda < 2.0)
-    alerts.push(`Projeção baixa (${fmt(totalLambda)}) — partida pode demorar a se abrir.`);
+    alerts.push(`Projeção baixa de gols (${fmt(totalLambda, 1)}). É o tipo de jogo que demora a se abrir.`);
   if (totalLambda > 3.3)
-    alerts.push(`Projeção muito alta (${fmt(totalLambda)}) — jogos abertos viram imprevisíveis.`);
+    alerts.push(`Projeção muito alta (${fmt(totalLambda, 1)} gols). Jogos abertos viram imprevisíveis — entradas curtas e seletivas.`);
   if (hGA <= 0.9 && aGA <= 0.9)
-    alerts.push(
-      `Duas defesas sólidas (${fmt(hGA)} e ${fmt(aGA)} sofridos) — cautela em Over.`
-    );
-  if (alerts.length === 0) alerts.push('Sem alertas relevantes — leitura limpa pelos números.');
+    alerts.push(`As duas defesas estão muito sólidas. Forçar Over aqui é risco grande.`);
+  if (alerts.length === 0) alerts.push('Nenhum sinal de alerta — leitura limpa, dá para confiar no que os números mostram.');
 
-  // ─── Likely scores from real Poisson distribution ─────────────
+  // ─── Placares prováveis ───────────────────────────────────────
   const likelyScores = topScores(homeLambda, awayLambda, 3);
 
-  // ─── Timing — derived from λ split ────────────────────────────
+  // ─── Timing ───────────────────────────────────────────────────
   const timing = {
     pressure: totalLambda >= 2.6 ? "20'–40'" : "25'–45'",
     acceleration: stronger === away ? "55'–70'" : "60'–80'",

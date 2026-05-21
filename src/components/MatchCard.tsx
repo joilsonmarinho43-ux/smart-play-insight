@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MatchData } from '@/types/match';
 import TicketSuggestionCard from './TicketSuggestion';
 import GoalSparkline from './GoalSparkline';
-import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, Flame, Crosshair } from 'lucide-react';
+import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, Flame, Crosshair, BookOpen } from 'lucide-react';
+import { buildMatchReading } from '@/lib/matchReading';
+import { MatchReadingModal } from './MatchReadingModal';
+
 
 interface Props {
   match: MatchData;

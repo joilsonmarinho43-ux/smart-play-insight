@@ -374,12 +374,17 @@ function PoissonTab({ match }: { match: MatchData }) {
 // ─── MAIN COMPONENT ───
 const MatchCard = ({ match }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
+  const [readingOpen, setReadingOpen] = useState(false);
+  const reading = useMemo(() => {
+    try { return buildMatchReading(match); } catch { return null; }
+  }, [match]);
 
   const tabs: { key: TabKey; label: string; icon: typeof BarChart3 }[] = [
     { key: 'stats', label: 'Estatísticas', icon: BarChart3 },
     { key: 'poisson', label: 'Poisson', icon: TrendingUp },
     { key: 'ticket', label: 'Bilhete', icon: Target },
   ];
+
 
   return (
     <div className="bg-card rounded-2xl sm:rounded-3xl border border-border overflow-hidden animate-slide-in shadow-2xl shadow-black/20 flex flex-col h-full">

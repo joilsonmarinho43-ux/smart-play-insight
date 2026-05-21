@@ -178,15 +178,16 @@ const Index = () => {
       <main className="container max-w-3xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Controls Bar */}
         <div className="flex items-center justify-between pt-4 pb-2">
-          <h1 className="text-lg font-bold">PRÉ-JOGO</h1>
+          <h1 className="text-2xl font-bold">PRÉ-JOGO</h1>
           <div className="flex items-center gap-2">
-            <button onClick={() => refetch()} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
-              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
+            <button onClick={() => refetch()} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
+              <RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
             </button>
-            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
-              <Trash2 className="w-4 h-4 text-muted-foreground" />
+            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
+              <Trash2 className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
+
         </div>
 
         {/* Banner Modo Offline */}

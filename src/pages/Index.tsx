@@ -211,7 +211,7 @@ const Index = () => {
               <button
                 key={day.index}
                 onClick={() => { setSelectedDay(day.index); setSelectedLeague('all'); }}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
                   selectedDay === day.index
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-white/5 text-muted-foreground hover:bg-white/10'
@@ -221,6 +221,7 @@ const Index = () => {
               </button>
             );
           })}
+
         </div>
 
         {/* Identity Banner */}

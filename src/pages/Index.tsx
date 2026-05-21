@@ -231,9 +231,9 @@ const Index = () => {
             alt="Analista Joilson"
             className="w-full h-auto block rounded-2xl"
           />
-          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-primary/30">
-            <span className="text-2xl font-black text-primary tabular-nums leading-none">{dayMatches.length}</span>
-            <span className="text-[10px] text-muted-foreground ml-1.5">jogos</span>
+          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-primary/30">
+            <span className="text-3xl font-black text-primary tabular-nums leading-none">{dayMatches.length}</span>
+            <span className="text-sm text-muted-foreground ml-2">jogos</span>
           </div>
         </div>
 
@@ -242,11 +242,12 @@ const Index = () => {
           href="https://t.me/sinais_joilson"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-center gap-2 w-full max-w-3xl mx-auto bg-gradient-to-r from-[#229ED9] to-[#1d8bbf] hover:from-[#1d8bbf] hover:to-[#1879a8] text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-[#229ED9]/30 transition-all"
+          className="mt-4 flex items-center justify-center gap-2 w-full max-w-3xl mx-auto bg-gradient-to-r from-[#229ED9] to-[#1d8bbf] hover:from-[#1d8bbf] hover:to-[#1879a8] text-white font-bold py-4 px-4 rounded-xl shadow-lg shadow-[#229ED9]/30 transition-all"
         >
           <Send className="w-5 h-5" fill="currentColor" />
-          <span className="text-sm tracking-wide">ENTRAR NO GRUPO DE SINAIS NO TELEGRAM</span>
+          <span className="text-base tracking-wide">ENTRAR NO GRUPO DE SINAIS NO TELEGRAM</span>
         </a>
+
 
         {/* League Filter */}
         {availableLeagues.length > 1 && (

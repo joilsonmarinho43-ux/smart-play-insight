@@ -451,14 +451,34 @@ const MatchCard = ({ match }: Props) => {
         {activeTab === 'ticket' && <TicketSuggestionCard match={match} />}
       </div>
 
+      {/* LEITURA DO JOGO */}
+      <div className="px-4 sm:px-5 pb-3">
+        <button
+          onClick={() => setReadingOpen(true)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/70 text-primary-foreground font-bold text-xs sm:text-sm shadow-lg hover:opacity-95 transition-opacity"
+        >
+          <BookOpen className="w-4 h-4" />
+          📖 Leitura do Jogo
+        </button>
+      </div>
+
       {/* RODAPÉ */}
       <div className="text-center py-2 border-t border-border/30 mt-auto">
         <span className="text-[8px] text-muted-foreground/50 uppercase tracking-widest">
           Dados reais · API-Sports · Últimos 5 jogos
         </span>
       </div>
+
+      <MatchReadingModal
+        open={readingOpen}
+        onOpenChange={setReadingOpen}
+        reading={reading}
+        homeTeam={match.homeTeam}
+        awayTeam={match.awayTeam}
+      />
     </div>
   );
 };
+
 
 export default MatchCard;

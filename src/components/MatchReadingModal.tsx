@@ -22,9 +22,9 @@ const Section = ({
   <div className="bg-secondary/40 border border-border rounded-xl p-3.5">
     <div className="flex items-center gap-2 mb-2">
       <Icon className="w-4 h-4 text-primary" />
-      <h3 className="text-[11px] uppercase tracking-wider font-bold text-primary">{title}</h3>
+      <h3 className="text-xs uppercase tracking-wider font-bold text-foreground">{title}</h3>
     </div>
-    <div className="text-sm text-foreground/90 leading-relaxed">{children}</div>
+    <div className="text-[15px] text-foreground leading-relaxed">{children}</div>
   </div>
 );
 
@@ -71,17 +71,17 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
             <Section icon={Flame} title="Melhores Oportunidades">
               <div className="space-y-2.5">
                 {reading.opportunities.map((op, k) => (
-                  <div key={k} className="rounded-lg bg-primary/10 border border-primary/20 p-2.5">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-primary text-sm">
+                  <div key={k} className="rounded-lg bg-secondary border border-primary/40 p-3">
+                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                      <span className="font-bold text-foreground text-base">
                         {k === 0 ? '🔥 ' : ''}
                         {op.market}
                       </span>
-                      <span className="text-xs font-display text-primary">
+                      <span className="text-sm font-display font-bold px-2 py-0.5 rounded-md bg-primary text-primary-foreground">
                         {op.confidence}%
                       </span>
                     </div>
-                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                    <ul className="text-sm text-foreground/80 space-y-0.5">
                       {op.reasons.map((r, i) => (
                         <li key={i}>• {r}</li>
                       ))}
@@ -107,7 +107,7 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
                 {reading.likelyScores.map((s, k) => (
                   <span
                     key={k}
-                    className="px-3 py-1.5 rounded-lg bg-primary/15 text-primary font-display text-base"
+                    className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-display font-bold text-base"
                   >
                     {s}
                   </span>
@@ -118,16 +118,16 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
             <Section icon={Clock} title="Timing da Partida">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">
+                  <div className="text-xs uppercase text-foreground/70 tracking-wider mb-1">
                     Maior pressão
                   </div>
-                  <div className="font-display text-primary">{reading.timing.pressure}</div>
+                  <div className="font-display text-foreground text-lg">{reading.timing.pressure}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-muted-foreground tracking-wider">
+                  <div className="text-xs uppercase text-foreground/70 tracking-wider mb-1">
                     Aceleração ofensiva
                   </div>
-                  <div className="font-display text-primary">{reading.timing.acceleration}</div>
+                  <div className="font-display text-foreground text-lg">{reading.timing.acceleration}</div>
                 </div>
               </div>
             </Section>

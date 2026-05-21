@@ -178,15 +178,16 @@ const Index = () => {
       <main className="container max-w-3xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Controls Bar */}
         <div className="flex items-center justify-between pt-4 pb-2">
-          <h1 className="text-lg font-bold">PRÉ-JOGO</h1>
+          <h1 className="text-2xl font-bold">PRÉ-JOGO</h1>
           <div className="flex items-center gap-2">
-            <button onClick={() => refetch()} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
-              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
+            <button onClick={() => refetch()} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
+              <RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
             </button>
-            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
-              <Trash2 className="w-4 h-4 text-muted-foreground" />
+            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
+              <Trash2 className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
+
         </div>
 
         {/* Banner Modo Offline */}
@@ -210,7 +211,7 @@ const Index = () => {
               <button
                 key={day.index}
                 onClick={() => { setSelectedDay(day.index); setSelectedLeague('all'); }}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
                   selectedDay === day.index
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-white/5 text-muted-foreground hover:bg-white/10'
@@ -220,6 +221,7 @@ const Index = () => {
               </button>
             );
           })}
+
         </div>
 
         {/* Identity Banner */}
@@ -229,9 +231,9 @@ const Index = () => {
             alt="Analista Joilson"
             className="w-full h-auto block rounded-2xl"
           />
-          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-primary/30">
-            <span className="text-2xl font-black text-primary tabular-nums leading-none">{dayMatches.length}</span>
-            <span className="text-[10px] text-muted-foreground ml-1.5">jogos</span>
+          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-primary/30">
+            <span className="text-3xl font-black text-primary tabular-nums leading-none">{dayMatches.length}</span>
+            <span className="text-sm text-muted-foreground ml-2">jogos</span>
           </div>
         </div>
 
@@ -240,18 +242,19 @@ const Index = () => {
           href="https://t.me/sinais_joilson"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-center gap-2 w-full max-w-3xl mx-auto bg-gradient-to-r from-[#229ED9] to-[#1d8bbf] hover:from-[#1d8bbf] hover:to-[#1879a8] text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-[#229ED9]/30 transition-all"
+          className="mt-4 flex items-center justify-center gap-2 w-full max-w-3xl mx-auto bg-gradient-to-r from-[#229ED9] to-[#1d8bbf] hover:from-[#1d8bbf] hover:to-[#1879a8] text-white font-bold py-4 px-4 rounded-xl shadow-lg shadow-[#229ED9]/30 transition-all"
         >
           <Send className="w-5 h-5" fill="currentColor" />
-          <span className="text-sm tracking-wide">ENTRAR NO GRUPO DE SINAIS NO TELEGRAM</span>
+          <span className="text-base tracking-wide">ENTRAR NO GRUPO DE SINAIS NO TELEGRAM</span>
         </a>
+
 
         {/* League Filter */}
         {availableLeagues.length > 1 && (
           <div className="mt-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             <button
               onClick={() => setSelectedLeague('all')}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
                 selectedLeague === 'all'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-white/5 text-muted-foreground hover:bg-white/10'
@@ -266,7 +269,7 @@ const Index = () => {
                 <button
                   key={league}
                   onClick={() => setSelectedLeague(league)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
                     selectedLeague === league
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-white/5 text-muted-foreground hover:bg-white/10'
@@ -276,6 +279,7 @@ const Index = () => {
                 </button>
               );
             })}
+
           </div>
         )}
 

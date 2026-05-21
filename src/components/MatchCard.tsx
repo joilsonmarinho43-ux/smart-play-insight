@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MatchData } from '@/types/match';
 import TicketSuggestionCard from './TicketSuggestion';
 import GoalSparkline from './GoalSparkline';
-import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, Flame, Crosshair } from 'lucide-react';
+import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, Flame, Crosshair, BookOpen } from 'lucide-react';
+import { buildMatchReading } from '@/lib/matchReading';
+import { MatchReadingModal } from './MatchReadingModal';
+
 
 interface Props {
   match: MatchData;
@@ -371,12 +374,17 @@ function PoissonTab({ match }: { match: MatchData }) {
 // ─── MAIN COMPONENT ───
 const MatchCard = ({ match }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
+  const [readingOpen, setReadingOpen] = useState(false);
+  const reading = useMemo(() => {
+    try { return buildMatchReading(match); } catch { return null; }
+  }, [match]);
 
   const tabs: { key: TabKey; label: string; icon: typeof BarChart3 }[] = [
     { key: 'stats', label: 'Estatísticas', icon: BarChart3 },
     { key: 'poisson', label: 'Poisson', icon: TrendingUp },
     { key: 'ticket', label: 'Bilhete', icon: Target },
   ];
+
 
   return (
     <div className="bg-card rounded-2xl sm:rounded-3xl border border-border overflow-hidden animate-slide-in shadow-2xl shadow-black/20 flex flex-col h-full">
@@ -443,14 +451,34 @@ const MatchCard = ({ match }: Props) => {
         {activeTab === 'ticket' && <TicketSuggestionCard match={match} />}
       </div>
 
+      {/* LEITURA DO JOGO */}
+      <div className="px-4 sm:px-5 pb-3">
+        <button
+          onClick={() => setReadingOpen(true)}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary/70 text-primary-foreground font-bold text-xs sm:text-sm shadow-lg hover:opacity-95 transition-opacity"
+        >
+          <BookOpen className="w-4 h-4" />
+          📖 Leitura do Jogo
+        </button>
+      </div>
+
       {/* RODAPÉ */}
       <div className="text-center py-2 border-t border-border/30 mt-auto">
         <span className="text-[8px] text-muted-foreground/50 uppercase tracking-widest">
           Dados reais · API-Sports · Últimos 5 jogos
         </span>
       </div>
+
+      <MatchReadingModal
+        open={readingOpen}
+        onOpenChange={setReadingOpen}
+        reading={reading}
+        homeTeam={match.homeTeam}
+        awayTeam={match.awayTeam}
+      />
     </div>
   );
 };
+
 
 export default MatchCard;

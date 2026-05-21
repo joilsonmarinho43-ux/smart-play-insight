@@ -640,15 +640,6 @@ const Live = () => {
                 </div>
               </div>
 
-              {/* Leitura do Jogo CTA */}
-              <div className="px-4 pb-2 pt-1">
-                <Link
-                  to={`/match/${id}`}
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-primary to-primary/70 text-primary-foreground font-bold text-xs shadow hover:opacity-95 transition-opacity"
-                >
-                  📖 Leitura do Jogo
-                </Link>
-              </div>
 
 
               {/* ═══ ALERTA MÁXIMO CARD ═══ */}

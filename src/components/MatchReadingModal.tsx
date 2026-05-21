@@ -55,6 +55,20 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
           <div className="space-y-3 mt-2">
             <Section icon={LineChart} title="Resumo da Partida">
               <p>{reading.summary}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] uppercase tracking-wider">
+                <span className={`px-2 py-0.5 rounded-md font-bold ${
+                  reading.dataQuality.label === 'completa'
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : reading.dataQuality.label === 'parcial'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'bg-red-500/20 text-red-300'
+                }`}>
+                  Amostra {reading.dataQuality.label}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-secondary text-foreground/80 font-bold">
+                  {reading.dataQuality.homeGames} vs {reading.dataQuality.awayGames} jogos
+                </span>
+              </div>
             </Section>
 
             <Section icon={TrendingUp} title="Indicadores Encontrados">

@@ -254,7 +254,7 @@ const Index = () => {
           <div className="mt-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             <button
               onClick={() => setSelectedLeague('all')}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
                 selectedLeague === 'all'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-white/5 text-muted-foreground hover:bg-white/10'
@@ -269,7 +269,7 @@ const Index = () => {
                 <button
                   key={league}
                   onClick={() => setSelectedLeague(league)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
                     selectedLeague === league
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-white/5 text-muted-foreground hover:bg-white/10'
@@ -279,6 +279,7 @@ const Index = () => {
                 </button>
               );
             })}
+
           </div>
         )}
 

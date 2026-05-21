@@ -42,8 +42,12 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
         </DialogHeader>
 
         {!reading && (
-          <div className="text-center text-sm text-muted-foreground py-10">
-            Sem dados suficientes para gerar a leitura.
+          <div className="text-center text-sm text-foreground/80 py-10 px-4">
+            <div className="text-foreground font-bold mb-1">Dados insuficientes</div>
+            Esta partida ainda não possui histórico estatístico suficiente para gerar uma leitura real.
+            <div className="text-xs text-muted-foreground mt-2">
+              A análise só é exibida quando há médias confirmadas de gols, escanteios e amostra de jogos.
+            </div>
           </div>
         )}
 

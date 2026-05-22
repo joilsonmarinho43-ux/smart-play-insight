@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, Loader2 } from 'lucide-react';
 import { fetchLiveMatches, fetchMultiDayMatches } from '@/services/footballApi';
-import { buildMatchReading } from '@/lib/matchReading';
+import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from '@/components/MatchReadingModal';
+
 
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,20 +56,21 @@ const MatchDetails = () => {
   }, [match]);
 
   const [readingOpen, setReadingOpen] = useState(false);
-  const reading = useMemo(() => {
+  const normalizedMatch = useMemo(() => {
     if (!match || !view) return null;
-    try {
-      return buildMatchReading({
-        ...(match as any),
-        id: String((match as any).id ?? id ?? ''),
-        homeTeam: view.homeTeam,
-        awayTeam: view.awayTeam,
-        league: view.league,
-      } as any);
-    } catch {
-      return null;
-    }
+    return {
+      ...(match as any),
+      id: String((match as any).id ?? id ?? ''),
+      homeTeam: view.homeTeam,
+      awayTeam: view.awayTeam,
+      league: view.league,
+    } as any;
   }, [match, view, id]);
+  const { reading, loading: readingLoading } = useMatchReading(
+    (normalizedMatch || (match as any)) ?? ({ homeTeam: '', awayTeam: '', id: '' } as any),
+    readingOpen && !!normalizedMatch,
+  );
+
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
@@ -180,9 +182,11 @@ const MatchDetails = () => {
         open={readingOpen}
         onOpenChange={setReadingOpen}
         reading={reading}
+        loading={readingLoading}
         homeTeam={view?.homeTeam || ''}
         awayTeam={view?.awayTeam || ''}
       />
+
     </div>
   );
 };

@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { MatchData } from '@/types/match';
 import TicketSuggestionCard from './TicketSuggestion';
 import GoalSparkline from './GoalSparkline';
 import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, Flame, Crosshair, BookOpen } from 'lucide-react';
-import { buildMatchReading } from '@/lib/matchReading';
+import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from './MatchReadingModal';
+
 
 
 interface Props {
@@ -375,9 +376,8 @@ function PoissonTab({ match }: { match: MatchData }) {
 const MatchCard = ({ match }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
   const [readingOpen, setReadingOpen] = useState(false);
-  const reading = useMemo(() => {
-    try { return buildMatchReading(match); } catch { return null; }
-  }, [match]);
+  const { reading, loading } = useMatchReading(match, readingOpen);
+
 
   const tabs: { key: TabKey; label: string; icon: typeof BarChart3 }[] = [
     { key: 'stats', label: 'Estatísticas', icon: BarChart3 },
@@ -473,9 +473,11 @@ const MatchCard = ({ match }: Props) => {
         open={readingOpen}
         onOpenChange={setReadingOpen}
         reading={reading}
+        loading={loading}
         homeTeam={match.homeTeam}
         awayTeam={match.awayTeam}
       />
+
     </div>
   );
 };

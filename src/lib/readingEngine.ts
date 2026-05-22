@@ -388,6 +388,19 @@ export function buildMatchReadingV2(
     if (finalMarkets.length >= 3) break;
   }
 
+  // Amortecedor de confiança — evita percentuais exagerados em jogos sensíveis
+  const dampen = (prob: number, marketName: string): number => {
+    let cap = 85; // teto absoluto: nunca soar como certeza
+    if (balanced) cap = Math.min(cap, 74);
+    if (ctxReliab === "limitado") cap = Math.min(cap, 72);
+    if (homeN < 5 || awayN < 5) cap = Math.min(cap, 72);
+    if (marketDisagrees || injuriesOnFav) cap = Math.min(cap, 70);
+    if (fatigueOnFav) cap = Math.min(cap, 75);
+    if (goalsVsTacticConflict && /Gols|Ambas/i.test(marketName)) cap = Math.min(cap, 68);
+    if (/Handicap/i.test(marketName) && balanced) cap = Math.min(cap, 66);
+    return Math.min(prob, cap);
+  };
+
   const opportunities: ReadingOpportunity[] = finalMarkets.map((m) => {
     const reasons: string[] = [];
     if (m.market.includes("Over") && m.market.includes("Gols")) {
@@ -418,7 +431,7 @@ export function buildMatchReadingV2(
     } else {
       reasons.push(`leitura combinada aponta ${m.probability}% de chance`);
     }
-    return { market: m.market, confidence: m.probability, reasons: reasons.slice(0, 3) };
+    return { market: m.market, confidence: dampen(m.probability, m.market), reasons: reasons.slice(0, 3) };
   });
 
   // ─── 6. ALERTAS (inteligentes, não genéricos) ───────────────

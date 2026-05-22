@@ -182,9 +182,11 @@ const MatchDetails = () => {
         open={readingOpen}
         onOpenChange={setReadingOpen}
         reading={reading}
+        loading={readingLoading}
         homeTeam={view?.homeTeam || ''}
         awayTeam={view?.awayTeam || ''}
       />
+
     </div>
   );
 };

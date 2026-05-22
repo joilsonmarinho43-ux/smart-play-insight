@@ -217,28 +217,59 @@ export function buildMatchReadingV2(
     : `Ritmo equilibrado esperado, com projeção de ${fmt(total)} gols na conta final.`;
   summary += " " + rhythm;
 
-  // ─── 2. TÁTICA (interpretação real) ─────────────────────────
-  let tactical = "";
+  // ─── 2. TÁTICA (multi-frase: posse + transição + comportamento + ritmo) ──
+  const tacticalParts: string[] = [];
+
+  // 2a. Quem controla / quem reage
   if (homeAttacks && awayLeaks && !awayAttacks) {
-    tactical = `${home} tende a impor o ritmo desde o início, explorando a defesa frágil de ${away}. A tendência é de pressão em casa e ${away} baixando linhas para tentar contra-atacar pontualmente.`;
+    tacticalParts.push(
+      pick([
+        `${home} tende a controlar mais a posse em casa e empurrar ${away} para trás cedo.`,
+        `Em casa, ${home} costuma puxar o jogo para o campo adversário e impor pressão posicional sobre ${away}.`,
+      ], seed),
+    );
+    tacticalParts.push(`${away} deve responder com bloco médio-baixo, tentando sair em transição rápida quando recuperar a bola.`);
   } else if (awayAttacks && homeLeaks && !homeSolid) {
-    tactical = `${away} costuma jogar bem em transições e tem espaço para incomodar — ${home} dá brechas que podem ser exploradas em jogadas verticais.`;
+    tacticalParts.push(`${away} chega ofensivamente mais afiado e tem condições reais de tomar a iniciativa, mesmo fora.`);
+    tacticalParts.push(`${home} dá espaços entre linhas — é justamente onde ${away} costuma machucar, em jogadas verticais.`);
   } else if (homeSolid && awaySolid) {
-    tactical = `Duas equipes defensivamente organizadas. Espera-se um jogo posicional, com poucos espaços, bola disputada no meio e gols saindo mais de bola parada ou erro individual.`;
+    tacticalParts.push(`Dois blocos defensivos bem organizados. A leitura é de jogo posicional, disputado no meio-campo, com poucos espaços naturais.`);
+    tacticalParts.push(pick([
+      `Gols, se vierem, devem nascer de bola parada ou erro individual.`,
+      `O placar deve ser decidido em detalhe — uma jogada ensaiada, um lance isolado.`,
+    ], seed));
   } else if (homeAttacks && awayAttacks) {
-    tactical = `Os dois lados gostam de atacar. A leitura aponta para um jogo de ida e volta, com linhas adiantadas e oportunidades nas duas metades de campo.`;
+    tacticalParts.push(`Os dois gostam de jogar para frente. A tendência é de linhas adiantadas e troca constante de iniciativa.`);
+    tacticalParts.push(`Espaços nas costas das laterais devem aparecer dos dois lados — jogo de ida e volta é o cenário mais provável.`);
   } else if (balanced && physicalProfile) {
-    tactical = `Espera-se um jogo físico e truncado, com muita disputa no meio-campo. Os espaços devem aparecer apenas após os 30 minutos, quando a intensidade cair.`;
+    tacticalParts.push(`Início estudado, físico, com muita disputa no meio. Os times não devem se expor antes dos 25 minutos.`);
+    tacticalParts.push(`Os espaços tendem a aparecer só quando a intensidade cair — geralmente na transição para o segundo tempo.`);
   } else if (statFav === "home") {
-    tactical = `${home} deve controlar a posse e ditar o ritmo em casa, enquanto ${away} tende a recuar bloco e apostar em jogadas pontuais.`;
+    tacticalParts.push(`${home} deve ditar o ritmo em casa, com posse mais elaborada e construção pelos lados.`);
+    tacticalParts.push(`${away} provavelmente recua bloco e aposta em jogadas pontuais, sem se entregar no campo de ataque.`);
   } else if (statFav === "away") {
-    tactical = `${away} chega em melhor fase ofensiva e pode comandar boa parte das ações. ${home} provavelmente vai estudar mais a partida antes de se lançar.`;
+    tacticalParts.push(`${away} chega em melhor fase ofensiva e pode comandar boa parte das ações mesmo fora.`);
+    tacticalParts.push(`${home} tende a estudar a partida antes de se lançar — primeiro tempo de poucos riscos é provável.`);
   } else {
-    tactical = `Cenário tático equilibrado: os dois times costumam estudar o adversário antes de se expor, o que tende a deixar o jogo aberto apenas a partir da segunda etapa.`;
+    tacticalParts.push(`Cenário tático equilibrado: os dois costumam medir o adversário antes de se expor.`);
+    tacticalParts.push(`O jogo deve abrir mesmo só a partir da segunda etapa, quando o cansaço diluir o cuidado.`);
   }
+
+  // 2b. Ritmo do 1º vs 2º tempo
+  if (openProfile) {
+    tacticalParts.push(`Ritmo deve ser intenso desde cedo — equipes não costumam segurar a bola.`);
+  } else if (lowScoringProfile) {
+    tacticalParts.push(`Primeiro tempo tende a ser de poucas finalizações claras; a partida costuma se abrir só após o intervalo.`);
+  } else {
+    tacticalParts.push(`Início mais estudado é o esperado, com aceleração ofensiva real depois dos 25 minutos.`);
+  }
+
+  // 2c. Esquemas se disponíveis
   if (ctx?.lineups?.home?.formation && ctx?.lineups?.away?.formation) {
-    tactical += ` Esquema provável: ${home} ${ctx.lineups.home.formation} × ${ctx.lineups.away.formation} ${away}.`;
+    tacticalParts.push(`Esquema provável: ${home} ${ctx.lineups.home.formation} × ${ctx.lineups.away.formation} ${away}.`);
   }
+
+  const tactical = tacticalParts.join(" ");
 
   // ─── 3. INDICADORES (apenas os relevantes) ──────────────────
   const indicators: string[] = [];

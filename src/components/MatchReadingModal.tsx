@@ -16,7 +16,9 @@ import {
   Activity,
   Sparkles,
   Loader2,
+  Share2,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { MatchReadingV2 } from "@/lib/readingEngine";
 
 interface Props {
@@ -60,6 +62,71 @@ const qualityBadge = {
   limitado: "bg-red-500/20 text-red-300",
 };
 
+function buildShareText(reading: MatchReadingV2, homeTeam: string, awayTeam: string) {
+  const top = reading.opportunities
+    .slice(0, 3)
+    .map((o, i) => `${i + 1}. ${o.market} — ${o.confidence}%`)
+    .join("\n");
+  const scores = reading.likelyScores.slice(0, 3).join(" · ");
+  return [
+    `📖 Leitura do Jogo`,
+    `${homeTeam} vs ${awayTeam}`,
+    ``,
+    `📝 ${reading.summary}`,
+    ``,
+    `🔥 Oportunidades:`,
+    top,
+    ``,
+    `🎯 Placares prováveis: ${scores}`,
+    ``,
+    `📌 ${reading.verdict}`,
+    ``,
+    `— Analista Joilson`,
+  ].join("\n");
+}
+
+const ShareButton = ({
+  reading,
+  homeTeam,
+  awayTeam,
+}: {
+  reading: MatchReadingV2;
+  homeTeam: string;
+  awayTeam: string;
+}) => {
+  const handleShare = async () => {
+    const text = buildShareText(reading, homeTeam, awayTeam);
+    const title = `Leitura: ${homeTeam} vs ${awayTeam}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast.success("Leitura copiada para a área de transferência");
+    } catch (e: any) {
+      if (e?.name === "AbortError") return;
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success("Leitura copiada");
+      } catch {
+        toast.error("Não foi possível compartilhar");
+      }
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-md hover:opacity-95 transition-opacity"
+    >
+      <Share2 className="w-4 h-4" />
+      Compartilhar leitura
+    </button>
+  );
+};
+
+
 export const MatchReadingModal = ({
   open,
   onOpenChange,
@@ -101,6 +168,8 @@ export const MatchReadingModal = ({
 
         {!loading && reading && (
           <div className="space-y-3 mt-2">
+            <ShareButton reading={reading} homeTeam={homeTeam} awayTeam={awayTeam} />
+
             {/* Badges */}
             <div className="flex flex-wrap gap-2">
               <span

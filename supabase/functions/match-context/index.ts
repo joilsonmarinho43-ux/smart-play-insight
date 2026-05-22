@@ -296,8 +296,54 @@ serve(async (req) => {
       away: awayId ? summarizeFatigue(aRecent || [], awayId) : null,
     };
 
-    // Odds
+    // Odds (atuais — média de N casas)
     const oddsOut = summarizeOdds(odds || []);
+
+    // Movimento: persistimos primeira leitura como "abertura"
+    let movement: any = null;
+    let opening: any = null;
+    if (oddsOut && fixtureId) {
+      const openKey = `odds_open_${fixtureId}`;
+      try {
+        const { data: openRow } = await sb()
+          .from("cache_api")
+          .select("dados_json")
+          .eq("cache_key", openKey)
+          .maybeSingle();
+        if (openRow?.dados_json) {
+          opening = openRow.dados_json;
+        } else {
+          opening = {
+            home: oddsOut.home, draw: oddsOut.draw, away: oddsOut.away,
+            over25: oddsOut.over25, under25: oddsOut.under25,
+            capturedAt: new Date().toISOString(),
+          };
+          await sb().from("cache_api").upsert({
+            cache_key: openKey,
+            dados_json: opening,
+            status_jogo: "PRE",
+            ultima_atualizacao: new Date().toISOString(),
+          });
+        }
+        const drift = (cur: number | null, op: number | null) => {
+          if (!cur || !op) return "flat";
+          const delta = (cur - op) / op;
+          if (delta <= -0.07) return "down";   // odd caiu = confiança subiu
+          if (delta >= 0.07) return "up";      // odd subiu = confiança caiu
+          return "flat";
+        };
+        movement = {
+          home: drift(oddsOut.home, opening.home),
+          draw: drift(oddsOut.draw, opening.draw),
+          away: drift(oddsOut.away, opening.away),
+          over25: drift(oddsOut.over25, opening.over25),
+        };
+        (oddsOut as any).opening = opening;
+        (oddsOut as any).movement = movement;
+      } catch (e) {
+        console.warn("opening odds persist fail", e);
+      }
+    }
 
     // Reliability
     const haveLineups = !!homeLineup || !!awayLineup;

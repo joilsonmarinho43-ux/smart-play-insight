@@ -135,6 +135,7 @@ export const MatchReadingModal = ({
   loading,
   homeTeam,
   awayTeam,
+  context,
 }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

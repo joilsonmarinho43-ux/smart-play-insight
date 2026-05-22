@@ -498,40 +498,50 @@ export function buildMatchReadingV2(
   )
     pred = "amarelo";
 
-  // ─── 10. VEREDITO (decisão forte) ───────────────────────────
+  // ─── 10. VEREDITO (decisão, voz de analista) ────────────────
   let verdict = "";
   const topOp = opportunities[0];
   const goalsMarket = opportunities.find((o) => o.market.includes("Gols") || o.market === "Ambas Marcam");
 
   if (pred === "vermelho" && marketDisagrees) {
-    verdict = `O favoritismo de mercado não se sustenta nos números — cenário típico de armadilha. Melhor evitar a linha de vencedor e olhar mercados alternativos${goalsMarket ? `, com destaque para ${goalsMarket.market.toLowerCase()}` : ""}.`;
+    verdict = pick([
+      `O favoritismo de mercado não se sustenta nos números — cenário típico de armadilha. A leitura segura é ficar fora do vencedor e olhar mercados alternativos${goalsMarket ? `, com destaque para ${goalsMarket.market.toLowerCase()}` : ""}.`,
+      `O mercado parece mais confiante do que o desempenho recente justifica. É o tipo de jogo em que respeitar a dúvida vale mais do que insistir na linha óbvia.`,
+    ], seed);
   } else if (pred === "vermelho" && injuriesOnFav) {
-    verdict = `Lesões importantes desestabilizam o lado favorito e tornam a entrada pré-jogo arriscada. Cenário pede paciência e leitura ao vivo antes de qualquer decisão.`;
+    verdict = `Lesões importantes desestabilizam justamente o lado favorito. Cenário pede paciência: melhor confirmar comportamento ao vivo do que arriscar pré-jogo exposto.`;
   } else if (pred === "vermelho" && goalsVsTacticConflict) {
-    verdict = `Números e cenário tático entram em conflito — não há leitura segura para mercado de gols agressivo. Operar com cautela e em mercados específicos vale mais do que apostar no resultado final.`;
+    verdict = `Números e perfil tático brigam entre si — não há leitura segura para gols agressivos. Mercados conservadores ou específicos oferecem leitura melhor do que linhas amplas.`;
   } else if (topOp && topOp.confidence >= 72) {
-    verdict = `${topOp.market} (${topOp.confidence}%) é a leitura mais sólida do confronto. ${
+    verdict = `${topOp.market} (${topOp.confidence}%) aparece como a leitura mais sólida do confronto. ${
       goalsMarket && goalsMarket !== topOp
-        ? `Linhas de gols/ambas marcam aparecem como segunda camada interessante.`
-        : `Linhas de resultado oferecem menos valor que os mercados específicos do jogo.`
+        ? `Os mercados conservadores de gols oferecem leitura mais segura do que linhas agressivas de vencedor.`
+        : `O valor está aí — linhas de resultado simples entregam menos do que esse mercado específico.`
     }`;
   } else if (balanced) {
-    verdict = `Partida muito equilibrada e com baixa margem para explorar vencedor pré-jogo. ${
-      goalsMarket
-        ? `O mercado de ${goalsMarket.market.toLowerCase()} apresenta a leitura mais segura do confronto.`
-        : `Sem distorções claras — entrar somente com convicção tática.`
-    } Favoritismo existe? Em pequena dose. Domínio absoluto? Não.`;
+    verdict = pick([
+      `Partida equilibrada e com baixa margem para entradas pré-jogo muito expostas. ${
+        goalsMarket
+          ? `O mercado de ${goalsMarket.market.toLowerCase()} é o que oferece leitura mais segura.`
+          : `Sem distorções claras — só entrar com convicção tática real.`
+      } Favoritismo existe? Em pequena dose. Domínio absoluto? Não.`,
+      `É o tipo de jogo decidido em detalhe. ${
+        goalsMarket
+          ? `Linhas conservadoras de gols se sustentam melhor que qualquer entrada no vencedor.`
+          : `Melhor recuar a exposição e aguardar leitura ao vivo do que forçar entrada agora.`
+      }`,
+    ], seed);
   } else if (pred === "amarelo") {
     verdict = `Leitura razoável, mas sem favoritismo dominante. ${
       topOp
-        ? `Vale priorizar ${topOp.market.toLowerCase()} e evitar mercados de vencedor com odd curta.`
-        : `Sem entrada com convicção plena — aguardar movimentação do mercado pode ser o mais sensato.`
+        ? `Vale priorizar ${topOp.market.toLowerCase()} e fugir de mercados de vencedor com odd curta.`
+        : `Sem entrada com convicção plena — aguardar movimentação do mercado é o mais sensato.`
     }`;
   } else {
     verdict = `Cenário previsível e coerente. ${
       topOp
-        ? `${topOp.market} oferece a melhor relação risco/retorno do pré-jogo.`
-        : `Os mercados de gols apresentam melhor leitura do que as linhas de vencedor.`
+        ? `${topOp.market} oferece a melhor relação risco/retorno do pré-jogo. Os mercados específicos têm mais valor que as linhas de vencedor.`
+        : `Os mercados conservadores de gols entregam leitura mais segura do que linhas agressivas de resultado.`
     }`;
   }
 

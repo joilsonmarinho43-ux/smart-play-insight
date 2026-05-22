@@ -185,6 +185,7 @@ const MatchDetails = () => {
         loading={readingLoading}
         homeTeam={view?.homeTeam || ''}
         awayTeam={view?.awayTeam || ''}
+        context={readingContext}
       />
 
     </div>

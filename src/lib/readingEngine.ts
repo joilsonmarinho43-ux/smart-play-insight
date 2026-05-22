@@ -396,9 +396,18 @@ export function buildMatchReadingV2(
     return false;
   };
 
+  // Bloqueia mercados rasos/genéricos que não soam como leitura profissional
+  const shallowMarket = (name: string) =>
+    /Over 0\.5/i.test(name) ||
+    /Over 1\.5 Gols/i.test(name) ||
+    /Under 4\.5/i.test(name) ||
+    /Under 5\.5/i.test(name) ||
+    /Dupla Chance/i.test(name) === false && /Empate/i.test(name);
+
   const ranked = [...markets]
-    .filter((m) => m.probability >= 55)
+    .filter((m) => m.probability >= 58)
     .filter((m) => !conf2Side(m))
+    .filter((m) => !shallowMarket(m.market))
     .sort((a, b) => b.probability - a.probability);
 
   const finalMarkets: MarketAnalysis[] = [];

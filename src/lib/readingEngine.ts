@@ -401,8 +401,7 @@ export function buildMatchReadingV2(
     /Over 0\.5/i.test(name) ||
     /Over 1\.5 Gols/i.test(name) ||
     /Under 4\.5/i.test(name) ||
-    /Under 5\.5/i.test(name) ||
-    /Dupla Chance/i.test(name) === false && /Empate/i.test(name);
+    /Under 5\.5/i.test(name);
 
   const ranked = [...markets]
     .filter((m) => m.probability >= 58)

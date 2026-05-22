@@ -307,35 +307,49 @@ export function buildMatchReadingV2(
       const mFav = oddFav === "home" ? home : away;
       const sFav = statFav === "home" ? home : away;
       bits.push(
-        `O mercado coloca ${mFav} como favorito (${(oddFav === "home" ? oddH : oddA).toFixed(2)}), mas os números mostram cenário mais favorável a ${sFav}. Possível linha inflada pelo peso do nome.`,
+        pick([
+          `O mercado respeita o peso de ${mFav} (${(oddFav === "home" ? oddH : oddA).toFixed(2)}), mas os números recentes de ${sFav} contam outra história. Linha provavelmente turbinada pelo nome.`,
+          `Mercado precifica ${mFav} como referência, só que o cenário estatístico desenha favoritismo do outro lado. Sinal clássico de armadilha pré-jogo.`,
+        ], seed),
       );
     } else if (statFav) {
       const sFav = statFav === "home" ? home : away;
       const sOdd = (statFav === "home" ? oddH : oddA).toFixed(2);
-      bits.push(
-        `Mercado reconhece o favoritismo de ${sFav} (${sOdd}) — alinhado ao que os números apontam, sem distorção evidente.`,
-      );
+      const minOdd = Math.min(oddH, oddA);
+      if (minOdd < 1.45) {
+        bits.push(`Favoritismo de ${sFav} (${sOdd}) já está totalmente precificado. O mercado parece mais confiante do que os números sustentam.`);
+      } else if (minOdd < 1.7) {
+        bits.push(`Mercado reconhece ${sFav} como favorito (${sOdd}), em linha com o que os indicadores apontam — sem distorção evidente, mas também sem prêmio.`);
+      } else {
+        bits.push(`Favoritismo existe a favor de ${sFav} (${sOdd}). Controle absoluto, não — a margem é mais magra do que o nome sugere.`);
+      }
     } else {
-      bits.push(`As odds (${oddH.toFixed(2)} × ${oddD ? oddD.toFixed(2) : "—"} × ${oddA.toFixed(2)}) refletem o equilíbrio real do confronto.`);
+      bits.push(
+        pick([
+          `Odds equilibradas (${oddH.toFixed(2)} × ${oddD ? oddD.toFixed(2) : "—"} × ${oddA.toFixed(2)}) — o mercado também não enxerga favorito claro.`,
+          `Linhas espelham o que os números mostram: confronto sem favorito convincente, decidido em detalhe.`,
+        ], seed),
+      );
     }
   }
 
   if (oddO && o25Prob) {
     const implied = (1 / oddO) * 100;
     if (o25Prob - implied >= 8)
-      bits.push(`Linha de Over 2.5 (${oddO.toFixed(2)}) parece subdimensionada frente à projeção real (${o25Prob}%) — há valor.`);
+      bits.push(`Linha de Over 2.5 (${oddO.toFixed(2)}) parece subdimensionada frente à projeção real (${o25Prob}%) — há valor disponível.`);
     else if (implied - o25Prob >= 8)
-      bits.push(`Over 2.5 está caro para o cenário real: ${o25Prob}% projetado contra ${implied.toFixed(0)}% implícita.`);
+      bits.push(`Over 2.5 está caro para o cenário: ${o25Prob}% projetado contra ${implied.toFixed(0)}% implícita no preço. Linha inflada.`);
     else
-      bits.push(`Linha de gols precificada de forma justa pelo mercado, sem distorção exploratória.`);
+      bits.push(`Linha de gols parece relativamente ajustada — pouca margem para entradas agressivas.`);
   } else if (lowScoringProfile && o25Prob < 50) {
-    bits.push(`O perfil do jogo aponta para Under com mais consistência do que Over — atenção a quem está olhando linha de gols alta.`);
+    bits.push(`O perfil do jogo aponta Under com mais consistência do que Over — quem está olhando linha de gols alta precisa redobrar a atenção.`);
   }
 
-  if (statFav && oddFav === statFav && oddH && oddA) {
-    const minOdd = Math.min(oddH, oddA);
-    if (minOdd < 1.45)
-      bits.push(`Favoritismo extremo já precificado (${minOdd.toFixed(2)}). Risco/retorno pouco atrativo na linha de vencedor.`);
+  // Frase de fechamento contextual do mercado
+  if (balanced && oddH && oddA && Math.min(oddH, oddA) >= 1.9) {
+    bits.push(`Cenário pouco confortável para handicaps agressivos — o equilíbrio reduz margem em qualquer linha exposta.`);
+  } else if (statFav && oddFav === statFav && oddH && oddA && Math.min(oddH, oddA) < 1.45) {
+    bits.push(`Risco/retorno pouco atrativo na linha de vencedor. O valor real está nos mercados específicos do jogo, não no resultado.`);
   }
   if (bits.length === 0)
     bits.push(`Mercado sem distorções claras — não há entrada óbvia apenas olhando preço. A leitura tem que vir do cenário.`);

@@ -584,6 +584,21 @@ export function buildMatchReadingV2(
     }`;
   }
 
+  // Assinatura humana — fecha o veredito com voz de analista
+  const signatures = [
+    `Favoritismo existe. Controle absoluto, não.`,
+    `É mais jogo de paciência do que intensidade.`,
+    `O mercado parece mais confortável com o favorito do que os números.`,
+    `Jogo decidido em detalhe costuma punir entradas agressivas.`,
+    `A odd chama atenção. O contexto nem tanto.`,
+    `Leitura fria pesa mais aqui do que torcida pelo nome.`,
+    `Nesses jogos, recuar exposição é jogada de analista, não de torcedor.`,
+  ];
+  // Só adiciona assinatura se ainda não houver uma frase muito parecida no verdict
+  if (!/Favoritismo existe|paciência|punir entradas|recuar exposição/i.test(verdict)) {
+    verdict += ` ${pick(signatures, seed + 3)}`;
+  }
+
   return {
     summary,
     tactical,

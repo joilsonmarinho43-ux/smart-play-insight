@@ -19,7 +19,7 @@ import {
   Share2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { MatchReadingV2 } from "@/lib/readingEngine";
+import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
 
 interface Props {
   open: boolean;
@@ -28,6 +28,7 @@ interface Props {
   loading: boolean;
   homeTeam: string;
   awayTeam: string;
+  context?: MatchContext | null;
 }
 
 const Section = ({

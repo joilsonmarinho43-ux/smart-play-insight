@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const BASE_URL = "https://v3.football.api-sports.io";
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
+const CACHE_TTL_MS = 8 * 60 * 1000; // 8 min — odds precisam estar frescas
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;

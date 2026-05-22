@@ -16,7 +16,9 @@ import {
   Activity,
   Sparkles,
   Loader2,
+  Share2,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { MatchReadingV2 } from "@/lib/readingEngine";
 
 interface Props {

@@ -15,7 +15,7 @@ interface State {
 }
 
 const memCache = new Map<string, { ts: number; ctx: MatchContext }>();
-const TTL = 30 * 60 * 1000;
+const TTL = 8 * 60 * 1000; // 8 min — alinhar com TTL do servidor para odds frescas
 
 export function useMatchReading(match: MatchData, enabled: boolean) {
   const [state, setState] = useState<State>({

@@ -131,29 +131,54 @@ function inferMotivation(
 
 function summarizeOdds(oddsResp: any[]) {
   if (!oddsResp || oddsResp.length === 0) return null;
-  // Pega primeira casa com mercado 1X2 (id=1) e Over/Under (id=5)
-  const bookmaker = oddsResp[0]?.bookmakers?.[0];
-  if (!bookmaker) return null;
-  const matchWinner = bookmaker.bets?.find(
-    (b: any) => b.id === 1 || /Match Winner/i.test(b.name),
-  );
-  const over = bookmaker.bets?.find(
-    (b: any) => b.id === 5 || /Goals Over\/Under/i.test(b.name),
-  );
-  const btts = bookmaker.bets?.find((b: any) =>
-    /Both Teams/i.test(b.name || ""),
-  );
-  const parseVal = (bet: any, label: string) =>
-    Number(bet?.values?.find((v: any) => v.value === label)?.odd) || null;
+  const bookmakers = oddsResp[0]?.bookmakers || [];
+  if (!bookmakers.length) return null;
 
+  const parseVal = (bet: any, label: string) => {
+    const raw = bet?.values?.find((v: any) => v.value === label)?.odd;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 1 ? n : null;
+  };
+
+  const collect = {
+    home: [] as number[], draw: [] as number[], away: [] as number[],
+    over25: [] as number[], under25: [] as number[],
+    bttsYes: [] as number[], bttsNo: [] as number[],
+  };
+  const bookieNames: string[] = [];
+
+  for (const bk of bookmakers) {
+    bookieNames.push(bk?.name || "bookmaker");
+    const mw = bk.bets?.find((b: any) => b.id === 1 || /Match Winner/i.test(b.name));
+    const ou = bk.bets?.find((b: any) => b.id === 5 || /Goals Over\/Under/i.test(b.name));
+    const bt = bk.bets?.find((b: any) => /Both Teams/i.test(b.name || ""));
+    const pushIf = (arr: number[], v: number | null) => { if (v) arr.push(v); };
+    pushIf(collect.home, parseVal(mw, "Home"));
+    pushIf(collect.draw, parseVal(mw, "Draw"));
+    pushIf(collect.away, parseVal(mw, "Away"));
+    pushIf(collect.over25, parseVal(ou, "Over 2.5"));
+    pushIf(collect.under25, parseVal(ou, "Under 2.5"));
+    pushIf(collect.bttsYes, parseVal(bt, "Yes"));
+    pushIf(collect.bttsNo, parseVal(bt, "No"));
+  }
+
+  const avg = (a: number[]) =>
+    a.length ? Math.round((a.reduce((s, v) => s + v, 0) / a.length) * 100) / 100 : null;
+
+  const count = bookmakers.length;
   return {
-    home: parseVal(matchWinner, "Home"),
-    draw: parseVal(matchWinner, "Draw"),
-    away: parseVal(matchWinner, "Away"),
-    over25: parseVal(over, "Over 2.5"),
-    under25: parseVal(over, "Under 2.5"),
-    bttsYes: parseVal(btts, "Yes"),
-    bttsNo: parseVal(btts, "No"),
+    home: avg(collect.home),
+    draw: avg(collect.draw),
+    away: avg(collect.away),
+    over25: avg(collect.over25),
+    under25: avg(collect.under25),
+    bttsYes: avg(collect.bttsYes),
+    bttsNo: avg(collect.bttsNo),
+    meta: {
+      bookmakers: count,
+      sourceLabel: count > 1 ? `Média de ${count} casas` : (bookieNames[0] || "bookmaker"),
+      primaryBookmaker: bookieNames[0] || null,
+    },
   };
 }
 

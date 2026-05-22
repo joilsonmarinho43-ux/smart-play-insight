@@ -484,9 +484,15 @@ export function buildMatchReadingV2(
   if (oddH && oddA && statFav && Math.min(oddH, oddA) < 1.45)
     alerts.push(`Favoritismo extremo precificado — pouco valor na linha simples de vencedor.`);
   if (physicalProfile && balanced)
-    alerts.push(`Tendência de início estudado e jogo físico — bola na rede cedo é menos provável.`);
+    alerts.push(`Tendência de início estudado e jogo físico — bola na rede cedo é menos provável; cuidado com linhas agressivas de HT.`);
   if (statFav && Math.abs(diff) >= 0.5 && (oddH && oddA && Math.min(oddH, oddA) >= 1.7))
     alerts.push(`Favorito pode reduzir intensidade após abrir vantagem — atenção em mercados de ritmo.`);
+  if (balanced && (oddH && oddA && Math.min(oddH, oddA) >= 2.1))
+    alerts.push(`Cenário perigoso para handicaps agressivos — o equilíbrio cobra qualquer entrada exposta.`);
+  if (lowScoringProfile && o25Prob >= 50)
+    alerts.push(`Perfil tático truncado conflita com Over 2.5 alto — confiar no contexto, não só no número.`);
+  if (homeImpact === "alto" && awayImpact === "alto")
+    alerts.push(`Os dois lados chegam desfalcados — a leitura pré-jogo perde precisão e pede confirmação ao vivo.`);
   if (alerts.length === 0)
     alerts.push(`Sem sinais de alerta relevantes — leitura limpa, dá para confiar no que os números mostram.`);
 

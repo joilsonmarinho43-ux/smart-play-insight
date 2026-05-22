@@ -255,16 +255,41 @@ export function buildMatchReadingV2(
     tacticalParts.push(`O jogo deve abrir mesmo só a partir da segunda etapa, quando o cansaço diluir o cuidado.`);
   }
 
-  // 2b. Ritmo do 1º vs 2º tempo
+  // 2b. Ritmo do 1º vs 2º tempo + pressão lateral
   if (openProfile) {
-    tacticalParts.push(`Ritmo deve ser intenso desde cedo — equipes não costumam segurar a bola.`);
+    tacticalParts.push(pick([
+      `Ritmo deve ser intenso desde cedo — equipes não costumam segurar a bola.`,
+      `Linhas adiantadas e troca rápida de iniciativa devem marcar a primeira etapa.`,
+    ], seed));
   } else if (lowScoringProfile) {
-    tacticalParts.push(`Primeiro tempo tende a ser de poucas finalizações claras; a partida costuma se abrir só após o intervalo.`);
+    tacticalParts.push(`Primeiro tempo tende a ser de poucas finalizações claras; a partida costuma se abrir só após o intervalo, quando o cansaço diluir o cuidado tático.`);
   } else {
-    tacticalParts.push(`Início mais estudado é o esperado, com aceleração ofensiva real depois dos 25 minutos.`);
+    tacticalParts.push(`Início mais estudado é o esperado, com aceleração ofensiva real depois dos 25 minutos e segunda etapa naturalmente mais aberta.`);
   }
 
-  // 2c. Esquemas se disponíveis
+  // 2c. Pressão pelos lados / bola parada
+  if (hCorners != null && aCorners != null && hCorners + aCorners >= 10) {
+    tacticalParts.push(`A pressão pelos lados é uma marca dos dois — boa parte das chances claras tende a nascer de cruzamento ou segunda bola após escanteio.`);
+  } else if (homeAttacks && !awayAttacks) {
+    tacticalParts.push(`${home} deve concentrar a pressão pelos corredores em casa, enquanto ${away} tenta neutralizar pelo meio.`);
+  }
+
+  // 2d. Leitura emocional do confronto
+  const emotional: string[] = [];
+  if (homeMot === "luta contra rebaixamento" || awayMot === "luta contra rebaixamento") {
+    emotional.push(`A tensão competitiva é real — quem luta por sobrevivência costuma entregar mais raça do que técnica, e isso pesa no roteiro.`);
+  } else if (homeMot === "disputa por título" || awayMot === "disputa por título") {
+    emotional.push(`Há peso emocional pelo lado que briga lá em cima — pressão por resultado pode pesar mais do que ajudar.`);
+  } else if (balanced && physicalProfile) {
+    emotional.push(`A tendência é de um confronto mais estratégico do que acelerado, com controle psicológico contando tanto quanto o repertório técnico.`);
+  } else if (statFav && Math.abs(diff) >= 0.6) {
+    emotional.push(`Se o favorito abrir o placar cedo, costuma administrar e baixar a intensidade. Se sofrer primeiro, o jogo ganha cara emocional na segunda etapa.`);
+  } else if (balanced) {
+    emotional.push(`O jogo deve oscilar emocionalmente — paciência conta mais do que pressão constante.`);
+  }
+  if (emotional.length) tacticalParts.push(emotional[0]);
+
+  // 2e. Esquemas se disponíveis
   if (ctx?.lineups?.home?.formation && ctx?.lineups?.away?.formation) {
     tacticalParts.push(`Esquema provável: ${home} ${ctx.lineups.home.formation} × ${ctx.lineups.away.formation} ${away}.`);
   }

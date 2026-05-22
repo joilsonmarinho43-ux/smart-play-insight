@@ -307,6 +307,8 @@ export const MatchReadingModal = ({
           <div className="space-y-3 mt-2">
             <ShareButton reading={reading} homeTeam={homeTeam} awayTeam={awayTeam} />
 
+            <OddsPanel context={context} homeTeam={homeTeam} awayTeam={awayTeam} />
+
             {/* Badges */}
             <div className="flex flex-wrap gap-2">
               <span

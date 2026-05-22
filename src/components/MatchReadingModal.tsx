@@ -127,6 +127,141 @@ const ShareButton = ({
   );
 };
 
+const movementMeta = {
+  down: { icon: "📉", label: "queda", cls: "text-emerald-400" },
+  up: { icon: "📈", label: "alta", cls: "text-red-400" },
+  flat: { icon: "•", label: "estável", cls: "text-muted-foreground" },
+} as const;
+
+const OddBox = ({
+  flag,
+  name,
+  odd,
+  move,
+  open,
+  accent,
+}: {
+  flag: string;
+  name: string;
+  odd: number | null;
+  move?: "up" | "down" | "flat";
+  open?: number | null;
+  accent?: boolean;
+}) => {
+  if (!odd) {
+    return (
+      <div className="flex-1 rounded-lg bg-secondary/40 border border-border p-2.5 text-center">
+        <div className="text-[10px] uppercase text-muted-foreground truncate">{flag} {name}</div>
+        <div className="font-display text-lg text-muted-foreground">—</div>
+      </div>
+    );
+  }
+  const m = move ? movementMeta[move] : null;
+  return (
+    <div
+      className={`flex-1 rounded-lg p-2.5 text-center border ${
+        accent
+          ? "bg-primary/10 border-primary/50"
+          : "bg-secondary/60 border-border"
+      }`}
+    >
+      <div className="text-[10px] uppercase text-muted-foreground truncate">
+        {flag} {name}
+      </div>
+      <div className="font-display text-lg font-bold text-foreground leading-tight">
+        {odd.toFixed(2)}
+      </div>
+      {m && (
+        <div className={`text-[10px] ${m.cls} leading-none mt-0.5`}>
+          {m.icon} {open ? `de ${open.toFixed(2)}` : m.label}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const OddsPanel = ({
+  context,
+  homeTeam,
+  awayTeam,
+}: {
+  context?: MatchContext | null;
+  homeTeam: string;
+  awayTeam: string;
+}) => {
+  const odds = context?.odds;
+  if (!odds || (!odds.home && !odds.draw && !odds.away)) return null;
+
+  const fav =
+    odds.home && odds.away
+      ? odds.home < odds.away
+        ? "home"
+        : odds.away < odds.home
+          ? "away"
+          : null
+      : null;
+
+  return (
+    <div className="bg-secondary/40 border border-primary/30 rounded-xl p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-wider font-bold text-primary">
+            📊 Mercado 1X2
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">
+          {odds.meta?.sourceLabel || "Mercado ao vivo"}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <OddBox
+          flag="🏠"
+          name={homeTeam}
+          odd={odds.home}
+          move={odds.movement?.home}
+          open={odds.opening?.home}
+          accent={fav === "home"}
+        />
+        <OddBox
+          flag="🤝"
+          name="Empate"
+          odd={odds.draw}
+          move={odds.movement?.draw}
+          open={odds.opening?.draw}
+        />
+        <OddBox
+          flag="✈"
+          name={awayTeam}
+          odd={odds.away}
+          move={odds.movement?.away}
+          open={odds.opening?.away}
+          accent={fav === "away"}
+        />
+      </div>
+      {(odds.over25 || odds.under25 || odds.bttsYes) && (
+        <div className="flex gap-2 mt-2">
+          {odds.over25 && (
+            <OddBox
+              flag="⚽"
+              name="Over 2.5"
+              odd={odds.over25}
+              move={odds.movement?.over25}
+              open={odds.opening?.over25}
+            />
+          )}
+          {odds.under25 && (
+            <OddBox flag="🛡" name="Under 2.5" odd={odds.under25} />
+          )}
+          {odds.bttsYes && (
+            <OddBox flag="🎯" name="BTTS Sim" odd={odds.bttsYes} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 
 export const MatchReadingModal = ({
   open,

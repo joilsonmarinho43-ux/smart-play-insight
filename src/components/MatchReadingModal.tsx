@@ -1,11 +1,29 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Flame, AlertTriangle, Target, TrendingUp, Clock, Trophy, LineChart } from 'lucide-react';
-import type { MatchReading } from '@/lib/matchReading';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Flame,
+  AlertTriangle,
+  Target,
+  TrendingUp,
+  Clock,
+  Trophy,
+  LineChart,
+  Gauge,
+  Activity,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import type { MatchReadingV2 } from "@/lib/readingEngine";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  reading: MatchReading | null;
+  reading: MatchReadingV2 | null;
+  loading: boolean;
   homeTeam: string;
   awayTeam: string;
 }
@@ -22,13 +40,34 @@ const Section = ({
   <div className="bg-secondary/40 border border-border rounded-xl p-3.5">
     <div className="flex items-center gap-2 mb-2">
       <Icon className="w-4 h-4 text-primary" />
-      <h3 className="text-xs uppercase tracking-wider font-bold text-foreground">{title}</h3>
+      <h3 className="text-xs uppercase tracking-wider font-bold text-foreground">
+        {title}
+      </h3>
     </div>
     <div className="text-[15px] text-foreground leading-relaxed">{children}</div>
   </div>
 );
 
-export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayTeam }: Props) => {
+const predBadge = {
+  verde: { color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40", label: "🟢 Jogo previsível" },
+  amarelo: { color: "bg-amber-500/20 text-amber-300 border-amber-500/40", label: "🟡 Jogo sensível" },
+  vermelho: { color: "bg-red-500/20 text-red-300 border-red-500/40", label: "🔴 Mercado perigoso" },
+};
+
+const qualityBadge = {
+  completo: "bg-emerald-500/20 text-emerald-300",
+  parcial: "bg-amber-500/20 text-amber-300",
+  limitado: "bg-red-500/20 text-red-300",
+};
+
+export const MatchReadingModal = ({
+  open,
+  onOpenChange,
+  reading,
+  loading,
+  homeTeam,
+  awayTeam,
+}: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg w-[95vw] max-h-[88vh] overflow-y-auto bg-background border-primary/20 p-4 sm:p-5">
@@ -41,41 +80,54 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
           </div>
         </DialogHeader>
 
-        {!reading && (
-          <div className="text-center text-sm text-foreground/80 py-10 px-4">
-            <div className="text-foreground font-bold mb-1">Dados insuficientes</div>
-            Esta partida ainda não possui histórico estatístico suficiente para gerar uma leitura real.
-            <div className="text-xs text-muted-foreground mt-2">
-              A análise só é exibida quando há médias confirmadas de gols, escanteios e amostra de jogos.
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="text-sm text-muted-foreground">
+              Coletando contexto e montando a análise...
             </div>
           </div>
         )}
 
-        {reading && (
+        {!loading && !reading && (
+          <div className="text-center text-sm text-foreground/80 py-10 px-4">
+            <div className="text-foreground font-bold mb-1">
+              Dados insuficientes
+            </div>
+            Esta partida ainda não possui histórico estatístico suficiente para
+            gerar uma leitura real.
+          </div>
+        )}
+
+        {!loading && reading && (
           <div className="space-y-3 mt-2">
+            {/* Badges */}
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={`px-3 py-1 rounded-lg border text-xs font-bold ${predBadge[reading.predictability].color}`}
+              >
+                {predBadge[reading.predictability].label}
+              </span>
+              <span
+                className={`px-3 py-1 rounded-lg text-xs font-bold ${qualityBadge[reading.contextQuality]}`}
+              >
+                Contexto {reading.contextQuality}
+              </span>
+            </div>
+
             <Section icon={LineChart} title="Resumo da Partida">
               <p>{reading.summary}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] uppercase tracking-wider">
-                <span className={`px-2 py-0.5 rounded-md font-bold ${
-                  reading.dataQuality.label === 'completa'
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : reading.dataQuality.label === 'parcial'
-                    ? 'bg-amber-500/20 text-amber-300'
-                    : 'bg-red-500/20 text-red-300'
-                }`}>
-                  Amostra {reading.dataQuality.label}
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-secondary text-foreground/80 font-bold">
-                  {reading.dataQuality.homeGames} vs {reading.dataQuality.awayGames} jogos
-                </span>
-              </div>
             </Section>
 
-            <Section icon={TrendingUp} title="Indicadores Encontrados">
+            <Section icon={Activity} title="Leitura Tática">
+              <p>{reading.tactical}</p>
+            </Section>
+
+            <Section icon={TrendingUp} title="Indicadores Relevantes">
               <ul className="space-y-1">
                 {reading.indicators.map((i, k) => (
                   <li key={k} className="flex gap-2">
-                    <span className="text-primary">✔</span>
+                    <span className="text-primary shrink-0">✔</span>
                     <span>{i}</span>
                   </li>
                 ))}
@@ -89,10 +141,13 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
             <Section icon={Flame} title="Melhores Oportunidades">
               <div className="space-y-2.5">
                 {reading.opportunities.map((op, k) => (
-                  <div key={k} className="rounded-lg bg-secondary border border-primary/40 p-3">
+                  <div
+                    key={k}
+                    className="rounded-lg bg-secondary border border-primary/40 p-3"
+                  >
                     <div className="flex items-center justify-between mb-1.5 gap-2">
                       <span className="font-bold text-foreground text-base">
-                        {k === 0 ? '🔥 ' : ''}
+                        {k === 0 ? "🔥 " : ""}
                         {op.market}
                       </span>
                       <span className="text-sm font-display font-bold px-2 py-0.5 rounded-md bg-primary text-primary-foreground">
@@ -113,7 +168,7 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
               <ul className="space-y-1">
                 {reading.alerts.map((a, k) => (
                   <li key={k} className="flex gap-2">
-                    <span className="text-primary">⚠</span>
+                    <span className="text-primary shrink-0">⚠</span>
                     <span>{a}</span>
                   </li>
                 ))}
@@ -134,20 +189,34 @@ export const MatchReadingModal = ({ open, onOpenChange, reading, homeTeam, awayT
             </Section>
 
             <Section icon={Clock} title="Timing da Partida">
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="space-y-2 text-sm">
                 <div>
-                  <div className="text-xs uppercase text-foreground/70 tracking-wider mb-1">
-                    Maior pressão
-                  </div>
-                  <div className="font-display text-foreground text-lg">{reading.timing.pressure}</div>
+                  <span className="text-xs uppercase text-foreground/60 tracking-wider mr-2">
+                    Início:
+                  </span>
+                  {reading.timing.opening}
                 </div>
                 <div>
-                  <div className="text-xs uppercase text-foreground/70 tracking-wider mb-1">
-                    Aceleração ofensiva
-                  </div>
-                  <div className="font-display text-foreground text-lg">{reading.timing.acceleration}</div>
+                  <span className="text-xs uppercase text-foreground/60 tracking-wider mr-2">
+                    Maior pressão:
+                  </span>
+                  <span className="font-display text-foreground">
+                    {reading.timing.pressure}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs uppercase text-foreground/60 tracking-wider mr-2">
+                    Aceleração:
+                  </span>
+                  <span className="font-display text-foreground">
+                    {reading.timing.acceleration}
+                  </span>
                 </div>
               </div>
+            </Section>
+
+            <Section icon={Sparkles} title="📌 Veredito Final">
+              <p className="font-medium text-foreground">{reading.verdict}</p>
             </Section>
           </div>
         )}

@@ -473,9 +473,11 @@ const MatchCard = ({ match }: Props) => {
         open={readingOpen}
         onOpenChange={setReadingOpen}
         reading={reading}
+        loading={loading}
         homeTeam={match.homeTeam}
         awayTeam={match.awayTeam}
       />
+
     </div>
   );
 };

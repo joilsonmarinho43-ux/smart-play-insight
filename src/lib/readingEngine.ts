@@ -28,6 +28,22 @@ export interface MatchContext {
     under25: number | null;
     bttsYes: number | null;
     bttsNo: number | null;
+    meta?: {
+      bookmakers: number;
+      sourceLabel: string;
+      primaryBookmaker: string | null;
+    };
+    opening?: {
+      home: number | null; draw: number | null; away: number | null;
+      over25: number | null; under25: number | null;
+      capturedAt?: string;
+    };
+    movement?: {
+      home: "up" | "down" | "flat";
+      draw: "up" | "down" | "flat";
+      away: "up" | "down" | "flat";
+      over25: "up" | "down" | "flat";
+    };
   } | null;
   reliability?: "completo" | "parcial" | "limitado";
 }

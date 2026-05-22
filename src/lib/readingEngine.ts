@@ -343,6 +343,25 @@ export function buildMatchReadingV2(
 
   // ─── 4. LEITURA DE MERCADO (interpretação, não números) ─────
   const bits: string[] = [];
+
+  // Movimento real de odds (steam / drift)
+  const mv = ctx?.odds?.movement;
+  const op = ctx?.odds?.opening;
+  if (mv && op) {
+    if (mv.home === "down" && op.home && oddH)
+      bits.push(`📉 ${home} teve a odd recuada de ${op.home.toFixed(2)} para ${oddH.toFixed(2)} — mercado aumentou a confiança no mandante.`);
+    else if (mv.away === "down" && op.away && oddA)
+      bits.push(`📉 Visitante caiu de ${op.away.toFixed(2)} para ${oddA.toFixed(2)} — sinal de dinheiro entrando em ${away}.`);
+    else if (mv.home === "up" && op.home && oddH)
+      bits.push(`📈 ${home} subiu de ${op.home.toFixed(2)} para ${oddH.toFixed(2)} — mercado esfriou em relação ao mandante.`);
+    else if (mv.away === "up" && op.away && oddA)
+      bits.push(`📈 Odd visitante abriu em ${op.away.toFixed(2)} e está em ${oddA.toFixed(2)} — confiança recuou nas últimas horas.`);
+    if (mv.over25 === "down" && op.over25 && oddO)
+      bits.push(`📉 Linha de Over 2.5 recuou (${op.over25.toFixed(2)} → ${oddO.toFixed(2)}) — mercado ajustou a expectativa para mais gols.`);
+    else if (mv.over25 === "up" && op.over25 && oddO)
+      bits.push(`📈 Over 2.5 subiu de ${op.over25.toFixed(2)} para ${oddO.toFixed(2)} — perfil de jogo travado ganhou força.`);
+  }
+
   if (oddH && oddA) {
     if (marketDisagrees) {
       const mFav = oddFav === "home" ? home : away;

@@ -476,6 +476,7 @@ const MatchCard = ({ match }: Props) => {
         loading={loading}
         homeTeam={match.homeTeam}
         awayTeam={match.awayTeam}
+        context={context}
       />
 
     </div>

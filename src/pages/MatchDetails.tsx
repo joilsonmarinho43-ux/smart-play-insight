@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, Loader2 } from 'lucide-react';
 import { fetchLiveMatches, fetchMultiDayMatches } from '@/services/footballApi';
-import { buildMatchReading } from '@/lib/matchReading';
+import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from '@/components/MatchReadingModal';
+
 
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();

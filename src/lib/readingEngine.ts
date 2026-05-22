@@ -255,16 +255,41 @@ export function buildMatchReadingV2(
     tacticalParts.push(`O jogo deve abrir mesmo só a partir da segunda etapa, quando o cansaço diluir o cuidado.`);
   }
 
-  // 2b. Ritmo do 1º vs 2º tempo
+  // 2b. Ritmo do 1º vs 2º tempo + pressão lateral
   if (openProfile) {
-    tacticalParts.push(`Ritmo deve ser intenso desde cedo — equipes não costumam segurar a bola.`);
+    tacticalParts.push(pick([
+      `Ritmo deve ser intenso desde cedo — equipes não costumam segurar a bola.`,
+      `Linhas adiantadas e troca rápida de iniciativa devem marcar a primeira etapa.`,
+    ], seed));
   } else if (lowScoringProfile) {
-    tacticalParts.push(`Primeiro tempo tende a ser de poucas finalizações claras; a partida costuma se abrir só após o intervalo.`);
+    tacticalParts.push(`Primeiro tempo tende a ser de poucas finalizações claras; a partida costuma se abrir só após o intervalo, quando o cansaço diluir o cuidado tático.`);
   } else {
-    tacticalParts.push(`Início mais estudado é o esperado, com aceleração ofensiva real depois dos 25 minutos.`);
+    tacticalParts.push(`Início mais estudado é o esperado, com aceleração ofensiva real depois dos 25 minutos e segunda etapa naturalmente mais aberta.`);
   }
 
-  // 2c. Esquemas se disponíveis
+  // 2c. Pressão pelos lados / bola parada
+  if (hCorners != null && aCorners != null && hCorners + aCorners >= 10) {
+    tacticalParts.push(`A pressão pelos lados é uma marca dos dois — boa parte das chances claras tende a nascer de cruzamento ou segunda bola após escanteio.`);
+  } else if (homeAttacks && !awayAttacks) {
+    tacticalParts.push(`${home} deve concentrar a pressão pelos corredores em casa, enquanto ${away} tenta neutralizar pelo meio.`);
+  }
+
+  // 2d. Leitura emocional do confronto
+  const emotional: string[] = [];
+  if (homeMot === "luta contra rebaixamento" || awayMot === "luta contra rebaixamento") {
+    emotional.push(`A tensão competitiva é real — quem luta por sobrevivência costuma entregar mais raça do que técnica, e isso pesa no roteiro.`);
+  } else if (homeMot === "disputa por título" || awayMot === "disputa por título") {
+    emotional.push(`Há peso emocional pelo lado que briga lá em cima — pressão por resultado pode pesar mais do que ajudar.`);
+  } else if (balanced && physicalProfile) {
+    emotional.push(`A tendência é de um confronto mais estratégico do que acelerado, com controle psicológico contando tanto quanto o repertório técnico.`);
+  } else if (statFav && Math.abs(diff) >= 0.6) {
+    emotional.push(`Se o favorito abrir o placar cedo, costuma administrar e baixar a intensidade. Se sofrer primeiro, o jogo ganha cara emocional na segunda etapa.`);
+  } else if (balanced) {
+    emotional.push(`O jogo deve oscilar emocionalmente — paciência conta mais do que pressão constante.`);
+  }
+  if (emotional.length) tacticalParts.push(emotional[0]);
+
+  // 2e. Esquemas se disponíveis
   if (ctx?.lineups?.home?.formation && ctx?.lineups?.away?.formation) {
     tacticalParts.push(`Esquema provável: ${home} ${ctx.lineups.home.formation} × ${ctx.lineups.away.formation} ${away}.`);
   }
@@ -371,9 +396,17 @@ export function buildMatchReadingV2(
     return false;
   };
 
+  // Bloqueia mercados rasos/genéricos que não soam como leitura profissional
+  const shallowMarket = (name: string) =>
+    /Over 0\.5/i.test(name) ||
+    /Over 1\.5 Gols/i.test(name) ||
+    /Under 4\.5/i.test(name) ||
+    /Under 5\.5/i.test(name);
+
   const ranked = [...markets]
-    .filter((m) => m.probability >= 55)
+    .filter((m) => m.probability >= 58)
     .filter((m) => !conf2Side(m))
+    .filter((m) => !shallowMarket(m.market))
     .sort((a, b) => b.probability - a.probability);
 
   const finalMarkets: MarketAnalysis[] = [];
@@ -451,9 +484,15 @@ export function buildMatchReadingV2(
   if (oddH && oddA && statFav && Math.min(oddH, oddA) < 1.45)
     alerts.push(`Favoritismo extremo precificado — pouco valor na linha simples de vencedor.`);
   if (physicalProfile && balanced)
-    alerts.push(`Tendência de início estudado e jogo físico — bola na rede cedo é menos provável.`);
+    alerts.push(`Tendência de início estudado e jogo físico — bola na rede cedo é menos provável; cuidado com linhas agressivas de HT.`);
   if (statFav && Math.abs(diff) >= 0.5 && (oddH && oddA && Math.min(oddH, oddA) >= 1.7))
     alerts.push(`Favorito pode reduzir intensidade após abrir vantagem — atenção em mercados de ritmo.`);
+  if (balanced && (oddH && oddA && Math.min(oddH, oddA) >= 2.1))
+    alerts.push(`Cenário perigoso para handicaps agressivos — o equilíbrio cobra qualquer entrada exposta.`);
+  if (lowScoringProfile && o25Prob >= 50)
+    alerts.push(`Perfil tático truncado conflita com Over 2.5 alto — confiar no contexto, não só no número.`);
+  if (homeImpact === "alto" && awayImpact === "alto")
+    alerts.push(`Os dois lados chegam desfalcados — a leitura pré-jogo perde precisão e pede confirmação ao vivo.`);
   if (alerts.length === 0)
     alerts.push(`Sem sinais de alerta relevantes — leitura limpa, dá para confiar no que os números mostram.`);
 
@@ -543,6 +582,21 @@ export function buildMatchReadingV2(
         ? `${topOp.market} oferece a melhor relação risco/retorno do pré-jogo. Os mercados específicos têm mais valor que as linhas de vencedor.`
         : `Os mercados conservadores de gols entregam leitura mais segura do que linhas agressivas de resultado.`
     }`;
+  }
+
+  // Assinatura humana — fecha o veredito com voz de analista
+  const signatures = [
+    `Favoritismo existe. Controle absoluto, não.`,
+    `É mais jogo de paciência do que intensidade.`,
+    `O mercado parece mais confortável com o favorito do que os números.`,
+    `Jogo decidido em detalhe costuma punir entradas agressivas.`,
+    `A odd chama atenção. O contexto nem tanto.`,
+    `Leitura fria pesa mais aqui do que torcida pelo nome.`,
+    `Nesses jogos, recuar exposição é jogada de analista, não de torcedor.`,
+  ];
+  // Só adiciona assinatura se ainda não houver uma frase muito parecida no verdict
+  if (!/Favoritismo existe|paciência|punir entradas|recuar exposição/i.test(verdict)) {
+    verdict += ` ${pick(signatures, seed + 3)}`;
   }
 
   return {

@@ -217,28 +217,59 @@ export function buildMatchReadingV2(
     : `Ritmo equilibrado esperado, com projeção de ${fmt(total)} gols na conta final.`;
   summary += " " + rhythm;
 
-  // ─── 2. TÁTICA (interpretação real) ─────────────────────────
-  let tactical = "";
+  // ─── 2. TÁTICA (multi-frase: posse + transição + comportamento + ritmo) ──
+  const tacticalParts: string[] = [];
+
+  // 2a. Quem controla / quem reage
   if (homeAttacks && awayLeaks && !awayAttacks) {
-    tactical = `${home} tende a impor o ritmo desde o início, explorando a defesa frágil de ${away}. A tendência é de pressão em casa e ${away} baixando linhas para tentar contra-atacar pontualmente.`;
+    tacticalParts.push(
+      pick([
+        `${home} tende a controlar mais a posse em casa e empurrar ${away} para trás cedo.`,
+        `Em casa, ${home} costuma puxar o jogo para o campo adversário e impor pressão posicional sobre ${away}.`,
+      ], seed),
+    );
+    tacticalParts.push(`${away} deve responder com bloco médio-baixo, tentando sair em transição rápida quando recuperar a bola.`);
   } else if (awayAttacks && homeLeaks && !homeSolid) {
-    tactical = `${away} costuma jogar bem em transições e tem espaço para incomodar — ${home} dá brechas que podem ser exploradas em jogadas verticais.`;
+    tacticalParts.push(`${away} chega ofensivamente mais afiado e tem condições reais de tomar a iniciativa, mesmo fora.`);
+    tacticalParts.push(`${home} dá espaços entre linhas — é justamente onde ${away} costuma machucar, em jogadas verticais.`);
   } else if (homeSolid && awaySolid) {
-    tactical = `Duas equipes defensivamente organizadas. Espera-se um jogo posicional, com poucos espaços, bola disputada no meio e gols saindo mais de bola parada ou erro individual.`;
+    tacticalParts.push(`Dois blocos defensivos bem organizados. A leitura é de jogo posicional, disputado no meio-campo, com poucos espaços naturais.`);
+    tacticalParts.push(pick([
+      `Gols, se vierem, devem nascer de bola parada ou erro individual.`,
+      `O placar deve ser decidido em detalhe — uma jogada ensaiada, um lance isolado.`,
+    ], seed));
   } else if (homeAttacks && awayAttacks) {
-    tactical = `Os dois lados gostam de atacar. A leitura aponta para um jogo de ida e volta, com linhas adiantadas e oportunidades nas duas metades de campo.`;
+    tacticalParts.push(`Os dois gostam de jogar para frente. A tendência é de linhas adiantadas e troca constante de iniciativa.`);
+    tacticalParts.push(`Espaços nas costas das laterais devem aparecer dos dois lados — jogo de ida e volta é o cenário mais provável.`);
   } else if (balanced && physicalProfile) {
-    tactical = `Espera-se um jogo físico e truncado, com muita disputa no meio-campo. Os espaços devem aparecer apenas após os 30 minutos, quando a intensidade cair.`;
+    tacticalParts.push(`Início estudado, físico, com muita disputa no meio. Os times não devem se expor antes dos 25 minutos.`);
+    tacticalParts.push(`Os espaços tendem a aparecer só quando a intensidade cair — geralmente na transição para o segundo tempo.`);
   } else if (statFav === "home") {
-    tactical = `${home} deve controlar a posse e ditar o ritmo em casa, enquanto ${away} tende a recuar bloco e apostar em jogadas pontuais.`;
+    tacticalParts.push(`${home} deve ditar o ritmo em casa, com posse mais elaborada e construção pelos lados.`);
+    tacticalParts.push(`${away} provavelmente recua bloco e aposta em jogadas pontuais, sem se entregar no campo de ataque.`);
   } else if (statFav === "away") {
-    tactical = `${away} chega em melhor fase ofensiva e pode comandar boa parte das ações. ${home} provavelmente vai estudar mais a partida antes de se lançar.`;
+    tacticalParts.push(`${away} chega em melhor fase ofensiva e pode comandar boa parte das ações mesmo fora.`);
+    tacticalParts.push(`${home} tende a estudar a partida antes de se lançar — primeiro tempo de poucos riscos é provável.`);
   } else {
-    tactical = `Cenário tático equilibrado: os dois times costumam estudar o adversário antes de se expor, o que tende a deixar o jogo aberto apenas a partir da segunda etapa.`;
+    tacticalParts.push(`Cenário tático equilibrado: os dois costumam medir o adversário antes de se expor.`);
+    tacticalParts.push(`O jogo deve abrir mesmo só a partir da segunda etapa, quando o cansaço diluir o cuidado.`);
   }
+
+  // 2b. Ritmo do 1º vs 2º tempo
+  if (openProfile) {
+    tacticalParts.push(`Ritmo deve ser intenso desde cedo — equipes não costumam segurar a bola.`);
+  } else if (lowScoringProfile) {
+    tacticalParts.push(`Primeiro tempo tende a ser de poucas finalizações claras; a partida costuma se abrir só após o intervalo.`);
+  } else {
+    tacticalParts.push(`Início mais estudado é o esperado, com aceleração ofensiva real depois dos 25 minutos.`);
+  }
+
+  // 2c. Esquemas se disponíveis
   if (ctx?.lineups?.home?.formation && ctx?.lineups?.away?.formation) {
-    tactical += ` Esquema provável: ${home} ${ctx.lineups.home.formation} × ${ctx.lineups.away.formation} ${away}.`;
+    tacticalParts.push(`Esquema provável: ${home} ${ctx.lineups.home.formation} × ${ctx.lineups.away.formation} ${away}.`);
   }
+
+  const tactical = tacticalParts.join(" ");
 
   // ─── 3. INDICADORES (apenas os relevantes) ──────────────────
   const indicators: string[] = [];
@@ -276,35 +307,49 @@ export function buildMatchReadingV2(
       const mFav = oddFav === "home" ? home : away;
       const sFav = statFav === "home" ? home : away;
       bits.push(
-        `O mercado coloca ${mFav} como favorito (${(oddFav === "home" ? oddH : oddA).toFixed(2)}), mas os números mostram cenário mais favorável a ${sFav}. Possível linha inflada pelo peso do nome.`,
+        pick([
+          `O mercado respeita o peso de ${mFav} (${(oddFav === "home" ? oddH : oddA).toFixed(2)}), mas os números recentes de ${sFav} contam outra história. Linha provavelmente turbinada pelo nome.`,
+          `Mercado precifica ${mFav} como referência, só que o cenário estatístico desenha favoritismo do outro lado. Sinal clássico de armadilha pré-jogo.`,
+        ], seed),
       );
     } else if (statFav) {
       const sFav = statFav === "home" ? home : away;
       const sOdd = (statFav === "home" ? oddH : oddA).toFixed(2);
-      bits.push(
-        `Mercado reconhece o favoritismo de ${sFav} (${sOdd}) — alinhado ao que os números apontam, sem distorção evidente.`,
-      );
+      const minOdd = Math.min(oddH, oddA);
+      if (minOdd < 1.45) {
+        bits.push(`Favoritismo de ${sFav} (${sOdd}) já está totalmente precificado. O mercado parece mais confiante do que os números sustentam.`);
+      } else if (minOdd < 1.7) {
+        bits.push(`Mercado reconhece ${sFav} como favorito (${sOdd}), em linha com o que os indicadores apontam — sem distorção evidente, mas também sem prêmio.`);
+      } else {
+        bits.push(`Favoritismo existe a favor de ${sFav} (${sOdd}). Controle absoluto, não — a margem é mais magra do que o nome sugere.`);
+      }
     } else {
-      bits.push(`As odds (${oddH.toFixed(2)} × ${oddD ? oddD.toFixed(2) : "—"} × ${oddA.toFixed(2)}) refletem o equilíbrio real do confronto.`);
+      bits.push(
+        pick([
+          `Odds equilibradas (${oddH.toFixed(2)} × ${oddD ? oddD.toFixed(2) : "—"} × ${oddA.toFixed(2)}) — o mercado também não enxerga favorito claro.`,
+          `Linhas espelham o que os números mostram: confronto sem favorito convincente, decidido em detalhe.`,
+        ], seed),
+      );
     }
   }
 
   if (oddO && o25Prob) {
     const implied = (1 / oddO) * 100;
     if (o25Prob - implied >= 8)
-      bits.push(`Linha de Over 2.5 (${oddO.toFixed(2)}) parece subdimensionada frente à projeção real (${o25Prob}%) — há valor.`);
+      bits.push(`Linha de Over 2.5 (${oddO.toFixed(2)}) parece subdimensionada frente à projeção real (${o25Prob}%) — há valor disponível.`);
     else if (implied - o25Prob >= 8)
-      bits.push(`Over 2.5 está caro para o cenário real: ${o25Prob}% projetado contra ${implied.toFixed(0)}% implícita.`);
+      bits.push(`Over 2.5 está caro para o cenário: ${o25Prob}% projetado contra ${implied.toFixed(0)}% implícita no preço. Linha inflada.`);
     else
-      bits.push(`Linha de gols precificada de forma justa pelo mercado, sem distorção exploratória.`);
+      bits.push(`Linha de gols parece relativamente ajustada — pouca margem para entradas agressivas.`);
   } else if (lowScoringProfile && o25Prob < 50) {
-    bits.push(`O perfil do jogo aponta para Under com mais consistência do que Over — atenção a quem está olhando linha de gols alta.`);
+    bits.push(`O perfil do jogo aponta Under com mais consistência do que Over — quem está olhando linha de gols alta precisa redobrar a atenção.`);
   }
 
-  if (statFav && oddFav === statFav && oddH && oddA) {
-    const minOdd = Math.min(oddH, oddA);
-    if (minOdd < 1.45)
-      bits.push(`Favoritismo extremo já precificado (${minOdd.toFixed(2)}). Risco/retorno pouco atrativo na linha de vencedor.`);
+  // Frase de fechamento contextual do mercado
+  if (balanced && oddH && oddA && Math.min(oddH, oddA) >= 1.9) {
+    bits.push(`Cenário pouco confortável para handicaps agressivos — o equilíbrio reduz margem em qualquer linha exposta.`);
+  } else if (statFav && oddFav === statFav && oddH && oddA && Math.min(oddH, oddA) < 1.45) {
+    bits.push(`Risco/retorno pouco atrativo na linha de vencedor. O valor real está nos mercados específicos do jogo, não no resultado.`);
   }
   if (bits.length === 0)
     bits.push(`Mercado sem distorções claras — não há entrada óbvia apenas olhando preço. A leitura tem que vir do cenário.`);
@@ -343,6 +388,19 @@ export function buildMatchReadingV2(
     if (finalMarkets.length >= 3) break;
   }
 
+  // Amortecedor de confiança — evita percentuais exagerados em jogos sensíveis
+  const dampen = (prob: number, marketName: string): number => {
+    let cap = 85; // teto absoluto: nunca soar como certeza
+    if (balanced) cap = Math.min(cap, 74);
+    if (ctxReliab === "limitado") cap = Math.min(cap, 72);
+    if (homeN < 5 || awayN < 5) cap = Math.min(cap, 72);
+    if (marketDisagrees || injuriesOnFav) cap = Math.min(cap, 70);
+    if (fatigueOnFav) cap = Math.min(cap, 75);
+    if (goalsVsTacticConflict && /Gols|Ambas/i.test(marketName)) cap = Math.min(cap, 68);
+    if (/Handicap/i.test(marketName) && balanced) cap = Math.min(cap, 66);
+    return Math.min(prob, cap);
+  };
+
   const opportunities: ReadingOpportunity[] = finalMarkets.map((m) => {
     const reasons: string[] = [];
     if (m.market.includes("Over") && m.market.includes("Gols")) {
@@ -373,7 +431,7 @@ export function buildMatchReadingV2(
     } else {
       reasons.push(`leitura combinada aponta ${m.probability}% de chance`);
     }
-    return { market: m.market, confidence: m.probability, reasons: reasons.slice(0, 3) };
+    return { market: m.market, confidence: dampen(m.probability, m.market), reasons: reasons.slice(0, 3) };
   });
 
   // ─── 6. ALERTAS (inteligentes, não genéricos) ───────────────
@@ -440,40 +498,50 @@ export function buildMatchReadingV2(
   )
     pred = "amarelo";
 
-  // ─── 10. VEREDITO (decisão forte) ───────────────────────────
+  // ─── 10. VEREDITO (decisão, voz de analista) ────────────────
   let verdict = "";
   const topOp = opportunities[0];
   const goalsMarket = opportunities.find((o) => o.market.includes("Gols") || o.market === "Ambas Marcam");
 
   if (pred === "vermelho" && marketDisagrees) {
-    verdict = `O favoritismo de mercado não se sustenta nos números — cenário típico de armadilha. Melhor evitar a linha de vencedor e olhar mercados alternativos${goalsMarket ? `, com destaque para ${goalsMarket.market.toLowerCase()}` : ""}.`;
+    verdict = pick([
+      `O favoritismo de mercado não se sustenta nos números — cenário típico de armadilha. A leitura segura é ficar fora do vencedor e olhar mercados alternativos${goalsMarket ? `, com destaque para ${goalsMarket.market.toLowerCase()}` : ""}.`,
+      `O mercado parece mais confiante do que o desempenho recente justifica. É o tipo de jogo em que respeitar a dúvida vale mais do que insistir na linha óbvia.`,
+    ], seed);
   } else if (pred === "vermelho" && injuriesOnFav) {
-    verdict = `Lesões importantes desestabilizam o lado favorito e tornam a entrada pré-jogo arriscada. Cenário pede paciência e leitura ao vivo antes de qualquer decisão.`;
+    verdict = `Lesões importantes desestabilizam justamente o lado favorito. Cenário pede paciência: melhor confirmar comportamento ao vivo do que arriscar pré-jogo exposto.`;
   } else if (pred === "vermelho" && goalsVsTacticConflict) {
-    verdict = `Números e cenário tático entram em conflito — não há leitura segura para mercado de gols agressivo. Operar com cautela e em mercados específicos vale mais do que apostar no resultado final.`;
+    verdict = `Números e perfil tático brigam entre si — não há leitura segura para gols agressivos. Mercados conservadores ou específicos oferecem leitura melhor do que linhas amplas.`;
   } else if (topOp && topOp.confidence >= 72) {
-    verdict = `${topOp.market} (${topOp.confidence}%) é a leitura mais sólida do confronto. ${
+    verdict = `${topOp.market} (${topOp.confidence}%) aparece como a leitura mais sólida do confronto. ${
       goalsMarket && goalsMarket !== topOp
-        ? `Linhas de gols/ambas marcam aparecem como segunda camada interessante.`
-        : `Linhas de resultado oferecem menos valor que os mercados específicos do jogo.`
+        ? `Os mercados conservadores de gols oferecem leitura mais segura do que linhas agressivas de vencedor.`
+        : `O valor está aí — linhas de resultado simples entregam menos do que esse mercado específico.`
     }`;
   } else if (balanced) {
-    verdict = `Partida muito equilibrada e com baixa margem para explorar vencedor pré-jogo. ${
-      goalsMarket
-        ? `O mercado de ${goalsMarket.market.toLowerCase()} apresenta a leitura mais segura do confronto.`
-        : `Sem distorções claras — entrar somente com convicção tática.`
-    } Favoritismo existe? Em pequena dose. Domínio absoluto? Não.`;
+    verdict = pick([
+      `Partida equilibrada e com baixa margem para entradas pré-jogo muito expostas. ${
+        goalsMarket
+          ? `O mercado de ${goalsMarket.market.toLowerCase()} é o que oferece leitura mais segura.`
+          : `Sem distorções claras — só entrar com convicção tática real.`
+      } Favoritismo existe? Em pequena dose. Domínio absoluto? Não.`,
+      `É o tipo de jogo decidido em detalhe. ${
+        goalsMarket
+          ? `Linhas conservadoras de gols se sustentam melhor que qualquer entrada no vencedor.`
+          : `Melhor recuar a exposição e aguardar leitura ao vivo do que forçar entrada agora.`
+      }`,
+    ], seed);
   } else if (pred === "amarelo") {
     verdict = `Leitura razoável, mas sem favoritismo dominante. ${
       topOp
-        ? `Vale priorizar ${topOp.market.toLowerCase()} e evitar mercados de vencedor com odd curta.`
-        : `Sem entrada com convicção plena — aguardar movimentação do mercado pode ser o mais sensato.`
+        ? `Vale priorizar ${topOp.market.toLowerCase()} e fugir de mercados de vencedor com odd curta.`
+        : `Sem entrada com convicção plena — aguardar movimentação do mercado é o mais sensato.`
     }`;
   } else {
     verdict = `Cenário previsível e coerente. ${
       topOp
-        ? `${topOp.market} oferece a melhor relação risco/retorno do pré-jogo.`
-        : `Os mercados de gols apresentam melhor leitura do que as linhas de vencedor.`
+        ? `${topOp.market} oferece a melhor relação risco/retorno do pré-jogo. Os mercados específicos têm mais valor que as linhas de vencedor.`
+        : `Os mercados conservadores de gols entregam leitura mais segura do que linhas agressivas de resultado.`
     }`;
   }
 

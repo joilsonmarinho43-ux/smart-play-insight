@@ -376,7 +376,7 @@ function PoissonTab({ match }: { match: MatchData }) {
 const MatchCard = ({ match }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
   const [readingOpen, setReadingOpen] = useState(false);
-  const { reading, loading } = useMatchReading(match, readingOpen);
+  const { reading, loading, context } = useMatchReading(match, readingOpen);
 
 
   const tabs: { key: TabKey; label: string; icon: typeof BarChart3 }[] = [
@@ -476,6 +476,7 @@ const MatchCard = ({ match }: Props) => {
         loading={loading}
         homeTeam={match.homeTeam}
         awayTeam={match.awayTeam}
+        context={context}
       />
 
     </div>

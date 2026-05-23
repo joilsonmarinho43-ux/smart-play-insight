@@ -104,7 +104,7 @@ function findProb(markets: MarketAnalysis[], name: string): number {
 }
 
 export function formatBingoWhatsApp(bingoMatches: BingoMatchData[]): string {
-  const header = `🎯 *BINGO VIP — ANALISTA JOILSON*\n*Trade Esportivo Profissional*\n${'─'.repeat(30)}\n\n`;
+  const header = `🎯 *BINGO VIP — NEXUS 33*\n*Trade Esportivo Profissional*\n${'─'.repeat(30)}\n\n`;
 
   const body = bingoMatches.map(bm => {
     const matchHeader = `⚽ *${bm.homeTeam} vs ${bm.awayTeam}*\n`;

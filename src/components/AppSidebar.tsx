@@ -75,7 +75,7 @@ export function AppSidebar() {
                   filter: "drop-shadow(0 2px 8px hsl(30 90% 45% / 0.4))",
                 }}
               >
-                Analista
+                Nexus
               </span>
               <span
                 className="font-display text-[2.8rem] leading-[1] tracking-[0.1em] uppercase -mt-1"
@@ -86,7 +86,7 @@ export function AppSidebar() {
                   filter: "drop-shadow(0 2px 12px hsl(35 95% 50% / 0.5))",
                 }}
               >
-                Joilson
+                33
               </span>
               <span
                 className="mt-2 text-[0.85rem] font-bold tracking-[0.25em] uppercase"
@@ -108,7 +108,7 @@ export function AppSidebar() {
                   WebkitTextFillColor: "transparent",
                 }}
               >
-                AJ
+                N33
               </span>
             </div>
           )}

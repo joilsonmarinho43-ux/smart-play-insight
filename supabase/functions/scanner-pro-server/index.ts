@@ -326,7 +326,7 @@ function buildSniperMessage(s: SniperSignal): string {
     `✅ Status: <b>ENTRADA APROVADA</b>`,
     `📌 Stake: ${s.stake}% da banca`,
     ``,
-    `🤖 <i>Analista Joilson | Sniper Dual Mode</i>`,
+    `🤖 <i>Nexus 33 | Sniper Dual Mode</i>`,
   ].join('\n');
 }
 

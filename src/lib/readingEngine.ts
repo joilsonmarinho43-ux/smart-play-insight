@@ -684,7 +684,7 @@ export function buildMatchReadingV2(
     projectedGoals: Number(total.toFixed(1)),
     trendTags,
     premiumInsight,
-    signature: "— Analista Joilson",
+    signature: "— Nexus 33",
     summary,
     tactical,
     indicators,

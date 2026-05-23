@@ -18,7 +18,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </SidebarTrigger>
             <div className="flex items-center gap-2 ml-auto">
               <img src={globeIcon} alt="" className="w-5 h-5 object-contain" />
-              <span className="text-sm font-bold text-white tracking-wide">ANALISTA JOILSON</span>
+              <span className="text-sm font-bold text-white tracking-wide">NEXUS 33</span>
             </div>
           </header>
           <main className="flex-1">{children}</main>

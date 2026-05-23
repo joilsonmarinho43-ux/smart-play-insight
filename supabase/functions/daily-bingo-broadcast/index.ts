@@ -327,7 +327,7 @@ function buildPremiumMessage(a: MatchAnalysis): string {
   lines.push('');
   lines.push(SEP);
   lines.push('');
-  lines.push('🤖 <b>Analista Joilson</b>');
+  lines.push('🤖 <b>Nexus 33</b>');
   lines.push('📌 Modelo Híbrido Ponderado');
   return lines.join('\n');
 }

@@ -15,7 +15,7 @@ const Paywall = () => {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <Brain className="w-14 h-14 text-primary mx-auto mb-3" />
-          <h1 className="font-display text-3xl text-foreground tracking-wider">ANALISTA JOILSON</h1>
+          <h1 className="font-display text-3xl text-foreground tracking-wider">NEXUS 33</h1>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-8 space-y-6 text-center">

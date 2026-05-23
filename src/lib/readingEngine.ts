@@ -551,6 +551,12 @@ export function buildMatchReadingV2(
     alerts.push(`Perfil tático truncado conflita com Over 2.5 alto — confiar no contexto, não só no número.`);
   if (homeImpact === "alto" && awayImpact === "alto")
     alerts.push(`Os dois lados chegam desfalcados — a leitura pré-jogo perde precisão e pede confirmação ao vivo.`);
+  const hasCornerOp = opportunities.some((o) => /Cantos|Escanteios/i.test(o.market));
+  const hasCardOp = opportunities.some((o) => /Cart[õo]es|Amarelos/i.test(o.market));
+  if (!hasCornerOp && hCorners != null && aCorners != null)
+    alerts.push(`Sem valor estatístico relevante para escanteios pré-jogo — cenário não sustenta entrada.`);
+  if (!hasCardOp && hCards != null && aCards != null)
+    alerts.push(`Mercado disciplinar sem valor estatístico relevante — contexto frio para cartões.`);
   if (alerts.length === 0)
     alerts.push(`Sem sinais de alerta relevantes — leitura limpa, dá para confiar no que os números mostram.`);
 

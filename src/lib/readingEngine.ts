@@ -79,12 +79,31 @@ const bayes = (avg: number, league: number, n: number, k = 3) =>
   n <= 0 ? league : (n * avg + k * league) / (n + k);
 
 function topScores(hL: number, aL: number, n = 3) {
-  const items: { s: string; p: number }[] = [];
-  for (let h = 0; h <= 5; h++)
-    for (let a = 0; a <= 5; a++)
-      items.push({ s: `${h}-${a}`, p: poisson(hL, h) * poisson(aL, a) });
+  const max = Math.max(5, Math.ceil(hL + aL) + 2);
+  const items: { s: string; p: number; h: number; a: number }[] = [];
+  let totalMass = 0;
+  for (let h = 0; h <= max; h++)
+    for (let a = 0; a <= max; a++) {
+      const p = poisson(hL, h) * poisson(aL, a);
+      totalMass += p;
+      items.push({ s: `${h}-${a}`, p, h, a });
+    }
   items.sort((x, y) => y.p - x.p);
-  return items.slice(0, n).map((i) => i.s);
+  // Diversidade: evita 3 placares com mesmo total de gols (ex.: 1-1, 1-0, 0-0 todos baixos)
+  const out: typeof items = [];
+  const totalsSeen = new Map<number, number>();
+  for (const it of items) {
+    const tot = it.h + it.a;
+    const seen = totalsSeen.get(tot) ?? 0;
+    if (seen >= 2) continue; // no máx. 2 placares com mesmo total
+    out.push(it);
+    totalsSeen.set(tot, seen + 1);
+    if (out.length >= n) break;
+  }
+  return out.map((i) => {
+    const pct = Math.round((i.p / (totalMass || 1)) * 100);
+    return `${i.s} (${pct}%)`;
+  });
 }
 const fmt = (n: number, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : "—");
 const pick = <T,>(arr: T[], seed: number): T => arr[Math.abs(seed) % arr.length];

@@ -66,6 +66,10 @@ export interface MatchReadingV2 {
   predictability: "verde" | "amarelo" | "vermelho";
   verdict: string;
   contextQuality: "completo" | "parcial" | "limitado";
+  projectedGoals: number;
+  trendTags: string[];
+  premiumInsight: string;
+  signature: string;
 }
 
 // ─── Math ─────────────────────────────────────────────────────

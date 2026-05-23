@@ -506,6 +506,15 @@ export function buildMatchReadingV2(
     return { market: m.market, confidence: dampen(m.probability, m.market), reasons: reasons.slice(0, 3) };
   });
 
+  // Variação anti-template: garante que confianças não fiquem todas iguais
+  const seenConf = new Set<number>();
+  opportunities.forEach((op, idx) => {
+    let c = op.confidence;
+    while (seenConf.has(c)) c = Math.max(58, c - 1 - (idx % 2));
+    seenConf.add(c);
+    op.confidence = c;
+  });
+
   // ─── 6. ALERTAS (inteligentes, não genéricos) ───────────────
   const alerts: string[] = [];
   if (ctxReliab === "limitado")

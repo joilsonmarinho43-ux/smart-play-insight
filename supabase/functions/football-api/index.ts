@@ -630,6 +630,16 @@ serve(async (req) => {
     let fixtures = fixturesData?.response || [];
     console.log(`Got ${fixtures.length} total fixtures`);
 
+    // Fallback: API vazia/bloqueada por quota → serve cache stale se existir
+    if (fixtures.length === 0) {
+      const stale = await dbCacheGetStale(preCk);
+      if (stale && Array.isArray(stale.matches) && stale.matches.length > 0) {
+        console.log(`[stale-fallback] Serving ${stale.matches.length} cached matches for ${date} (API empty/quota)`);
+        memSet(`date_v14_${date}`, stale);
+        return new Response(JSON.stringify(stale), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';
       return status === 'NS' && LEAGUES_TO_ANALYZE.includes(f.league?.id);

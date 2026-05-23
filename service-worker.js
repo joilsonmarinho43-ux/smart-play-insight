@@ -1,4 +1,4 @@
-const CACHE_NAME = "analista-joilson-v3";
+const CACHE_NAME = "nexus-33-v3";
 const PRECACHE_URLS = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {

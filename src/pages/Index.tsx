@@ -228,7 +228,7 @@ const Index = () => {
         <div className="mt-6 relative overflow-hidden rounded-2xl shadow-2xl shadow-primary/10 max-w-3xl mx-auto">
           <img
             src={bannerImg}
-            alt="Analista Joilson"
+            alt="Nexus 33"
             className="w-full h-auto block rounded-2xl"
           />
           <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-primary/30">

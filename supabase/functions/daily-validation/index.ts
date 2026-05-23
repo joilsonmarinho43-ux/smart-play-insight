@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
           '🎯 <b>Mercados validados:</b>',
           ...lines,
           '',
-          '🤖 <i>Analista Joilson — Validação automática</i>',
+          '🤖 <i>Nexus 33 — Validação automática</i>',
         ].join('\n');
 
         const er = await editTelegramMessage(TELEGRAM_CHAT_ID, msgId, text, {
@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
       '<b>Por tipo de mercado:</b>',
       ...typeLines,
       '',
-      '🤖 <i>Analista Joilson • Relatório Automático</i>',
+      '🤖 <i>Nexus 33 • Relatório Automático</i>',
     ].join('\n');
 
     const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, summary, {

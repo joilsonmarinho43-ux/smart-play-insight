@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
       `${confBar} <b>${payload.confidence}%</b>`,
       payload.janela ? `🕐 ${payload.janela}` : null,
       ``,
-      `🤖 <i>Analista Joilson</i>`,
+      `🤖 <i>Nexus 33</i>`,
     ].filter(Boolean).join('\n');
 
     let telegramSuccess = false;

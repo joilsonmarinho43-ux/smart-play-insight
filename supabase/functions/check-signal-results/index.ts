@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
             ``,
             `${resultEmoji} <b>${resultLabel}</b> • Final: <b>${data.homeGoals} x ${data.awayGoals}</b>`,
             ``,
-            `🤖 <i>Analista Joilson</i>`,
+            `🤖 <i>Nexus 33</i>`,
           ].join('\n');
 
           const tgResp = await editTelegramMessage(CHAT_ID, signal.telegram_message_id, updatedText, {

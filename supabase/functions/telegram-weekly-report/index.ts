@@ -87,7 +87,7 @@ ${lucroEmoji} <b>ESTIMATIVA FINANCEIRA</b>
 └ ROI: <b>${roi}%</b>
 
 ━━━━━━━━━━━━━━━━━━━━━━
-🤖 <i>Analista Joilson — Relatório Automático</i>
+🤖 <i>Nexus 33 — Relatório Automático</i>
     `.trim();
 
     const tg = await sendTelegramMessage(TELEGRAM_CHAT_ID, message, {

@@ -81,7 +81,7 @@ const Auth = () => {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <Brain className="w-12 h-12 text-primary mx-auto mb-3" />
-          <h1 className="font-display text-3xl text-foreground tracking-wider">ANALISTA JOILSON</h1>
+          <h1 className="font-display text-3xl text-foreground tracking-wider">NEXUS 33</h1>
           <p className="text-xs text-muted-foreground tracking-widest uppercase mt-1">Modelo Híbrido Ponderado</p>
         </div>
 

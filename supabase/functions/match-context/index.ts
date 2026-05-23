@@ -252,7 +252,7 @@ serve(async (req) => {
       await Promise.all([
         apiGet(`fixtures/lineups?fixture=${fixtureId}`, apiKey),
         apiGet(`injuries?fixture=${fixtureId}`, apiKey),
-        apiGet(`odds?fixture=${fixtureId}`, apiKey),
+        getOddsCached(fixtureId!, apiKey),
         leagueId && season
           ? apiGet(`standings?league=${leagueId}&season=${season}`, apiKey)
           : Promise.resolve(null),

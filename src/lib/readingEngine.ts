@@ -79,12 +79,31 @@ const bayes = (avg: number, league: number, n: number, k = 3) =>
   n <= 0 ? league : (n * avg + k * league) / (n + k);
 
 function topScores(hL: number, aL: number, n = 3) {
-  const items: { s: string; p: number }[] = [];
-  for (let h = 0; h <= 5; h++)
-    for (let a = 0; a <= 5; a++)
-      items.push({ s: `${h}-${a}`, p: poisson(hL, h) * poisson(aL, a) });
+  const max = Math.max(5, Math.ceil(hL + aL) + 2);
+  const items: { s: string; p: number; h: number; a: number }[] = [];
+  let totalMass = 0;
+  for (let h = 0; h <= max; h++)
+    for (let a = 0; a <= max; a++) {
+      const p = poisson(hL, h) * poisson(aL, a);
+      totalMass += p;
+      items.push({ s: `${h}-${a}`, p, h, a });
+    }
   items.sort((x, y) => y.p - x.p);
-  return items.slice(0, n).map((i) => i.s);
+  // Diversidade: evita 3 placares com mesmo total de gols (ex.: 1-1, 1-0, 0-0 todos baixos)
+  const out: typeof items = [];
+  const totalsSeen = new Map<number, number>();
+  for (const it of items) {
+    const tot = it.h + it.a;
+    const seen = totalsSeen.get(tot) ?? 0;
+    if (seen >= 2) continue; // no máx. 2 placares com mesmo total
+    out.push(it);
+    totalsSeen.set(tot, seen + 1);
+    if (out.length >= n) break;
+  }
+  return out.map((i) => {
+    const pct = Math.round((i.p / (totalMass || 1)) * 100);
+    return `${i.s} (${pct}%)`;
+  });
 }
 const fmt = (n: number, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : "—");
 const pick = <T,>(arr: T[], seed: number): T => arr[Math.abs(seed) % arr.length];
@@ -560,8 +579,35 @@ export function buildMatchReadingV2(
   if (alerts.length === 0)
     alerts.push(`Sem sinais de alerta relevantes — leitura limpa, dá para confiar no que os números mostram.`);
 
-  // ─── 7. PLACARES ────────────────────────────────────────────
-  const likelyScores = topScores(hL, aL, 3);
+  // ─── 7. PLACARES (λ ajustado por contexto real) ─────────────
+  let hLs = hL;
+  let aLs = aL;
+  // Lesões em peças ofensivas reduzem produção; defensivas fragilizam
+  if (homeImpact === "alto") { hLs *= 0.88; aLs *= 1.05; }
+  else if (homeImpact === "médio") { hLs *= 0.95; }
+  if (awayImpact === "alto") { aLs *= 0.85; hLs *= 1.06; }
+  else if (awayImpact === "médio") { aLs *= 0.94; }
+  // Motivação real (briga por título/classificação intensifica; meio-tabela esfria)
+  if (homeMot === "título" || homeMot === "classificação") hLs *= 1.05;
+  if (awayMot === "título" || awayMot === "classificação") aLs *= 1.05;
+  if (homeMot === "rebaixamento") hLs *= 0.96;
+  if (awayMot === "rebaixamento") aLs *= 0.94;
+  if (homeMot === "meio-tabela" && awayMot === "meio-tabela") { hLs *= 0.95; aLs *= 0.95; }
+  // Calendário pesado / pouco descanso derruba intensidade
+  if (homeLoad >= 3 || (homeRest != null && homeRest <= 2)) hLs *= 0.93;
+  if (awayLoad >= 3 || (awayRest != null && awayRest <= 2)) aLs *= 0.91;
+  // Drift de odds (mercado movendo para um lado é sinal real de força)
+  if (oddH && oddA) {
+    if (oddFav === "home" && oddH <= 1.6) hLs *= 1.04;
+    if (oddFav === "away" && oddA <= 1.7) aLs *= 1.05;
+  }
+  // Perfil tático ajusta dispersão
+  if (lowScoringProfile) { hLs *= 0.92; aLs *= 0.92; }
+  if (openProfile) { hLs *= 1.04; aLs *= 1.04; }
+  // Clamp para evitar extremos absurdos
+  hLs = Math.max(0.15, Math.min(hLs, 3.8));
+  aLs = Math.max(0.10, Math.min(aLs, 3.4));
+  const likelyScores = topScores(hLs, aLs, 3);
 
   // ─── 8. TIMING (perfil tático real) ─────────────────────────
   const timing = {

@@ -87,6 +87,9 @@ async function dbCacheGetStale(cacheKey: string): Promise<any | null> {
   } catch {
     return null;
   }
+}
+
+
 
 async function dbCacheSet(cacheKey: string, dados: any, statusJogo: string): Promise<void> {
   try {

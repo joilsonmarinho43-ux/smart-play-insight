@@ -72,6 +72,25 @@ async function dbCacheGet(cacheKey: string, statusJogo: string): Promise<any | n
   }
 }
 
+// Retorna o cache mesmo se vencido (TTL ignorado). Usado como fallback
+// quando a API externa está com quota bloqueada / fora do ar.
+async function dbCacheGetStale(cacheKey: string): Promise<any | null> {
+  try {
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb
+      .from("cache_api")
+      .select("dados_json")
+      .eq("cache_key", cacheKey)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data.dados_json;
+  } catch {
+    return null;
+  }
+}
+
+
+
 async function dbCacheSet(cacheKey: string, dados: any, statusJogo: string): Promise<void> {
   try {
     const sb = getSupabaseAdmin();
@@ -613,6 +632,16 @@ serve(async (req) => {
     const fixturesData = await fetchWithAuth(`fixtures?date=${date}`, apiKey);
     let fixtures = fixturesData?.response || [];
     console.log(`Got ${fixtures.length} total fixtures`);
+
+    // Fallback: API vazia/bloqueada por quota → serve cache stale se existir
+    if (fixtures.length === 0) {
+      const stale = await dbCacheGetStale(preCk);
+      if (stale && Array.isArray(stale.matches) && stale.matches.length > 0) {
+        console.log(`[stale-fallback] Serving ${stale.matches.length} cached matches for ${date} (API empty/quota)`);
+        memSet(`date_v14_${date}`, stale);
+        return new Response(JSON.stringify(stale), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     fixtures = fixtures.filter((f: any) => {
       const status = f.fixture?.status?.short || '';

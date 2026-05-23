@@ -457,7 +457,7 @@ export function buildMatchReadingV2(
     if (m.market.includes("Over") && finalMarkets.some((x) => x.market.includes("Under"))) continue;
     if (m.market.includes("Under") && finalMarkets.some((x) => x.market.includes("Over"))) continue;
     finalMarkets.push(m);
-    if (finalMarkets.length >= 3) break;
+    if (finalMarkets.length >= 4) break;
   }
 
   // Amortecedor de confiança — evita percentuais exagerados em jogos sensíveis

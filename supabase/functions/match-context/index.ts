@@ -45,6 +45,37 @@ async function cacheSet(key: string, value: any) {
   }
 }
 
+// Cache dedicado para odds: 1x ao dia (24h) para preservar cota da API
+const ODDS_TTL_MS = 24 * 60 * 60 * 1000;
+async function getOddsCached(fixtureId: number, apiKey: string) {
+  const key = `odds_day_${fixtureId}`;
+  try {
+    const { data } = await sb()
+      .from("cache_api")
+      .select("dados_json, ultima_atualizacao")
+      .eq("cache_key", key)
+      .maybeSingle();
+    if (data) {
+      const age = Date.now() - new Date(data.ultima_atualizacao).getTime();
+      if (age < ODDS_TTL_MS) return data.dados_json;
+    }
+  } catch {}
+  const fresh = await apiGet(`odds?fixture=${fixtureId}`, apiKey);
+  if (fresh) {
+    try {
+      await sb().from("cache_api").upsert({
+        cache_key: key,
+        dados_json: fresh,
+        status_jogo: "PRE",
+        ultima_atualizacao: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn("odds cache set fail", e);
+    }
+  }
+  return fresh;
+}
+
 async function apiGet(path: string, apiKey: string): Promise<any> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);

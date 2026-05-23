@@ -579,8 +579,35 @@ export function buildMatchReadingV2(
   if (alerts.length === 0)
     alerts.push(`Sem sinais de alerta relevantes — leitura limpa, dá para confiar no que os números mostram.`);
 
-  // ─── 7. PLACARES ────────────────────────────────────────────
-  const likelyScores = topScores(hL, aL, 3);
+  // ─── 7. PLACARES (λ ajustado por contexto real) ─────────────
+  let hLs = hL;
+  let aLs = aL;
+  // Lesões em peças ofensivas reduzem produção; defensivas fragilizam
+  if (homeImpact === "alto") { hLs *= 0.88; aLs *= 1.05; }
+  else if (homeImpact === "médio") { hLs *= 0.95; }
+  if (awayImpact === "alto") { aLs *= 0.85; hLs *= 1.06; }
+  else if (awayImpact === "médio") { aLs *= 0.94; }
+  // Motivação real (briga por título/classificação intensifica; meio-tabela esfria)
+  if (homeMot === "título" || homeMot === "classificação") hLs *= 1.05;
+  if (awayMot === "título" || awayMot === "classificação") aLs *= 1.05;
+  if (homeMot === "rebaixamento") hLs *= 0.96;
+  if (awayMot === "rebaixamento") aLs *= 0.94;
+  if (homeMot === "meio-tabela" && awayMot === "meio-tabela") { hLs *= 0.95; aLs *= 0.95; }
+  // Calendário pesado / pouco descanso derruba intensidade
+  if (homeLoad >= 3 || (homeRest != null && homeRest <= 2)) hLs *= 0.93;
+  if (awayLoad >= 3 || (awayRest != null && awayRest <= 2)) aLs *= 0.91;
+  // Drift de odds (mercado movendo para um lado é sinal real de força)
+  if (oddH && oddA) {
+    if (oddFav === "home" && oddH <= 1.6) hLs *= 1.04;
+    if (oddFav === "away" && oddA <= 1.7) aLs *= 1.05;
+  }
+  // Perfil tático ajusta dispersão
+  if (lowScoringProfile) { hLs *= 0.92; aLs *= 0.92; }
+  if (openProfile) { hLs *= 1.04; aLs *= 1.04; }
+  // Clamp para evitar extremos absurdos
+  hLs = Math.max(0.15, Math.min(hLs, 3.8));
+  aLs = Math.max(0.10, Math.min(aLs, 3.4));
+  const likelyScores = topScores(hLs, aLs, 3);
 
   // ─── 8. TIMING (perfil tático real) ─────────────────────────
   const timing = {

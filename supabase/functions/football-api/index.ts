@@ -37,7 +37,7 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 // ========================
 const CACHE_TTL = {
   LIVE: 4 * 60 * 1000,        // 4 minutes (was 2) — covers 5min cron with overlap
-  PRE: 12 * 60 * 60 * 1000,   // 12 hours
+  PRE: 24 * 60 * 60 * 1000,   // 24 hours — evita recálculo pesado no meio do dia
   FINISHED: Infinity,          // Never expires
   STATS: 24 * 60 * 60 * 1000, // 24 hours for fixture stats
 };
@@ -481,13 +481,21 @@ serve(async (req) => {
       });
     }
 
+    const body = await req.json().catch(() => ({}));
+    const isHealthCheck = body?.health === true || body?.ping === true;
     const apiKey = Deno.env.get("API_FUTEBOL_KEY");
+
+    if (isHealthCheck) {
+      return new Response(JSON.stringify({ ok: true, apiKeyConfigured: Boolean(apiKey), apiCalls: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "API key missing", matches: [] }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const body = await req.json().catch(() => ({}));
     const isLive = body?.live === true;
     const fixtureId = body?.fixture;
     const date = body?.date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());

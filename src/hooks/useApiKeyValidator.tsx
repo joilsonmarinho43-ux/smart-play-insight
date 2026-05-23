@@ -17,9 +17,8 @@ export function useApiKeyValidator() {
 
     const validate = async () => {
       try {
-        const today = new Date().toISOString().split('T')[0];
         const { data, error } = await supabase.functions.invoke('football-api', {
-          body: { date: today },
+          body: { health: true },
         });
 
         if (error) {
@@ -30,12 +29,12 @@ export function useApiKeyValidator() {
           return;
         }
 
-        // Se voltou error explícito da API (ex: token inválido)
-        if (data?.error || data?.errors) {
+        // Se voltou error explícito da configuração
+        if (data?.error || data?.errors || data?.apiKeyConfigured === false) {
           const msg =
             typeof data.error === 'string'
               ? data.error
-              : data.errors?.token || data.errors?.requests || 'Chave inválida ou cota excedida.';
+              : data.errors?.token || data.errors?.requests || 'Chave da API não configurada.';
           toast.error('API de futebol indisponível', {
             description: String(msg),
             duration: 8000,

@@ -231,10 +231,6 @@ const Index = () => {
             alt="Nexus 33"
             className="w-full h-auto block rounded-2xl"
           />
-          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-primary/30">
-            <span className="text-3xl font-black text-primary tabular-nums leading-none">{dayMatches.length}</span>
-            <span className="text-sm text-muted-foreground ml-2">jogos</span>
-          </div>
         </div>
 
         {/* Telegram Group CTA */}

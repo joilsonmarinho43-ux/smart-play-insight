@@ -349,11 +349,7 @@ serve(async (req) => {
     const haveLineups = !!homeLineup || !!awayLineup;
     const haveOdds = !!oddsOut;
     const haveStandings = table.length > 0;
-    const haveInjuries =
-      (injuriesOut?.home?.list?.length ?? 0) > 0 ||
-      (injuriesOut?.away?.list?.length ?? 0) > 0 ||
-      injuriesOut?.home?.impact === "baixo" ||
-      injuriesOut?.away?.impact === "baixo";
+    const haveInjuries = injuries !== null; // chamada respondeu (mesmo que vazia)
     const haveRecent = (hRecent?.length ?? 0) > 0 && (aRecent?.length ?? 0) > 0;
 
     const kickoffMs = kickoffISO ? new Date(kickoffISO).getTime() : 0;

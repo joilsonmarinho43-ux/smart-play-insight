@@ -481,13 +481,21 @@ serve(async (req) => {
       });
     }
 
+    const body = await req.json().catch(() => ({}));
+    const isHealthCheck = body?.health === true || body?.ping === true;
     const apiKey = Deno.env.get("API_FUTEBOL_KEY");
+
+    if (isHealthCheck) {
+      return new Response(JSON.stringify({ ok: true, apiKeyConfigured: Boolean(apiKey), apiCalls: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "API key missing", matches: [] }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const body = await req.json().catch(() => ({}));
     const isLive = body?.live === true;
     const fixtureId = body?.fixture;
     const date = body?.date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());

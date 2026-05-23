@@ -345,14 +345,27 @@ serve(async (req) => {
       }
     }
 
-    // Reliability
+    // Reliability — considera distância do kickoff (escalações só saem ~1h antes)
     const haveLineups = !!homeLineup || !!awayLineup;
     const haveOdds = !!oddsOut;
     const haveStandings = table.length > 0;
-    const score =
-      (haveLineups ? 1 : 0) + (haveOdds ? 1 : 0) + (haveStandings ? 1 : 0);
+    const haveInjuries = injuries !== null; // chamada respondeu (mesmo que vazia)
+    const haveRecent = (hRecent?.length ?? 0) > 0 && (aRecent?.length ?? 0) > 0;
+
+    const kickoffMs = kickoffISO ? new Date(kickoffISO).getTime() : 0;
+    const hoursToKickoff = kickoffMs ? (kickoffMs - Date.now()) / 3600000 : 0;
+    const lineupsExpected = hoursToKickoff <= 1.5 && hoursToKickoff >= -2;
+
+    let score = 0;
+    if (haveOdds) score += 1;
+    if (haveStandings) score += 1;
+    if (haveRecent) score += 1;
+    if (haveInjuries) score += 1;
+    if (lineupsExpected && haveLineups) score += 1;
+    else if (!lineupsExpected) score += 1; // não penaliza ausência de escalação cedo
+
     const reliability =
-      score >= 3 ? "completo" : score >= 1 ? "parcial" : "limitado";
+      score >= 4 ? "completo" : score >= 2 ? "parcial" : "limitado";
 
     const result = {
       lineups: lineupsOut,

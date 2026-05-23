@@ -37,7 +37,7 @@ function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 // ========================
 const CACHE_TTL = {
   LIVE: 4 * 60 * 1000,        // 4 minutes (was 2) — covers 5min cron with overlap
-  PRE: 12 * 60 * 60 * 1000,   // 12 hours
+  PRE: 24 * 60 * 60 * 1000,   // 24 hours — evita recálculo pesado no meio do dia
   FINISHED: Infinity,          // Never expires
   STATS: 24 * 60 * 60 * 1000, // 24 hours for fixture stats
 };

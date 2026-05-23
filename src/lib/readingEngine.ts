@@ -487,13 +487,23 @@ export function buildMatchReadingV2(
       reasons.push(`ataques somam ${fmt(hGF + aGF)} gols/jogo`);
       if (homeLeaks && awayLeaks) reasons.push(`as duas defesas dão brechas com frequência`);
     } else if (m.market.includes("Cantos") || m.market.includes("Escanteios")) {
-      if (hCorners != null && aCorners != null)
-        reasons.push(`média combinada de ${fmt(hCorners + aCorners)} escanteios por jogo`);
-      if (statFav) reasons.push(`o favorito tende a empilhar pressão ofensiva`);
+      const tot = (hCorners ?? 0) + (aCorners ?? 0);
+      if (tot > 0) reasons.push(`média combinada de ${fmt(tot)} escanteios nos últimos jogos`);
+      if (hCorners != null && aCorners != null && tot >= 10)
+        reasons.push(`pressão lateral consistente nos dois lados — boa parte das chances nasce de cruzamento`);
+      else if (balanced && openProfile)
+        reasons.push(`equilíbrio e ritmo aberto favorecem volume de bola parada ofensiva`);
+      else if (statFav && Math.abs(diff) < 0.8)
+        reasons.push(`favorito empilha posse no campo de ataque sem dominar o placar`);
     } else if (m.market.includes("Cartões") || m.market.includes("Amarelos")) {
-      if (hCards != null && aCards != null)
-        reasons.push(`${fmt(hCards + aCards)} amarelos por jogo nas duas equipes`);
-      if (physicalProfile) reasons.push(`perfil físico esperado favorece o mercado`);
+      const totC = (hCards ?? 0) + (aCards ?? 0);
+      if (totC > 0) reasons.push(`${fmt(totC)} amarelos por jogo somando as duas equipes`);
+      if (physicalProfile && balanced)
+        reasons.push(`confronto com características físicas acima da média e disputa parelha`);
+      else if (physicalProfile)
+        reasons.push(`perfil disciplinar agressivo das equipes sustenta a leitura`);
+      if (homeMot === "luta contra rebaixamento" || awayMot === "luta contra rebaixamento")
+        reasons.push(`tensão competitiva eleva o nível de faltas táticas`);
     } else if (m.market === "Vitória Casa") {
       reasons.push(`${home} chega em melhor fase ofensiva como mandante`);
       if (oddH) reasons.push(`mercado precifica em ${oddH.toFixed(2)}`);
@@ -541,6 +551,12 @@ export function buildMatchReadingV2(
     alerts.push(`Perfil tático truncado conflita com Over 2.5 alto — confiar no contexto, não só no número.`);
   if (homeImpact === "alto" && awayImpact === "alto")
     alerts.push(`Os dois lados chegam desfalcados — a leitura pré-jogo perde precisão e pede confirmação ao vivo.`);
+  const hasCornerOp = opportunities.some((o) => /Cantos|Escanteios/i.test(o.market));
+  const hasCardOp = opportunities.some((o) => /Cart[õo]es|Amarelos/i.test(o.market));
+  if (!hasCornerOp && hCorners != null && aCorners != null)
+    alerts.push(`Sem valor estatístico relevante para escanteios pré-jogo — cenário não sustenta entrada.`);
+  if (!hasCardOp && hCards != null && aCards != null)
+    alerts.push(`Mercado disciplinar sem valor estatístico relevante — contexto frio para cartões.`);
   if (alerts.length === 0)
     alerts.push(`Sem sinais de alerta relevantes — leitura limpa, dá para confiar no que os números mostram.`);
 

@@ -227,53 +227,137 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
   }
 
   // ════════════════════════════════════════
-  // MERCADO: ESCANTEIOS
+  // MERCADO: ESCANTEIOS (contextual, com filtro de qualidade)
   // ════════════════════════════════════════
   if (!isLive) {
     const hCorners = match.modelData?.homeCornersAvg || (match as any).homeStats?.corners || 0;
     const aCorners = match.modelData?.awayCornersAvg || (match as any).awayStats?.corners || 0;
     const totalCorners = hCorners + aCorners;
 
-    if (totalCorners > 0) {
-      const o55 = Math.round(poissonOver(totalCorners, 6) * 100);
-      if (o55 >= 40) {
-        markets.push({ market: 'Over 5.5 Cantos', probability: Math.min(95, o55), risk: o55 > 80 ? 'Baixo' : 'Médio', category: 'corners' });
+    // Contexto ofensivo do confronto
+    const hGFc = match.modelData?.homeGoalsAvg ?? 0;
+    const aGFc = match.modelData?.awayGoalsAvg ?? 0;
+    const goalsTotal = hGFc + aGFc;
+    const goalDiff = Math.abs(hGFc - aGFc);
+
+    const balanced = goalDiff < 0.4;
+    const offensiveProfile = goalsTotal >= 2.7;
+    const lowProduction = goalsTotal < 2.0;
+    const lateralPressure = totalCorners >= 10;        // jogo pelos lados
+    const extremeFavorite = goalDiff >= 1.0;            // tendência de jogo morto após vantagem
+    const sampleOk = totalCorners > 0 &&
+      ((match.sampleSize?.homeGames ?? 0) + (match.sampleSize?.awayGames ?? 0) >= 6);
+
+    if (sampleOk) {
+      // Ajuste contextual no λ esperado de escanteios
+      let cornerLambda = totalCorners;
+      if (offensiveProfile && balanced) cornerLambda *= 1.05;
+      if (lateralPressure) cornerLambda *= 1.04;
+      if (lowProduction) cornerLambda *= 0.88;
+      if (extremeFavorite) cornerLambda *= 0.92;
+
+      // Bônus/penalidade de confiança pelo contexto
+      let ctxBonus = 0;
+      if (balanced && (offensiveProfile || lateralPressure)) ctxBonus += 7;
+      if (extremeFavorite) ctxBonus -= 10;
+      if (lowProduction) ctxBonus -= 12;
+
+      const MIN_QUALITY = 70;
+
+      // Linhas baixas (5.5 e 7.5) — comportamento real esperado
+      const o55 = Math.round(poissonOver(cornerLambda, 6) * 100) + ctxBonus;
+      if (o55 >= MIN_QUALITY && !lowProduction) {
+        markets.push({
+          market: 'Over 5.5 Cantos',
+          probability: Math.min(90, o55),
+          risk: o55 >= 78 ? 'Baixo' : 'Médio',
+          category: 'corners',
+        });
       }
 
-      const o75 = Math.round(poissonOver(totalCorners, 8) * 100);
-      if (o75 >= 30) {
-        markets.push({ market: 'Over 7.5 Cantos', probability: Math.min(95, o75), risk: o75 > 70 ? 'Baixo' : 'Médio', category: 'corners' });
+      const o75 = Math.round(poissonOver(cornerLambda, 8) * 100) + ctxBonus;
+      if (o75 >= MIN_QUALITY && !lowProduction && !extremeFavorite) {
+        markets.push({
+          market: 'Over 7.5 Cantos',
+          probability: Math.min(88, o75),
+          risk: o75 >= 78 ? 'Baixo' : 'Médio',
+          category: 'corners',
+        });
       }
 
-      const o95 = Math.round(poissonOver(totalCorners, 10) * 100);
-      if (o95 >= 20) {
-        markets.push({ market: 'Over 9.5 Cantos', probability: Math.min(90, o95), risk: 'Alto', category: 'corners' });
+      // Linhas altas (9.5+) apenas com evidência forte — evita recomendação automática
+      const o95 = Math.round(poissonOver(cornerLambda, 10) * 100) + ctxBonus;
+      if (o95 >= 78 && offensiveProfile && lateralPressure && balanced && !extremeFavorite) {
+        markets.push({
+          market: 'Over 9.5 Cantos',
+          probability: Math.min(84, o95),
+          risk: 'Médio',
+          category: 'corners',
+        });
       }
     }
   }
 
   // ════════════════════════════════════════
-  // MERCADO: CARTÕES
+  // MERCADO: CARTÕES (contextual, filtro disciplinar)
   // ════════════════════════════════════════
   if (!isLive) {
     const hCards = match.modelData?.homeCardsAvg || (match as any).homeStats?.yellowCards || 0;
     const aCards = match.modelData?.awayCardsAvg || (match as any).awayStats?.yellowCards || 0;
     const totalCards = hCards + aCards;
 
-    if (totalCards > 0) {
-      const o25c = Math.round(poissonOver(totalCards, 3) * 100);
-      if (o25c >= 30) {
-        markets.push({ market: 'Over 2.5 Cartões', probability: Math.min(95, o25c), risk: o25c > 75 ? 'Baixo' : 'Médio', category: 'cards' });
+    // Proxies de intensidade (sem dados de árbitro, usamos perfil disciplinar das equipes)
+    const hGFc = match.modelData?.homeGoalsAvg ?? 0;
+    const aGFc = match.modelData?.awayGoalsAvg ?? 0;
+    const goalDiff = Math.abs(hGFc - aGFc);
+    const balanced = goalDiff < 0.4;
+
+    const peaceful = totalCards > 0 && totalCards < 3.6;     // jogo frio
+    const physical = totalCards >= 5;                         // tensão real
+    const veryPhysical = totalCards >= 6;                     // confronto agressivo
+    const sampleOk = totalCards > 0 &&
+      ((match.sampleSize?.homeGames ?? 0) + (match.sampleSize?.awayGames ?? 0) >= 6);
+
+    if (sampleOk && !peaceful) {
+      let cardsLambda = totalCards;
+      if (balanced && physical) cardsLambda *= 1.06;
+      if (veryPhysical) cardsLambda *= 1.04;
+
+      let ctxBonus = 0;
+      if (veryPhysical && balanced) ctxBonus += 7;
+      if (!physical) ctxBonus -= 8;
+
+      const MIN_QUALITY = 70;
+
+      const o25c = Math.round(poissonOver(cardsLambda, 3) * 100) + ctxBonus;
+      if (o25c >= MIN_QUALITY && physical) {
+        markets.push({
+          market: 'Over 2.5 Cartões',
+          probability: Math.min(92, o25c),
+          risk: o25c >= 78 ? 'Baixo' : 'Médio',
+          category: 'cards',
+        });
       }
 
-      const o35c = Math.round(poissonOver(totalCards, 4) * 100);
-      if (o35c >= 20) {
-        markets.push({ market: 'Over 3.5 Cartões', probability: Math.min(90, o35c), risk: o35c > 65 ? 'Médio' : 'Alto', category: 'cards' });
+      const o35c = Math.round(poissonOver(cardsLambda, 4) * 100) + ctxBonus;
+      if (o35c >= MIN_QUALITY && physical && balanced) {
+        markets.push({
+          market: 'Over 3.5 Cartões',
+          probability: Math.min(88, o35c),
+          risk: o35c >= 76 ? 'Médio' : 'Alto',
+          category: 'cards',
+        });
       }
 
-      const o45c = Math.round(poissonOver(totalCards, 5) * 100);
-      if (o45c >= 15) {
-        markets.push({ market: 'Over 4.5 Cartões', probability: Math.min(85, o45c), risk: 'Alto', category: 'cards' });
+      // Over 4.5 só com confronto realmente agressivo e equilibrado
+      const o45c = Math.round(poissonOver(cardsLambda, 5) * 100) + ctxBonus;
+      if (o45c >= 72 && veryPhysical && balanced) {
+        markets.push({
+          market: 'Over 4.5 Cartões',
+          probability: Math.min(82, o45c),
+          risk: 'Alto',
+          category: 'cards',
+        });
       }
     }
   }

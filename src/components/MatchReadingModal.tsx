@@ -423,9 +423,37 @@ export const MatchReadingModal = ({
               </div>
             </Section>
 
-            <Section icon={Sparkles} title="📌 Veredito Final">
+            <Section icon={Gauge} title="Projeções Matemáticas">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="text-sm">⚽ Gols projetados:</span>
+                <span className="font-display text-lg text-primary font-bold">
+                  {reading.projectedGoals.toFixed(1)}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-xs text-muted-foreground self-center mr-1">📈 Tendência:</span>
+                {reading.trendTags.map((t, k) => (
+                  <span
+                    key={k}
+                    className="px-2 py-0.5 rounded-md bg-primary/15 text-primary text-xs font-bold border border-primary/30"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </Section>
+
+            <Section icon={Sparkles} title="💡 Insight Premium">
+              <p className="italic text-foreground/90">{reading.premiumInsight}</p>
+            </Section>
+
+            <Section icon={Sparkles} title="🧠 Leitura Final">
               <p className="font-medium text-foreground">{reading.verdict}</p>
             </Section>
+
+            <div className="text-right text-xs text-muted-foreground italic pt-1">
+              {reading.signature}
+            </div>
           </div>
         )}
       </DialogContent>

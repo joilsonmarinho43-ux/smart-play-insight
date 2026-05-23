@@ -72,6 +72,22 @@ async function dbCacheGet(cacheKey: string, statusJogo: string): Promise<any | n
   }
 }
 
+// Retorna o cache mesmo se vencido (TTL ignorado). Usado como fallback
+// quando a API externa está com quota bloqueada / fora do ar.
+async function dbCacheGetStale(cacheKey: string): Promise<any | null> {
+  try {
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb
+      .from("cache_api")
+      .select("dados_json")
+      .eq("cache_key", cacheKey)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data.dados_json;
+  } catch {
+    return null;
+  }
+
 async function dbCacheSet(cacheKey: string, dados: any, statusJogo: string): Promise<void> {
   try {
     const sb = getSupabaseAdmin();

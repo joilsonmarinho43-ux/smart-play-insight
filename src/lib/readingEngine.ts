@@ -647,7 +647,44 @@ export function buildMatchReadingV2(
     verdict += ` ${pick(signatures, seed + 3)}`;
   }
 
+  // ─── 11. TRENDS + PREMIUM INSIGHT ───────────────────────────
+  const trendTags: string[] = [];
+  if (openProfile) trendTags.push("jogo aberto");
+  if (lowScoringProfile) trendTags.push("truncado");
+  if (physicalProfile) trendTags.push("físico");
+  if (homeAttacks && awayAttacks) trendTags.push("ofensivo");
+  if (homeSolid && awaySolid) trendTags.push("posicional");
+  if (statFav && Math.abs(diff) >= 0.5) trendTags.push("reativo do azarão");
+  if (hCorners != null && aCorners != null && hCorners + aCorners >= 10)
+    trendTags.push("pressão alta");
+  if (!openProfile && !lowScoringProfile) trendTags.push("crescimento no 2° tempo");
+  if (balanced && !physicalProfile) trendTags.push("equilibrado");
+  if (trendTags.length === 0) trendTags.push("ritmo médio");
+
+  const insightPool: string[] = [];
+  if (hCorners != null && aCorners != null && hCorners + aCorners >= 9)
+    insightPool.push("O mercado de cantos apresenta mais estabilidade estatística do que a linha de resultado.");
+  if (!openProfile && !lowScoringProfile)
+    insightPool.push("A intensidade ofensiva tende a crescer de forma consistente depois dos 60 minutos.");
+  if (balanced)
+    insightPool.push("A projeção favorece a dinâmica do jogo, não o domínio absoluto de um dos lados.");
+  if (statFav && Math.abs(diff) >= 0.6 && oddH && oddA && Math.min(oddH, oddA) < 1.55)
+    insightPool.push("Favoritismo está integralmente precificado — o valor migra para mercados de comportamento, não de vencedor.");
+  if (homeLeaks && awayLeaks)
+    insightPool.push("Com as duas defesas vulneráveis, mercados de ambas marcam costumam responder melhor que linhas de gols totais.");
+  if (lowScoringProfile)
+    insightPool.push("Perfil truncado eleva o peso de bola parada e de erros pontuais sobre o resultado final.");
+  if (marketDisagrees)
+    insightPool.push("Quando o mercado vai contra os números, leitura de valor exige paciência tática maior do que o normal.");
+  if (insightPool.length === 0)
+    insightPool.push("A leitura sustenta entradas seletivas em mercados de dinâmica, e desaconselha exposição em linhas amplas.");
+  const premiumInsight = pick(insightPool, seed + 7);
+
   return {
+    projectedGoals: Number(total.toFixed(1)),
+    trendTags,
+    premiumInsight,
+    signature: "— Analista Joilson",
     summary,
     tactical,
     indicators,

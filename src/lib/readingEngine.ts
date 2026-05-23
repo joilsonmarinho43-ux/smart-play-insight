@@ -632,17 +632,21 @@ export function buildMatchReadingV2(
 
   // ─── 9. PREDICTABILIDADE ────────────────────────────────────
   let pred: "verde" | "amarelo" | "vermelho" = "verde";
+  // Só marca "vermelho" quando há conflito real de leitura — não apenas por contexto limitado
   if (
-    ctxReliab === "limitado" ||
-    injuriesOnFav ||
-    marketDisagrees ||
-    goalsVsTacticConflict
+    (injuriesOnFav && marketDisagrees) ||
+    (marketDisagrees && goalsVsTacticConflict) ||
+    (ctxReliab === "limitado" && marketDisagrees)
   )
     pred = "vermelho";
   else if (
+    ctxReliab === "limitado" ||
     ctxReliab === "parcial" ||
     homeN < 5 || awayN < 5 ||
     homeImpact === "médio" || awayImpact === "médio" ||
+    injuriesOnFav ||
+    marketDisagrees ||
+    goalsVsTacticConflict ||
     fatigueOnFav
   )
     pred = "amarelo";

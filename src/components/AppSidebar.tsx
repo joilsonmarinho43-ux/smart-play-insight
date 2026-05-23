@@ -108,7 +108,7 @@ export function AppSidebar() {
                   WebkitTextFillColor: "transparent",
                 }}
               >
-                AJ
+                N33
               </span>
             </div>
           )}

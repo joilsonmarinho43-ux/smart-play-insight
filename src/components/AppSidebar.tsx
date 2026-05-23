@@ -35,81 +35,122 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-white/10 bg-[#0f172a]">
       <SidebarContent className="bg-[#0f172a]">
-        {/* Banner Header — geometric gradient background edge-to-edge */}
+        {/* Banner Header — premium minimal */}
         <div
-          className={`relative w-full overflow-hidden ${collapsed ? "py-3" : "py-8"}`}
+          className={`relative w-full overflow-hidden ${collapsed ? "py-4" : "py-7"}`}
           style={{
-            background: "linear-gradient(135deg, #0a0a0a 0%, #1a1000 30%, #2a1800 50%, #1a1000 70%, #0a0a0a 100%)",
+            background:
+              "radial-gradient(ellipse 120% 80% at 50% 0%, #1a1305 0%, #0d0a05 45%, #07070a 100%)",
           }}
         >
-          {/* Geometric mesh overlay */}
-          <div className="absolute inset-0 opacity-30" style={{
-            backgroundImage: `
-              linear-gradient(30deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
-              linear-gradient(150deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
-              linear-gradient(30deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
-              linear-gradient(150deg, hsl(30 80% 40% / 0.15) 12%, transparent 12.5%, transparent 87%, hsl(30 80% 40% / 0.15) 87.5%, hsl(30 80% 40% / 0.15)),
-              linear-gradient(60deg, hsl(35 70% 30% / 0.25) 25%, transparent 25.5%, transparent 75%, hsl(35 70% 30% / 0.25) 75%, hsl(35 70% 30% / 0.25)),
-              linear-gradient(60deg, hsl(35 70% 30% / 0.25) 25%, transparent 25.5%, transparent 75%, hsl(35 70% 30% / 0.25) 75%, hsl(35 70% 30% / 0.25))
-            `,
-            backgroundSize: '40px 70px',
-            backgroundPosition: '0 0, 0 0, 20px 35px, 20px 35px, 0 0, 20px 35px',
-          }} />
-          {/* Radial glow */}
-          <div className="absolute inset-0" style={{
-            background: "radial-gradient(ellipse at center, hsl(30 90% 50% / 0.12) 0%, transparent 70%)",
-          }} />
-          {/* Horizontal gold lines */}
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.4)] to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(35,80%,50%,0.4)] to-transparent" />
+          {/* Subtle noise / vignette */}
+          <div
+            className="absolute inset-0 opacity-40 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse at 50% 40%, hsl(38 95% 55% / 0.18) 0%, transparent 60%)",
+            }}
+          />
+          {/* Thin gold rule top & bottom */}
+          <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[hsl(40,90%,55%,0.55)] to-transparent" />
+          <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[hsl(40,90%,55%,0.35)] to-transparent" />
 
-          {/* Brand text */}
           {!collapsed ? (
             <div className="relative z-10 flex flex-col items-center justify-center px-4 text-center">
+              {/* Logo mark — hexagonal monogram */}
+              <div className="relative mb-3">
+                <div
+                  className="absolute inset-0 blur-xl opacity-70"
+                  style={{
+                    background:
+                      "radial-gradient(circle, hsl(40 95% 55% / 0.55) 0%, transparent 70%)",
+                  }}
+                />
+                <div
+                  className="relative h-12 w-12 rotate-45 rounded-md flex items-center justify-center"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #1a1305 0%, #2a1d08 100%)",
+                    border: "1px solid hsl(40 80% 45% / 0.6)",
+                    boxShadow:
+                      "inset 0 0 12px hsl(40 95% 50% / 0.25), 0 4px 18px hsl(40 90% 40% / 0.35)",
+                  }}
+                >
+                  <span
+                    className="-rotate-45 font-display text-base font-black tracking-tight"
+                    style={{
+                      background:
+                        "linear-gradient(180deg, #ffe08a 0%, #f5c842 50%, #c97b18 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    N33
+                  </span>
+                </div>
+              </div>
+
+              {/* Wordmark */}
+              <div className="flex items-baseline gap-1.5">
+                <span
+                  className="font-display text-[1.6rem] leading-none tracking-[0.14em] uppercase"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, #fff5d6 0%, #f5c842 55%, #c97b18 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    filter: "drop-shadow(0 1px 6px hsl(40 90% 45% / 0.35))",
+                  }}
+                >
+                  Nexus
+                </span>
+                <span
+                  className="font-display text-[1.6rem] leading-none tracking-[0.06em]"
+                  style={{
+                    color: "hsl(40 92% 60%)",
+                    textShadow: "0 0 12px hsl(40 95% 50% / 0.45)",
+                  }}
+                >
+                  33
+                </span>
+              </div>
+
+              {/* Divider ornament */}
+              <div className="mt-2.5 flex items-center gap-2">
+                <div className="h-px w-8 bg-gradient-to-r from-transparent to-[hsl(40,80%,50%,0.6)]" />
+                <div className="h-1 w-1 rotate-45 bg-[hsl(40,90%,55%)]" />
+                <div className="h-px w-8 bg-gradient-to-l from-transparent to-[hsl(40,80%,50%,0.6)]" />
+              </div>
+
               <span
-                className="font-display text-[2.2rem] leading-[1] tracking-[0.08em] uppercase"
-                style={{
-                  background: "linear-gradient(180deg, #f5c842 0%, #e8a020 40%, #c97b18 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  filter: "drop-shadow(0 2px 8px hsl(30 90% 45% / 0.4))",
-                }}
-              >
-                Nexus
-              </span>
-              <span
-                className="font-display text-[2.8rem] leading-[1] tracking-[0.1em] uppercase -mt-1"
-                style={{
-                  background: "linear-gradient(180deg, #ffd970 0%, #f5c842 30%, #d4960a 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  filter: "drop-shadow(0 2px 12px hsl(35 95% 50% / 0.5))",
-                }}
-              >
-                33
-              </span>
-              <span
-                className="mt-2 text-[0.85rem] font-bold tracking-[0.25em] uppercase"
-                style={{
-                  color: "hsl(35, 60%, 55%)",
-                  textShadow: "0 0 10px hsl(30 80% 50% / 0.3)",
-                }}
+                className="mt-2 text-[0.62rem] font-semibold tracking-[0.35em] uppercase"
+                style={{ color: "hsl(40 35% 65%)" }}
               >
                 Modelo Real Pro
               </span>
             </div>
           ) : (
             <div className="relative z-10 flex items-center justify-center">
-              <span
-                className="font-display text-2xl font-black"
+              <div
+                className="relative h-9 w-9 rotate-45 rounded-md flex items-center justify-center"
                 style={{
-                  background: "linear-gradient(180deg, #f5c842 0%, #d4960a 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
+                  background: "linear-gradient(135deg, #1a1305 0%, #2a1d08 100%)",
+                  border: "1px solid hsl(40 80% 45% / 0.6)",
+                  boxShadow: "inset 0 0 10px hsl(40 95% 50% / 0.25)",
                 }}
               >
-                N33
-              </span>
+                <span
+                  className="-rotate-45 font-display text-xs font-black"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, #ffe08a 0%, #d4960a 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  N33
+                </span>
+              </div>
             </div>
           )}
         </div>

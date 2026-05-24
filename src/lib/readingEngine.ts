@@ -819,6 +819,7 @@ export function buildMatchReadingV2(
 
   return {
     projectedGoals: Number(total.toFixed(1)),
+    goalLines,
     trendTags,
     premiumInsight,
     signature: "— Nexus 33",

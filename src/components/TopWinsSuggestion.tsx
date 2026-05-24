@@ -137,7 +137,7 @@ const TopWinsSuggestion = ({ matches }: Props) => {
       </div>
 
       <div className="px-4 py-3 bg-background flex items-center justify-between border-t border-white/5">
-        <span className="text-[10px] text-muted-foreground italic">Margem ≥ 18% • Empate ≤ 28%</span>
+        <span className="text-[10px] text-muted-foreground italic">Margem ≥ 12% • Empate ≤ 35%</span>
         <div className="flex gap-2">
           <button
             onClick={handleCopy}

@@ -396,6 +396,41 @@ export const MatchReadingModal = ({
               </div>
             </Section>
 
+            <Section icon={Target} title="Linhas de Gols (Realistas)">
+              <div className="space-y-1.5">
+                {reading.goalLines.map((g, k) => {
+                  const label = `${g.side === "over" ? "Over" : "Under"} ${g.line.toFixed(1)}`;
+                  return (
+                    <div
+                      key={k}
+                      className={`flex items-center justify-between gap-2 rounded-lg p-2.5 border ${
+                        g.recommended
+                          ? "bg-primary/15 border-primary/60"
+                          : "bg-secondary/40 border-border"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-foreground text-sm">
+                            {g.recommended ? "✅ " : ""}{label}
+                          </span>
+                          {g.recommended && (
+                            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary text-primary-foreground font-bold">
+                              Recomendado
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-foreground/70 mt-0.5">{g.rationale}</div>
+                      </div>
+                      <span className="font-display font-bold text-base px-2 py-0.5 rounded-md bg-primary text-primary-foreground shrink-0">
+                        {g.probability}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Section>
+
             <Section icon={Clock} title="Timing da Partida">
               <div className="space-y-2 text-sm">
                 <div>

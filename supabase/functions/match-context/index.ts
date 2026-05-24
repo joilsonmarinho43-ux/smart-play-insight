@@ -219,7 +219,7 @@ serve(async (req) => {
 
   try {
     const body: Body = await req.json().catch(() => ({}));
-    const { fixtureId, leagueId, season, homeId, awayId } = body;
+    const { fixtureId, leagueId, season, homeId, awayId, kickoffISO } = body;
 
     if (!fixtureId) {
       return new Response(

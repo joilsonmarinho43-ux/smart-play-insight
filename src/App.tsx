@@ -20,6 +20,7 @@ import Favorites from "./pages/Favorites";
 import Scanner from "./pages/Scanner";
 import Elite from "./pages/Elite";
 import Bingo from "./pages/Bingo";
+import Suggestions from "./pages/Suggestions";
 import Paywall from "./pages/Paywall";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -91,6 +92,7 @@ const App = () => {
             <Route path="/elite" element={<ProtectedRoute><AppLayout><Elite /></AppLayout></ProtectedRoute>} />
             <Route path="/bingo" element={<ProtectedRoute><AppLayout><Bingo /></AppLayout></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
+            <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
             <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />

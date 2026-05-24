@@ -47,15 +47,18 @@ const TopWinsSuggestion = ({ matches }: Props) => {
       const mk = analyzeMarkets(m);
       const home = mk.find(x => x.market === 'Vitória Casa');
       const away = mk.find(x => x.market === 'Vitória Fora');
-      const homeP = home?.probability ?? 0;
-      const awayP = away?.probability ?? 0;
-      const drawP = Math.max(0, 100 - homeP - awayP);
+      // Fallback: usa predictions do match quando o mercado não foi gerado (< 35%)
+      const fallbackHome = Number((m as any).predictions?.homeWin) || 0;
+      const fallbackAway = Number((m as any).predictions?.awayWin) || 0;
+      const fallbackDraw = Number((m as any).predictions?.draw) || 0;
+      const homeP = home?.probability ?? fallbackHome;
+      const awayP = away?.probability ?? fallbackAway;
+      const drawP = Math.max(0, fallbackDraw || (100 - homeP - awayP));
 
-      // Apenas escolha de vitória direta com folga real e empate baixo
       const best = homeP >= awayP ? { side: 'home' as const, prob: homeP } : { side: 'away' as const, prob: awayP };
       const margin = Math.abs(homeP - awayP);
 
-      // Filtros realistas: prob >= 45, margem >= 12, empate <= 35
+      // Filtros realistas: favorito claro com folga
       if (best.prob < 45 || margin < 12 || drawP > 35) continue;
 
       candidates.push({

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, Trophy } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import BingoSuggestion from '@/components/BingoSuggestion';
+import TopWinsSuggestion from '@/components/TopWinsSuggestion';
 
 const Bingo = () => {
   const { data: matches = [], isLoading } = useQuery({
@@ -46,7 +47,10 @@ const Bingo = () => {
             Nenhum jogo elegível encontrado.
           </div>
         ) : (
-          <BingoSuggestion matches={safeMatches} />
+          <>
+            <TopWinsSuggestion matches={safeMatches} />
+            <BingoSuggestion matches={safeMatches} />
+          </>
         )}
       </div>
     </div>

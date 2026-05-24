@@ -31,6 +31,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { signOut } = useAuth();
   const { profile } = useProfile();
+  const { increase, decrease, canIncrease, canDecrease } = useFontScale();
 
   return (
     <Sidebar collapsible="icon" className="border-r border-white/10 bg-[#0f172a]">

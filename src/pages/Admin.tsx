@@ -311,6 +311,13 @@ const Admin = () => {
               <Shield className="w-5 h-5 text-cyan-400" />
             </button>
             <button
+              onClick={() => { resetPanels(); setShowSuggestions(!showSuggestions); }}
+              className={`relative p-2 rounded-lg transition-all ${showSuggestions ? 'bg-amber-500/20' : 'hover:bg-white/5'}`}
+              title="Sugestões dos Usuários"
+            >
+              <Lightbulb className="w-5 h-5 text-amber-400" />
+            </button>
+            <button
               onClick={() => { resetPanels(); setShowDashboard(!showDashboard); }}
               className={`relative p-2 rounded-lg transition-all ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
               title="Dashboard Win Rate"

@@ -94,6 +94,7 @@ const App = () => {
             <Route path="/bingo" element={<ProtectedRoute><AppLayout><Bingo /></AppLayout></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
             <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
+            <Route path="/autopilot" element={<ProtectedRoute><AppLayout><AutoPilot /></AppLayout></ProtectedRoute>} />
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
             <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />

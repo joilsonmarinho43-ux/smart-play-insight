@@ -22,6 +22,7 @@ import {
 const navItems = [
   { title: "Pré-Jogo", url: "/", icon: Home },
   { title: "Live Trader", url: "/live", icon: Zap },
+  { title: "AutoPilot LIVE", url: "/autopilot", icon: Crosshair },
   { title: "Bingo VIP PRO", url: "/bingo", icon: Trophy },
   { title: "Favoritos", url: "/favorites", icon: Star },
   { title: "Sugestões", url: "/suggestions", icon: Lightbulb },

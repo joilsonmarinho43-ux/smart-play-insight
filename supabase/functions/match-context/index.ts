@@ -45,8 +45,12 @@ async function cacheSet(key: string, value: any) {
   }
 }
 
-// Cache dedicado para odds: 1x ao dia (24h) para preservar cota da API
-const ODDS_TTL_MS = 24 * 60 * 60 * 1000;
+// Cache de odds:
+//  - Com odds disponíveis → 24h (preserva cota)
+//  - Resposta vazia (jogo distante, casas ainda não abriram mercado) → 2h
+//    para tentar novamente logo, sem consumir muita cota.
+const ODDS_TTL_FULL_MS = 24 * 60 * 60 * 1000;
+const ODDS_TTL_EMPTY_MS = 2 * 60 * 60 * 1000;
 async function getOddsCached(fixtureId: number, apiKey: string) {
   const key = `odds_day_${fixtureId}`;
   try {
@@ -57,7 +61,9 @@ async function getOddsCached(fixtureId: number, apiKey: string) {
       .maybeSingle();
     if (data) {
       const age = Date.now() - new Date(data.ultima_atualizacao).getTime();
-      if (age < ODDS_TTL_MS) return data.dados_json;
+      const isEmpty = Array.isArray(data.dados_json) && data.dados_json.length === 0;
+      const ttl = isEmpty ? ODDS_TTL_EMPTY_MS : ODDS_TTL_FULL_MS;
+      if (age < ttl) return data.dados_json;
     }
   } catch {}
   const fresh = await apiGet(`odds?fixture=${fixtureId}`, apiKey);

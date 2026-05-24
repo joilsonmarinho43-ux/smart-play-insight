@@ -26,8 +26,11 @@ const navItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile, isMobile } = useSidebar();
   const collapsed = state === "collapsed";
+  const handleNavClick = () => {
+    if (isMobile) setOpenMobile(false);
+  };
   const location = useLocation();
   const { signOut } = useAuth();
   const { profile } = useProfile();
@@ -170,7 +173,7 @@ export function AppSidebar() {
                       to={item.url}
                       end={item.url === "/"}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-                      activeClassName="bg-orange-500/10 text-orange-500 font-bold"
+                      onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"
                     >
                       <item.icon className="h-5 w-5 shrink-0" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
@@ -187,7 +190,7 @@ export function AppSidebar() {
                       <NavLink
                         to="/quality"
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-                        activeClassName="bg-orange-500/10 text-orange-500 font-bold"
+                        onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"
                       >
                         <Activity className="h-5 w-5 shrink-0 text-orange-500" />
                         {!collapsed && <span className="text-sm">Quality Lab</span>}
@@ -199,7 +202,7 @@ export function AppSidebar() {
                       <NavLink
                         to="/context"
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-                        activeClassName="bg-orange-500/10 text-orange-500 font-bold"
+                        onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"
                       >
                         <Radar className="h-5 w-5 shrink-0 text-orange-500" />
                         {!collapsed && <span className="text-sm">Contexto</span>}
@@ -211,7 +214,7 @@ export function AppSidebar() {
                       <NavLink
                         to="/admin"
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-                        activeClassName="bg-orange-500/10 text-orange-500 font-bold"
+                        onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"
                       >
                         <Shield className="h-5 w-5 shrink-0 text-orange-500" />
                         {!collapsed && <span className="text-sm">Admin</span>}

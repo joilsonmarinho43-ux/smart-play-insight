@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Trophy } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
-import BingoSuggestion from '@/components/BingoSuggestion';
 import TopWinsSuggestion from '@/components/TopWinsSuggestion';
 
 const Bingo = () => {
@@ -33,7 +32,7 @@ const Bingo = () => {
           <div>
             <h1 className="text-xl font-black tracking-tight text-orange-400">BINGO VIP PRO</h1>
             <p className="text-[11px] text-gray-500 uppercase tracking-wider">
-              10 estratégias • Poisson + xG • Confiança ≥ 72%
+              Top 4 — Maior chance de vitória do dia
             </p>
           </div>
         </header>
@@ -49,7 +48,6 @@ const Bingo = () => {
         ) : (
           <>
             <TopWinsSuggestion matches={safeMatches} />
-            <BingoSuggestion matches={safeMatches} />
           </>
         )}
       </div>

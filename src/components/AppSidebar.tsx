@@ -1,8 +1,9 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useFontScale } from "@/hooks/useFontScale";
 
 import {
   Sidebar,

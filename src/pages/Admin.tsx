@@ -73,6 +73,7 @@ const Admin = () => {
   const [togglingAutoMode, setTogglingAutoMode] = useState(false);
   const [autoModeLastRun, setAutoModeLastRun] = useState<any>(null);
   const [testingAutoMode, setTestingAutoMode] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const resetPanels = () => {
     setShowConflicts(false);
@@ -80,6 +81,7 @@ const Admin = () => {
     setShowDashboard(false);
     setShowAutoMode(false);
     setShowRMA(false);
+    setShowSuggestions(false);
   };
 
   useEffect(() => {

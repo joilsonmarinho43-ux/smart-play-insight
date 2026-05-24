@@ -24,6 +24,7 @@ import Suggestions from "./pages/Suggestions";
 import Paywall from "./pages/Paywall";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import AutoPilot from "./pages/AutoPilot";
 import { AppLayout } from "./components/AppLayout";
 
 import { Loader2 } from "lucide-react";
@@ -93,6 +94,7 @@ const App = () => {
             <Route path="/bingo" element={<ProtectedRoute><AppLayout><Bingo /></AppLayout></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
             <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
+            <Route path="/autopilot" element={<ProtectedRoute><AppLayout><AutoPilot /></AppLayout></ProtectedRoute>} />
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
             <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />

@@ -1,9 +1,10 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Crosshair } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useFontScale } from "@/hooks/useFontScale";
+import { AUTO_BET_ENABLED } from "@/modules/auto-bet/config";
 
 import {
   Sidebar,
@@ -182,6 +183,23 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {/* AutoPilot LIVE — gated por feature flag + admin (rollout controlado) */}
+              {AUTO_BET_ENABLED && profile?.is_admin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/autopilot"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                      onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"
+                    >
+                      <Crosshair className="h-5 w-5 shrink-0 text-orange-500" />
+                      {!collapsed && <span className="text-sm">AutoPilot LIVE</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
 
               {/* Admin link */}
               {profile?.is_admin && (

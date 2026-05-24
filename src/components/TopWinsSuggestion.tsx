@@ -55,8 +55,8 @@ const TopWinsSuggestion = ({ matches }: Props) => {
       const best = homeP >= awayP ? { side: 'home' as const, prob: homeP } : { side: 'away' as const, prob: awayP };
       const margin = Math.abs(homeP - awayP);
 
-      // Filtros de qualidade: prob >= 60, margem >= 18, empate <= 28
-      if (best.prob < 60 || margin < 18 || drawP > 28) continue;
+      // Filtros realistas: prob >= 45, margem >= 12, empate <= 35
+      if (best.prob < 45 || margin < 12 || drawP > 35) continue;
 
       candidates.push({
         match: m,

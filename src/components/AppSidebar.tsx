@@ -1,8 +1,9 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useFontScale } from "@/hooks/useFontScale";
 
 import {
   Sidebar,
@@ -30,6 +31,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { signOut } = useAuth();
   const { profile } = useProfile();
+  const { increase, decrease, canIncrease, canDecrease } = useFontScale();
 
   return (
     <Sidebar collapsible="icon" className="border-r border-white/10 bg-[#0f172a]">
@@ -224,7 +226,32 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Logout */}
-      <SidebarFooter className="bg-[#0f172a] border-t border-white/10 p-3">
+      <SidebarFooter className="bg-[#0f172a] border-t border-white/10 p-3 space-y-2">
+        {/* Font zoom controls */}
+        <div className={`flex items-center gap-1 ${collapsed ? 'justify-center' : 'justify-between'} px-1`}>
+          {!collapsed && (
+            <span className="text-[10px] text-gray-500 font-medium">Zoom</span>
+          )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={decrease}
+              disabled={!canDecrease}
+              aria-label="Diminuir tamanho da fonte"
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+            <button
+              onClick={increase}
+              disabled={!canIncrease}
+              aria-label="Aumentar tamanho da fonte"
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
         <button
           onClick={signOut}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"

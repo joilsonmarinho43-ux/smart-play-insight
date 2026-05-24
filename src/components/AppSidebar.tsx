@@ -26,8 +26,11 @@ const navItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile, isMobile } = useSidebar();
   const collapsed = state === "collapsed";
+  const handleNavClick = () => {
+    if (isMobile) setOpenMobile(false);
+  };
   const location = useLocation();
   const { signOut } = useAuth();
   const { profile } = useProfile();

@@ -1,4 +1,4 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +23,7 @@ const navItems = [
   { title: "Live Trader", url: "/live", icon: Zap },
   { title: "Bingo VIP PRO", url: "/bingo", icon: Trophy },
   { title: "Favoritos", url: "/favorites", icon: Star },
+  { title: "Sugestões", url: "/suggestions", icon: Lightbulb },
 ];
 
 export function AppSidebar() {

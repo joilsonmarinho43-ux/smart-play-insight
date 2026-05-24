@@ -184,8 +184,8 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
 
-              {/* AutoPilot LIVE — gated por feature flag + admin (rollout controlado) */}
-              {AUTO_BET_ENABLED && profile?.is_admin && (
+              {/* AutoPilot LIVE — gated por feature flag */}
+              {AUTO_BET_ENABLED && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink

@@ -300,7 +300,7 @@ const Admin = () => {
           <div className="flex items-center gap-0.5 sm:gap-2 shrink-0 overflow-x-auto no-scrollbar">
             <button
               onClick={() => { resetPanels(); setShowAutoMode(!showAutoMode); }}
-              className={`relative p-2 rounded-lg transition-all ${showAutoMode ? 'bg-purple-500/20' : 'hover:bg-white/5'}`}
+              className={`relative p-1.5 sm:p-2 rounded-lg transition-all shrink-0 ${showAutoMode ? 'bg-purple-500/20' : 'hover:bg-white/5'}`}
               title="Auto-Mode Server"
             >
               <Zap className={`w-5 h-5 ${autoModeActive ? 'text-purple-400' : 'text-muted-foreground'}`} />
@@ -308,28 +308,28 @@ const Admin = () => {
             </button>
             <button
               onClick={() => { resetPanels(); setShowRMA(!showRMA); }}
-              className={`relative p-2 rounded-lg transition-all ${showRMA ? 'bg-cyan-500/20' : 'hover:bg-white/5'}`}
+              className={`relative p-1.5 sm:p-2 rounded-lg transition-all shrink-0 ${showRMA ? 'bg-cyan-500/20' : 'hover:bg-white/5'}`}
               title="Dashboard RMA"
             >
               <Shield className="w-5 h-5 text-cyan-400" />
             </button>
             <button
               onClick={() => { resetPanels(); setShowSuggestions(!showSuggestions); }}
-              className={`relative p-2 rounded-lg transition-all ${showSuggestions ? 'bg-amber-500/20' : 'hover:bg-white/5'}`}
+              className={`relative p-1.5 sm:p-2 rounded-lg transition-all shrink-0 ${showSuggestions ? 'bg-amber-500/20' : 'hover:bg-white/5'}`}
               title="Sugestões dos Usuários"
             >
               <Lightbulb className="w-5 h-5 text-amber-400" />
             </button>
             <button
               onClick={() => { resetPanels(); setShowDashboard(!showDashboard); }}
-              className={`relative p-2 rounded-lg transition-all ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
+              className={`relative p-1.5 sm:p-2 rounded-lg transition-all shrink-0 ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
               title="Dashboard Win Rate"
             >
               <BarChart3 className="w-5 h-5 text-green-400" />
             </button>
             <button
               onClick={() => { resetPanels(); setShowSignals(!showSignals); }}
-              className={`relative p-2 rounded-lg transition-all ${showSignals ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
+              className={`relative p-1.5 sm:p-2 rounded-lg transition-all shrink-0 ${showSignals ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               title="Sinais Telegram"
             >
               <Send className="w-5 h-5 text-blue-400" />
@@ -345,7 +345,7 @@ const Admin = () => {
                 setShowConflicts(!showConflicts);
                 if (!showConflicts) markConflictsSeen();
               }}
-              className={`relative p-2 rounded-lg transition-all ${showConflicts ? 'bg-yellow-500/20' : 'hover:bg-white/5'}`}
+              className={`relative p-1.5 sm:p-2 rounded-lg transition-all shrink-0 ${showConflicts ? 'bg-yellow-500/20' : 'hover:bg-white/5'}`}
             >
               <AlertTriangle className="w-5 h-5 text-yellow-500" />
               {unseenConflicts > 0 && (

@@ -5,18 +5,20 @@
 // ============================================================
 
 /**
- * Feature flag mestre. Default OFF.
- * Para ativar em produção, defina VITE_AUTO_BET_ENABLED=true no .env
- * Em dev, pode ativar manualmente no localStorage:
- *   localStorage.setItem('autopilot.flag.override', 'true')
+ * Feature flag mestre. Default ON (ativo por padrão).
+ * Para desativar em produção, defina VITE_AUTO_BET_ENABLED=false no .env
+ * Em dev, pode desativar manualmente no localStorage:
+ *   localStorage.setItem('autopilot.flag.override', 'false')
  */
 export const AUTO_BET_ENABLED: boolean = (() => {
-  const env = (import.meta.env.VITE_AUTO_BET_ENABLED ?? "").toString().toLowerCase() === "true";
-  if (env) return true;
+  const env = (import.meta.env.VITE_AUTO_BET_ENABLED ?? "").toString().toLowerCase();
+  if (env === "false") return false;
+  if (env === "true") return true;
   if (typeof window !== "undefined") {
-    return localStorage.getItem("autopilot.flag.override") === "true";
+    const override = localStorage.getItem("autopilot.flag.override");
+    if (override !== null) return override === "true";
   }
-  return false;
+  return true; // default ON
 })();
 
 export const SUPPORTED_HOUSES = [

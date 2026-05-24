@@ -72,16 +72,10 @@ const TopWinsSuggestion = ({ matches }: Props) => {
     const candidates: WinPick[] = [];
     for (const m of matches) {
       if (!isStable(m) || !hasReliable(m)) continue;
-      const mk = analyzeMarkets(m);
-      const home = mk.find(x => x.market === 'Vitória Casa');
-      const away = mk.find(x => x.market === 'Vitória Fora');
-      // Fallback: usa predictions do match quando o mercado não foi gerado (< 35%)
-      const fallbackHome = Number((m as any).predictions?.homeWin) || 0;
-      const fallbackAway = Number((m as any).predictions?.awayWin) || 0;
-      const fallbackDraw = Number((m as any).predictions?.draw) || 0;
-      const homeP = home?.probability ?? fallbackHome;
-      const awayP = away?.probability ?? fallbackAway;
-      const drawP = Math.max(0, fallbackDraw || (100 - homeP - awayP));
+      const probs = computeWinProbs(m);
+      const homeP = probs.home;
+      const awayP = probs.away;
+      const drawP = probs.draw;
 
       const best = homeP >= awayP ? { side: 'home' as const, prob: homeP } : { side: 'away' as const, prob: awayP };
       const margin = Math.abs(homeP - awayP);

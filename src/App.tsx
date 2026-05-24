@@ -24,6 +24,7 @@ import Suggestions from "./pages/Suggestions";
 import Paywall from "./pages/Paywall";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import AutoPilot from "./pages/AutoPilot";
 import { AppLayout } from "./components/AppLayout";
 
 import { Loader2 } from "lucide-react";

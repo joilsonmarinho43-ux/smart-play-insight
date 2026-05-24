@@ -47,7 +47,10 @@ const Bingo = () => {
             Nenhum jogo elegível encontrado.
           </div>
         ) : (
-          <BingoSuggestion matches={safeMatches} />
+          <>
+            <TopWinsSuggestion matches={safeMatches} />
+            <BingoSuggestion matches={safeMatches} />
+          </>
         )}
       </div>
     </div>

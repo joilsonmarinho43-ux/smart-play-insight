@@ -286,15 +286,18 @@ const Admin = () => {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-foreground">
       <header className="border-b border-white/10 bg-black/40 backdrop-blur-md sticky top-0 z-50">
-        <div className="container max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="p-2 hover:bg-white/5 rounded-full transition-all"><ArrowLeft className="w-5 h-5" /></Link>
-            <div className="flex items-center gap-2">
-              <Brain className="w-6 h-6 text-primary" />
-              <h1 className="font-bold text-xl tracking-tight">CENTRAL DO ANALISTA</h1>
+        <div className="container max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <Link to="/" className="p-2 hover:bg-white/5 rounded-full transition-all shrink-0"><ArrowLeft className="w-5 h-5" /></Link>
+            <div className="flex items-center gap-2 min-w-0">
+              <Brain className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
+              <h1 className="font-bold text-sm sm:text-xl tracking-tight truncate">
+                <span className="sm:hidden">CENTRAL</span>
+                <span className="hidden sm:inline">CENTRAL DO ANALISTA</span>
+              </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0 overflow-x-auto no-scrollbar">
             <button
               onClick={() => { resetPanels(); setShowAutoMode(!showAutoMode); }}
               className={`relative p-2 rounded-lg transition-all ${showAutoMode ? 'bg-purple-500/20' : 'hover:bg-white/5'}`}

@@ -618,6 +618,68 @@ export function buildMatchReadingV2(
   aLs = Math.max(0.10, Math.min(aLs, 3.4));
   const likelyScores = topScores(hLs, aLs, 3);
 
+  // ─── 7b. LINHAS DE GOLS (Over/Under realista por Poisson) ───
+  const totalAdj = hLs + aLs;
+  const probOver = (line: number): number => {
+    // line é X.5 → Over = P(N >= ceil(line)) = P(N >= line+0.5)
+    const threshold = Math.ceil(line); // 0.5→1, 1.5→2, 2.5→3, 3.5→4
+    let cum = 0;
+    for (let k = 0; k < threshold; k++) cum += poisson(totalAdj, k);
+    return Math.max(0, Math.min(1, 1 - cum));
+  };
+
+  const linesRaw = [0.5, 1.5, 2.5, 3.5].map((line) => {
+    const pOver = probOver(line) * 100;
+    const pUnder = 100 - pOver;
+    const side: "over" | "under" = pOver >= pUnder ? "over" : "under";
+    const probability = Math.round(Math.max(pOver, pUnder));
+    return { line, side, probability };
+  });
+
+  // Sugestão recomendada: maior valor realista
+  // - prioriza Over com maior linha que ainda tenha prob ≥ 72%
+  // - se nenhuma Over alcança, escolhe Under com prob ≥ 72% na menor linha
+  // - fallback: maior probabilidade entre todas
+  let recIdx = -1;
+  for (let i = linesRaw.length - 1; i >= 0; i--) {
+    const l = linesRaw[i];
+    if (l.side === "over" && l.probability >= 72) { recIdx = i; break; }
+  }
+  if (recIdx === -1) {
+    for (let i = 0; i < linesRaw.length; i++) {
+      const l = linesRaw[i];
+      if (l.side === "under" && l.probability >= 72) { recIdx = i; break; }
+    }
+  }
+  if (recIdx === -1) {
+    recIdx = linesRaw.reduce((best, l, i, arr) => l.probability > arr[best].probability ? i : best, 0);
+  }
+
+  const rationaleFor = (l: { line: number; side: "over" | "under"; probability: number }): string => {
+    if (l.side === "over") {
+      if (l.line <= 0.5) return `É raríssimo o jogo terminar 0-0 com a projeção atual (${fmt(totalAdj)} gols esperados).`;
+      if (l.line <= 1.5) return `Pelo menos 2 gols se sustentam bem na projeção combinada (${fmt(totalAdj)}).`;
+      if (l.line <= 2.5) return openProfile
+        ? `Perfil ofensivo dos dois lados sustenta a linha com folga.`
+        : `Projeção total (${fmt(totalAdj)}) cobre a linha com margem.`;
+      return `Cenário aberto o suficiente para passar dos 3 gols — entrada agressiva, mas amparada.`;
+    }
+    if (l.line >= 3.5) return `Improvável o jogo passar de 3 gols dado o perfil das equipes.`;
+    if (l.line >= 2.5) return lowScoringProfile
+      ? `Perfil truncado e defesas firmes pesam contra a linha de 2.5.`
+      : `Projeção (${fmt(totalAdj)}) não sustenta consistentemente Over 2.5.`;
+    if (l.line >= 1.5) return `Jogo tende a ficar abaixo de 2 gols — defesas se sobrepõem ao ataque.`;
+    return `Cenário extremo de jogo zerado — só aparece em partidas muito travadas.`;
+  };
+
+  const goalLines: GoalLineSuggestion[] = linesRaw.map((l, i) => ({
+    line: l.line,
+    side: l.side,
+    probability: l.probability,
+    recommended: i === recIdx,
+    rationale: rationaleFor(l),
+  }));
+
   // ─── 8. TIMING (perfil tático real) ─────────────────────────
   const timing = {
     opening:

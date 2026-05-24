@@ -356,6 +356,12 @@ const Admin = () => {
       </header>
 
       <main className="container max-w-5xl mx-auto px-4 py-8">
+        {showSuggestions && (
+          <div className="mb-8">
+            <AdminSuggestionsPanel />
+          </div>
+        )}
+
         {/* AUTO-MODE SERVER */}
         {showAutoMode && (
           <div className="mb-8 space-y-4">

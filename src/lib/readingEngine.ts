@@ -54,6 +54,14 @@ export interface ReadingOpportunity {
   reasons: string[];
 }
 
+export interface GoalLineSuggestion {
+  line: number;              // 0.5, 1.5, 2.5, 3.5
+  side: "over" | "under";
+  probability: number;       // 0-100
+  recommended: boolean;
+  rationale: string;
+}
+
 export interface MatchReadingV2 {
   summary: string;
   tactical: string;
@@ -67,6 +75,7 @@ export interface MatchReadingV2 {
   verdict: string;
   contextQuality: "completo" | "parcial" | "limitado";
   projectedGoals: number;
+  goalLines: GoalLineSuggestion[];
   trendTags: string[];
   premiumInsight: string;
   signature: string;

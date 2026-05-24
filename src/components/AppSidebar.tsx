@@ -23,6 +23,7 @@ const navItems = [
   { title: "Live Trader", url: "/live", icon: Zap },
   { title: "Bingo VIP PRO", url: "/bingo", icon: Trophy },
   { title: "Favoritos", url: "/favorites", icon: Star },
+  { title: "Sugestões", url: "/suggestions", icon: Lightbulb },
 ];
 
 export function AppSidebar() {

@@ -1,8 +1,36 @@
 import { useMemo } from 'react';
 import { MatchData } from '@/types/match';
-import { analyzeMarkets } from '@/lib/matchAnalysis';
 import { Trophy, Copy, MessageCircle, Crown } from 'lucide-react';
 import { toast } from 'sonner';
+
+function fact(n: number): number { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
+function pois(l: number, k: number): number { return (Math.exp(-l) * Math.pow(l, k)) / fact(k); }
+
+function computeWinProbs(m: MatchData): { home: number; draw: number; away: number } {
+  const hStats: any = (m as any).homeStats || {};
+  const aStats: any = (m as any).awayStats || {};
+  const hGF = m.modelData?.homeGoalsAvg ?? hStats.goalsFor ?? 0;
+  const aGF = m.modelData?.awayGoalsAvg ?? aStats.goalsFor ?? 0;
+  const hGA = m.modelData?.homeGoalsAgainstAvg ?? hStats.goalsAgainst ?? 0;
+  const aGA = m.modelData?.awayGoalsAgainstAvg ?? aStats.goalsAgainst ?? 0;
+  const leagueAvg = hStats.leagueAvg || aStats.leagueAvg || 1.30;
+  const hN = m.sampleSize?.homeGames || hStats.gamesCount || 0;
+  const aN = m.sampleSize?.awayGames || aStats.gamesCount || 0;
+  const k = 3;
+  const bay = (avg: number, n: number) => n === 0 ? leagueAvg : (n * avg + k * leagueAvg) / (n + k);
+  const adjHGF = bay(hGF, hN), adjAGA = bay(aGA, aN), adjAGF = bay(aGF, aN), adjHGA = bay(hGA, hN);
+  const hL = (adjHGF / leagueAvg) * (adjAGA / leagueAvg) * leagueAvg;
+  const aL = (adjAGF / leagueAvg) * (adjHGA / leagueAvg) * leagueAvg;
+  let pH = 0, pD = 0, pA = 0;
+  for (let h = 0; h <= 7; h++) {
+    for (let a = 0; a <= 7; a++) {
+      const p = pois(hL, h) * pois(aL, a);
+      if (h > a) pH += p; else if (h === a) pD += p; else pA += p;
+    }
+  }
+  return { home: Math.round(pH * 100), draw: Math.round(pD * 100), away: Math.round(pA * 100) };
+}
+
 
 interface Props {
   matches: MatchData[];

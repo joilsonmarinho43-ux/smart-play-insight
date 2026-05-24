@@ -2,9 +2,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProfile, Profile } from '@/hooks/useProfile';
 import { Navigate, Link } from 'react-router-dom';
-import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power, Shield, ShieldOff, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Brain, ArrowLeft, Loader2, CalendarPlus, XCircle, Search, Users, CheckCircle2, Clock, AlertTriangle, Eye, Send, RefreshCw, BarChart3, TrendingUp, Zap, Power, Shield, ShieldOff, ShieldCheck, ChevronDown, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { AdminSuggestionsPanel } from '@/components/AdminSuggestionsPanel';
 
 const DAYS_OPTIONS = [3, 7, 15, 30];
 
@@ -72,6 +73,7 @@ const Admin = () => {
   const [togglingAutoMode, setTogglingAutoMode] = useState(false);
   const [autoModeLastRun, setAutoModeLastRun] = useState<any>(null);
   const [testingAutoMode, setTestingAutoMode] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const resetPanels = () => {
     setShowConflicts(false);
@@ -79,6 +81,7 @@ const Admin = () => {
     setShowDashboard(false);
     setShowAutoMode(false);
     setShowRMA(false);
+    setShowSuggestions(false);
   };
 
   useEffect(() => {
@@ -308,6 +311,13 @@ const Admin = () => {
               <Shield className="w-5 h-5 text-cyan-400" />
             </button>
             <button
+              onClick={() => { resetPanels(); setShowSuggestions(!showSuggestions); }}
+              className={`relative p-2 rounded-lg transition-all ${showSuggestions ? 'bg-amber-500/20' : 'hover:bg-white/5'}`}
+              title="Sugestões dos Usuários"
+            >
+              <Lightbulb className="w-5 h-5 text-amber-400" />
+            </button>
+            <button
               onClick={() => { resetPanels(); setShowDashboard(!showDashboard); }}
               className={`relative p-2 rounded-lg transition-all ${showDashboard ? 'bg-green-500/20' : 'hover:bg-white/5'}`}
               title="Dashboard Win Rate"
@@ -346,6 +356,12 @@ const Admin = () => {
       </header>
 
       <main className="container max-w-5xl mx-auto px-4 py-8">
+        {showSuggestions && (
+          <div className="mb-8">
+            <AdminSuggestionsPanel />
+          </div>
+        )}
+
         {/* AUTO-MODE SERVER */}
         {showAutoMode && (
           <div className="mb-8 space-y-4">

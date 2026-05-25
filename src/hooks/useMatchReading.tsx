@@ -7,15 +7,26 @@ import {
   type MatchReadingV2,
 } from "@/lib/readingEngine";
 
+export interface AnalystReading {
+  cenario: string;
+  pontoAtencao: string;
+  veredito: string;
+  risco: "baixo" | "medio" | "alto";
+}
+
 interface State {
   loading: boolean;
   reading: MatchReadingV2 | null;
   context: MatchContext | null;
   error: string | null;
+  analyst: AnalystReading | null;
+  analystLoading: boolean;
 }
 
 const memCache = new Map<string, { ts: number; ctx: MatchContext }>();
+const analystCache = new Map<string, { ts: number; data: AnalystReading }>();
 const TTL = 8 * 60 * 1000; // 8 min — alinhar com TTL do servidor para odds frescas
+const ANALYST_TTL = 30 * 60 * 1000; // 30 min
 
 export function useMatchReading(match: MatchData, enabled: boolean) {
   const [state, setState] = useState<State>({
@@ -23,6 +34,8 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
     reading: null,
     context: null,
     error: null,
+    analyst: null,
+    analystLoading: false,
   });
 
   useEffect(() => {
@@ -37,7 +50,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       const homeId = m.teams?.home?.id || m.homeId;
       const awayId = m.teams?.away?.id || m.awayId;
 
-      setState((s) => ({ ...s, loading: true, error: null }));
+      setState((s) => ({ ...s, loading: true, error: null, analyst: null }));
 
       let ctx: MatchContext | null = null;
       if (fixtureId) {
@@ -73,8 +86,61 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       }
 
       const reading = buildMatchReadingV2(match, ctx);
-      if (!cancel)
-        setState({ loading: false, reading, context: ctx, error: null });
+      if (cancel) return;
+
+      setState({
+        loading: false,
+        reading,
+        context: ctx,
+        error: null,
+        analyst: null,
+        analystLoading: !!reading,
+      });
+
+      // Camada de análise humana via Lovable AI (não bloqueia a UI principal)
+      if (reading) {
+        const akey = String(fixtureId || `${match.homeTeam}-${match.awayTeam}`);
+        const cachedA = analystCache.get(akey);
+        if (cachedA && Date.now() - cachedA.ts < ANALYST_TTL) {
+          if (!cancel)
+            setState((s) => ({ ...s, analyst: cachedA.data, analystLoading: false }));
+          return;
+        }
+        try {
+          const { data, error } = await supabase.functions.invoke(
+            "match-analyst",
+            {
+              body: {
+                match: {
+                  id: fixtureId,
+                  homeTeam: match.homeTeam,
+                  awayTeam: match.awayTeam,
+                  league: match.league,
+                  time: match.time,
+                },
+                reading,
+                context: ctx,
+              },
+            },
+          );
+          if (cancel) return;
+          if (!error && data && data.cenario && data.veredito) {
+            const a: AnalystReading = {
+              cenario: data.cenario,
+              pontoAtencao: data.pontoAtencao,
+              veredito: data.veredito,
+              risco: data.risco || "medio",
+            };
+            analystCache.set(akey, { ts: Date.now(), data: a });
+            setState((s) => ({ ...s, analyst: a, analystLoading: false }));
+          } else {
+            setState((s) => ({ ...s, analystLoading: false }));
+          }
+        } catch (e) {
+          console.warn("match-analyst invoke fail", e);
+          if (!cancel) setState((s) => ({ ...s, analystLoading: false }));
+        }
+      }
     }
 
     run();

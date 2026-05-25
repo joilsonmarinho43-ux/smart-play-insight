@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
+import type { AnalystReading } from "@/hooks/useMatchReading";
 
 interface Props {
   open: boolean;
@@ -29,6 +30,8 @@ interface Props {
   homeTeam: string;
   awayTeam: string;
   context?: MatchContext | null;
+  analyst?: AnalystReading | null;
+  analystLoading?: boolean;
 }
 
 const Section = ({
@@ -263,6 +266,69 @@ const OddsPanel = ({
 
 
 
+const riscoBadge = {
+  baixo: { color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40", label: "Risco baixo" },
+  medio: { color: "bg-amber-500/20 text-amber-300 border-amber-500/40", label: "Risco moderado" },
+  alto: { color: "bg-red-500/20 text-red-300 border-red-500/40", label: "Risco alto" },
+} as const;
+
+const AnalystBlock = ({
+  analyst,
+  loading,
+}: {
+  analyst?: AnalystReading | null;
+  loading?: boolean;
+}) => {
+  if (!analyst && !loading) return null;
+  return (
+    <div className="rounded-xl border border-primary/40 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <h3 className="text-xs uppercase tracking-wider font-bold text-primary">
+            Análise do Especialista
+          </h3>
+        </div>
+        {analyst && (
+          <span
+            className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${riscoBadge[analyst.risco].color}`}
+          >
+            {riscoBadge[analyst.risco].label}
+          </span>
+        )}
+      </div>
+      {loading && !analyst && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Cruzando estatísticas com contexto real...
+        </div>
+      )}
+      {analyst && (
+        <div className="space-y-2.5 text-[14px] leading-relaxed text-foreground">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block mb-0.5">
+              Cenário
+            </span>
+            <p>{analyst.cenario}</p>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-bold text-amber-400/90 block mb-0.5">
+              Ponto de Atenção
+            </span>
+            <p>{analyst.pontoAtencao}</p>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block mb-0.5">
+              Veredito de Valor
+            </span>
+            <p className="font-medium">{analyst.veredito}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const MatchReadingModal = ({
   open,
   onOpenChange,
@@ -271,6 +337,8 @@ export const MatchReadingModal = ({
   homeTeam,
   awayTeam,
   context,
+  analyst,
+  analystLoading,
 }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -305,6 +373,8 @@ export const MatchReadingModal = ({
 
         {!loading && reading && (
           <div className="space-y-3 mt-2">
+            <AnalystBlock analyst={analyst} loading={analystLoading} />
+
             <ShareButton reading={reading} homeTeam={homeTeam} awayTeam={awayTeam} />
 
             <OddsPanel context={context} homeTeam={homeTeam} awayTeam={awayTeam} />

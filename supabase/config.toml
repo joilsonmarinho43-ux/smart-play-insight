@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.daily-bingo-broadcast]
 verify_jwt = false
+
+[functions.match-analyst]
+verify_jwt = false

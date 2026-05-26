@@ -224,7 +224,7 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const fixtureId = body?.match?.id || body?.fixtureId;
-    const cacheKey = fixtureId ? `analyst:${fixtureId}` : null;
+    const cacheKey = fixtureId ? `analyst:${PROMPT_VERSION}:${fixtureId}` : null;
 
     if (cacheKey) {
       const cached = await cacheGet(cacheKey);

@@ -16,7 +16,7 @@ export default function AutoPilot() {
   if (!AUTO_BET_ENABLED) return <Navigate to="/" replace />;
 
   const { settings, update, reset, toggleKillSwitch } = useAutoPilotSettings();
-  const { data: signals = [], isLoading } = useAutoPilotSignals(30);
+  const { data: signals = [], isLoading } = useAutoPilotSignals(720);
 
   const [logs, setLogs] = useState<AutoPilotLog[]>(() => {
     try {
@@ -60,7 +60,7 @@ export default function AutoPilot() {
 
         <section>
           <h2 className="text-xs uppercase tracking-widest text-gray-400 mb-2">
-            Sinais elegíveis (últimos 30 min)
+            Sinais elegíveis (últimas 12h)
           </h2>
           {isLoading ? (
             <div className="flex items-center gap-2 text-gray-400 text-sm py-6">
@@ -68,7 +68,7 @@ export default function AutoPilot() {
             </div>
           ) : signals.length === 0 ? (
             <p className="text-sm text-gray-500 py-6 text-center bg-black/20 rounded-xl border border-white/5">
-              Nenhum sinal nos últimos 30 minutos.
+              Nenhum sinal nas últimas 12 horas.
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">

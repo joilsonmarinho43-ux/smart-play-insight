@@ -60,7 +60,7 @@ export default function AutoPilot() {
 
         <section>
           <h2 className="text-xs uppercase tracking-widest text-gray-400 mb-2">
-            Sinais elegíveis (últimos 30 min)
+            Sinais elegíveis (últimas 12h)
           </h2>
           {isLoading ? (
             <div className="flex items-center gap-2 text-gray-400 text-sm py-6">

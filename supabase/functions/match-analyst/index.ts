@@ -61,33 +61,77 @@ Sua função é cruzar dados estatísticos puros com o contexto real do confront
    - Avalie a média de gols recente. Se for alta mas houver desfalques ofensivos relevantes, reduza a confiança em mercados de gols.
    - Avalie a motivação: mata-mata, clássico, disputa de título ou rebaixamento. Se houver, priorize cautela e considere Under.
 
-2. CONFRONTO DE DADOS ("o dedo na ferida")
+2. CONFRONTO MODELO × MERCADO (CRÍTICO — sempre verificar)
+   - Compare "favorito_modelo" com "favorito_mercado" no payload.
+   - Se forem o MESMO lado: confirme em uma frase e siga.
+   - Se DIVERGIREM: você é OBRIGADO a explicar a divergência em "pontoAtencao", citando objetivamente as causas mais prováveis. Considere nesta ordem:
+     a) Fator casa não capturado pelos números brutos (estádio difícil, altitude, torcida, viagem do visitante).
+     b) Assimetria entre ligas — médias de gols/finalizações entre Brasileirão, ligas argentina/chilena/uruguaia, MLS, Europa não são comparáveis sem ajuste; um time pode "parecer" superior só porque enfrenta defesas piores.
+     c) Contexto de competição — mata-mata, jogo de ida, classificado/eliminado, rodízio (B do calendário).
+     d) Histórico de campanha do mandante na competição (ex.: Libertadores) versus inexperiência do visitante.
+     e) Viés de amostra — últimos 5 jogos podem ter sido contra adversários muito mais fracos.
+   - Conclua explicitamente quem você considera mais provável de acertar (modelo ou casas) e POR QUÊ.
+
+3. CONFRONTO DE DADOS ("o dedo na ferida")
    - Compare a expectativa estatística com o momento defensivo e ofensivo recente.
    - Se os números apontam tendência mas o histórico das últimas 3 a 5 partidas mostra queda de rendimento, aponte a divergência explicitamente.
 
-3. SÍNTESE
+4. SÍNTESE
    - Não repita números brutos — o usuário já os vê na tela. Foque no "porquê".
-   - Linguagem direta, profissional, em português do Brasil. Sem emojis. Sem palavras "IA", "algoritmo", "robô", "Poisson", "regressão", "modelo".
+   - Linguagem direta, profissional, em português do Brasil. Sem emojis. Sem palavras "IA", "algoritmo", "robô", "Poisson", "regressão", "modelo estatístico". Pode dizer "projeção" ou "os números".
 
 # REGRAS DE OURO
 - Se a estatística estiver muito óbvia ("batida"), avise que o mercado provavelmente já precificou e o risco/retorno piorou.
 - Nunca garanta resultado. Use "alta probabilidade", "tendência favorável", "cenário de risco".
-- Se houver dados conflitantes (estatística aponta um lado, contexto aponta outro), alerte o usuário sobre a inconsistência.
+- Se houver dados conflitantes (estatística aponta um lado, contexto/mercado aponta outro), alerte o usuário sobre a inconsistência.
+- Em jogos de mata-mata Libertadores/Sul-Americana com mandante histórico forte e visitante brasileiro estreante, o fator casa costuma pesar mais do que a forma recente em campeonatos domésticos. Reconheça isso quando aplicável.
 
 # SAÍDA
 Devolva APENAS um JSON válido, sem markdown, sem comentários, no formato:
 {
-  "cenario": "1 a 3 frases. Resumo do contexto: motivação e momento dos dois times.",
-  "pontoAtencao": "1 a 3 frases. O fator que pode quebrar a estatística (desfalques, estilo de jogo, calendário, divergência mercado x números).",
-  "veredito": "1 a 3 frases. Recomendação baseada em risco x retorno. Pode sugerir um mercado específico, evitar um lado, ou indicar que não há valor claro.",
+  "cenario": "1 a 3 frases. Resumo do contexto: motivação, momento dos dois times e qual lado é favorito segundo o mercado.",
+  "pontoAtencao": "1 a 4 frases. O fator que pode quebrar a estatística OU a explicação da divergência modelo × mercado quando houver. Seja objetivo: cite a causa (fator casa, liga, mata-mata, viagem, etc.).",
+  "veredito": "1 a 3 frases. Recomendação baseada em risco x retorno. Pode sugerir um mercado específico, evitar um lado, ou indicar que não há valor claro. Se modelo e mercado divergirem, diga em qual lado você se apoia.",
   "risco": "baixo" | "medio" | "alto"
 }`;
+
+function pickFavorito(probs: { home?: number; draw?: number; away?: number } | null | undefined): string | null {
+  if (!probs) return null;
+  const h = Number(probs.home ?? 0);
+  const d = Number(probs.draw ?? 0);
+  const a = Number(probs.away ?? 0);
+  const max = Math.max(h, d, a);
+  if (max <= 0) return null;
+  if (max === h) return "casa";
+  if (max === a) return "fora";
+  return "empate";
+}
+
+function pickFavoritoOdds(odds: { home?: number; draw?: number; away?: number }): string | null {
+  const h = Number(odds.home ?? 0);
+  const d = Number(odds.draw ?? 0);
+  const a = Number(odds.away ?? 0);
+  const valid = [
+    { side: "casa", v: h },
+    { side: "empate", v: d },
+    { side: "fora", v: a },
+  ].filter((x) => x.v > 1);
+  if (!valid.length) return null;
+  valid.sort((x, y) => x.v - y.v);
+  return valid[0].side;
+}
 
 function buildUserPayload(input: any): string {
   const m = input.match || {};
   const r = input.reading || {};
   const c = input.context || {};
   const odds = c.odds || {};
+
+  const probs = m.matchProbabilities || null;
+  const favModelo = pickFavorito(probs);
+  const favMercado = pickFavoritoOdds(odds);
+  const divergencia =
+    favModelo && favMercado && favModelo !== favMercado ? true : false;
 
   return JSON.stringify(
     {
@@ -96,7 +140,13 @@ function buildUserPayload(input: any): string {
         fora: m.awayTeam,
         liga: m.league,
         horario: m.time,
+        estadio: m.venue,
+        fase: m.fixtureType,
       },
+      favorito_modelo: favModelo,
+      favorito_mercado: favMercado,
+      divergencia_modelo_mercado: divergencia,
+      probabilidades_modelo_pct: probs,
       projecao: {
         gols_projetados: r.projectedGoals,
         placares_provaveis: r.likelyScores,

@@ -185,21 +185,8 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
 
-              {/* AutoPilot LIVE — gated por feature flag */}
-              {AUTO_BET_ENABLED && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to="/autopilot"
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-                      onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"
-                    >
-                      <Crosshair className="h-5 w-5 shrink-0 text-orange-500" />
-                      {!collapsed && <span className="text-sm">AutoPilot LIVE</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
+
+
 
 
               {/* Admin link */}

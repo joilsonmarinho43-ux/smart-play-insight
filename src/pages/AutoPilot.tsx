@@ -68,7 +68,7 @@ export default function AutoPilot() {
             </div>
           ) : signals.length === 0 ? (
             <p className="text-sm text-gray-500 py-6 text-center bg-black/20 rounded-xl border border-white/5">
-              Nenhum sinal nos últimos 30 minutos.
+              Nenhum sinal nas últimas 12 horas.
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">

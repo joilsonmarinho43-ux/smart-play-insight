@@ -16,7 +16,7 @@ export default function AutoPilot() {
   if (!AUTO_BET_ENABLED) return <Navigate to="/" replace />;
 
   const { settings, update, reset, toggleKillSwitch } = useAutoPilotSettings();
-  const { data: signals = [], isLoading } = useAutoPilotSignals(30);
+  const { data: signals = [], isLoading } = useAutoPilotSignals(720);
 
   const [logs, setLogs] = useState<AutoPilotLog[]>(() => {
     try {

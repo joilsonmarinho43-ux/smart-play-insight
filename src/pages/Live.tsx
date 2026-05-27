@@ -32,6 +32,8 @@ import CornerTimeline from '@/components/CornerTimeline';
 import MomentumChart from '@/components/MomentumChart';
 import OverGoalsPanel from '@/components/OverGoalsPanel';
 import { calculateHtFtStrategy, type HtFtPrediction } from '@/lib/htftEngine';
+import { analyzeLiveGoal } from '@/lib/liveGoalEngine';
+import LiveGoalOverlay from '@/components/LiveGoalOverlay';
 
 type DataStatus = 'valid' | 'awaiting_data' | 'awaiting_api' | 'blocked' | 'error';
 
@@ -687,6 +689,28 @@ const Live = () => {
                   </span>
                 </div>
               )}
+
+              {/* ═══ GOAL PRESSURE ENGINE (overlay aditivo) ═══ */}
+              {(() => {
+                try {
+                  const read = analyzeLiveGoal({
+                    homeStats: stats?.home || null,
+                    awayStats: stats?.away || null,
+                    minute: elapsed,
+                    homeGoals,
+                    awayGoals,
+                    homeName,
+                    awayName,
+                    league: match?.league?.name || match?.league || '',
+                    pressure,
+                    history,
+                  });
+                  return <LiveGoalOverlay read={read} />;
+                } catch (e) {
+                  console.error('LiveGoalOverlay error:', e);
+                  return null;
+                }
+              })()}
 
               {/* ═══ LIVE PERFORMANCE & PI ═══ */}
               <div className="px-4 py-3">

@@ -690,6 +690,28 @@ const Live = () => {
                 </div>
               )}
 
+              {/* ═══ GOAL PRESSURE ENGINE (overlay aditivo) ═══ */}
+              {(() => {
+                try {
+                  const read = analyzeLiveGoal({
+                    homeStats: stats?.home || null,
+                    awayStats: stats?.away || null,
+                    minute: elapsed,
+                    homeGoals,
+                    awayGoals,
+                    homeName,
+                    awayName,
+                    league: match?.league?.name || match?.league || '',
+                    pressure,
+                    history,
+                  });
+                  return <LiveGoalOverlay read={read} />;
+                } catch (e) {
+                  console.error('LiveGoalOverlay error:', e);
+                  return null;
+                }
+              })()}
+
               {/* ═══ LIVE PERFORMANCE & PI ═══ */}
               <div className="px-4 py-3">
                 <div className="flex items-center gap-2 mb-2">

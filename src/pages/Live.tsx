@@ -32,6 +32,8 @@ import CornerTimeline from '@/components/CornerTimeline';
 import MomentumChart from '@/components/MomentumChart';
 import OverGoalsPanel from '@/components/OverGoalsPanel';
 import { calculateHtFtStrategy, type HtFtPrediction } from '@/lib/htftEngine';
+import { analyzeLiveGoal } from '@/lib/liveGoalEngine';
+import LiveGoalOverlay from '@/components/LiveGoalOverlay';
 
 type DataStatus = 'valid' | 'awaiting_data' | 'awaiting_api' | 'blocked' | 'error';
 

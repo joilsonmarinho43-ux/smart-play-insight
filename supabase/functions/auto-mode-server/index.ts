@@ -245,6 +245,15 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
 
   if (!isSuperSniper && !isSniper && !isSemi) return null;
 
+  // 🔒 Filtro de posse estéril (aplicado apenas em SEMI; SNIPER/SUPER já têm SoG≥3)
+  if (isSemi) {
+    const sterile = detectSterilePossession(s);
+    if (sterile.sterile) {
+      console.log(`[AUTO-MODE-SERVER] ⚠️ Posse estéril bloqueada: ${s.homeTeam} vs ${s.awayTeam} • ${sterile.reason}`);
+      return null;
+    }
+  }
+
   const tier: HybridTier = isSuperSniper ? 'SUPER_SNIPER' : isSniper ? 'SNIPER' : 'SEMI';
   const market = 'Over 1.5';
 

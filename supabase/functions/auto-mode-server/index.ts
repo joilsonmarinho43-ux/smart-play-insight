@@ -151,6 +151,12 @@ function extractStats(match: any) {
     daEstimated = true;
   }
 
+  // Novos indicadores de penetração / posse estéril
+  const blockedShots = (lH.blockedShots || 0) + (lA.blockedShots || 0);
+  const shotsInsideBox = (lH.shotsInsideBox || 0) + (lA.shotsInsideBox || 0);
+  const attacks = (lH.attacks || 0) + (lA.attacks || 0);
+  const passesAccurate = (lH.passesAccurate || 0) + (lA.passesAccurate || 0);
+
   const homePoss = Number(lH.possession || 0);
   const awayPoss = Number(lA.possession || 0);
   const dominantPoss = Math.max(homePoss, awayPoss);
@@ -161,7 +167,46 @@ function extractStats(match: any) {
   const league = match.league || '';
   const hasStats = !!(lH.shotsOnGoal || lA.shotsOnGoal || lH.dangerousAttacks || lA.dangerousAttacks || totalShots || corners);
 
-  return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats };
+  return {
+    minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated,
+    blockedShots, shotsInsideBox, attacks, passesAccurate,
+    dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats,
+  };
+}
+
+/**
+ * Detecta posse estéril: domínio territorial sem penetração real.
+ * Bypass em jogos intensos (SoG≥3 ou pressão≥70) para preservar sensibilidade.
+ * Retorna { sterile: boolean, reason: string }.
+ */
+function detectSterilePossession(s: ReturnType<typeof extractStats>): { sterile: boolean; reason: string } {
+  // Bypass — jogo intenso, sinal real de gol
+  if (s.sog >= 3 || s.pressure >= 70) return { sterile: false, reason: '' };
+  // Só avalia após 20' (antes há ruído natural)
+  if (s.minute < 20) return { sterile: false, reason: '' };
+
+  // Domínio claro
+  const dominant = s.dominantPoss >= 60;
+  if (!dominant) return { sterile: false, reason: '' };
+
+  // Indicadores de penetração real (qualquer um derruba a flag)
+  const hasPenetration =
+    s.shotsInsideBox >= 2 ||
+    s.blockedShots >= 2 ||
+    s.sog >= 2;
+
+  if (hasPenetration) return { sterile: false, reason: '' };
+
+  // Razão DA/Attacks: se vem da API real e está baixa, confirma jogo lateral
+  if (s.attacks > 0 && !s.daEstimated) {
+    const daRatio = s.da / Math.max(1, s.attacks);
+    if (daRatio < 0.35) {
+      return { sterile: true, reason: `posse ${s.dominantPoss}% sem penetração (DA/AT ${daRatio.toFixed(2)})` };
+    }
+  }
+
+  // Sem indicadores de finalização interna após 20' com domínio = estéril
+  return { sterile: true, reason: `posse ${s.dominantPoss}% sem finalização interna (SIB:${s.shotsInsideBox} BS:${s.blockedShots})` };
 }
 
 function classifyServer(match: any, rmaScorePreview: number): HybridSignal | null {

@@ -232,6 +232,11 @@ function extractStats(stats: any[]) {
     corners: get("Corner Kicks"),
     totalShots: get("Total Shots"),
     dangerousAttacks: get("Dangerous Attacks"),
+    // Indicadores adicionais p/ detectar posse estéril
+    blockedShots: get("Blocked Shots"),
+    shotsInsideBox: get("Shots insidebox"),
+    attacks: get("Attacks"),
+    passesAccurate: get("Passes accurate"),
   };
 }
 

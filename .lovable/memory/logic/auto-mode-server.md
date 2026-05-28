@@ -9,7 +9,7 @@ Edge function `auto-mode-server` envia sinais Over 1.5 FT ao Telegram.
 ## Tiers (prioridade SUPER > SNIPER > SEMI)
 - **SUPER_SNIPER 💀**: 0x0, min 12-28, SoG≥4, DA≥12, corners≥3, posse≥58%, pressão≥75, RMA≥28. Sensitivity: `premium`.
 - **SNIPER 🔥**: 0x0, min **8-28**, SoG≥3, posse≥55, DA≥8, corners≥2, pressão≥60. Sensitivity: `agressivo`.
-- **SEMI ⚡**: 0x0 ou 1x0/0x1, min **8-35** (não aceita HT/2ºT), SoG≥**2**, posse≥**52**, DA≥**5** **REAL** (não estimado), corners≥1, pressão≥**35**. Sensitivity: `moderado`. 🔒 Bloqueia DA estimado (calibração 27/05: 3/3 losses foram SEMI com DA≈).
+- **SEMI ⚡**: 0x0 ou 1x0/0x1, min **8-35** (não aceita HT/2ºT), SoG≥**2**, posse≥**52**, DA≥**5** **REAL** (não estimado), corners≥1, pressão≥**35**. Sensitivity: `moderado`. 🔒 Bloqueia DA estimado + 🔒 **Filtro de posse estéril**: se min≥20 e posse≥60% sem penetração (SIB≥2 OR BS≥2 OR SoG≥2) OU DA/Attacks<0.35 → bloqueia. Bypass quando SoG≥3 ou pressão≥70 (preserva sensibilidade em jogos intensos).
 
 ## RMA + Hard Blocks
 `score = pressão×0.30 + ap_norm×0.35 + f_norm×0.15 + sot_norm×0.20 + leagueWeight + momentumDelta`

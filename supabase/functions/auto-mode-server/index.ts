@@ -188,11 +188,14 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
 
   // SEMI — janela endurecida: 8-35 (não aceita HT min 38-45 nem 2º tempo)
   // Histórico: min ≥ 38 = 56% acerto, min 45 = 67%, min ≥ 50 = 38%. Zona dourada: 8-35.
+  // 🔒 Anti-falso-positivo: SEMI só aceita DA REAL do feed.
+  // Calibração 27/05: 3/3 losses do dia eram SEMI com DA estimado (≈) em ligas SA travadas.
   const totalGoals = s.homeGoals + s.awayGoals;
   const semiWindowOk =
     (totalGoals === 0 && s.minute >= 8 && s.minute <= 35) ||
     (totalGoals === 1 && s.minute >= 8 && s.minute <= 35);
   const isSemi = !isSuperSniper && !isSniper && semiWindowOk &&
+    !s.daEstimated &&
     s.sog >= 2 && s.dominantPoss >= 52 && s.da >= 5 && s.corners >= 1 && s.pressure >= 35;
 
   if (!isSuperSniper && !isSniper && !isSemi) return null;

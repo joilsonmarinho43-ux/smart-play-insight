@@ -10,6 +10,7 @@ import { MatchReadingModal } from './MatchReadingModal';
 
 interface Props {
   match: MatchData;
+  isPremium?: boolean;
 }
 
 type TabKey = 'stats' | 'poisson' | 'ticket';
@@ -373,7 +374,7 @@ function PoissonTab({ match }: { match: MatchData }) {
 }
 
 // ─── MAIN COMPONENT ───
-const MatchCard = ({ match }: Props) => {
+const MatchCard = ({ match, isPremium }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
   const [readingOpen, setReadingOpen] = useState(false);
   const { reading, loading, context, analyst, analystLoading } = useMatchReading(match, readingOpen);
@@ -389,10 +390,16 @@ const MatchCard = ({ match }: Props) => {
   return (
     <div className="bg-card rounded-2xl sm:rounded-3xl border border-border overflow-hidden animate-slide-in shadow-2xl shadow-black/20 flex flex-col h-full">
       {/* HEADER */}
-      <div className="bg-secondary/50 px-4 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between border-b border-border">
+      <div className={`bg-secondary/50 px-4 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between border-b border-border ${isPremium ? 'border-amber-500/30' : ''}`}>
         <div className="flex items-center gap-2 text-muted-foreground min-w-0">
-          <Trophy className="w-4 h-4 text-primary shrink-0" />
+          <Trophy className={`w-4 h-4 shrink-0 ${isPremium ? 'text-amber-400' : 'text-primary'}`} />
           <span className="text-xs sm:text-sm font-medium truncate">{match.league}</span>
+          {isPremium && (
+            <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-[9px] font-black text-amber-400 uppercase tracking-wider">
+              <Flame className="w-3 h-3" fill="currentColor" />
+              Premium
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
           <Clock className="w-3.5 h-3.5" />

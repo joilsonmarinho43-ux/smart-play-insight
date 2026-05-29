@@ -259,9 +259,35 @@ const Index = () => {
         </a>
 
 
+        {/* Premium Filter */}
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() => setPremiumFilter('all')}
+            className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-1.5 ${
+              premiumFilter === 'all'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-white/5 text-muted-foreground hover:bg-white/10'
+            }`}
+          >
+            <Crown className="w-3.5 h-3.5" />
+            Todas ({dayMatches.length})
+          </button>
+          <button
+            onClick={() => setPremiumFilter('premium')}
+            className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-1.5 ${
+              premiumFilter === 'premium'
+                ? 'bg-amber-500 text-amber-950'
+                : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20'
+            }`}
+          >
+            <Crown className="w-3.5 h-3.5" fill="currentColor" />
+            🔥 Premium ({dayMatches.filter((m: any) => m.isPremium).length})
+          </button>
+        </div>
+
         {/* League Filter */}
         {availableLeagues.length > 1 && (
-          <div className="mt-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             <button
               onClick={() => setSelectedLeague('all')}
               className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
@@ -270,21 +296,25 @@ const Index = () => {
                   : 'bg-white/5 text-muted-foreground hover:bg-white/10'
               }`}
             >
-              Todas ({dayMatches.length})
+              Ligas ({dayMatches.length})
             </button>
             {availableLeagues.map(league => {
               const count = dayMatches.filter((m: any) => m.league === league).length;
               const label = LEAGUE_LABELS[league] || league;
+              const isLeaguePremium = isPremiumLeague(league);
               return (
                 <button
                   key={league}
                   onClick={() => setSelectedLeague(league)}
-                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-1.5 ${
                     selectedLeague === league
                       ? 'bg-primary text-primary-foreground'
-                      : 'bg-white/5 text-muted-foreground hover:bg-white/10'
+                      : isLeaguePremium
+                        ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20'
+                        : 'bg-white/5 text-muted-foreground hover:bg-white/10'
                   }`}
                 >
+                  {isLeaguePremium && <Crown className="w-3 h-3 text-amber-400" fill="currentColor" />}
                   {label} ({count})
                 </button>
               );
@@ -307,7 +337,7 @@ const Index = () => {
         {/* Match Cards */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredMatches.map((match: any) => (
-            <MatchCard key={match.id} match={match} />
+            <MatchCard key={match.id} match={match} isPremium={match.isPremium} />
           ))}
         </div>
       </main>

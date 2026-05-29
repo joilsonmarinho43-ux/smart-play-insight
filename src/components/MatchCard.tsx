@@ -10,6 +10,7 @@ import { MatchReadingModal } from './MatchReadingModal';
 
 interface Props {
   match: MatchData;
+  isPremium?: boolean;
 }
 
 type TabKey = 'stats' | 'poisson' | 'ticket';

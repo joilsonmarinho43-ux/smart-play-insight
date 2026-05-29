@@ -2,10 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMultiDayMatches, isOfflineMode, getOfflineSince } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
+import { isPremiumLeague } from '@/lib/premiumLeagues';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, RefreshCw, Trash2, WifiOff, Send } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, WifiOff, Send, Crown } from 'lucide-react';
 import bannerImg from "@/assets/banner-hero.jpg";
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from "@/lib/timezone";
@@ -34,6 +35,7 @@ const Index = () => {
   const { profile } = useProfile();
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<number>(0);
+  const [premiumFilter, setPremiumFilter] = useState<'all' | 'premium'>('all');
   const [offline, setOffline] = useState<boolean>(isOfflineMode());
 
   useEffect(() => {
@@ -132,6 +134,7 @@ const Index = () => {
           awayWithStats: aStats.gamesCount || (hasAway ? 5 : 0),
         },
         predictions: { homeWin: String(homeWin), draw: String(draw), awayWin: String(awayWin) },
+        isPremium: isPremiumLeague(m.league?.name || m.league || ''),
       };
     }),
   [rawMatches]);

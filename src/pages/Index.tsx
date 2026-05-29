@@ -158,11 +158,22 @@ const Index = () => {
     return Array.from(leagues).sort();
   }, [dayMatches]);
 
-  // Filtered by league
+  // Filter by league + premium + sort (premium first)
   const filteredMatches = useMemo(() => {
-    if (selectedLeague === 'all') return dayMatches;
-    return dayMatches.filter((m: any) => m.league === selectedLeague);
-  }, [dayMatches, selectedLeague]);
+    let result = dayMatches;
+    if (selectedLeague !== 'all') {
+      result = result.filter((m: any) => m.league === selectedLeague);
+    }
+    if (premiumFilter === 'premium') {
+      result = result.filter((m: any) => m.isPremium);
+    }
+    // Sort: premium first, then by time
+    return result.sort((a: any, b: any) => {
+      if (a.isPremium && !b.isPremium) return -1;
+      if (!a.isPremium && b.isPremium) return 1;
+      return (a.time || '').localeCompare(b.time || '');
+    });
+  }, [dayMatches, selectedLeague, premiumFilter]);
 
   return (
     <div className="min-h-screen text-white pb-8 font-sans relative">

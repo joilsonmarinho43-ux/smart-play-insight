@@ -126,11 +126,14 @@ async function acquireCacheLock(cacheKey: string): Promise<void> {
 // ========================
 // LEAGUE CONFIG
 // ========================
-const LEAGUES_TO_ANALYZE = [71, 39, 140, 78, 135, 61, 13, 2];
+// Ligas habilitadas para pré-jogo — alinhado com LEAGUES_WITH_STATS
+// para que todas as ligas premium configuradas no app apareçam no pré-jogo,
+// não só as 8 originais (que faziam aparecer só Brasil em dias sem jogo europeu).
 const LEAGUES_WITH_STATS = new Set([
   71, 39, 140, 78, 135, 61, 253, 128, 262, 13, 11, 2, 3, 88, 94, 40, 239,
   345, 299, 268, 242, 307, 332,
 ]);
+const LEAGUES_TO_ANALYZE = Array.from(LEAGUES_WITH_STATS);
 
 const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   71: 'Brasileirão Série A', 39: 'Premier League', 140: 'La Liga',

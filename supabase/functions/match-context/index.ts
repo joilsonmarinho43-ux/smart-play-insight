@@ -52,7 +52,9 @@ async function cacheSet(key: string, value: any) {
 //  - Com odds disponíveis → 24h (preserva cota)
 //  - Resposta vazia (jogo distante, casas ainda não abriram mercado) → 2h
 //    para tentar novamente logo, sem consumir muita cota.
-const ODDS_TTL_FULL_MS = 24 * 60 * 60 * 1000;
+// Odds TTL alinhado ao TTL do contexto (8 min) para permitir detecção real de drift.
+// Empty stays at 2h para não desperdiçar cota em jogos distantes sem mercado.
+const ODDS_TTL_FULL_MS = 8 * 60 * 1000;
 const ODDS_TTL_EMPTY_MS = 2 * 60 * 60 * 1000;
 async function getOddsCached(fixtureId: number, apiKey: string) {
   const key = `odds_day_${fixtureId}`;

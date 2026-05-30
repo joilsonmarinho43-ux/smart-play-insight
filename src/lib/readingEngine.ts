@@ -822,7 +822,7 @@ export function buildMatchReadingV2(
   const premiumInsight = pick(insightPool, seed + 7);
 
   return {
-    projectedGoals: Number(total.toFixed(1)),
+    projectedGoals: Number((hLs + aLs).toFixed(1)),
     goalLines,
     trendTags,
     premiumInsight,

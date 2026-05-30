@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v2"; // bump para invalidar caches antigos
+const PROMPT_VERSION = "v3"; // bump após auditoria: payload enriquecido + probs normalizadas
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;
@@ -121,14 +121,26 @@ function pickFavoritoOdds(odds: { home?: number; draw?: number; away?: number })
   return valid[0].side;
 }
 
+function normalizeProbs(p: any): { home: number; draw: number; away: number } | null {
+  if (!p) return null;
+  let h = Number(p.home ?? 0);
+  let d = Number(p.draw ?? 0);
+  let a = Number(p.away ?? 0);
+  const sum = h + d + a;
+  if (sum <= 0) return null;
+  // se vier em 0-1, converte para %
+  if (sum <= 1.5) { h *= 100; d *= 100; a *= 100; }
+  return { home: Math.round(h), draw: Math.round(d), away: Math.round(a) };
+}
+
 function buildUserPayload(input: any): string {
   const m = input.match || {};
   const r = input.reading || {};
   const c = input.context || {};
   const odds = c.odds || {};
 
-  const probs = m.matchProbabilities || null;
-  const favModelo = pickFavorito(probs);
+  const probsPct = normalizeProbs(m.matchProbabilities);
+  const favModelo = pickFavorito(probsPct);
   const favMercado = pickFavoritoOdds(odds);
   const divergencia =
     favModelo && favMercado && favModelo !== favMercado ? true : false;
@@ -146,7 +158,7 @@ function buildUserPayload(input: any): string {
       favorito_modelo: favModelo,
       favorito_mercado: favMercado,
       divergencia_modelo_mercado: divergencia,
-      probabilidades_modelo_pct: probs,
+      probabilidades_modelo_pct: probsPct,
       projecao: {
         gols_projetados: r.projectedGoals,
         placares_provaveis: r.likelyScores,
@@ -155,9 +167,12 @@ function buildUserPayload(input: any): string {
       },
       resumo_tecnico: r.summary,
       leitura_tatica: r.tactical,
+      tendencias: r.trendTags,
+      insight_premium: r.premiumInsight,
       melhores_mercados: (r.opportunities || []).slice(0, 4).map((o: any) => ({
         mercado: o.market,
         confianca_pct: o.confidence,
+        motivos: o.reasons,
       })),
       linhas_gols: (r.goalLines || []).map((g: any) => ({
         linha: `${g.side} ${g.line}`,

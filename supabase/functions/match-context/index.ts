@@ -10,10 +10,13 @@ const corsHeaders = {
 const BASE_URL = "https://v3.football.api-sports.io";
 const CACHE_TTL_MS = 8 * 60 * 1000; // 8 min — odds precisam estar frescas
 
+let _sb: ReturnType<typeof createClient> | null = null;
 function sb() {
+  if (_sb) return _sb;
   const url = Deno.env.get("SUPABASE_URL")!;
   const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  return createClient(url, sk);
+  _sb = createClient(url, sk);
+  return _sb;
 }
 
 async function cacheGet(key: string) {
@@ -49,7 +52,9 @@ async function cacheSet(key: string, value: any) {
 //  - Com odds disponíveis → 24h (preserva cota)
 //  - Resposta vazia (jogo distante, casas ainda não abriram mercado) → 2h
 //    para tentar novamente logo, sem consumir muita cota.
-const ODDS_TTL_FULL_MS = 24 * 60 * 60 * 1000;
+// Odds TTL alinhado ao TTL do contexto (8 min) para permitir detecção real de drift.
+// Empty stays at 2h para não desperdiçar cota em jogos distantes sem mercado.
+const ODDS_TTL_FULL_MS = 8 * 60 * 1000;
 const ODDS_TTL_EMPTY_MS = 2 * 60 * 60 * 1000;
 async function getOddsCached(fixtureId: number, apiKey: string) {
   const key = `odds_day_${fixtureId}`;
@@ -120,9 +125,11 @@ function classifyInjuryImpact(items: any[]): "baixo" | "médio" | "alto" {
   if (!items || items.length === 0) return "baixo";
   const keyPositions = items.filter((p) => {
     const pos = (p?.player?.position || "").toLowerCase();
-    return pos === "attacker" || pos === "midfielder" || pos === "goalkeeper";
+    return pos === "attacker" || pos === "midfielder" || pos === "goalkeeper" || pos === "defender";
   });
-  if (keyPositions.length >= 3) return "alto";
+  // Defensores em massa também desestruturam — peso maior para 3+ defensores
+  const defenders = items.filter((p) => (p?.player?.position || "").toLowerCase() === "defender").length;
+  if (keyPositions.length >= 3 || defenders >= 3) return "alto";
   if (keyPositions.length >= 1 || items.length >= 2) return "médio";
   return "baixo";
 }
@@ -299,7 +306,7 @@ serve(async (req) => {
         count: hInjuries.length,
         players: hInjuries.slice(0, 5).map((i: any) => ({
           name: i?.player?.name,
-          reason: i?.player?.reason,
+          reason: i?.player?.type ?? i?.player?.reason ?? null,
           position: i?.player?.position,
         })),
         impact: classifyInjuryImpact(hInjuries),
@@ -308,7 +315,7 @@ serve(async (req) => {
         count: aInjuries.length,
         players: aInjuries.slice(0, 5).map((i: any) => ({
           name: i?.player?.name,
-          reason: i?.player?.reason,
+          reason: i?.player?.type ?? i?.player?.reason ?? null,
           position: i?.player?.position,
         })),
         impact: classifyInjuryImpact(aInjuries),

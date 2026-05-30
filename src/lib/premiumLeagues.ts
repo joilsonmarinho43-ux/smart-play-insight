@@ -2,21 +2,35 @@
 // NÃO altera lógica de análise. Apenas organização visual no pré-jogo.
 
 export const PREMIUM_LEAGUES = new Set([
+  // Top Europa
+  'Premier League',
+  'La Liga',
   'Bundesliga',
+  'Serie A',
+  'Serie A (ITA)',
+  'Ligue 1',
   'Eredivisie',
+  'Liga Portugal',
+  'Primeira Liga Portugal',
+  'Championship',
   'Jupiler Pro League',
   'Eliteserien',
   'Allsvenskan',
-  'Championship',
-  'Brasileirão Série A',
-  'Brasileirão Série B',
-  'Liga Argentina',
   'Superliga Dinamarca',
   'Bundesliga Áustria',
   'Super League Suíça',
-  'Primeira Liga Portugal',
-  'Ligue 1',
-  'La Liga',
+  // Brasil
+  'Brasileirão Série A',
+  'Brasileirão Série B',
+  // Américas
+  'Liga Argentina',
+  'Liga MX',
+  'MLS',
+  // Copas continentais
+  'Copa Libertadores',
+  'Copa Sudamericana',
+  'Champions League',
+  'Europa League',
 ]);
 
 /** Verifica se uma liga é premium (case-insensitive, normaliza acentos) */

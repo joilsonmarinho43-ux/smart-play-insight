@@ -10,10 +10,13 @@ const corsHeaders = {
 const BASE_URL = "https://v3.football.api-sports.io";
 const CACHE_TTL_MS = 8 * 60 * 1000; // 8 min — odds precisam estar frescas
 
+let _sb: ReturnType<typeof createClient> | null = null;
 function sb() {
+  if (_sb) return _sb;
   const url = Deno.env.get("SUPABASE_URL")!;
   const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  return createClient(url, sk);
+  _sb = createClient(url, sk);
+  return _sb;
 }
 
 async function cacheGet(key: string) {

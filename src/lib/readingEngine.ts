@@ -597,11 +597,15 @@ export function buildMatchReadingV2(
   if (awayImpact === "alto") { aLs *= 0.85; hLs *= 1.06; }
   else if (awayImpact === "médio") { aLs *= 0.94; }
   // Motivação real (briga por título/classificação intensifica; meio-tabela esfria)
-  if (homeMot === "título" || homeMot === "classificação") hLs *= 1.05;
-  if (awayMot === "título" || awayMot === "classificação") aLs *= 1.05;
-  if (homeMot === "rebaixamento") hLs *= 0.96;
-  if (awayMot === "rebaixamento") aLs *= 0.94;
-  if (homeMot === "meio-tabela" && awayMot === "meio-tabela") { hLs *= 0.95; aLs *= 0.95; }
+  const motTitle = (s: string | null) => !!s && /t[íi]tulo/i.test(s);
+  const motCont  = (s: string | null) => !!s && /classifica/i.test(s);
+  const motReleg = (s: string | null) => !!s && /rebaixamento/i.test(s);
+  const motMid   = (s: string | null) => !!s && /meio-tabela/i.test(s);
+  if (motTitle(homeMot) || motCont(homeMot)) hLs *= 1.05;
+  if (motTitle(awayMot) || motCont(awayMot)) aLs *= 1.05;
+  if (motReleg(homeMot)) hLs *= 0.96;
+  if (motReleg(awayMot)) aLs *= 0.94;
+  if (motMid(homeMot) && motMid(awayMot)) { hLs *= 0.95; aLs *= 0.95; }
   // Calendário pesado / pouco descanso derruba intensidade
   if (homeLoad >= 3 || (homeRest != null && homeRest <= 2)) hLs *= 0.93;
   if (awayLoad >= 3 || (awayRest != null && awayRest <= 2)) aLs *= 0.91;

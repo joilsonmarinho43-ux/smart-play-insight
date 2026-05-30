@@ -125,9 +125,11 @@ function classifyInjuryImpact(items: any[]): "baixo" | "médio" | "alto" {
   if (!items || items.length === 0) return "baixo";
   const keyPositions = items.filter((p) => {
     const pos = (p?.player?.position || "").toLowerCase();
-    return pos === "attacker" || pos === "midfielder" || pos === "goalkeeper";
+    return pos === "attacker" || pos === "midfielder" || pos === "goalkeeper" || pos === "defender";
   });
-  if (keyPositions.length >= 3) return "alto";
+  // Defensores em massa também desestruturam — peso maior para 3+ defensores
+  const defenders = items.filter((p) => (p?.player?.position || "").toLowerCase() === "defender").length;
+  if (keyPositions.length >= 3 || defenders >= 3) return "alto";
   if (keyPositions.length >= 1 || items.length >= 2) return "médio";
   return "baixo";
 }

@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v2"; // bump para invalidar caches antigos
+const PROMPT_VERSION = "v3"; // bump após auditoria: payload enriquecido + probs normalizadas
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;

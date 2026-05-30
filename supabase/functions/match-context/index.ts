@@ -306,7 +306,7 @@ serve(async (req) => {
         count: hInjuries.length,
         players: hInjuries.slice(0, 5).map((i: any) => ({
           name: i?.player?.name,
-          reason: i?.player?.reason,
+          reason: i?.player?.type ?? i?.player?.reason ?? null,
           position: i?.player?.position,
         })),
         impact: classifyInjuryImpact(hInjuries),

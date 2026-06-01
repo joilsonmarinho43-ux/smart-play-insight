@@ -172,25 +172,28 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     markets.push({ market: 'Over 1.5 Gols', probability: Math.floor(o15), risk: o15 > 80 ? 'Baixo' : 'Médio', category: 'goals' });
     markets.push({ market: 'Over 2.5 Gols', probability: Math.floor(o25), risk: o25 > 65 ? 'Médio' : 'Alto', category: 'goals' });
   } else {
+    // APM gate só faz sentido AO VIVO (dangerousAttacks real). Em pré-jogo,
+    // libera Over 1.5/2.5/3.5 incondicionalmente — o filtro de qualidade é
+    // a probabilidade mínima de cada linha + xG cross-validation.
     const rawO05 = Math.round(poissonOver(totalLambda, 1) * 100);
     const o05 = crossValidateWithXG(rawO05, totalXG, 'Over 0.5');
     markets.push({ market: 'Over 0.5 Gols', probability: o05, risk: 'Baixo', category: 'goals' });
 
     const rawO15 = Math.round(poissonOver(totalLambda, 2) * 100);
     const o15 = crossValidateWithXG(rawO15, totalXG, 'Over 1.5');
-    if (passesAPMGate) {
-      markets.push({ market: 'Over 1.5 Gols', probability: o15, risk: o15 > 80 ? 'Baixo' : 'Médio', category: 'goals' });
-    }
+    markets.push({ market: 'Over 1.5 Gols', probability: o15, risk: o15 > 80 ? 'Baixo' : 'Médio', category: 'goals' });
 
     const rawO25 = Math.round(poissonOver(totalLambda, 3) * 100);
     const o25 = crossValidateWithXG(rawO25, totalXG, 'Over 2.5');
-    if (passesAPMGate) {
-      markets.push({ market: 'Over 2.5 Gols', probability: o25, risk: o25 > 65 ? 'Médio' : 'Alto', category: 'goals' });
-    }
+    markets.push({ market: 'Over 2.5 Gols', probability: o25, risk: o25 > 65 ? 'Médio' : 'Alto', category: 'goals' });
+
+    // Under 2.5 = complemento direto do Over 2.5 (probabilidades coerentes)
+    const u25 = Math.max(5, Math.min(95, 100 - o25));
+    markets.push({ market: 'Under 2.5 Gols', probability: u25, risk: u25 > 65 ? 'Médio' : 'Alto', category: 'goals' });
 
     const rawO35 = Math.round(poissonOver(totalLambda, 4) * 100);
     const o35 = crossValidateWithXG(rawO35, totalXG, 'Over 3.5');
-    if (o35 >= 20 && passesAPMGate) {
+    if (o35 >= 20) {
       markets.push({ market: 'Over 3.5 Gols', probability: o35, risk: 'Alto', category: 'goals' });
     }
   }

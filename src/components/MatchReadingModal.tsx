@@ -159,7 +159,10 @@ const OddBox = ({
       </div>
     );
   }
-  const m = move ? movementMeta[move] : null;
+  // Só considera "movimento" quando há drift real (>= 1 centésimo) entre abertura e atual.
+  const hasRealDrift =
+    !!open && Math.abs(open - odd) >= 0.01 && move && move !== "flat";
+  const m = hasRealDrift ? movementMeta[move!] : null;
   return (
     <div
       className={`flex-1 rounded-lg p-2.5 text-center border ${
@@ -174,9 +177,9 @@ const OddBox = ({
       <div className="font-display text-lg font-bold text-foreground leading-tight">
         {odd.toFixed(2)}
       </div>
-      {m && (
+      {m && open && (
         <div className={`text-[10px] ${m.cls} leading-none mt-0.5`}>
-          {m.icon} {open ? `de ${open.toFixed(2)}` : m.label}
+          {m.icon} de {open.toFixed(2)}
         </div>
       )}
     </div>

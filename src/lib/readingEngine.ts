@@ -162,7 +162,8 @@ export function buildMatchReadingV2(
 
   const o25Prob = markets.find((m) => m.market === "Over 2.5 Gols")?.probability ?? 0;
   const bttsProb = markets.find((m) => m.market === "Ambas Marcam")?.probability ?? 0;
-  const u25Prob = markets.find((m) => m.market === "Under 2.5 Gols")?.probability ?? 0;
+  // Under 2.5 agora é exposto em analyzeMarkets como complemento direto de Over 2.5
+  const u25Prob = markets.find((m) => m.market === "Under 2.5 Gols")?.probability ?? Math.max(0, 100 - o25Prob);
 
   // Contexto
   const homeImpact = ctx?.injuries?.home?.impact || "baixo";

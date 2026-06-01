@@ -387,9 +387,12 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
       }
     }
 
-    const homeWinProb = Math.round(pHomeWin * 100);
-    const drawProb = Math.round(pDraw * 100);
-    const awayWinProb = Math.round(pAwayWin * 100);
+    // Normaliza para soma 100 (corrige arredondamentos divergentes do 1X2)
+    const rawSum = pHomeWin + pDraw + pAwayWin;
+    const norm = rawSum > 0 ? 100 / rawSum : 1;
+    const homeWinProb = Math.round(pHomeWin * 100 * norm);
+    const drawProb = Math.round(pDraw * 100 * norm);
+    const awayWinProb = Math.max(0, 100 - homeWinProb - drawProb);
 
     if (homeWinProb >= 35) {
       markets.push({ market: 'Vitória Casa', probability: Math.min(95, homeWinProb), risk: homeWinProb > 55 ? 'Médio' : 'Alto', category: 'result' });
@@ -397,24 +400,50 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     if (awayWinProb >= 35) {
       markets.push({ market: 'Vitória Fora', probability: Math.min(95, awayWinProb), risk: awayWinProb > 55 ? 'Médio' : 'Alto', category: 'result' });
     }
+    // Empate exposto quando relevante (cenário equilibrado)
+    if (drawProb >= 28) {
+      markets.push({ market: 'Empate', probability: Math.min(60, drawProb), risk: 'Alto', category: 'result' });
+    }
 
-    const dc1X = homeWinProb + drawProb;
-    const dcX2 = awayWinProb + drawProb;
+    // DNB (Draw No Bet) — devolve stake se empatar
+    // Probabilidade condicional: vitória / (vitória + derrota)
+    const dnbDenomHome = pHomeWin + pAwayWin;
+    const dnbDenomAway = pAwayWin + pHomeWin;
+    if (dnbDenomHome > 0) {
+      const dnbHome = Math.round((pHomeWin / dnbDenomHome) * 100);
+      if (dnbHome >= 55) {
+        markets.push({ market: 'DNB Casa', probability: Math.min(90, dnbHome), risk: dnbHome > 70 ? 'Baixo' : 'Médio', category: 'result' });
+      }
+    }
+    if (dnbDenomAway > 0) {
+      const dnbAway = Math.round((pAwayWin / dnbDenomAway) * 100);
+      if (dnbAway >= 55) {
+        markets.push({ market: 'DNB Fora', probability: Math.min(90, dnbAway), risk: dnbAway > 70 ? 'Baixo' : 'Médio', category: 'result' });
+      }
+    }
+
+    const dc1X = Math.min(98, homeWinProb + drawProb);
+    const dcX2 = Math.min(98, awayWinProb + drawProb);
 
     if (dc1X >= 50) {
-      markets.push({ market: '1X (Casa ou Empate)', probability: Math.min(95, dc1X), risk: dc1X > 75 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
+      markets.push({ market: '1X (Casa ou Empate)', probability: dc1X, risk: dc1X > 75 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
     }
     if (dcX2 >= 50) {
-      markets.push({ market: 'X2 (Empate ou Fora)', probability: Math.min(95, dcX2), risk: dcX2 > 75 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
+      markets.push({ market: 'X2 (Empate ou Fora)', probability: dcX2, risk: dcX2 > 75 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
     }
+
+    // ─── Handicaps com filtro de coerência fav/azarão ─────────
+    // -1 só faz sentido para o FAVORITO; +1 só faz sentido para o AZARÃO.
+    const homeIsFav = homeWinProb > awayWinProb;
+    const awayIsFav = awayWinProb > homeWinProb;
 
     const hcHome = Math.round(pHomeWin2Plus * 100);
     const hcAway = Math.round(pAwayWin2Plus * 100);
 
-    if (hcHome >= 20) {
+    if (hcHome >= 20 && homeIsFav) {
       markets.push({ market: 'Handicap -1 Casa', probability: Math.min(90, hcHome), risk: hcHome > 40 ? 'Médio' : 'Alto', category: 'handicap' });
     }
-    if (hcAway >= 20) {
+    if (hcAway >= 20 && awayIsFav) {
       markets.push({ market: 'Handicap -1 Fora', probability: Math.min(90, hcAway), risk: hcAway > 40 ? 'Médio' : 'Alto', category: 'handicap' });
     }
 
@@ -430,10 +459,11 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     const hcPlus1Home = Math.round((pHomeWin + pDraw + pAwayWin1) * 100);
     const hcPlus1Away = Math.round((pAwayWin + pDraw + pHomeWin1) * 100);
 
-    if (hcPlus1Home >= 50 && hcPlus1Home <= 95) {
+    // +1 só para o azarão (cobrir o favorito com +1 é sem valor)
+    if (hcPlus1Home >= 55 && hcPlus1Home <= 95 && !homeIsFav) {
       markets.push({ market: 'Handicap +1 Casa', probability: hcPlus1Home, risk: hcPlus1Home > 75 ? 'Baixo' : 'Médio', category: 'handicap' });
     }
-    if (hcPlus1Away >= 50 && hcPlus1Away <= 95) {
+    if (hcPlus1Away >= 55 && hcPlus1Away <= 95 && !awayIsFav) {
       markets.push({ market: 'Handicap +1 Fora', probability: hcPlus1Away, risk: hcPlus1Away > 75 ? 'Baixo' : 'Médio', category: 'handicap' });
     }
   } else {

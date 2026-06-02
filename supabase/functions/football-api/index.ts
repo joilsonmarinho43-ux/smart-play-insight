@@ -132,6 +132,7 @@ async function acquireCacheLock(cacheKey: string): Promise<void> {
 const LEAGUES_WITH_STATS = new Set([
   71, 39, 140, 78, 135, 61, 253, 128, 262, 13, 11, 2, 3, 88, 94, 40, 239,
   345, 299, 268, 242, 307, 332,
+  1, 10, 32, 9, // World Cup, Friendlies Int'l, WC Qualifiers Europe, WC Qualifiers (intercontinental)
 ]);
 const LEAGUES_TO_ANALYZE = Array.from(LEAGUES_WITH_STATS);
 
@@ -143,6 +144,8 @@ const LEAGUE_DISPLAY_NAMES: Record<number, string> = {
   88: 'Eredivisie', 94: 'Liga Portugal', 40: 'Championship',
   239: 'Brasileirão Série B', 299: 'Division Profesional',
   268: 'Primera División (BOL)', 242: 'Liga Pro (ECU)',
+  1: 'Copa do Mundo', 10: 'Amistosos Internacionais',
+  32: 'Eliminatórias Copa do Mundo', 9: 'Eliminatórias Copa do Mundo',
 };
 
 function getLeagueDisplayName(leagueId: number, fallbackName: string): string {

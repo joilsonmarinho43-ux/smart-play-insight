@@ -31,6 +31,14 @@ export const PREMIUM_LEAGUES = new Set([
   'Copa Sudamericana',
   'Champions League',
   'Europa League',
+  // Seleções
+  'Copa do Mundo',
+  'World Cup',
+  'Amistosos Internacionais',
+  'Friendlies',
+  'International Friendlies',
+  'Eliminatórias Copa do Mundo',
+  'World Cup - Qualification',
 ]);
 
 /** Verifica se uma liga é premium (case-insensitive, normaliza acentos) */

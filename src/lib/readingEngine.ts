@@ -685,6 +685,29 @@ export function buildMatchReadingV2(
     rationale: rationaleFor(l),
   }));
 
+  // ─── UNIFICAÇÃO: sincroniza Over/Under X.5 Gols em "opportunities"
+  // com as mesmas probabilidades das "Linhas de Gols Realistas" (Poisson
+  // sobre o λ ajustado por contexto). Garante que as duas seções da
+  // leitura nunca exibam percentuais divergentes para a mesma linha.
+  const lineByKey = new Map<string, number>();
+  linesRaw.forEach((l) => {
+    lineByKey.set(`over_${l.line}`, Math.round(probOver(l.line) * 100));
+    lineByKey.set(`under_${l.line}`, Math.round((1 - probOver(l.line)) * 100));
+  });
+  opportunities.forEach((op) => {
+    const mOver = op.market.match(/Over\s+(\d\.\d)\s+Gols/i);
+    const mUnder = op.market.match(/Under\s+(\d\.\d)\s+Gols/i);
+    if (mOver) {
+      const line = parseFloat(mOver[1]);
+      const p = lineByKey.get(`over_${line}`);
+      if (p != null) op.confidence = dampen(p, op.market);
+    } else if (mUnder) {
+      const line = parseFloat(mUnder[1]);
+      const p = lineByKey.get(`under_${line}`);
+      if (p != null) op.confidence = dampen(p, op.market);
+    }
+  });
+
   // ─── 8. TIMING (perfil tático real) ─────────────────────────
   const timing = {
     opening:

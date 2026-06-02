@@ -286,7 +286,11 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const fixtureId = body?.match?.id || body?.fixtureId;
-    const cacheKey = fixtureId ? `analyst:${PROMPT_VERSION}:${fixtureId}` : null;
+    const pesquisaWeb = body?.pesquisaWeb === true;
+    const modeTag = pesquisaWeb ? "research" : "standard";
+    const cacheKey = fixtureId
+      ? `analyst:${PROMPT_VERSION}:${modeTag}:${fixtureId}`
+      : null;
 
     if (cacheKey) {
       const cached = await cacheGet(cacheKey);
@@ -305,7 +309,40 @@ serve(async (req) => {
       );
     }
 
-    const userPayload = buildUserPayload(body);
+    // Em modo pesquisa, payload mínimo (sem reading/context vazios) + odds se houver
+    const userPayload = pesquisaWeb
+      ? JSON.stringify({
+          partida: {
+            casa: body?.match?.homeTeam,
+            fora: body?.match?.awayTeam,
+            liga: body?.match?.league,
+            horario: body?.match?.time,
+            estadio: body?.match?.venue,
+            fase: body?.match?.fixtureType,
+          },
+          mercado: body?.context?.odds
+            ? {
+                odds_1x2: {
+                  casa: body.context.odds.home,
+                  empate: body.context.odds.draw,
+                  fora: body.context.odds.away,
+                },
+                over_under_25: {
+                  over: body.context.odds.over25,
+                  under: body.context.odds.under25,
+                },
+              }
+            : null,
+          observacao:
+            "Sem histórico estatístico interno. Use seu conhecimento sobre as equipes/seleções.",
+        })
+      : buildUserPayload(body);
+
+    const systemPrompt = pesquisaWeb ? RESEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    const model = pesquisaWeb ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const userPrefix = pesquisaWeb
+      ? "Analise a partida abaixo em MODO PESQUISA usando seu conhecimento sobre as equipes. Devolva apenas o JSON.\n\n"
+      : "Analise a partida abaixo seguindo o fluxo. Devolva apenas o JSON.\n\n";
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -314,15 +351,10 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content:
-              "Analise a partida abaixo seguindo o fluxo. Devolva apenas o JSON.\n\n" +
-              userPayload,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrefix + userPayload },
         ],
         response_format: { type: "json_object" },
       }),

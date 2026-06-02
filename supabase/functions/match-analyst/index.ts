@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v4"; // bump após auditoria: regra anti-handicap-para-favorito
+const PROMPT_VERSION = "v5"; // bump: modo pesquisa web para amistosos/seleções sem dados API
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;

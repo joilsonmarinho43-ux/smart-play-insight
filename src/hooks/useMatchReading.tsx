@@ -88,61 +88,64 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       const reading = buildMatchReadingV2(match, ctx);
       if (cancel) return;
 
+      // Detecta dados insuficientes: reading nulo OU qualidade "limitado"
+      const dadosInsuficientes =
+        !reading || reading.contextQuality === "limitado";
+
       setState({
         loading: false,
         reading,
         context: ctx,
         error: null,
         analyst: null,
-        analystLoading: !!reading,
+        analystLoading: true, // sempre tentamos analyst (modo pesquisa se necessário)
       });
 
-      // Camada de análise humana via Lovable AI (não bloqueia a UI principal)
-      if (reading) {
-        const akey = String(fixtureId || `${match.homeTeam}-${match.awayTeam}`);
-        const cachedA = analystCache.get(akey);
-        if (cachedA && Date.now() - cachedA.ts < ANALYST_TTL) {
-          if (!cancel)
-            setState((s) => ({ ...s, analyst: cachedA.data, analystLoading: false }));
-          return;
-        }
-        try {
-          const { data, error } = await supabase.functions.invoke(
-            "match-analyst",
-            {
-              body: {
-                match: {
-                  id: fixtureId,
-                  homeTeam: match.homeTeam,
-                  awayTeam: match.awayTeam,
-                  league: match.league,
-                  time: match.time,
-                  matchProbabilities: (match as any).matchProbabilities ?? null,
-                  venue: m.fixture?.venue?.name ?? null,
-                  fixtureType: m.fixture?.round ?? null,
-                },
-                reading,
-                context: ctx,
+      // Camada de análise humana via Lovable AI
+      const akey = String(fixtureId || `${match.homeTeam}-${match.awayTeam}`);
+      const cachedA = analystCache.get(akey);
+      if (cachedA && Date.now() - cachedA.ts < ANALYST_TTL) {
+        if (!cancel)
+          setState((s) => ({ ...s, analyst: cachedA.data, analystLoading: false }));
+        return;
+      }
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "match-analyst",
+          {
+            body: {
+              match: {
+                id: fixtureId,
+                homeTeam: match.homeTeam,
+                awayTeam: match.awayTeam,
+                league: match.league,
+                time: match.time,
+                matchProbabilities: (match as any).matchProbabilities ?? null,
+                venue: m.fixture?.venue?.name ?? null,
+                fixtureType: m.fixture?.round ?? null,
               },
+              reading,
+              context: ctx,
+              pesquisaWeb: dadosInsuficientes,
             },
-          );
-          if (cancel) return;
-          if (!error && data && data.cenario && data.veredito) {
-            const a: AnalystReading = {
-              cenario: data.cenario,
-              pontoAtencao: data.pontoAtencao,
-              veredito: data.veredito,
-              risco: data.risco || "medio",
-            };
-            analystCache.set(akey, { ts: Date.now(), data: a });
-            setState((s) => ({ ...s, analyst: a, analystLoading: false }));
-          } else {
-            setState((s) => ({ ...s, analystLoading: false }));
-          }
-        } catch (e) {
-          console.warn("match-analyst invoke fail", e);
-          if (!cancel) setState((s) => ({ ...s, analystLoading: false }));
+          },
+        );
+        if (cancel) return;
+        if (!error && data && data.cenario && data.veredito) {
+          const a: AnalystReading = {
+            cenario: data.cenario,
+            pontoAtencao: data.pontoAtencao,
+            veredito: data.veredito,
+            risco: data.risco || "medio",
+          };
+          analystCache.set(akey, { ts: Date.now(), data: a });
+          setState((s) => ({ ...s, analyst: a, analystLoading: false }));
+        } else {
+          setState((s) => ({ ...s, analystLoading: false }));
         }
+      } catch (e) {
+        console.warn("match-analyst invoke fail", e);
+        if (!cancel) setState((s) => ({ ...s, analystLoading: false }));
       }
     }
 

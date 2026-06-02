@@ -364,7 +364,16 @@ export const MatchReadingModal = ({
           </div>
         )}
 
-        {!loading && !reading && (
+        {!loading && !reading && (analyst || analystLoading) && (
+          <div className="space-y-3 mt-2">
+            <AnalystBlock analyst={analyst} loading={analystLoading} />
+            <div className="text-xs text-muted-foreground text-center px-4 italic">
+              Sem histórico estatístico da API para esta partida — leitura gerada por pesquisa externa da IA.
+            </div>
+          </div>
+        )}
+
+        {!loading && !reading && !analyst && !analystLoading && (
           <div className="text-center text-sm text-foreground/80 py-10 px-4">
             <div className="text-foreground font-bold mb-1">
               Dados insuficientes

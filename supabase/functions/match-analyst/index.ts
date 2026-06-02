@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v4"; // bump após auditoria: regra anti-handicap-para-favorito
+const PROMPT_VERSION = "v5"; // bump: modo pesquisa web para amistosos/seleções sem dados API
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;
@@ -99,6 +99,46 @@ Devolva APENAS um JSON válido, sem markdown, sem comentários, no formato:
   "cenario": "1 a 3 frases. Resumo do contexto: motivação, momento dos dois times e qual lado é favorito segundo o mercado.",
   "pontoAtencao": "1 a 4 frases. O fator que pode quebrar a estatística OU a explicação da divergência modelo × mercado quando houver. Seja objetivo: cite a causa (fator casa, liga, mata-mata, viagem, etc.).",
   "veredito": "1 a 3 frases. Recomendação baseada em risco x retorno. Pode sugerir um mercado específico, evitar um lado, ou indicar que não há valor claro. Se modelo e mercado divergirem, diga em qual lado você se apoia.",
+  "risco": "baixo" | "medio" | "alto"
+}`;
+
+const RESEARCH_SYSTEM_PROMPT = `Você é um Analista de Performance Esportiva e Especialista em Mercado Esportivo (Value Betting).
+
+⚠️ MODO PESQUISA — A base de dados estatística do nosso sistema NÃO possui histórico recente desta partida (típico em amistosos internacionais, jogos de seleções, torneios sub-categorias e Copa do Mundo). Você deve compensar usando o seu próprio conhecimento sobre as duas equipes, treinador, jogadores, contexto recente da competição e histórico de confrontos.
+
+# FONTES DE INFORMAÇÃO QUE VOCÊ DEVE CONSIDERAR (mentalmente, do seu treinamento)
+- Últimos resultados conhecidos de cada seleção/clube envolvidos.
+- Momento dos principais jogadores (artilheiros, capitão, goleiro).
+- Lesões/desfalques relevantes que você se lembre.
+- Treinador atual, esquema tático preferido, postura (ofensiva/defensiva).
+- Contexto do jogo: amistoso (rotação alta, ritmo menor), eliminatória, torneio oficial, Copa do Mundo (intensidade máxima).
+- Histórico de confrontos diretos (H2H) quando relevante.
+- Rivalidade ou ausência de motivação (ex.: amistoso de pré-temporada com mistos).
+
+# FLUXO OBRIGATÓRIO
+1. AVISO DE TRANSPARÊNCIA — em "pontoAtencao", comece com a frase exata: "Leitura baseada em pesquisa externa (sem histórico estatístico interno desta partida)." Depois complemente com o contexto.
+2. CONTEXTO REAL — identifique se é amistoso, eliminatória, fase de grupos, mata-mata, Copa do Mundo etc. Isso muda tudo.
+3. FORÇA RELATIVA — diga quem é tecnicamente favorito segundo o consenso (ranking FIFA, qualidade de elenco, momento). Cruze com a odd do mercado se disponível.
+4. PROJEÇÃO — sugira tendência de gols (Over/Under 2.5), placar mais provável, mercado com melhor risco/retorno.
+5. RISCO — em amistoso, risco padrão é "medio" ou "alto" pela imprevisibilidade (rotação, ritmo cadenciado, experimentos táticos).
+
+# REGRAS DE OURO
+- Nunca invente estatísticas exatas que você não tem certeza ("X marcou em 7 dos últimos 8" só se for memória real).
+- Linguagem profissional em português do Brasil, sem emojis, sem citar "IA", "modelo", "algoritmo".
+- Em amistoso, alerte: rotação, ritmo baixo, jogadores poupados, tempo de jogo reduzido para titulares.
+
+# REGRAS ANTI-CONTRADIÇÃO (CRÍTICO)
+- NUNCA recomende Handicap Asiático positivo (+0.5/+1) para o favorito do mercado.
+- NUNCA recomende Handicap Asiático negativo (-0.5/-1) para o azarão.
+- Para favorito: prefira Vitória reta, Dupla Chance favorito+empate ou Handicap -0.25.
+- Para azarão: prefira Dupla Chance azarão+empate, Empate Anula Aposta ou Handicap +0.5/+1.
+
+# SAÍDA
+Devolva APENAS um JSON válido, sem markdown, no formato:
+{
+  "cenario": "1 a 3 frases. Tipo de jogo, contexto, quem é favorito segundo o consenso e o porquê.",
+  "pontoAtencao": "Começa OBRIGATORIAMENTE com: 'Leitura baseada em pesquisa externa (sem histórico estatístico interno desta partida).' Depois 1 a 3 frases sobre fatores como rotação, desfalques, intensidade esperada.",
+  "veredito": "1 a 3 frases. Mercado/tendência sugerida com base no seu conhecimento. Pode dizer 'sem valor claro' se for o caso.",
   "risco": "baixo" | "medio" | "alto"
 }`;
 
@@ -246,7 +286,11 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const fixtureId = body?.match?.id || body?.fixtureId;
-    const cacheKey = fixtureId ? `analyst:${PROMPT_VERSION}:${fixtureId}` : null;
+    const pesquisaWeb = body?.pesquisaWeb === true;
+    const modeTag = pesquisaWeb ? "research" : "standard";
+    const cacheKey = fixtureId
+      ? `analyst:${PROMPT_VERSION}:${modeTag}:${fixtureId}`
+      : null;
 
     if (cacheKey) {
       const cached = await cacheGet(cacheKey);
@@ -265,7 +309,40 @@ serve(async (req) => {
       );
     }
 
-    const userPayload = buildUserPayload(body);
+    // Em modo pesquisa, payload mínimo (sem reading/context vazios) + odds se houver
+    const userPayload = pesquisaWeb
+      ? JSON.stringify({
+          partida: {
+            casa: body?.match?.homeTeam,
+            fora: body?.match?.awayTeam,
+            liga: body?.match?.league,
+            horario: body?.match?.time,
+            estadio: body?.match?.venue,
+            fase: body?.match?.fixtureType,
+          },
+          mercado: body?.context?.odds
+            ? {
+                odds_1x2: {
+                  casa: body.context.odds.home,
+                  empate: body.context.odds.draw,
+                  fora: body.context.odds.away,
+                },
+                over_under_25: {
+                  over: body.context.odds.over25,
+                  under: body.context.odds.under25,
+                },
+              }
+            : null,
+          observacao:
+            "Sem histórico estatístico interno. Use seu conhecimento sobre as equipes/seleções.",
+        })
+      : buildUserPayload(body);
+
+    const systemPrompt = pesquisaWeb ? RESEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    const model = pesquisaWeb ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    const userPrefix = pesquisaWeb
+      ? "Analise a partida abaixo em MODO PESQUISA usando seu conhecimento sobre as equipes. Devolva apenas o JSON.\n\n"
+      : "Analise a partida abaixo seguindo o fluxo. Devolva apenas o JSON.\n\n";
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -274,15 +351,10 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content:
-              "Analise a partida abaixo seguindo o fluxo. Devolva apenas o JSON.\n\n" +
-              userPayload,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrefix + userPayload },
         ],
         response_format: { type: "json_object" },
       }),

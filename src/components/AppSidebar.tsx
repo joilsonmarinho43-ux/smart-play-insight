@@ -1,4 +1,4 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Crosshair } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Crosshair, Globe } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,7 @@ import {
 
 const navItems = [
   { title: "Pré-Jogo", url: "/", icon: Home },
+  { title: "Copa do Mundo", url: "/world-cup", icon: Globe },
   { title: "Live Trader", url: "/live", icon: Zap },
   { title: "AutoPilot LIVE", url: "/autopilot", icon: Crosshair },
   { title: "Bingo VIP PRO", url: "/bingo", icon: Trophy },

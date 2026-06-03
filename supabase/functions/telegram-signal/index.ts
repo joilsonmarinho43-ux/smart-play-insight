@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendTelegramMessage, enqueueTelegramOutbox, escapeHtml } from '../_shared/telegram.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,23 +39,11 @@ interface SignalPayload {
   shotsOnGoal?: number;
 }
 
-const MAX_ATTEMPTS = 4;
-const RETRY_DELAYS = [500, 1500, 3500];
-
-async function sendTelegramDirect(botToken: string, chatId: string, text: string): Promise<{ ok: boolean; status: number; data: any }> {
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    }),
+function jsonResp(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok && data?.ok === true, status: res.status, data };
 }
 
 Deno.serve(async (req) => {
@@ -68,13 +57,19 @@ Deno.serve(async (req) => {
 
     const payload: SignalPayload = await req.json();
 
+    // Validação mínima de input (defesa contra payloads malformados)
+    if (!payload?.market || typeof payload.market !== 'string' ||
+        !payload?.match || typeof payload.match !== 'string' ||
+        typeof payload.confidence !== 'number' ||
+        typeof payload.minute !== 'number') {
+      return jsonResp({ success: false, error: 'invalid payload (match, market, confidence, minute required)' }, 400);
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
     // ═══ IDEMPOTÊNCIA ATÔMICA ═══
-    // INSERT ... ON CONFLICT DO NOTHING via RPC. Sem SELECT-then-INSERT.
-    // Se outra invocação já reservou o slot (match_id, market, minute), retorna NULL.
     let claimedSignalId: string | null = null;
     if (payload.matchId) {
       const { data: claimed, error: claimErr } = await sb.rpc('try_claim_telegram_slot', {
@@ -96,10 +91,8 @@ Deno.serve(async (req) => {
         console.error('[TELEGRAM-SIGNAL] try_claim_telegram_slot error:', claimErr);
         // fail-open: continua para tentar enviar (legado)
       } else if (!claimed) {
-        console.log(`[TELEGRAM-SIGNAL] ⏭️ Duplicado bloqueado (slot já reservado): ${payload.match} • ${payload.market} • ${payload.minute}'`);
-        return new Response(JSON.stringify({ success: true, deduped: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        console.log(`[TELEGRAM-SIGNAL] ⏭️ Duplicado bloqueado: ${payload.match} • ${payload.market} • ${payload.minute}'`);
+        return jsonResp({ success: true, deduped: true });
       } else {
         claimedSignalId = claimed as unknown as string;
       }
@@ -129,7 +122,6 @@ Deno.serve(async (req) => {
             block_reason: 'telegram-signal — sinal bloqueado pelo RMA',
           });
         } catch (e) { console.error('Failed to log RMA block:', e); }
-        // Libera o slot atomicamente reservado para permitir reenvio futuro válido
         if (claimedSignalId) {
           try {
             await sb.rpc('mark_telegram_signal_failed', {
@@ -138,64 +130,41 @@ Deno.serve(async (req) => {
             });
           } catch (e) { console.error('Failed to release slot after RMA block:', e); }
         }
-        return new Response(JSON.stringify({ success: false, blocked: true, rma_verdict: 'BLOQUEADO', rma_score: rma.score }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return jsonResp({ success: false, blocked: true, rma_verdict: 'BLOQUEADO', rma_score: rma.score });
       }
     }
 
     const emoji = payload.confidence >= 80 ? '🔥' : payload.confidence >= 70 ? '⚡' : '📊';
-    const confBar = '🟢'.repeat(Math.round(payload.confidence / 20)) + '⚪'.repeat(5 - Math.round(payload.confidence / 20));
+    const bars = Math.max(0, Math.min(5, Math.round(payload.confidence / 20)));
+    const confBar = '🟢'.repeat(bars) + '⚪'.repeat(5 - bars);
 
+    // 🔒 HTML escape em todos os campos dinâmicos — evita erro 400 do Telegram
     const text = [
-      `${emoji} <b>${payload.market}</b>`,
+      `${emoji} <b>${escapeHtml(payload.market)}</b>`,
       ``,
-      `⚽ ${payload.match} • ${payload.minute}'`,
-      `📊 ${payload.score}`,
+      `⚽ ${escapeHtml(payload.match)} • ${payload.minute}'`,
+      `📊 ${escapeHtml(payload.score)}`,
       ``,
       `${confBar} <b>${payload.confidence}%</b>`,
-      payload.janela ? `🕐 ${payload.janela}` : null,
+      payload.janela ? `🕐 ${escapeHtml(payload.janela)}` : null,
       ``,
       `🤖 <i>Nexus 33</i>`,
     ].filter(Boolean).join('\n');
 
-    let telegramSuccess = false;
-    let telegramError = '';
-    let telegramMessageId: number | null = null;
+    // Envio via helper compartilhado (timeout, retry exponencial, detecção de erro permanente)
+    const result = await sendTelegramMessage(CHAT_ID, text, {
+      botToken: TELEGRAM_BOT_TOKEN,
+      tag: 'TELEGRAM-SIGNAL',
+    });
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        const { ok, status, data } = await sendTelegramDirect(TELEGRAM_BOT_TOKEN, CHAT_ID, text);
-        if (ok) {
-          telegramSuccess = true;
-          telegramMessageId = data?.result?.message_id ?? null;
-          telegramError = '';
-          if (attempt > 1) console.log(`[TELEGRAM-SIGNAL] ✅ Sucesso na tentativa ${attempt}`);
-          break;
-        }
-        telegramError = `Telegram API failed [${status}]: ${JSON.stringify(data)}`;
-
-        // Respect 429 retry_after if provided
-        let delay = RETRY_DELAYS[Math.min(attempt - 1, RETRY_DELAYS.length - 1)];
-        if (status === 429 && data?.parameters?.retry_after) {
-          delay = Math.max(delay, Number(data.parameters.retry_after) * 1000);
-        }
-        const isTransient = status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
-        if (!isTransient || attempt === MAX_ATTEMPTS) break;
-        console.log(`[TELEGRAM-SIGNAL] ⚠️ tentativa ${attempt} falhou (${status}), retry em ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
-      } catch (e) {
-        telegramError = e instanceof Error ? e.message : 'Unknown Telegram error';
-        if (attempt === MAX_ATTEMPTS) break;
-        const delay = RETRY_DELAYS[Math.min(attempt - 1, RETRY_DELAYS.length - 1)];
-        console.log(`[TELEGRAM-SIGNAL] ⚠️ tentativa ${attempt} erro de rede, retry em ${delay}ms`);
-        await new Promise((r) => setTimeout(r, delay));
-      }
-    }
+    const telegramSuccess = result.ok;
+    const telegramMessageId: number | null = result.data?.result?.message_id ?? null;
+    const telegramError = telegramSuccess
+      ? ''
+      : (result.error || `Telegram API [${result.status}]: ${JSON.stringify(result.data || {})}`);
 
     try {
       if (claimedSignalId) {
-        // Slot já reservado via try_claim_telegram_slot — apenas finalizar.
         if (telegramSuccess) {
           await sb.rpc('mark_telegram_signal_sent', {
             _signal_id: claimedSignalId,
@@ -204,11 +173,10 @@ Deno.serve(async (req) => {
         } else {
           await sb.rpc('mark_telegram_signal_failed', {
             _signal_id: claimedSignalId,
-            _error: telegramError || 'unknown',
+            _error: telegramError.slice(0, 500),
           });
         }
       } else {
-        // Sem matchId (legado) — log direto sem dedupe atômico.
         await sb.from('telegram_signals').insert({
           match_name: payload.match,
           match_id: payload.matchId || null,
@@ -223,46 +191,35 @@ Deno.serve(async (req) => {
           janela: payload.janela || null,
           reason: payload.reason || null,
           success: telegramSuccess,
-          error_message: telegramError || null,
+          error_message: telegramError ? telegramError.slice(0, 500) : null,
           telegram_message_id: telegramMessageId,
           status: 'pendente',
         });
       }
     } catch (logErr) {
-      console.error('Failed to log signal:', logErr);
+      console.error('[TELEGRAM-SIGNAL] Failed to log signal:', logErr);
     }
 
-    // DLQ: se falhou após retries, enfileira para retry assíncrono
-    if (!telegramSuccess) {
-      try {
-        await sb.from('telegram_outbox').insert({
-          chat_id: String(CHAT_ID),
-          text,
-          parse_mode: 'HTML',
-          source: 'telegram-signal',
-          signal_id: claimedSignalId,
-          last_error: telegramError || 'unknown',
-          attempts: 0,
-          max_attempts: 3,
-          next_retry_at: new Date(Date.now() + 30_000).toISOString(),
-          status: 'pending',
-        });
-        console.log('[TELEGRAM-SIGNAL] 📬 Enfileirado em telegram_outbox para retry');
-      } catch (qe) {
-        console.error('[TELEGRAM-SIGNAL] Falha ao enfileirar outbox:', qe);
-      }
-      throw new Error(telegramError);
+    if (telegramSuccess) {
+      return jsonResp({ success: true, messageId: telegramMessageId });
     }
 
-    return new Response(JSON.stringify({ success: true, messageId: telegramMessageId }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Falha após retries: enfileira para DLQ e retorna 200 (cliente já fez seu trabalho).
+    // Retornar 500 aqui poderia induzir o cliente a reinvocar, gerando ruído.
+    await enqueueTelegramOutbox(sb, {
+      chat_id: CHAT_ID,
+      text,
+      parse_mode: 'HTML',
+      source: 'telegram-signal',
+      signal_id: claimedSignalId,
+      last_error: telegramError.slice(0, 500),
     });
+    console.log('[TELEGRAM-SIGNAL] 📬 Enfileirado em telegram_outbox para retry assíncrono');
+
+    return jsonResp({ success: false, queued: true, error: telegramError });
   } catch (error: unknown) {
-    console.error('Telegram signal error:', error);
+    console.error('[TELEGRAM-SIGNAL] error:', error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResp({ success: false, error: msg }, 500);
   }
 });

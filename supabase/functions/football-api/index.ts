@@ -624,7 +624,11 @@ serve(async (req) => {
         }
       }
 
-      console.log(`Live: returning ${matches.length} matches, ${matches.filter((m: any) => m.stats?.home !== null).length} with stats. API calls: ${apiCallCount}`);
+      const withStats = matches.filter((m: any) => m.stats?.home !== null).length;
+      console.log(`Live: returning ${matches.length} matches, ${withStats} with stats. API calls: ${apiCallCount}`);
+      if (matches.length > 0 && withStats === 0) {
+        console.warn(`⚠️ Live: 0/${matches.length} fixtures retornaram stats — provavelmente ligas sem cobertura no plano API-Sports (sinais não serão gerados)`);
+      }
       const responseData = { matches };
       memSet("live_v3", responseData);
       await dbCacheSet(liveCk, responseData, "LIVE");

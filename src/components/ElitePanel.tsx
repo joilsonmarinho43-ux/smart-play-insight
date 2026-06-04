@@ -111,7 +111,7 @@ const ElitePanel = ({ matches }: Props) => {
                     <div key={bar.label} className="space-y-0.5">
                       <div className="flex justify-between">
                         <span className="text-[8px] text-muted-foreground">{bar.label}</span>
-                        <span className="text-[8px] font-bold text-foreground">{bar.val}</span>
+                        <span className="text-[8px] font-bold text-foreground">{Number(bar.val ?? 0).toFixed(1)}</span>
                       </div>
                       <div className="h-1 bg-secondary/50 rounded-full overflow-hidden">
                         <div

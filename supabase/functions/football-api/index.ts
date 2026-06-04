@@ -589,16 +589,24 @@ serve(async (req) => {
             stats = cachedFStats;
             memSet(fStatsCk, cachedFStats);
           } else if (canCallAPI()) {
+            let apiReturnedEmpty = false;
             try {
               const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
               const resS = sData?.response || [];
               if (resS.length >= 2) {
                 stats.home = extractStats(resS[0].statistics);
                 stats.away = extractStats(resS[1].statistics);
+              } else {
+                apiReturnedEmpty = true;
               }
             } catch (e) { console.error(`Stats error for ${fId}:`, e); }
 
             if (stats.home !== null || stats.away !== null) {
+              memSet(fStatsCk, stats);
+              await dbCacheSet(fStatsCk, stats, "LIVE");
+            } else if (apiReturnedEmpty) {
+              // 🔇 API respondeu 200 mas sem stats (liga sem cobertura no plano).
+              // Cacheia o "vazio" para não gastar quota a cada ciclo neste fixture.
               memSet(fStatsCk, stats);
               await dbCacheSet(fStatsCk, stats, "LIVE");
             }

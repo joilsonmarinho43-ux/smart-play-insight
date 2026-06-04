@@ -589,16 +589,24 @@ serve(async (req) => {
             stats = cachedFStats;
             memSet(fStatsCk, cachedFStats);
           } else if (canCallAPI()) {
+            let apiReturnedEmpty = false;
             try {
               const sData = await fetchWithAuth(`fixtures/statistics?fixture=${fId}`, apiKey);
               const resS = sData?.response || [];
               if (resS.length >= 2) {
                 stats.home = extractStats(resS[0].statistics);
                 stats.away = extractStats(resS[1].statistics);
+              } else {
+                apiReturnedEmpty = true;
               }
             } catch (e) { console.error(`Stats error for ${fId}:`, e); }
 
             if (stats.home !== null || stats.away !== null) {
+              memSet(fStatsCk, stats);
+              await dbCacheSet(fStatsCk, stats, "LIVE");
+            } else if (apiReturnedEmpty) {
+              // 🔇 API respondeu 200 mas sem stats (liga sem cobertura no plano).
+              // Cacheia o "vazio" para não gastar quota a cada ciclo neste fixture.
               memSet(fStatsCk, stats);
               await dbCacheSet(fStatsCk, stats, "LIVE");
             }
@@ -616,7 +624,11 @@ serve(async (req) => {
         }
       }
 
-      console.log(`Live: returning ${matches.length} matches, ${matches.filter((m: any) => m.stats?.home !== null).length} with stats. API calls: ${apiCallCount}`);
+      const withStats = matches.filter((m: any) => m.stats?.home !== null).length;
+      console.log(`Live: returning ${matches.length} matches, ${withStats} with stats. API calls: ${apiCallCount}`);
+      if (matches.length > 0 && withStats === 0) {
+        console.warn(`⚠️ Live: 0/${matches.length} fixtures retornaram stats — provavelmente ligas sem cobertura no plano API-Sports (sinais não serão gerados)`);
+      }
       const responseData = { matches };
       memSet("live_v3", responseData);
       await dbCacheSet(liveCk, responseData, "LIVE");

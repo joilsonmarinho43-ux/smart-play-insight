@@ -313,6 +313,32 @@ async function fetchLeagueRecentFixtures(leagueId: number, apiKey: string): Prom
   return games;
 }
 
+// Para seleções e amistosos, ligas têm pouquíssimos jogos por time.
+// Buscamos os últimos jogos do TIME (em qualquer competição) como fallback.
+const SELECTION_LEAGUES = new Set([1, 10, 32, 9]);
+
+async function fetchTeamRecentFixtures(teamId: number, apiKey: string): Promise<any[]> {
+  const ck = `team_recent_${teamId}`;
+  const memCached = memGet(ck, 6 * 3600000);
+  if (memCached) return memCached;
+  const dbCached = await dbCacheGet(ck, "PRE");
+  if (dbCached) { memSet(ck, dbCached); return dbCached; }
+  if (!canCallAPI()) return [];
+  let games: any[] = [];
+  try {
+    const data = await fetchWithAuth(`fixtures?team=${teamId}&last=10`, apiKey);
+    games = (data?.response || []).filter((g: any) =>
+      (g.fixture?.status?.short || '').toUpperCase() === 'FT'
+    );
+  } catch (e) {
+    console.error(`Team ${teamId} fetch error:`, e);
+  }
+  console.log(`Team ${teamId}: ${games.length} recent finished fixtures (fallback)`);
+  memSet(ck, games);
+  await dbCacheSet(ck, games, "PRE");
+  return games;
+}
+
 // ========================
 // DYNAMIC LEAGUE AVERAGE (replaces fixed 1.35)
 // ========================

@@ -735,18 +735,18 @@ const Live = () => {
                       <span className={`text-sm font-black tabular-nums ${apWindows.ap10Away >= 60 ? 'text-red-400' : 'text-gray-300'}`}>{apWindows.ap10Away.toFixed(0)}</span>
                     </div>
                   </div>
-                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2">
+                  <div className="bg-[#0D1117] border border-[#30363D] rounded-lg py-2 px-1">
                     <p className="text-[9px] text-gray-500 font-bold uppercase">Periculosidade</p>
                     <div className="flex justify-center gap-2 mt-1">
                       <span className={`text-sm font-black tabular-nums ${periculosity.home >= 70 ? 'text-red-400' : periculosity.home >= 50 ? 'text-orange-400' : 'text-gray-300'}`}>{periculosity.home.toFixed(0)}</span>
                       <span className="text-[10px] text-[#30363D]">vs</span>
                       <span className={`text-sm font-black tabular-nums ${periculosity.away >= 70 ? 'text-red-400' : periculosity.away >= 50 ? 'text-orange-400' : 'text-gray-300'}`}>{periculosity.away.toFixed(0)}</span>
                     </div>
+                    <div className="flex justify-between gap-1 mt-1 px-0.5">
+                      <span className="text-[8px] text-gray-500 truncate">{periculosity.homeLabel}</span>
+                      <span className="text-[8px] text-gray-500 truncate">{periculosity.awayLabel}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-between mt-1 px-1">
-                  <span className="text-[8px] text-gray-500">{periculosity.homeLabel}</span>
-                  <span className="text-[8px] text-gray-500">{periculosity.awayLabel}</span>
                 </div>
               </div>
 

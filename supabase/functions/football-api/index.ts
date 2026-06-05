@@ -717,23 +717,35 @@ serve(async (req) => {
     }
 
     const teamStatsCache = new Map<number, any>();
+    const teamPoolCache = new Map<number, any[]>(); // pool efetivamente usado por time (para enriquecimento)
     for (const f of fixtures) {
       const leagueId = f.league?.id;
-      const pool = leaguePools.get(leagueId) || [];
+      const leaguePool = leaguePools.get(leagueId) || [];
+      const isSelection = SELECTION_LEAGUES.has(leagueId);
       for (const teamId of [f.teams.home.id, f.teams.away.id]) {
-        if (!teamStatsCache.has(teamId)) {
-          teamStatsCache.set(teamId, calcTeamStatsFromPool(pool, teamId));
+        if (teamStatsCache.has(teamId)) continue;
+        let pool = leaguePool;
+        let stats = calcTeamStatsFromPool(pool, teamId);
+        // Fallback: seleções/amistosos OU pool insuficiente → buscar últimos jogos do time
+        const gamesInLeague = pool.filter((g: any) =>
+          g.teams.home.id === teamId || g.teams.away.id === teamId
+        ).length;
+        if ((isSelection || gamesInLeague < 3) && canCallAPI()) {
+          const teamPool = await fetchTeamRecentFixtures(teamId, apiKey);
+          if (teamPool.length > gamesInLeague) {
+            pool = teamPool;
+            stats = calcTeamStatsFromPool(pool, teamId);
+          }
         }
+        teamStatsCache.set(teamId, stats);
+        teamPoolCache.set(teamId, pool);
       }
     }
 
     for (const [teamId, stats] of teamStatsCache) {
       if (!stats) continue;
       if (!canCallAPI()) break;
-      const leagueId = fixtures.find(
-        (f: any) => f.teams.home.id === teamId || f.teams.away.id === teamId
-      )?.league?.id;
-      const pool = leaguePools.get(leagueId) || [];
+      const pool = teamPoolCache.get(teamId) || [];
       const enriched = await enrichWithDetailedStats(stats, teamId, pool, apiKey);
       teamStatsCache.set(teamId, enriched);
     }

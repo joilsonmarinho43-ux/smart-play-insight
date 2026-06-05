@@ -662,7 +662,8 @@ serve(async (req) => {
     }
 
     // ========== PRE-MATCH fixtures ==========
-    const preCk = `date_${date}`;
+    // v2: fallback de stats por time para seleções/amistosos
+    const preCk = `date_v2_${date}`;
 
     const memCached = memGet(`date_v14_${date}`, 7200000);
     if (memCached) {

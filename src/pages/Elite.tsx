@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Crown } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
+import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import ElitePanel from '@/components/ElitePanel';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 

@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -85,7 +86,7 @@ function buildShareText(reading: MatchReadingV2, homeTeam: string, awayTeam: str
     ``,
     `📌 ${reading.verdict}`,
     ``,
-    `— Nexus 33`,
+    `— Analista Joilson`,
   ].join("\n");
 }
 
@@ -350,9 +351,9 @@ export const MatchReadingModal = ({
           <DialogTitle className="font-display text-xl tracking-wide">
             📖 Leitura do Jogo
           </DialogTitle>
-          <div className="text-xs text-muted-foreground">
+          <DialogDescription className="text-xs text-muted-foreground">
             {homeTeam} <span className="opacity-60">vs</span> {awayTeam}
-          </div>
+          </DialogDescription>
         </DialogHeader>
 
         {loading && (

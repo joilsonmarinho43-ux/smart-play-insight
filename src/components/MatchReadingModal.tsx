@@ -85,7 +85,7 @@ function buildShareText(reading: MatchReadingV2, homeTeam: string, awayTeam: str
     ``,
     `📌 ${reading.verdict}`,
     ``,
-    `— Nexus 33`,
+    `— Analista Joilson`,
   ].join("\n");
 }
 

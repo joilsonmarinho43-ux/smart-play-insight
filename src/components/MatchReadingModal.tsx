@@ -351,9 +351,9 @@ export const MatchReadingModal = ({
           <DialogTitle className="font-display text-xl tracking-wide">
             📖 Leitura do Jogo
           </DialogTitle>
-          <div className="text-xs text-muted-foreground">
+          <DialogDescription className="text-xs text-muted-foreground">
             {homeTeam} <span className="opacity-60">vs</span> {awayTeam}
-          </div>
+          </DialogDescription>
         </DialogHeader>
 
         {loading && (

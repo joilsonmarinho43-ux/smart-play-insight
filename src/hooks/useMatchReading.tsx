@@ -88,9 +88,10 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       const reading = buildMatchReadingV2(match, ctx);
       if (cancel) return;
 
-      // Detecta dados insuficientes: reading nulo OU qualidade "limitado"
-      const dadosInsuficientes =
-        !reading || reading.contextQuality === "limitado";
+      // Pesquisa web SOMENTE quando não há reading (sem stats internas).
+      // Se existe reading — mesmo com contextQuality "limitado" — preservamos
+      // toda a leitura técnica enviando o payload completo ao analyst.
+      const dadosInsuficientes = !reading;
 
       setState({
         loading: false,

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Crown } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
+import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import ElitePanel from '@/components/ElitePanel';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
@@ -13,7 +14,7 @@ const Elite = () => {
     gcTime: 1000 * 60 * 30,
   });
 
-  const safeMatches = (matches || []).map((m: any) => ({
+  const safeMatches = (matches || []).filter((m: any) => !isWorldCupLeague(m.league)).map((m: any) => ({
     ...m,
     homeTeam: m.teams?.home?.name || m.homeTeam || 'Casa',
     awayTeam: m.teams?.away?.name || m.awayTeam || 'Fora',

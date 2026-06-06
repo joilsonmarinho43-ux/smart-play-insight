@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Trophy } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
+import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import TopWinsSuggestion from '@/components/TopWinsSuggestion';
 
 const Bingo = () => {

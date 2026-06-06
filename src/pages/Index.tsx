@@ -74,7 +74,9 @@ const Index = () => {
   }, []);
 
   const safeMatches = useMemo(() =>
-    (rawMatches || []).map((m: any) => {
+    (rawMatches || [])
+      .filter((m: any) => !isWorldCupLeague(m.league))
+      .map((m: any) => {
       const hStats = m.homeStats || {};
       const aStats = m.awayStats || {};
       const hGF = hStats.goalsFor || 0;

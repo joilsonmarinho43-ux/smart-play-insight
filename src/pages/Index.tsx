@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMultiDayMatches, isOfflineMode, getOfflineSince } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
+import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';

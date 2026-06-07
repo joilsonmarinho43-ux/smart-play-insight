@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
 import type { AnalystReading } from "@/hooks/useMatchReading";
+import { BookmakerFinder } from "@/components/BookmakerFinder";
 
 interface Props {
   open: boolean;

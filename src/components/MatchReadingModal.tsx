@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
 import type { AnalystReading } from "@/hooks/useMatchReading";
+import { BookmakerFinder } from "@/components/BookmakerFinder";
 
 interface Props {
   open: boolean;
@@ -371,6 +372,7 @@ export const MatchReadingModal = ({
             <div className="text-xs text-muted-foreground text-center px-4 italic">
               Sem histórico estatístico da API para esta partida — leitura gerada por pesquisa externa da IA.
             </div>
+            <BookmakerFinder homeTeam={homeTeam} awayTeam={awayTeam} />
           </div>
         )}
 
@@ -572,6 +574,8 @@ export const MatchReadingModal = ({
             <div className="text-right text-xs text-muted-foreground italic pt-1">
               {reading.signature}
             </div>
+
+            <BookmakerFinder homeTeam={homeTeam} awayTeam={awayTeam} />
           </div>
         )}
       </DialogContent>

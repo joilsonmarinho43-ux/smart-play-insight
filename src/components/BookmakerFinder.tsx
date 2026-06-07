@@ -63,14 +63,21 @@ function generateVariants(team: string): string[] {
   return Array.from(variants).filter(Boolean).slice(0, 6);
 }
 
+// Usamos busca no Google com `site:` porque URLs internas das casas mudam
+// constantemente e geram 404. A busca sempre devolve um resultado válido.
 const BOOKMAKERS = [
-  { name: "Bet365", url: (q: string) => `https://www.bet365.com/#/AS/B1/${encodeURIComponent(q)}` },
-  { name: "Betano", url: (q: string) => `https://www.betano.bet.br/sport/futebol/jogos-de-hoje/?search=${encodeURIComponent(q)}` },
-  { name: "Superbet", url: (q: string) => `https://superbet.bet.br/search?q=${encodeURIComponent(q)}` },
-  { name: "Sportingbet", url: (q: string) => `https://sports.sportingbet.bet.br/pt-br/search?query=${encodeURIComponent(q)}` },
-  { name: "Pinnacle", url: (q: string) => `https://www.pinnacle.com/en/search/?q=${encodeURIComponent(q)}` },
-  { name: "Google", url: (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q + " odds")}` },
+  { name: "Bet365", site: "bet365.com" },
+  { name: "Betano", site: "betano.bet.br" },
+  { name: "Superbet", site: "superbet.bet.br" },
+  { name: "Sportingbet", site: "sportingbet.bet.br" },
+  { name: "Pinnacle", site: "pinnacle.com" },
+  { name: "Google", site: null },
 ];
+
+function buildSearchUrl(query: string, site: string | null) {
+  const q = site ? `site:${site} ${query}` : `${query} odds`;
+  return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+}
 
 export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   const homeVariants = useMemo(() => generateVariants(homeTeam), [homeTeam]);

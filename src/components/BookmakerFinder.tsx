@@ -1,5 +1,6 @@
-import { Search, ExternalLink } from "lucide-react";
+import { Search, ExternalLink, Copy, Check } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 /**
  * Módulo independente: "🔎 Encontrar este jogo na casa de aposta"
@@ -63,49 +64,20 @@ function generateVariants(team: string): string[] {
   return Array.from(variants).filter(Boolean).slice(0, 6);
 }
 
-// URLs de busca interna das casas de aposta (Brasil).
-// O usuário já está logado — a página de busca abre direto na conta dele
-// e mostra os jogos correspondentes ao nome buscado.
-const BOOKMAKERS: { name: string; build: (q: string) => string }[] = [
-  {
-    name: "Bet365",
-    build: (q) => `https://www.bet365.bet.br/#/AS/B1/C1/D1002/E${encodeURIComponent(q)}/F2/`,
-  },
-  {
-    name: "Betano",
-    build: (q) => `https://www.betano.bet.br/search/?query=${encodeURIComponent(q)}`,
-  },
-  {
-    name: "Superbet",
-    build: (q) => `https://superbet.bet.br/pesquisa?query=${encodeURIComponent(q)}`,
-  },
-  {
-    name: "Sportingbet",
-    build: (q) =>
-      `https://sports.sportingbet.bet.br/pt-br/search?query=${encodeURIComponent(q)}`,
-  },
-  {
-    name: "Betfair",
-    build: (q) =>
-      `https://www.betfair.bet.br/sport/search?query=${encodeURIComponent(q)}`,
-  },
-  {
-    name: "KTO",
-    build: (q) => `https://www.kto.bet.br/search?q=${encodeURIComponent(q)}`,
-  },
-  {
-    name: "Pinnacle",
-    build: (q) => `https://www.pinnacle.com/en/search/#?q=${encodeURIComponent(q)}`,
-  },
-  {
-    name: "Google",
-    build: (q) => `https://www.google.com/search?q=${encodeURIComponent(q + " odds")}`,
-  },
+// Cada casa de aposta protege suas URLs internas de busca (mudam, expiram e
+// dão 404 quando acessadas de fora). A abordagem confiável é abrir a HOME
+// da casa — onde você já está logado — e colar o nome do jogo na busca
+// interna do próprio site. Por isso copiamos o nome automaticamente.
+const BOOKMAKERS: { name: string; url: string }[] = [
+  { name: "Bet365", url: "https://www.bet365.bet.br/" },
+  { name: "Betano", url: "https://www.betano.bet.br/" },
+  { name: "Superbet", url: "https://superbet.bet.br/" },
+  { name: "Sportingbet", url: "https://sports.sportingbet.bet.br/pt-br" },
+  { name: "Betfair", url: "https://www.betfair.bet.br/" },
+  { name: "KTO", url: "https://www.kto.bet.br/" },
+  { name: "Pinnacle", url: "https://www.pinnacle.com/" },
+  { name: "Esportes da Sorte", url: "https://esportesdasorte.bet.br/" },
 ];
-
-function buildSearchUrl(query: string, build: (q: string) => string) {
-  return build(query);
-}
 
 export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   const homeVariants = useMemo(() => generateVariants(homeTeam), [homeTeam]);
@@ -113,8 +85,35 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
 
   const [selHome, setSelHome] = useState(homeVariants[0] || homeTeam);
   const [selAway, setSelAway] = useState(awayVariants[0] || awayTeam);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const query = `${selHome} vs ${selAway}`;
+
+  const handleCopy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      toast.success(`"${text}" copiado — cole na busca da casa`);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  };
+
+  const handleOpenBookmaker = async (b: { name: string; url: string }) => {
+    // 1) copia o nome para colar na busca da casa
+    try {
+      await navigator.clipboard.writeText(selHome);
+    } catch {
+      // segue mesmo se não conseguir copiar
+    }
+    // 2) abre a home da casa (usuário já logado)
+    window.open(b.url, "_blank", "noopener,noreferrer");
+    toast.success(
+      `${b.name} aberto. Nome "${selHome}" copiado — cole na busca interna.`,
+      { duration: 4000 },
+    );
+  };
 
   return (
     <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
@@ -126,14 +125,24 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Casas de apostas costumam usar variações nos nomes dos times. Escolha a
-        variação mais provável e busque diretamente na sua casa preferida.
+        Toque em uma casa abaixo: ela abre na sua conta e o nome do time é{" "}
+        <strong className="text-foreground">copiado automaticamente</strong>{" "}
+        para você colar na busca interna do app/site.
       </p>
 
       {/* Variantes do mandante */}
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
-          Mandante — possíveis nomes
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Mandante — possíveis nomes
+          </div>
+          <button
+            onClick={() => handleCopy(selHome, "home")}
+            className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary hover:opacity-80"
+          >
+            {copied === "home" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            Copiar
+          </button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {homeVariants.map((v) => (
@@ -154,8 +163,17 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
 
       {/* Variantes do visitante */}
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
-          Visitante — possíveis nomes
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Visitante — possíveis nomes
+          </div>
+          <button
+            onClick={() => handleCopy(selAway, "away")}
+            className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary hover:opacity-80"
+          >
+            {copied === "away" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            Copiar
+          </button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {awayVariants.map((v) => (
@@ -175,29 +193,39 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       {/* Busca atual */}
-      <div className="rounded-lg bg-background/40 border border-border px-3 py-2 text-xs">
-        <span className="text-muted-foreground">Buscando: </span>
-        <span className="font-bold text-foreground">{query}</span>
+      <div className="rounded-lg bg-background/40 border border-border px-3 py-2 text-xs flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-muted-foreground">Jogo: </span>
+          <span className="font-bold text-foreground truncate">{query}</span>
+        </div>
+        <button
+          onClick={() => handleCopy(query, "full")}
+          className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary hover:opacity-80"
+        >
+          {copied === "full" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+          Copiar
+        </button>
       </div>
 
       {/* Botões das casas */}
       <div className="grid grid-cols-2 gap-2">
         {BOOKMAKERS.map((b) => (
-          <a
+          <button
             key={b.name}
-            href={buildSearchUrl(query, b.build)}
-            target="_blank"
-            rel="noopener noreferrer"
+            onClick={() => handleOpenBookmaker(b)}
             className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-xs font-bold text-foreground transition-colors"
           >
-            <span>{b.name}</span>
-            <ExternalLink className="w-3 h-3 opacity-70" />
-          </a>
+            <span className="truncate">{b.name}</span>
+            <ExternalLink className="w-3 h-3 opacity-70 shrink-0" />
+          </button>
         ))}
       </div>
 
-      <p className="text-[10px] text-muted-foreground italic">
-        Módulo auxiliar — não influencia análises, probabilidades ou sinais.
+      <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+        💡 Casas de aposta bloqueiam links de busca externos (geram 404).
+        Por isso abrimos a home da casa e copiamos o nome — basta colar na
+        lupa de busca do próprio site. Módulo auxiliar — não influencia
+        análises, probabilidades ou sinais.
       </p>
     </div>
   );

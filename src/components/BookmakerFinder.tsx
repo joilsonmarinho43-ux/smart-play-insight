@@ -1,5 +1,6 @@
-import { Search, ExternalLink } from "lucide-react";
+import { Search, ExternalLink, Copy, Check } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 /**
  * Módulo independente: "🔎 Encontrar este jogo na casa de aposta"

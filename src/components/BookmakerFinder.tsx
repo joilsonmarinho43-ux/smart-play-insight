@@ -63,20 +63,48 @@ function generateVariants(team: string): string[] {
   return Array.from(variants).filter(Boolean).slice(0, 6);
 }
 
-// Usamos busca no Google com `site:` porque URLs internas das casas mudam
-// constantemente e geram 404. A busca sempre devolve um resultado válido.
-const BOOKMAKERS = [
-  { name: "Bet365", site: "bet365.com" },
-  { name: "Betano", site: "betano.bet.br" },
-  { name: "Superbet", site: "superbet.bet.br" },
-  { name: "Sportingbet", site: "sportingbet.bet.br" },
-  { name: "Pinnacle", site: "pinnacle.com" },
-  { name: "Google", site: null },
+// URLs de busca interna das casas de aposta (Brasil).
+// O usuário já está logado — a página de busca abre direto na conta dele
+// e mostra os jogos correspondentes ao nome buscado.
+const BOOKMAKERS: { name: string; build: (q: string) => string }[] = [
+  {
+    name: "Bet365",
+    build: (q) => `https://www.bet365.bet.br/#/AS/B1/C1/D1002/E${encodeURIComponent(q)}/F2/`,
+  },
+  {
+    name: "Betano",
+    build: (q) => `https://www.betano.bet.br/search/?query=${encodeURIComponent(q)}`,
+  },
+  {
+    name: "Superbet",
+    build: (q) => `https://superbet.bet.br/pesquisa?query=${encodeURIComponent(q)}`,
+  },
+  {
+    name: "Sportingbet",
+    build: (q) =>
+      `https://sports.sportingbet.bet.br/pt-br/search?query=${encodeURIComponent(q)}`,
+  },
+  {
+    name: "Betfair",
+    build: (q) =>
+      `https://www.betfair.bet.br/sport/search?query=${encodeURIComponent(q)}`,
+  },
+  {
+    name: "KTO",
+    build: (q) => `https://www.kto.bet.br/search?q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: "Pinnacle",
+    build: (q) => `https://www.pinnacle.com/en/search/#?q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: "Google",
+    build: (q) => `https://www.google.com/search?q=${encodeURIComponent(q + " odds")}`,
+  },
 ];
 
-function buildSearchUrl(query: string, site: string | null) {
-  const q = site ? `site:${site} ${query}` : `${query} odds`;
-  return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+function buildSearchUrl(query: string, build: (q: string) => string) {
+  return build(query);
 }
 
 export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
@@ -157,7 +185,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
         {BOOKMAKERS.map((b) => (
           <a
             key={b.name}
-            href={buildSearchUrl(query, b.site)}
+            href={buildSearchUrl(query, b.build)}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-xs font-bold text-foreground transition-colors"

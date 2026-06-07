@@ -372,6 +372,7 @@ export const MatchReadingModal = ({
             <div className="text-xs text-muted-foreground text-center px-4 italic">
               Sem histórico estatístico da API para esta partida — leitura gerada por pesquisa externa da IA.
             </div>
+            <BookmakerFinder homeTeam={homeTeam} awayTeam={awayTeam} />
           </div>
         )}
 

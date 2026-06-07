@@ -573,6 +573,8 @@ export const MatchReadingModal = ({
             <div className="text-right text-xs text-muted-foreground italic pt-1">
               {reading.signature}
             </div>
+
+            <BookmakerFinder homeTeam={homeTeam} awayTeam={awayTeam} />
           </div>
         )}
       </DialogContent>

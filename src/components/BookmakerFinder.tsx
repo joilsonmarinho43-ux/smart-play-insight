@@ -185,7 +185,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
         {BOOKMAKERS.map((b) => (
           <a
             key={b.name}
-            href={buildSearchUrl(query, b.site)}
+            href={buildSearchUrl(query, b.build)}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-xs font-bold text-foreground transition-colors"

@@ -93,19 +93,21 @@ function generateVariants(team: string): string[] {
   return Array.from(variants).filter(Boolean).slice(0, 6);
 }
 
-// Cada casa de aposta protege suas URLs internas de busca (mudam, expiram e
-// dão 404 quando acessadas de fora). A abordagem confiável é abrir a HOME
-// da casa — onde você já está logado — e colar o nome do jogo na busca
-// interna do próprio site. Por isso copiamos o nome automaticamente.
-const BOOKMAKERS: { name: string; url: string }[] = [
-  { name: "Bet365", url: "https://www.bet365.bet.br/" },
-  { name: "Betano", url: "https://www.betano.bet.br/" },
-  { name: "Superbet", url: "https://superbet.bet.br/" },
-  { name: "Sportingbet", url: "https://sports.sportingbet.bet.br/pt-br" },
-  { name: "Betfair", url: "https://www.betfair.bet.br/" },
-  { name: "KTO", url: "https://www.kto.bet.br/" },
-  { name: "Pinnacle", url: "https://www.pinnacle.com/" },
-  { name: "Esportes da Sorte", url: "https://esportesdasorte.bet.br/" },
+type Bookmaker = {
+  name: string;
+  url: string;
+  search: (q: string) => string;
+};
+
+const BOOKMAKERS: Bookmaker[] = [
+  { name: "Bet365", url: "https://www.bet365.bet.br/", search: (q) => `https://www.bet365.bet.br/#/AS/B1/?search=${encodeURIComponent(q)}` },
+  { name: "Betano", url: "https://www.betano.bet.br/", search: (q) => `https://www.betano.bet.br/search/?query=${encodeURIComponent(q)}` },
+  { name: "Superbet", url: "https://superbet.bet.br/", search: (q) => `https://superbet.bet.br/pesquisa?query=${encodeURIComponent(q)}` },
+  { name: "Sportingbet", url: "https://sports.sportingbet.bet.br/pt-br", search: (q) => `https://sports.sportingbet.bet.br/pt-br/search?query=${encodeURIComponent(q)}` },
+  { name: "Betfair", url: "https://www.betfair.bet.br/", search: (q) => `https://www.betfair.bet.br/search?q=${encodeURIComponent(q)}` },
+  { name: "KTO", url: "https://www.kto.bet.br/", search: (q) => `https://www.kto.bet.br/search?q=${encodeURIComponent(q)}` },
+  { name: "Pinnacle", url: "https://www.pinnacle.com/", search: (q) => `https://www.pinnacle.com/pt/search?s=${encodeURIComponent(q)}` },
+  { name: "Esportes da Sorte", url: "https://esportesdasorte.bet.br/", search: (q) => `https://esportesdasorte.bet.br/search?query=${encodeURIComponent(q)}` },
 ];
 
 export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
@@ -116,6 +118,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   const [selAway, setSelAway] = useState(awayVariants[0] || awayTeam);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const [selectedBookmaker, setSelectedBookmaker] = useState<Bookmaker>(BOOKMAKERS[0]);
 
   const query = `${selHome} vs ${selAway}`;
   const searchSuggestions = useMemo(() => {
@@ -159,9 +162,15 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
     }
   };
 
-  const handleOpenBookmaker = async (b: { name: string; url: string }) => {
+  const handleOpenBookmaker = (b: Bookmaker) => {
+    setSelectedBookmaker(b);
     window.open(b.url, "_blank", "noopener,noreferrer");
-    toast.success(`${b.name} aberto. Agora copie uma das buscas sugeridas.`, { duration: 3500 });
+    toast.success(`${b.name} selecionada. Toque em qualquer nome para buscar direto.`, { duration: 3500 });
+  };
+
+  const handleOpenSearch = (text: string) => {
+    window.open(selectedBookmaker.search(text), "_blank", "noopener,noreferrer");
+    toast.success(`Abrindo "${text}" na ${selectedBookmaker.name}`);
   };
 
   const handleCopyNext = async () => {
@@ -180,9 +189,30 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Abra a casa onde você já está logado e teste as buscas sugeridas. Nada é copiado sozinho:
-        você escolhe qual variação usar.
+        Selecione a casa de aposta e toque em qualquer nome ou confronto para abrir a busca direta.
       </p>
+
+      {/* Casa selecionada */}
+      <div className="rounded-lg bg-background/40 border border-border px-3 py-2 space-y-2">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Casa selecionada para os cliques
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {BOOKMAKERS.map((b) => (
+            <button
+              key={b.name}
+              onClick={() => setSelectedBookmaker(b)}
+              className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${
+                selectedBookmaker.name === b.name
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background/40 text-foreground/80 border-border hover:bg-background/70"
+              }`}
+            >
+              {b.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Busca guiada */}
       <div className="rounded-lg bg-background/40 border border-primary/30 px-3 py-2 space-y-2">
@@ -225,7 +255,10 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           {homeVariants.map((v) => (
             <button
               key={v}
-              onClick={() => setSelHome(v)}
+              onClick={() => {
+                setSelHome(v);
+                handleOpenSearch(v);
+              }}
               className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                 selHome === v
                   ? "bg-primary text-primary-foreground border-primary"
@@ -256,7 +289,10 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           {awayVariants.map((v) => (
             <button
               key={v}
-              onClick={() => setSelAway(v)}
+              onClick={() => {
+                setSelAway(v);
+                handleOpenSearch(v);
+              }}
               className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                 selAway === v
                   ? "bg-primary text-primary-foreground border-primary"
@@ -276,11 +312,11 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           <span className="font-bold text-foreground truncate">{query}</span>
         </div>
         <button
-          onClick={() => handleCopy(query, "full")}
+          onClick={() => handleOpenSearch(query)}
           className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary hover:opacity-80"
         >
-          {copied === "full" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          Copiar
+          <ExternalLink className="w-3 h-3" />
+          Abrir
         </button>
       </div>
 
@@ -302,7 +338,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           {searchSuggestions.slice(0, 6).map((s, index) => (
             <button
               key={`${s}-${index}`}
-              onClick={() => handleCopy(s, `suggestion-${index}`)}
+              onClick={() => handleOpenSearch(s)}
               className="max-w-full px-2.5 py-1 rounded-md text-[11px] font-medium border border-border bg-background/40 text-foreground/80 hover:bg-background/70 transition-colors truncate"
             >
               {s}
@@ -311,7 +347,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
         </div>
       </div>
 
-      {/* Botões das casas */}
+      {/* Abrir casas */}
       <div className="grid grid-cols-2 gap-2">
         {BOOKMAKERS.map((b) => (
           <button
@@ -326,9 +362,8 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-        💡 Casas de aposta bloqueiam links de busca externos (geram 404).
-        Por isso o método mais seguro é abrir a casa e testar variações do nome
-        dentro da busca interna. Módulo auxiliar — não influencia
+        💡 Cada nome/confronto acima abre uma busca direta na casa selecionada.
+        Se a casa bloquear links externos, use o botão da casa para entrar logado e repita o clique. Módulo auxiliar — não influencia
         análises, probabilidades ou sinais.
       </p>
     </div>

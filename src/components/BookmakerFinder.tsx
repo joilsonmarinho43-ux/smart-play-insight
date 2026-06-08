@@ -37,7 +37,7 @@ function generateVariants(team: string): string[] {
   variants.add(stripAccents(original));
 
   // Remove tokens comuns
-  let tokens = original.split(/\s+/);
+  const tokens = original.split(/\s+/);
   const filtered = tokens.filter(
     (t) => !STRIP_TOKENS.some((s) => s.toLowerCase() === t.toLowerCase()),
   );
@@ -52,7 +52,7 @@ function generateVariants(team: string): string[] {
   }
 
   // Sem hífens/pontos
-  const clean = original.replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+  const clean = original.replace(/[.-]/g, " ").replace(/\s+/g, " ").trim();
   if (clean !== original) variants.add(clean);
 
   // Abreviação por iniciais (se múltiplas palavras significativas)
@@ -88,6 +88,28 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   const [copied, setCopied] = useState<string | null>(null);
 
   const query = `${selHome} vs ${selAway}`;
+  const searchSuggestions = useMemo(() => {
+    const suggestions = new Set<string>();
+    const homeMain = homeVariants[0] || homeTeam;
+    const awayMain = awayVariants[0] || awayTeam;
+
+    suggestions.add(`${selHome} vs ${selAway}`);
+    suggestions.add(`${selHome} ${selAway}`);
+    suggestions.add(`${homeMain} vs ${awayMain}`);
+    suggestions.add(`${homeMain} ${awayMain}`);
+    suggestions.add(selHome);
+    suggestions.add(selAway);
+    homeVariants.slice(0, 3).forEach((h) => {
+      awayVariants.slice(0, 3).forEach((a) => {
+        suggestions.add(`${h} vs ${a}`);
+        suggestions.add(`${h} ${a}`);
+      });
+    });
+
+    return Array.from(suggestions).filter(Boolean).slice(0, 10);
+  }, [awayTeam, awayVariants, homeTeam, homeVariants, selAway, selHome]);
+
+  const searchPack = searchSuggestions.join("\n");
 
   const handleCopy = async (text: string, label: string) => {
     try {
@@ -101,16 +123,16 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   };
 
   const handleOpenBookmaker = async (b: { name: string; url: string }) => {
-    // 1) copia o nome para colar na busca da casa
+    // 1) copia o jogo completo com as variações selecionadas para colar na busca da casa
     try {
-      await navigator.clipboard.writeText(selHome);
+      await navigator.clipboard.writeText(query);
     } catch {
       // segue mesmo se não conseguir copiar
     }
     // 2) abre a home da casa (usuário já logado)
     window.open(b.url, "_blank", "noopener,noreferrer");
     toast.success(
-      `${b.name} aberto. Nome "${selHome}" copiado — cole na busca interna.`,
+      `${b.name} aberto. Jogo "${query}" copiado — cole na busca interna.`,
       { duration: 4000 },
     );
   };
@@ -207,6 +229,33 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
         </button>
       </div>
 
+      {/* Pacote de buscas alternativas */}
+      <div className="rounded-lg bg-background/40 border border-border px-3 py-2 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Buscas alternativas
+          </div>
+          <button
+            onClick={() => handleCopy(searchPack, "pack")}
+            className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary hover:opacity-80"
+          >
+            {copied === "pack" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            Copiar tudo
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {searchSuggestions.slice(0, 6).map((s, index) => (
+            <button
+              key={`${s}-${index}`}
+              onClick={() => handleCopy(s, `suggestion-${index}`)}
+              className="max-w-full px-2.5 py-1 rounded-md text-[11px] font-medium border border-border bg-background/40 text-foreground/80 hover:bg-background/70 transition-colors truncate"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Botões das casas */}
       <div className="grid grid-cols-2 gap-2">
         {BOOKMAKERS.map((b) => (
@@ -223,8 +272,8 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
 
       <p className="text-[10px] text-muted-foreground italic leading-relaxed">
         💡 Casas de aposta bloqueiam links de busca externos (geram 404).
-        Por isso abrimos a home da casa e copiamos o nome — basta colar na
-        lupa de busca do próprio site. Módulo auxiliar — não influencia
+        Por isso abrimos a home da casa e copiamos o jogo completo — se não
+        aparecer, use uma das buscas alternativas acima. Módulo auxiliar — não influencia
         análises, probabilidades ou sinais.
       </p>
     </div>

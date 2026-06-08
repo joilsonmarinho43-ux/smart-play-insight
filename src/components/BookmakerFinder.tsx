@@ -1,4 +1,4 @@
-import { Search, ExternalLink, Copy, Check } from "lucide-react";
+import { Search, ExternalLink, Copy, Check, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -52,8 +52,37 @@ function generateVariants(team: string): string[] {
   }
 
   // Sem hífens/pontos
-  const clean = original.replace(/[.-]/g, " ").replace(/\s+/g, " ").trim();
+  const clean = original
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[.-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (clean !== original) variants.add(clean);
+
+  // Remove categorias/sufixos que algumas casas escondem ou padronizam diferente
+  const withoutCategory = clean
+    .replace(/\b(U\d{2}|Sub\s?\d{2}|Women|Feminino|Feminina|Reserves?|Reservas|B)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (withoutCategory && withoutCategory !== clean) {
+    variants.add(withoutCategory);
+    variants.add(stripAccents(withoutCategory));
+  }
+
+  // Apelidos/formatos curtos comuns em odds
+  const aliasRules: Array<[RegExp, string]> = [
+    [/\bManchester United\b/i, "Man United"],
+    [/\bManchester City\b/i, "Man City"],
+    [/\bInternazionale\b|\bInter Milano\b/i, "Inter Milan"],
+    [/\bAtl[eé]tico Madrid\b/i, "Atletico Madrid"],
+    [/\bAtl[eé]tico Mineiro\b/i, "Atletico MG"],
+    [/\bAthletico Paranaense\b/i, "Athletico PR"],
+    [/\bSão Paulo\b/i, "Sao Paulo"],
+    [/\bSantos FC\b/i, "Santos"],
+  ];
+  aliasRules.forEach(([rule, alias]) => {
+    if (rule.test(original)) variants.add(alias);
+  });
 
   // Abreviação por iniciais (se múltiplas palavras significativas)
   if (filtered.length >= 2) {
@@ -86,6 +115,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   const [selHome, setSelHome] = useState(homeVariants[0] || homeTeam);
   const [selAway, setSelAway] = useState(awayVariants[0] || awayTeam);
   const [copied, setCopied] = useState<string | null>(null);
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
 
   const query = `${selHome} vs ${selAway}`;
   const searchSuggestions = useMemo(() => {
@@ -94,22 +124,29 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
     const awayMain = awayVariants[0] || awayTeam;
 
     suggestions.add(`${selHome} vs ${selAway}`);
+    suggestions.add(`${selHome} x ${selAway}`);
+    suggestions.add(`${selHome} - ${selAway}`);
     suggestions.add(`${selHome} ${selAway}`);
     suggestions.add(`${homeMain} vs ${awayMain}`);
+    suggestions.add(`${homeMain} x ${awayMain}`);
+    suggestions.add(`${homeMain} - ${awayMain}`);
     suggestions.add(`${homeMain} ${awayMain}`);
-    suggestions.add(selHome);
-    suggestions.add(selAway);
     homeVariants.slice(0, 3).forEach((h) => {
       awayVariants.slice(0, 3).forEach((a) => {
         suggestions.add(`${h} vs ${a}`);
+        suggestions.add(`${h} x ${a}`);
+        suggestions.add(`${h} - ${a}`);
         suggestions.add(`${h} ${a}`);
       });
     });
+    suggestions.add(selHome);
+    suggestions.add(selAway);
 
-    return Array.from(suggestions).filter(Boolean).slice(0, 10);
+    return Array.from(suggestions).filter(Boolean).slice(0, 14);
   }, [awayTeam, awayVariants, homeTeam, homeVariants, selAway, selHome]);
 
   const searchPack = searchSuggestions.join("\n");
+  const activeSearch = searchSuggestions[activeSearchIndex] || query;
 
   const handleCopy = async (text: string, label: string) => {
     try {
@@ -123,18 +160,14 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   };
 
   const handleOpenBookmaker = async (b: { name: string; url: string }) => {
-    // 1) copia o jogo completo com as variações selecionadas para colar na busca da casa
-    try {
-      await navigator.clipboard.writeText(query);
-    } catch {
-      // segue mesmo se não conseguir copiar
-    }
-    // 2) abre a home da casa (usuário já logado)
     window.open(b.url, "_blank", "noopener,noreferrer");
-    toast.success(
-      `${b.name} aberto. Jogo "${query}" copiado — cole na busca interna.`,
-      { duration: 4000 },
-    );
+    toast.success(`${b.name} aberto. Agora copie uma das buscas sugeridas.`, { duration: 3500 });
+  };
+
+  const handleCopyNext = async () => {
+    const text = searchSuggestions[activeSearchIndex] || query;
+    await handleCopy(text, "guided");
+    setActiveSearchIndex((current) => (current + 1) % Math.max(searchSuggestions.length, 1));
   };
 
   return (
@@ -147,10 +180,32 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Toque em uma casa abaixo: ela abre na sua conta e o nome do time é{" "}
-        <strong className="text-foreground">copiado automaticamente</strong>{" "}
-        para você colar na busca interna do app/site.
+        Abra a casa onde você já está logado e teste as buscas sugeridas. Nada é copiado sozinho:
+        você escolhe qual variação usar.
       </p>
+
+      {/* Busca guiada */}
+      <div className="rounded-lg bg-background/40 border border-primary/30 px-3 py-2 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Busca guiada
+            </div>
+            <div className="text-sm font-bold text-foreground truncate">{activeSearch}</div>
+          </div>
+          <button
+            onClick={handleCopyNext}
+            className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/15 border border-primary/30 text-[10px] uppercase tracking-wider text-primary hover:bg-primary/25 transition-colors"
+          >
+            {copied === "guided" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            Copiar próxima
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          Se não achar, volte aqui e toque novamente para copiar outra variação.
+        </div>
+      </div>
 
       {/* Variantes do mandante */}
       <div>

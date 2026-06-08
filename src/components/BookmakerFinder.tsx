@@ -312,11 +312,11 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           <span className="font-bold text-foreground truncate">{query}</span>
         </div>
         <button
-          onClick={() => handleCopy(query, "full")}
+          onClick={() => handleOpenSearch(query)}
           className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary hover:opacity-80"
         >
-          {copied === "full" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          Copiar
+          <ExternalLink className="w-3 h-3" />
+          Abrir
         </button>
       </div>
 
@@ -347,7 +347,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
         </div>
       </div>
 
-      {/* Botões das casas */}
+      {/* Abrir casas */}
       <div className="grid grid-cols-2 gap-2">
         {BOOKMAKERS.map((b) => (
           <button
@@ -362,9 +362,8 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-        💡 Casas de aposta bloqueiam links de busca externos (geram 404).
-        Por isso o método mais seguro é abrir a casa e testar variações do nome
-        dentro da busca interna. Módulo auxiliar — não influencia
+        💡 Cada nome/confronto acima abre uma busca direta na casa selecionada.
+        Se a casa bloquear links externos, use o botão da casa para entrar logado e repita o clique. Módulo auxiliar — não influencia
         análises, probabilidades ou sinais.
       </p>
     </div>

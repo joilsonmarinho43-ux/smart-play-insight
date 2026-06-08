@@ -189,9 +189,30 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Abra a casa onde você já está logado e teste as buscas sugeridas. Nada é copiado sozinho:
-        você escolhe qual variação usar.
+        Selecione a casa de aposta e toque em qualquer nome ou confronto para abrir a busca direta.
       </p>
+
+      {/* Casa selecionada */}
+      <div className="rounded-lg bg-background/40 border border-border px-3 py-2 space-y-2">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Casa selecionada para os cliques
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {BOOKMAKERS.map((b) => (
+            <button
+              key={b.name}
+              onClick={() => setSelectedBookmaker(b)}
+              className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${
+                selectedBookmaker.name === b.name
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background/40 text-foreground/80 border-border hover:bg-background/70"
+              }`}
+            >
+              {b.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Busca guiada */}
       <div className="rounded-lg bg-background/40 border border-primary/30 px-3 py-2 space-y-2">
@@ -234,7 +255,10 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           {homeVariants.map((v) => (
             <button
               key={v}
-              onClick={() => setSelHome(v)}
+              onClick={() => {
+                setSelHome(v);
+                handleOpenSearch(v);
+              }}
               className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                 selHome === v
                   ? "bg-primary text-primary-foreground border-primary"
@@ -265,7 +289,10 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           {awayVariants.map((v) => (
             <button
               key={v}
-              onClick={() => setSelAway(v)}
+              onClick={() => {
+                setSelAway(v);
+                handleOpenSearch(v);
+              }}
               className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                 selAway === v
                   ? "bg-primary text-primary-foreground border-primary"
@@ -311,7 +338,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
           {searchSuggestions.slice(0, 6).map((s, index) => (
             <button
               key={`${s}-${index}`}
-              onClick={() => handleCopy(s, `suggestion-${index}`)}
+              onClick={() => handleOpenSearch(s)}
               className="max-w-full px-2.5 py-1 rounded-md text-[11px] font-medium border border-border bg-background/40 text-foreground/80 hover:bg-background/70 transition-colors truncate"
             >
               {s}

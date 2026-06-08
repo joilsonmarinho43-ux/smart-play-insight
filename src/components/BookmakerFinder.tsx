@@ -88,6 +88,28 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   const [copied, setCopied] = useState<string | null>(null);
 
   const query = `${selHome} vs ${selAway}`;
+  const searchSuggestions = useMemo(() => {
+    const suggestions = new Set<string>();
+    const homeMain = homeVariants[0] || homeTeam;
+    const awayMain = awayVariants[0] || awayTeam;
+
+    suggestions.add(`${selHome} vs ${selAway}`);
+    suggestions.add(`${selHome} ${selAway}`);
+    suggestions.add(`${homeMain} vs ${awayMain}`);
+    suggestions.add(`${homeMain} ${awayMain}`);
+    suggestions.add(selHome);
+    suggestions.add(selAway);
+    homeVariants.slice(0, 3).forEach((h) => {
+      awayVariants.slice(0, 3).forEach((a) => {
+        suggestions.add(`${h} vs ${a}`);
+        suggestions.add(`${h} ${a}`);
+      });
+    });
+
+    return Array.from(suggestions).filter(Boolean).slice(0, 10);
+  }, [awayTeam, awayVariants, homeTeam, homeVariants, selAway, selHome]);
+
+  const searchPack = searchSuggestions.join("\n");
 
   const handleCopy = async (text: string, label: string) => {
     try {
@@ -101,16 +123,16 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   };
 
   const handleOpenBookmaker = async (b: { name: string; url: string }) => {
-    // 1) copia o nome para colar na busca da casa
+    // 1) copia o jogo completo com as variações selecionadas para colar na busca da casa
     try {
-      await navigator.clipboard.writeText(selHome);
+      await navigator.clipboard.writeText(query);
     } catch {
       // segue mesmo se não conseguir copiar
     }
     // 2) abre a home da casa (usuário já logado)
     window.open(b.url, "_blank", "noopener,noreferrer");
     toast.success(
-      `${b.name} aberto. Nome "${selHome}" copiado — cole na busca interna.`,
+      `${b.name} aberto. Jogo "${query}" copiado — cole na busca interna.`,
       { duration: 4000 },
     );
   };

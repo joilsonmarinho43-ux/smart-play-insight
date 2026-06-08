@@ -37,7 +37,7 @@ function generateVariants(team: string): string[] {
   variants.add(stripAccents(original));
 
   // Remove tokens comuns
-  let tokens = original.split(/\s+/);
+  const tokens = original.split(/\s+/);
   const filtered = tokens.filter(
     (t) => !STRIP_TOKENS.some((s) => s.toLowerCase() === t.toLowerCase()),
   );
@@ -52,7 +52,7 @@ function generateVariants(team: string): string[] {
   }
 
   // Sem hífens/pontos
-  const clean = original.replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+  const clean = original.replace(/[.-]/g, " ").replace(/\s+/g, " ").trim();
   if (clean !== original) variants.add(clean);
 
   // Abreviação por iniciais (se múltiplas palavras significativas)

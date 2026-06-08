@@ -118,6 +118,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   const [selAway, setSelAway] = useState(awayVariants[0] || awayTeam);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const [selectedBookmaker, setSelectedBookmaker] = useState<Bookmaker>(BOOKMAKERS[0]);
 
   const query = `${selHome} vs ${selAway}`;
   const searchSuggestions = useMemo(() => {
@@ -161,9 +162,15 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
     }
   };
 
-  const handleOpenBookmaker = async (b: { name: string; url: string }) => {
+  const handleOpenBookmaker = (b: Bookmaker) => {
+    setSelectedBookmaker(b);
     window.open(b.url, "_blank", "noopener,noreferrer");
-    toast.success(`${b.name} aberto. Agora copie uma das buscas sugeridas.`, { duration: 3500 });
+    toast.success(`${b.name} selecionada. Toque em qualquer nome para buscar direto.`, { duration: 3500 });
+  };
+
+  const handleOpenSearch = (text: string) => {
+    window.open(selectedBookmaker.search(text), "_blank", "noopener,noreferrer");
+    toast.success(`Abrindo "${text}" na ${selectedBookmaker.name}`);
   };
 
   const handleCopyNext = async () => {

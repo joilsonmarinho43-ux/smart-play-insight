@@ -93,19 +93,21 @@ function generateVariants(team: string): string[] {
   return Array.from(variants).filter(Boolean).slice(0, 6);
 }
 
-// Cada casa de aposta protege suas URLs internas de busca (mudam, expiram e
-// dão 404 quando acessadas de fora). A abordagem confiável é abrir a HOME
-// da casa — onde você já está logado — e colar o nome do jogo na busca
-// interna do próprio site. Por isso copiamos o nome automaticamente.
-const BOOKMAKERS: { name: string; url: string }[] = [
-  { name: "Bet365", url: "https://www.bet365.bet.br/" },
-  { name: "Betano", url: "https://www.betano.bet.br/" },
-  { name: "Superbet", url: "https://superbet.bet.br/" },
-  { name: "Sportingbet", url: "https://sports.sportingbet.bet.br/pt-br" },
-  { name: "Betfair", url: "https://www.betfair.bet.br/" },
-  { name: "KTO", url: "https://www.kto.bet.br/" },
-  { name: "Pinnacle", url: "https://www.pinnacle.com/" },
-  { name: "Esportes da Sorte", url: "https://esportesdasorte.bet.br/" },
+type Bookmaker = {
+  name: string;
+  url: string;
+  search: (q: string) => string;
+};
+
+const BOOKMAKERS: Bookmaker[] = [
+  { name: "Bet365", url: "https://www.bet365.bet.br/", search: (q) => `https://www.bet365.bet.br/#/AS/B1/?search=${encodeURIComponent(q)}` },
+  { name: "Betano", url: "https://www.betano.bet.br/", search: (q) => `https://www.betano.bet.br/search/?query=${encodeURIComponent(q)}` },
+  { name: "Superbet", url: "https://superbet.bet.br/", search: (q) => `https://superbet.bet.br/pesquisa?query=${encodeURIComponent(q)}` },
+  { name: "Sportingbet", url: "https://sports.sportingbet.bet.br/pt-br", search: (q) => `https://sports.sportingbet.bet.br/pt-br/search?query=${encodeURIComponent(q)}` },
+  { name: "Betfair", url: "https://www.betfair.bet.br/", search: (q) => `https://www.betfair.bet.br/search?q=${encodeURIComponent(q)}` },
+  { name: "KTO", url: "https://www.kto.bet.br/", search: (q) => `https://www.kto.bet.br/search?q=${encodeURIComponent(q)}` },
+  { name: "Pinnacle", url: "https://www.pinnacle.com/", search: (q) => `https://www.pinnacle.com/pt/search?s=${encodeURIComponent(q)}` },
+  { name: "Esportes da Sorte", url: "https://esportesdasorte.bet.br/", search: (q) => `https://esportesdasorte.bet.br/search?query=${encodeURIComponent(q)}` },
 ];
 
 export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {

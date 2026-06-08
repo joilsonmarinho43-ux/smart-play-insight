@@ -269,10 +269,10 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
         </div>
       </div>
 
-      {/* Busca atual */}
+      {/* Confronto selecionado */}
       <div className="rounded-lg bg-background/40 border border-border px-3 py-2 text-xs flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <span className="text-muted-foreground">Jogo: </span>
+          <span className="text-muted-foreground">Confronto selecionado: </span>
           <span className="font-bold text-foreground truncate">{query}</span>
         </div>
         <button
@@ -327,8 +327,8 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
 
       <p className="text-[10px] text-muted-foreground italic leading-relaxed">
         💡 Casas de aposta bloqueiam links de busca externos (geram 404).
-        Por isso abrimos a home da casa e copiamos o jogo completo — se não
-        aparecer, use uma das buscas alternativas acima. Módulo auxiliar — não influencia
+        Por isso o método mais seguro é abrir a casa e testar variações do nome
+        dentro da busca interna. Módulo auxiliar — não influencia
         análises, probabilidades ou sinais.
       </p>
     </div>

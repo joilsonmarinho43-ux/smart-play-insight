@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { MatchData } from '@/types/match';
+import { APP_TIMEZONE, getTodayInPara } from '@/lib/timezone';
 
 // =============================
 // CACHE PERSISTENTE (LocalStorage)
@@ -114,10 +115,15 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
 // =============================
 export async function fetchMultiDayMatches(days: number = 3): Promise<MatchData[]> {
   const dates: string[] = [];
+  const today = getTodayInPara(); // YYYY-MM-DD em Pará (UTC-3)
+  const base = new Date(`${today}T12:00:00-03:00`);
   for (let i = 0; i < days; i++) {
-    const d = new Date();
+    const d = new Date(base);
     d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().split('T')[0]);
+    dates.push(new Intl.DateTimeFormat('en-CA', {
+      timeZone: APP_TIMEZONE,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(d));
   }
 
   const results = await Promise.allSettled(dates.map(d => fetchMatches(d)));

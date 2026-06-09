@@ -112,6 +112,7 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
 
 // =============================
 // Buscar jogos de múltiplas datas (hoje + próximos dias)
+// Agora passa pelo Data Provider Unificado (fallback automático entre fontes).
 // =============================
 export async function fetchMultiDayMatches(days: number = 3): Promise<MatchData[]> {
   const dates: string[] = [];
@@ -126,24 +127,11 @@ export async function fetchMultiDayMatches(days: number = 3): Promise<MatchData[
     }).format(d));
   }
 
-  const results = await Promise.allSettled(dates.map(d => fetchMatches(d)));
-  const allMatches: MatchData[] = [];
-  const seenIds = new Set<string>();
-
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      for (const m of result.value) {
-        const id = m.id || (m as any).fixture?.id;
-        if (id && !seenIds.has(String(id))) {
-          seenIds.add(String(id));
-          allMatches.push(m);
-        }
-      }
-    }
-  }
-
-  return allMatches;
+  // Import dinâmico evita ciclo de dependência (sources.ts importa este arquivo).
+  const { getMatchesForDays } = await import('./dataProvider');
+  return await getMatchesForDays(dates);
 }
+
 
 // =============================
 // LIVE REAL

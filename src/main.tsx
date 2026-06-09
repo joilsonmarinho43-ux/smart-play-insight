@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+// Registra as fontes do Data Provider Unificado (Pré-Jogo)
+import "./services/dataProvider/sources";
 
 // Register service worker only in production and NOT in iframes/preview
 const isInIframe = (() => {

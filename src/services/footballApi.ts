@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { MatchData } from '@/types/match';
+import { APP_TIMEZONE, getTodayInPara } from '@/lib/timezone';
 
 // =============================
 // CACHE PERSISTENTE (LocalStorage)

@@ -75,7 +75,6 @@ const Index = () => {
 
   const safeMatches = useMemo(() =>
     (rawMatches || [])
-      .filter((m: any) => !isWorldCupLeague(m.league))
       .map((m: any) => {
       const hStats = m.homeStats || {};
       const aStats = m.awayStats || {};

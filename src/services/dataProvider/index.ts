@@ -31,6 +31,7 @@ type ProviderLog = {
   source: string;
   status: 'ok' | 'empty' | 'error';
   count: number;
+  durationMs?: number;
   error?: string;
 };
 

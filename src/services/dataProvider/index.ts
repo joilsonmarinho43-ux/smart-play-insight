@@ -85,13 +85,22 @@ function dedupe(matches: MatchData[]): MatchData[] {
 }
 
 /**
- * Busca jogos para uma data, percorrendo as fontes em ordem de prioridade.
- * Retorna o primeiro resultado não-vazio. Se todas falharem, retorna [].
+ * Busca jogos para uma data, MESCLANDO resultados das fontes em ordem
+ * de prioridade. A fonte primária vence em caso de conflito (mesmo jogo);
+ * fontes secundárias preenchem partidas que a primária NÃO trouxe.
+ *
+ * Fontes com prioridade >= 90 (ex.: stale-local-cache) são usadas SOMENTE
+ * como último recurso, se nada veio das fontes "vivas".
  *
  * NUNCA lança exceção — erros são logados internamente.
  */
 export async function getMatchesByDate(date: string): Promise<MatchData[]> {
-  for (const src of sources) {
+  const live = sources.filter(s => s.priority < 90);
+  const lastResort = sources.filter(s => s.priority >= 90);
+
+  const merged: MatchData[] = [];
+
+  for (const src of live) {
     try {
       if (src.isAvailable) {
         const ok = await src.isAvailable();
@@ -104,15 +113,33 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
       const arr = Array.isArray(result) ? result : [];
       if (arr.length > 0) {
         pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: arr.length });
-        return dedupe(arr);
+        merged.push(...arr); // dedupe ao final preserva a 1ª ocorrência (maior prioridade)
+      } else {
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0 });
       }
-      pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0 });
     } catch (err: any) {
       pushLog({
         ts: Date.now(), date, source: src.name, status: 'error', count: 0,
         error: err?.message || String(err),
       });
-      // continua para próxima fonte
+    }
+  }
+
+  if (merged.length > 0) return dedupe(merged);
+
+  // Nada das fontes vivas → tenta cache expirado / último recurso
+  for (const src of lastResort) {
+    try {
+      const arr = await src.fetchByDate(date);
+      if (Array.isArray(arr) && arr.length > 0) {
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: arr.length });
+        return dedupe(arr);
+      }
+    } catch (err: any) {
+      pushLog({
+        ts: Date.now(), date, source: src.name, status: 'error', count: 0,
+        error: err?.message || String(err),
+      });
     }
   }
   return [];

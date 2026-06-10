@@ -102,25 +102,30 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
   const merged: MatchData[] = [];
 
   for (const src of live) {
+    const t0 = performance.now();
     try {
       if (src.isAvailable) {
         const ok = await src.isAvailable();
         if (!ok) {
-          pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0, error: 'unavailable' });
+          pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0, durationMs: Math.round(performance.now() - t0), error: 'unavailable' });
           continue;
         }
       }
       const result = await src.fetchByDate(date);
       const arr = Array.isArray(result) ? result : [];
-      if (arr.length > 0) {
-        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: arr.length });
-        merged.push(...arr); // dedupe ao final preserva a 1ª ocorrência (maior prioridade)
+      const durationMs = Math.round(performance.now() - t0);
+      // tag de fonte (não-invasivo) para diagnóstico — usado apenas em telas admin
+      const tagged = arr.map(m => ({ ...(m as any), __source: src.name } as MatchData));
+      if (tagged.length > 0) {
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: tagged.length, durationMs });
+        merged.push(...tagged); // dedupe preserva a 1ª (maior prioridade)
       } else {
-        pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0 });
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0, durationMs });
       }
     } catch (err: any) {
       pushLog({
         ts: Date.now(), date, source: src.name, status: 'error', count: 0,
+        durationMs: Math.round(performance.now() - t0),
         error: err?.message || String(err),
       });
     }
@@ -128,17 +133,20 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
 
   if (merged.length > 0) return dedupe(merged);
 
-  // Nada das fontes vivas → tenta cache expirado / último recurso
   for (const src of lastResort) {
+    const t0 = performance.now();
     try {
       const arr = await src.fetchByDate(date);
+      const durationMs = Math.round(performance.now() - t0);
       if (Array.isArray(arr) && arr.length > 0) {
-        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: arr.length });
-        return dedupe(arr);
+        const tagged = arr.map(m => ({ ...(m as any), __source: src.name } as MatchData));
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: tagged.length, durationMs });
+        return dedupe(tagged);
       }
     } catch (err: any) {
       pushLog({
         ts: Date.now(), date, source: src.name, status: 'error', count: 0,
+        durationMs: Math.round(performance.now() - t0),
         error: err?.message || String(err),
       });
     }

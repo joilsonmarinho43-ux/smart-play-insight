@@ -31,6 +31,7 @@ type ProviderLog = {
   source: string;
   status: 'ok' | 'empty' | 'error';
   count: number;
+  durationMs?: number;
   error?: string;
 };
 
@@ -101,25 +102,30 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
   const merged: MatchData[] = [];
 
   for (const src of live) {
+    const t0 = performance.now();
     try {
       if (src.isAvailable) {
         const ok = await src.isAvailable();
         if (!ok) {
-          pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0, error: 'unavailable' });
+          pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0, durationMs: Math.round(performance.now() - t0), error: 'unavailable' });
           continue;
         }
       }
       const result = await src.fetchByDate(date);
       const arr = Array.isArray(result) ? result : [];
-      if (arr.length > 0) {
-        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: arr.length });
-        merged.push(...arr); // dedupe ao final preserva a 1ª ocorrência (maior prioridade)
+      const durationMs = Math.round(performance.now() - t0);
+      // tag de fonte (não-invasivo) para diagnóstico — usado apenas em telas admin
+      const tagged = arr.map(m => ({ ...(m as any), __source: src.name } as MatchData));
+      if (tagged.length > 0) {
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: tagged.length, durationMs });
+        merged.push(...tagged); // dedupe preserva a 1ª (maior prioridade)
       } else {
-        pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0 });
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'empty', count: 0, durationMs });
       }
     } catch (err: any) {
       pushLog({
         ts: Date.now(), date, source: src.name, status: 'error', count: 0,
+        durationMs: Math.round(performance.now() - t0),
         error: err?.message || String(err),
       });
     }
@@ -127,17 +133,20 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
 
   if (merged.length > 0) return dedupe(merged);
 
-  // Nada das fontes vivas → tenta cache expirado / último recurso
   for (const src of lastResort) {
+    const t0 = performance.now();
     try {
       const arr = await src.fetchByDate(date);
+      const durationMs = Math.round(performance.now() - t0);
       if (Array.isArray(arr) && arr.length > 0) {
-        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: arr.length });
-        return dedupe(arr);
+        const tagged = arr.map(m => ({ ...(m as any), __source: src.name } as MatchData));
+        pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: tagged.length, durationMs });
+        return dedupe(tagged);
       }
     } catch (err: any) {
       pushLog({
         ts: Date.now(), date, source: src.name, status: 'error', count: 0,
+        durationMs: Math.round(performance.now() - t0),
         error: err?.message || String(err),
       });
     }
@@ -156,3 +165,51 @@ export async function getMatchesForDays(dates: string[]): Promise<MatchData[]> {
   }
   return dedupe(all);
 }
+
+// =====================================================================
+// DIAGNÓSTICO (admin) — executa cada fonte individualmente para uma data
+// e retorna métricas (tempo, contagem, erro). Não afeta a UI normal.
+// =====================================================================
+export interface SourceProbe {
+  source: string;
+  priority: number;
+  status: 'ok' | 'empty' | 'error';
+  count: number;
+  durationMs: number;
+  error?: string;
+  sample?: MatchData[];
+}
+
+export async function probeAllSources(date: string): Promise<SourceProbe[]> {
+  const out: SourceProbe[] = [];
+  for (const src of sources) {
+    const t0 = performance.now();
+    try {
+      if (src.isAvailable) {
+        const ok = await src.isAvailable();
+        if (!ok) {
+          out.push({ source: src.name, priority: src.priority, status: 'error', count: 0, durationMs: Math.round(performance.now() - t0), error: 'unavailable' });
+          continue;
+        }
+      }
+      const arr = await src.fetchByDate(date);
+      const list = Array.isArray(arr) ? arr : [];
+      out.push({
+        source: src.name,
+        priority: src.priority,
+        status: list.length > 0 ? 'ok' : 'empty',
+        count: list.length,
+        durationMs: Math.round(performance.now() - t0),
+        sample: list.slice(0, 5),
+      });
+    } catch (err: any) {
+      out.push({
+        source: src.name, priority: src.priority, status: 'error', count: 0,
+        durationMs: Math.round(performance.now() - t0),
+        error: err?.message || String(err),
+      });
+    }
+  }
+  return out;
+}
+

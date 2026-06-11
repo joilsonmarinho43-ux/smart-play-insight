@@ -46,6 +46,7 @@ const Diagnostics = () => {
   const [probes, setProbes] = useState<Record<string, SourceProbe[]>>({});
   const [matchesByDate, setMatchesByDate] = useState<Record<string, MatchData[]>>({});
   const [log, setLog] = useState(getProviderLog());
+  const [alerts, setAlerts] = useState<HealthAlert[]>(getAlerts());
 
   const dates = useMemo(() => buildDates(DAYS), []);
   const sources = useMemo(() => listSources(), []);

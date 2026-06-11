@@ -72,6 +72,7 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 // 🛡️ PROTEÇÃO EXCLUSIVA ADMIN
 const AdminRoute = ({ children }: { children: ReactNode }) => {
   const { profile, loading } = useProfile();
+  useDataProviderHealthMonitor(!!profile?.is_admin);
   if (loading) return <LoadingScreen />;
   if (!profile?.is_admin) return <Navigate to="/" replace />;
   return <>{children}</>;

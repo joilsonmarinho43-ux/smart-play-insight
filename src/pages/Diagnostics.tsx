@@ -85,6 +85,42 @@ const Diagnostics = () => {
     return map;
   }, [probes]);
 
+  // Auditoria avançada — responde itens 3, 4, 7, 8, 9
+  const audit = useMemo(() => {
+    const all = Object.values(matchesByDate).flat() as any[];
+    const bySource: Record<string, number> = {};
+    const leaguesBySource: Record<string, Set<string>> = {};
+    for (const m of all) {
+      const s = m.__source || 'unknown';
+      bySource[s] = (bySource[s] || 0) + 1;
+      (leaguesBySource[s] = leaguesBySource[s] || new Set()).add(m.league || '—');
+    }
+    const primary = bySource['football-api-edge'] || 0;
+    const secondary = bySource['thesportsdb-public'] || 0;
+    const stale = bySource['stale-local-cache'] || 0;
+    // Cobertura: % de jogos da secundária em relação à primária
+    const coverage = primary > 0 ? Math.round((secondary / primary) * 100) : (secondary > 0 ? 100 : 0);
+    // Exclusivos da secundária = jogos que só ela trouxe (após dedupe, todo m.__source==='thesportsdb-public' já é exclusivo)
+    const exclusiveSecondary = secondary;
+    // Ligas exclusivas por fonte
+    const allLeagues = new Set<string>();
+    Object.values(leaguesBySource).forEach(s => s.forEach(l => allLeagues.add(l)));
+    const exclusiveLeagues: Record<string, string[]> = {};
+    for (const src of Object.keys(leaguesBySource)) {
+      const others = new Set<string>();
+      for (const o of Object.keys(leaguesBySource)) if (o !== src) leaguesBySource[o].forEach(l => others.add(l));
+      exclusiveLeagues[src] = [...leaguesBySource[src]].filter(l => !others.has(l));
+    }
+    // Risco de tela vazia se a principal cair
+    const fallbackTotal = secondary + stale;
+    let resilience: 'alta' | 'média' | 'baixa' = 'baixa';
+    let emptyRisk = 'ALTO — sem fallback ativo';
+    if (fallbackTotal >= 20) { resilience = 'alta'; emptyRisk = 'BAIXO — fallback robusto'; }
+    else if (fallbackTotal >= 5) { resilience = 'média'; emptyRisk = 'MÉDIO — fallback parcial'; }
+    return { bySource, primary, secondary, stale, coverage, exclusiveSecondary, exclusiveLeagues, resilience, emptyRisk };
+  }, [matchesByDate]);
+
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white p-4 sm:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -143,6 +179,34 @@ const Diagnostics = () => {
               )}
             </tbody>
           </table>
+        </section>
+
+        {/* Auditoria — responde itens 1-9 */}
+        <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+          <h2 className="text-lg font-semibold mb-3">Auditoria completa ({DAYS} dias)</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-gray-400 text-left">
+                <tr><th className="py-2">#</th><th>Métrica</th><th>Valor</th></tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-zinc-800"><td className="py-2">1</td><td>Partidas via football-api-edge</td><td className="font-mono">{audit.primary}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">2</td><td>Partidas via thesportsdb-public</td><td className="font-mono">{audit.secondary}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">3</td><td>Exclusivas da secundária (preencheram lacunas)</td><td className="font-mono">{audit.exclusiveSecondary}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">4</td><td>Partidas via stale-local-cache</td><td className="font-mono">{audit.stale}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">5</td><td>Tempo médio por fonte</td><td className="font-mono text-xs">{Object.entries(aggregate).map(([n,a])=>`${n}: ${a.runs?Math.round(a.totalMs/a.runs):0}ms`).join(' · ')}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">6</td><td>Erros recentes registrados</td><td className="font-mono">{errors.length}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">7</td><td>Cobertura secundária / principal</td><td className="font-mono">{audit.coverage}%</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">8</td><td>Ligas exclusivas por fonte</td><td className="text-xs">
+                  {Object.entries(audit.exclusiveLeagues).map(([s,ls]) => (
+                    <div key={s}><span className={`px-1.5 py-0.5 rounded border ${SOURCE_COLOR[s]||''}`}>{s}</span> <span className="text-gray-400">{ls.length===0?'—':ls.slice(0,8).join(', ')}{ls.length>8?` (+${ls.length-8})`:''}</span></div>
+                  ))}
+                </td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">9</td><td>Risco de tela vazia se a API principal cair</td><td className={audit.resilience==='alta'?'text-emerald-400':audit.resilience==='média'?'text-yellow-400':'text-red-400'}>{audit.emptyRisk}</td></tr>
+                <tr className="border-t border-zinc-800 bg-zinc-800/40"><td className="py-2 font-bold">★</td><td className="font-bold">Nível de resiliência atual</td><td className={`font-bold uppercase ${audit.resilience==='alta'?'text-emerald-400':audit.resilience==='média'?'text-yellow-400':'text-red-400'}`}>{audit.resilience}</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         {/* Probe por data */}

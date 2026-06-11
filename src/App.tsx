@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useSessionGuard } from "@/hooks/useSessionGuard";
 import { useApiKeyValidator } from "@/hooks/useApiKeyValidator";
+import { useDataProviderHealthMonitor } from "@/hooks/useDataProviderHealthMonitor";
 import { ReactNode } from "react";
 
 import Index from "./pages/Index";

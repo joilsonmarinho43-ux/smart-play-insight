@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useSessionGuard } from "@/hooks/useSessionGuard";
 import { useApiKeyValidator } from "@/hooks/useApiKeyValidator";
+import { useDataProviderHealthMonitor } from "@/hooks/useDataProviderHealthMonitor";
 import { ReactNode } from "react";
 
 import Index from "./pages/Index";
@@ -72,6 +73,7 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 // 🛡️ PROTEÇÃO EXCLUSIVA ADMIN
 const AdminRoute = ({ children }: { children: ReactNode }) => {
   const { profile, loading } = useProfile();
+  useDataProviderHealthMonitor(!!profile?.is_admin);
   if (loading) return <LoadingScreen />;
   if (!profile?.is_admin) return <Navigate to="/" replace />;
   return <>{children}</>;

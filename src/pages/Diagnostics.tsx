@@ -8,8 +8,10 @@ import {
   getMatchesByDate,
   type SourceProbe,
 } from '@/services/dataProvider';
+import { getAlerts, clearAlerts, runHealthCheck, type HealthAlert } from '@/services/dataProvider/healthAlerts';
 import { getTodayInPara, APP_TIMEZONE } from '@/lib/timezone';
 import { MatchData } from '@/types/match';
+import { Bell, Trash2 } from 'lucide-react';
 
 const DAYS = 3;
 
@@ -44,6 +46,7 @@ const Diagnostics = () => {
   const [probes, setProbes] = useState<Record<string, SourceProbe[]>>({});
   const [matchesByDate, setMatchesByDate] = useState<Record<string, MatchData[]>>({});
   const [log, setLog] = useState(getProviderLog());
+  const [alerts, setAlerts] = useState<HealthAlert[]>(getAlerts());
 
   const dates = useMemo(() => buildDates(DAYS), []);
   const sources = useMemo(() => listSources(), []);
@@ -60,12 +63,20 @@ const Diagnostics = () => {
       setProbes(probeResults);
       setMatchesByDate(matchResults);
       setLog(getProviderLog());
+      await runHealthCheck();
+      setAlerts(getAlerts());
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { run(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => {
+    run();
+    const onAlert = () => setAlerts(getAlerts());
+    window.addEventListener('dp:health-alert', onAlert);
+    return () => window.removeEventListener('dp:health-alert', onAlert);
+    /* eslint-disable-next-line */
+  }, []);
 
   const errors = log.filter(l => l.status === 'error').slice(0, 20);
 
@@ -144,6 +155,50 @@ const Diagnostics = () => {
             Re-testar
           </button>
         </header>
+
+        {/* Alertas automáticos */}
+        <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Bell className="w-5 h-5 text-orange-400" />
+              Alertas automáticos
+              {alerts.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40">
+                  {alerts.length}
+                </span>
+              )}
+            </h2>
+            {alerts.length > 0 && (
+              <button
+                onClick={() => { clearAlerts(); setAlerts([]); }}
+                className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" /> Limpar
+              </button>
+            )}
+          </div>
+          {alerts.length === 0 ? (
+            <div className="text-sm text-gray-500">
+              Nenhum alerta. O sistema verifica a saúde do provider a cada 5 minutos enquanto você navega como admin.
+            </div>
+          ) : (
+            <div className="max-h-72 overflow-y-auto divide-y divide-zinc-800">
+              {alerts.map(a => (
+                <div key={a.id} className="py-2 flex items-start gap-3">
+                  <span className={`mt-0.5 shrink-0 px-2 py-0.5 rounded text-[10px] border ${
+                    a.severity === 'critical' ? 'bg-red-500/20 text-red-300 border-red-500/40' :
+                    a.severity === 'warning' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' :
+                    'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  }`}>{a.type}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm">{a.message}</div>
+                    <div className="text-[10px] text-gray-500">{new Date(a.ts).toLocaleString('pt-BR')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Fontes registradas */}
         <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">

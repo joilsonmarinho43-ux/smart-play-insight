@@ -63,12 +63,20 @@ const Diagnostics = () => {
       setProbes(probeResults);
       setMatchesByDate(matchResults);
       setLog(getProviderLog());
+      await runHealthCheck();
+      setAlerts(getAlerts());
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { run(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => {
+    run();
+    const onAlert = () => setAlerts(getAlerts());
+    window.addEventListener('dp:health-alert', onAlert);
+    return () => window.removeEventListener('dp:health-alert', onAlert);
+    /* eslint-disable-next-line */
+  }, []);
 
   const errors = log.filter(l => l.status === 'error').slice(0, 20);
 

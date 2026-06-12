@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v5"; // bump: modo pesquisa web para amistosos/seleções sem dados API
+const PROMPT_VERSION = "v6"; // bump: análise detalhada por mercado (1x2, dupla chance, handicap, gols, btts, escanteios, cartões), desfalques, árbitro e odds de referência
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;

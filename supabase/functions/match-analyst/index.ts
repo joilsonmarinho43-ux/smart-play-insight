@@ -267,7 +267,6 @@ function buildUserPayload(input: any): string {
 function safeParseAnalyst(raw: string): any | null {
   if (!raw) return null;
   let txt = raw.trim();
-  // remove cercas markdown se vierem
   txt = txt.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   const start = txt.indexOf("{");
   const end = txt.lastIndexOf("}");
@@ -280,7 +279,42 @@ function safeParseAnalyst(raw: string): any | null {
     const veredito = String(obj.veredito || "").trim();
     const risco = ["baixo", "medio", "alto"].includes(obj.risco) ? obj.risco : "medio";
     if (!cenario || !pontoAtencao || !veredito) return null;
-    return { cenario, pontoAtencao, veredito, risco };
+    const pickStr = (v: any) => (typeof v === "string" ? v.trim() : "");
+    const cd = obj.contextoDetalhado || obj.contexto_detalhado || {};
+    const mk = obj.mercados || {};
+    const od = obj.oddsReferencia || obj.odds_referencia || {};
+    return {
+      cenario,
+      pontoAtencao,
+      veredito,
+      risco,
+      contextoDetalhado: {
+        desfalques: pickStr(cd.desfalques),
+        arbitro: pickStr(cd.arbitro),
+        clima: pickStr(cd.clima),
+        motivacao: pickStr(cd.motivacao),
+      },
+      mercados: {
+        vitoria: pickStr(mk.vitoria),
+        duplaChance: pickStr(mk.duplaChance || mk.dupla_chance),
+        handicap: pickStr(mk.handicap),
+        overUnderGols: pickStr(mk.overUnderGols || mk.over_under_gols),
+        btts: pickStr(mk.btts),
+        escanteios: pickStr(mk.escanteios),
+        cartoes: pickStr(mk.cartoes),
+        placarExato: pickStr(mk.placarExato || mk.placar_exato),
+      },
+      oddsReferencia: {
+        casa: pickStr(od.casa),
+        empate: pickStr(od.empate),
+        fora: pickStr(od.fora),
+        over25: pickStr(od.over25),
+        under25: pickStr(od.under25),
+        bttsSim: pickStr(od.bttsSim || od.btts_sim),
+        escanteiosOver9: pickStr(od.escanteiosOver9 || od.escanteios_over9),
+        cartoesOver4: pickStr(od.cartoesOver4 || od.cartoes_over4),
+      },
+    };
   } catch {
     return null;
   }

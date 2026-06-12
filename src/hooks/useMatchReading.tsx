@@ -164,6 +164,9 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
             pontoAtencao: data.pontoAtencao,
             veredito: data.veredito,
             risco: data.risco || "medio",
+            contextoDetalhado: data.contextoDetalhado,
+            mercados: data.mercados,
+            oddsReferencia: data.oddsReferencia,
           };
           analystCache.set(akey, { ts: Date.now(), data: a });
           setState((s) => ({ ...s, analyst: a, analystLoading: false }));

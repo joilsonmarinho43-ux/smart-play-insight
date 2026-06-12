@@ -12,6 +12,32 @@ export interface AnalystReading {
   pontoAtencao: string;
   veredito: string;
   risco: "baixo" | "medio" | "alto";
+  contextoDetalhado?: {
+    desfalques?: string;
+    arbitro?: string;
+    clima?: string;
+    motivacao?: string;
+  };
+  mercados?: {
+    vitoria?: string;
+    duplaChance?: string;
+    handicap?: string;
+    overUnderGols?: string;
+    btts?: string;
+    escanteios?: string;
+    cartoes?: string;
+    placarExato?: string;
+  };
+  oddsReferencia?: {
+    casa?: string;
+    empate?: string;
+    fora?: string;
+    over25?: string;
+    under25?: string;
+    bttsSim?: string;
+    escanteiosOver9?: string;
+    cartoesOver4?: string;
+  };
 }
 
 interface State {
@@ -138,6 +164,9 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
             pontoAtencao: data.pontoAtencao,
             veredito: data.veredito,
             risco: data.risco || "medio",
+            contextoDetalhado: data.contextoDetalhado,
+            mercados: data.mercados,
+            oddsReferencia: data.oddsReferencia,
           };
           analystCache.set(akey, { ts: Date.now(), data: a });
           setState((s) => ({ ...s, analyst: a, analystLoading: false }));

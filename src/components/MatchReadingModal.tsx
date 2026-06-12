@@ -322,6 +322,61 @@ const AnalystBlock = ({
             </span>
             <p>{analyst.pontoAtencao}</p>
           </div>
+
+          {analyst.contextoDetalhado && (
+            <div className="rounded-lg border border-border bg-background/40 p-2.5 space-y-1.5">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block">
+                Contexto Detalhado
+              </span>
+              {analyst.contextoDetalhado.desfalques && (
+                <p><span className="font-bold text-foreground">Desfalques:</span> {analyst.contextoDetalhado.desfalques}</p>
+              )}
+              {analyst.contextoDetalhado.arbitro && (
+                <p><span className="font-bold text-foreground">Árbitro:</span> {analyst.contextoDetalhado.arbitro}</p>
+              )}
+              {analyst.contextoDetalhado.clima && (
+                <p><span className="font-bold text-foreground">Clima:</span> {analyst.contextoDetalhado.clima}</p>
+              )}
+              {analyst.contextoDetalhado.motivacao && (
+                <p><span className="font-bold text-foreground">Motivação:</span> {analyst.contextoDetalhado.motivacao}</p>
+              )}
+            </div>
+          )}
+
+          {analyst.mercados && (
+            <div className="rounded-lg border border-primary/30 bg-background/40 p-2.5 space-y-1.5">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block">
+                Análise por Mercado
+              </span>
+              {analyst.mercados.vitoria && (<p><span className="font-bold text-foreground">Vitória (1X2):</span> {analyst.mercados.vitoria}</p>)}
+              {analyst.mercados.duplaChance && (<p><span className="font-bold text-foreground">Dupla Chance:</span> {analyst.mercados.duplaChance}</p>)}
+              {analyst.mercados.handicap && (<p><span className="font-bold text-foreground">Handicap Asiático:</span> {analyst.mercados.handicap}</p>)}
+              {analyst.mercados.overUnderGols && (<p><span className="font-bold text-foreground">Over/Under Gols:</span> {analyst.mercados.overUnderGols}</p>)}
+              {analyst.mercados.btts && (<p><span className="font-bold text-foreground">Ambas Marcam:</span> {analyst.mercados.btts}</p>)}
+              {analyst.mercados.escanteios && (<p><span className="font-bold text-foreground">Escanteios:</span> {analyst.mercados.escanteios}</p>)}
+              {analyst.mercados.cartoes && (<p><span className="font-bold text-foreground">Cartões:</span> {analyst.mercados.cartoes}</p>)}
+              {analyst.mercados.placarExato && (<p><span className="font-bold text-foreground">Placar Provável:</span> {analyst.mercados.placarExato}</p>)}
+            </div>
+          )}
+
+          {analyst.oddsReferencia && Object.values(analyst.oddsReferencia).some(Boolean) && (
+            <div className="rounded-lg border border-border bg-background/40 p-2.5">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block mb-1.5">
+                Odds Justas Estimadas
+              </span>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[13px]">
+                {analyst.oddsReferencia.casa && (<div><span className="text-muted-foreground">Casa:</span> <span className="font-display font-bold">{analyst.oddsReferencia.casa}</span></div>)}
+                {analyst.oddsReferencia.empate && (<div><span className="text-muted-foreground">Empate:</span> <span className="font-display font-bold">{analyst.oddsReferencia.empate}</span></div>)}
+                {analyst.oddsReferencia.fora && (<div><span className="text-muted-foreground">Fora:</span> <span className="font-display font-bold">{analyst.oddsReferencia.fora}</span></div>)}
+                {analyst.oddsReferencia.over25 && (<div><span className="text-muted-foreground">Over 2.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.over25}</span></div>)}
+                {analyst.oddsReferencia.under25 && (<div><span className="text-muted-foreground">Under 2.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.under25}</span></div>)}
+                {analyst.oddsReferencia.bttsSim && (<div><span className="text-muted-foreground">BTTS Sim:</span> <span className="font-display font-bold">{analyst.oddsReferencia.bttsSim}</span></div>)}
+                {analyst.oddsReferencia.escanteiosOver9 && (<div><span className="text-muted-foreground">Esc. +9.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.escanteiosOver9}</span></div>)}
+                {analyst.oddsReferencia.cartoesOver4 && (<div><span className="text-muted-foreground">Cart. +4.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.cartoesOver4}</span></div>)}
+              </div>
+            </div>
+          )}
+
           <div>
             <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block mb-0.5">
               Veredito de Valor

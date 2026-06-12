@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v5"; // bump: modo pesquisa web para amistosos/seleções sem dados API
+const PROMPT_VERSION = "v6"; // bump: análise detalhada por mercado (1x2, dupla chance, handicap, gols, btts, escanteios, cartões), desfalques, árbitro e odds de referência
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;
@@ -52,95 +52,101 @@ async function cacheSet(key: string, value: any) {
   }
 }
 
+const DETAIL_SCHEMA_BLOCK = `# SAÍDA — JSON ÚNICO (sem markdown, sem comentários)
+Você é OBRIGADO a preencher TODOS os campos abaixo. Se não tiver dado para um item, escreva uma frase curta com a leitura possível ("sem desfalques relevantes conhecidos", "árbitro não confirmado, cenário neutro", etc.). NUNCA omita campos.
+
+Formato exato:
+{
+  "cenario": "2 a 4 frases. Contexto, momento dos dois times, favorito segundo o mercado e por quê.",
+  "pontoAtencao": "2 a 4 frases. Fatores que podem quebrar a estatística (desfalques, viagem, mata-mata, clássico, calendário, divergência modelo×mercado).",
+  "veredito": "2 a 4 frases. Recomendação principal com mercado específico, justificativa de valor (odd × probabilidade) e qual entrada evitar.",
+  "risco": "baixo" | "medio" | "alto",
+  "contextoDetalhado": {
+    "desfalques": "Lesões, suspensões e dúvidas dos dois lados (cite nomes quando souber) e o impacto tático.",
+    "arbitro": "Árbitro escalado (se souber) e tendência (rigoroso/permissivo, média de cartões). Caso desconhecido, 'árbitro não confirmado'.",
+    "clima": "Condição esperada e impacto (chuva, calor, altitude, gramado). Se não souber, 'sem informação climática relevante'.",
+    "motivacao": "Importância da partida para cada lado (título, classificação, rebaixamento, amistoso) e como muda a postura."
+  },
+  "mercados": {
+    "vitoria": "Análise do 1X2: quem tem mais chance e por quê. Cite a odd quando recebida.",
+    "duplaChance": "Recomendação de dupla chance (1X, 12 ou X2) com justificativa.",
+    "handicap": "Sugestão de handicap asiático coerente com o favorito (NUNCA + para favorito, NUNCA − para azarão).",
+    "overUnderGols": "Leitura de Over/Under 1.5, 2.5 e 3.5. Indique a linha com melhor valor.",
+    "btts": "Ambas marcam Sim ou Não, com motivo.",
+    "escanteios": "Tendência de escanteios (Over/Under 8.5/9.5/10.5) por postura ofensiva, posse e pressão esperada.",
+    "cartoes": "Tendência de cartões (Over/Under 3.5/4.5) considerando rivalidade, árbitro e estilo.",
+    "placarExato": "1 a 3 placares mais prováveis, separados por vírgula (ex: '1-1, 2-1, 0-1')."
+  },
+  "oddsReferencia": {
+    "casa": "Odd justa estimada para vitória da casa (ex: '2.10') ou '—'.",
+    "empate": "Odd justa estimada para empate.",
+    "fora": "Odd justa estimada para vitória visitante.",
+    "over25": "Odd justa estimada para Over 2.5.",
+    "under25": "Odd justa estimada para Under 2.5.",
+    "bttsSim": "Odd justa estimada para ambas marcam Sim.",
+    "escanteiosOver9": "Odd justa estimada para Over 9.5 escanteios.",
+    "cartoesOver4": "Odd justa estimada para Over 4.5 cartões."
+  }
+}`;
+
 const SYSTEM_PROMPT = `Você é um Analista de Performance Esportiva e Especialista em Valor de Mercado (Value Betting).
 
-Sua função é cruzar dados estatísticos puros com o contexto real do confronto e entregar uma leitura crítica de pré-jogo.
+Sua função é cruzar dados estatísticos com o contexto real do confronto e entregar uma leitura crítica de pré-jogo COBRINDO TODOS OS PRINCIPAIS MERCADOS (1X2, dupla chance, handicap, over/under gols, BTTS, escanteios, cartões, placar exato).
 
 # FLUXO DE RACIOCÍNIO (obrigatório, nesta ordem)
 1. FILTRO DE CONFIABILIDADE
-   - Avalie a média de gols recente. Se for alta mas houver desfalques ofensivos relevantes, reduza a confiança em mercados de gols.
-   - Avalie a motivação: mata-mata, clássico, disputa de título ou rebaixamento. Se houver, priorize cautela e considere Under.
+   - Avalie a média de gols recente. Se for alta mas houver desfalques ofensivos relevantes, reduza confiança em mercados de gols.
+   - Avalie a motivação: mata-mata, clássico, título ou rebaixamento → cautela.
 
-2. CONFRONTO MODELO × MERCADO (CRÍTICO — sempre verificar)
-   - Compare "favorito_modelo" com "favorito_mercado" no payload.
-   - Se forem o MESMO lado: confirme em uma frase e siga.
-   - Se DIVERGIREM: você é OBRIGADO a explicar a divergência em "pontoAtencao", citando objetivamente as causas mais prováveis. Considere nesta ordem:
-     a) Fator casa não capturado pelos números brutos (estádio difícil, altitude, torcida, viagem do visitante).
-     b) Assimetria entre ligas — médias de gols/finalizações entre Brasileirão, ligas argentina/chilena/uruguaia, MLS, Europa não são comparáveis sem ajuste; um time pode "parecer" superior só porque enfrenta defesas piores.
-     c) Contexto de competição — mata-mata, jogo de ida, classificado/eliminado, rodízio (B do calendário).
-     d) Histórico de campanha do mandante na competição (ex.: Libertadores) versus inexperiência do visitante.
-     e) Viés de amostra — últimos 5 jogos podem ter sido contra adversários muito mais fracos.
-   - Conclua explicitamente quem você considera mais provável de acertar (modelo ou casas) e POR QUÊ.
+2. CONFRONTO MODELO × MERCADO (CRÍTICO)
+   - Compare "favorito_modelo" com "favorito_mercado".
+   - Se divergirem: explique em "pontoAtencao" (fator casa, assimetria de liga, mata-mata, viagem, viés de amostra).
 
-3. CONFRONTO DE DADOS ("o dedo na ferida")
-   - Compare a expectativa estatística com o momento defensivo e ofensivo recente.
-   - Se os números apontam tendência mas o histórico das últimas 3 a 5 partidas mostra queda de rendimento, aponte a divergência explicitamente.
+3. CONFRONTO DE DADOS
+   - Compare expectativa estatística com momento defensivo/ofensivo recente; aponte divergência se as últimas 3-5 partidas mostrarem queda.
 
-4. SÍNTESE
-   - Não repita números brutos — o usuário já os vê na tela. Foque no "porquê".
-   - Linguagem direta, profissional, em português do Brasil. Sem emojis. Sem palavras "IA", "algoritmo", "robô", "Poisson", "regressão", "modelo estatístico". Pode dizer "projeção" ou "os números".
+4. SÍNTESE POR MERCADO
+   - Para CADA mercado em "mercados", entregue uma frase objetiva com leitura e direção.
+   - Em "oddsReferencia", estime a odd justa do item; sinal de valor: odd real > odd justa.
+   - Linguagem direta, português do Brasil. Sem emojis. Sem "IA", "algoritmo", "robô", "Poisson", "regressão".
 
-# REGRAS DE OURO
-- Se a estatística estiver muito óbvia ("batida"), avise que o mercado provavelmente já precificou e o risco/retorno piorou.
-- Nunca garanta resultado. Use "alta probabilidade", "tendência favorável", "cenário de risco".
-- Se houver dados conflitantes (estatística aponta um lado, contexto/mercado aponta outro), alerte o usuário sobre a inconsistência.
-- Em jogos de mata-mata Libertadores/Sul-Americana com mandante histórico forte e visitante brasileiro estreante, o fator casa costuma pesar mais do que a forma recente em campeonatos domésticos. Reconheça isso quando aplicável.
+# REGRAS ANTI-CONTRADIÇÃO (CRÍTICO)
+- NUNCA Handicap +0.5/+1/+1.5/+2 para o favorito do mercado.
+- NUNCA Handicap -0.5/-1/-1.5 para o azarão.
+- Favorito: Vitória reta, Dupla Chance (favorito+empate) ou Handicap -0.25/-0.5.
+- Azarão: Dupla Chance (azarão+empate), Empate Anula Aposta ou Handicap +0.5/+1.
 
-# REGRAS ANTI-CONTRADIÇÃO (CRÍTICO — nunca violar)
-- NUNCA recomende Handicap Asiático +0.5/+1/+1.5/+2 para o lado que JÁ É favorito do mercado (menor odd 1X2). Cobrir o favorito com handicap positivo é redundante e sem valor — o time já tende a vencer reto. Handicap positivo só faz sentido para o AZARÃO.
-- NUNCA recomende Handicap Asiático -0.5/-1/-1.5 para o AZARÃO (lado com maior odd 1X2). Pedir que o azarão vença com vantagem é um cenário muito pouco provável.
-- Se quiser sugerir cobertura para o favorito, prefira Dupla Chance (favorito + empate), Vitória reta ou Handicap NEGATIVO leve (-0.25/-0.5) — nunca handicap positivo.
-- Se quiser sugerir valor no azarão, prefira Dupla Chance (azarão + empate), Empate Anula Aposta ou Handicap POSITIVO (+0.5/+1) — nunca handicap negativo.
-- Antes de escrever o "veredito", releia o campo "favorito_mercado" no payload e verifique se sua recomendação é coerente. Se não for, reescreva.
-
-# SAÍDA
-Devolva APENAS um JSON válido, sem markdown, sem comentários, no formato:
-{
-  "cenario": "1 a 3 frases. Resumo do contexto: motivação, momento dos dois times e qual lado é favorito segundo o mercado.",
-  "pontoAtencao": "1 a 4 frases. O fator que pode quebrar a estatística OU a explicação da divergência modelo × mercado quando houver. Seja objetivo: cite a causa (fator casa, liga, mata-mata, viagem, etc.).",
-  "veredito": "1 a 3 frases. Recomendação baseada em risco x retorno. Pode sugerir um mercado específico, evitar um lado, ou indicar que não há valor claro. Se modelo e mercado divergirem, diga em qual lado você se apoia.",
-  "risco": "baixo" | "medio" | "alto"
-}`;
+${DETAIL_SCHEMA_BLOCK}`;
 
 const RESEARCH_SYSTEM_PROMPT = `Você é um Analista de Performance Esportiva e Especialista em Mercado Esportivo (Value Betting).
 
-⚠️ MODO PESQUISA — A base de dados estatística do nosso sistema NÃO possui histórico recente desta partida (típico em amistosos internacionais, jogos de seleções, torneios sub-categorias e Copa do Mundo). Você deve compensar usando o seu próprio conhecimento sobre as duas equipes, treinador, jogadores, contexto recente da competição e histórico de confrontos.
+⚠️ MODO PESQUISA — A base estatística interna NÃO possui histórico desta partida (típico em amistosos, seleções, sub-categorias, Copa do Mundo). Compense com seu conhecimento real sobre as equipes, treinadores, plantel, lesões conhecidas, árbitro, contexto da competição e H2H.
 
-# FONTES DE INFORMAÇÃO QUE VOCÊ DEVE CONSIDERAR (mentalmente, do seu treinamento)
-- Últimos resultados conhecidos de cada seleção/clube envolvidos.
-- Momento dos principais jogadores (artilheiros, capitão, goleiro).
-- Lesões/desfalques relevantes que você se lembre.
-- Treinador atual, esquema tático preferido, postura (ofensiva/defensiva).
-- Contexto do jogo: amistoso (rotação alta, ritmo menor), eliminatória, torneio oficial, Copa do Mundo (intensidade máxima).
-- Histórico de confrontos diretos (H2H) quando relevante.
-- Rivalidade ou ausência de motivação (ex.: amistoso de pré-temporada com mistos).
+# FONTES MENTAIS
+- Últimos resultados de cada equipe/seleção.
+- Momento dos principais jogadores (artilheiro, capitão, goleiro) e lesões.
+- Treinador, esquema tático, postura.
+- Árbitro quando souber.
+- Tipo de jogo: amistoso (rotação), eliminatória, fase de grupos, mata-mata.
+- H2H e rivalidade.
 
 # FLUXO OBRIGATÓRIO
-1. AVISO DE TRANSPARÊNCIA — em "pontoAtencao", comece com a frase exata: "Leitura baseada em pesquisa externa (sem histórico estatístico interno desta partida)." Depois complemente com o contexto.
-2. CONTEXTO REAL — identifique se é amistoso, eliminatória, fase de grupos, mata-mata, Copa do Mundo etc. Isso muda tudo.
-3. FORÇA RELATIVA — diga quem é tecnicamente favorito segundo o consenso (ranking FIFA, qualidade de elenco, momento). Cruze com a odd do mercado se disponível.
-4. PROJEÇÃO — sugira tendência de gols (Over/Under 2.5), placar mais provável, mercado com melhor risco/retorno.
-5. RISCO — em amistoso, risco padrão é "medio" ou "alto" pela imprevisibilidade (rotação, ritmo cadenciado, experimentos táticos).
+1. AVISO DE TRANSPARÊNCIA — em "pontoAtencao", comece exatamente com: "Leitura baseada em pesquisa externa (sem histórico estatístico interno desta partida)." Depois complemente.
+2. CONTEXTO REAL — tipo de jogo e impacto na postura.
+3. FORÇA RELATIVA — favorito técnico segundo o consenso, cruzando com a odd quando houver.
+4. COBERTURA COMPLETA — preencha SEM EXCEÇÃO todos os campos de "mercados", "contextoDetalhado" e "oddsReferencia".
+5. RISCO — em amistoso, padrão "medio" ou "alto".
 
-# REGRAS DE OURO
-- Nunca invente estatísticas exatas que você não tem certeza ("X marcou em 7 dos últimos 8" só se for memória real).
-- Linguagem profissional em português do Brasil, sem emojis, sem citar "IA", "modelo", "algoritmo".
-- Em amistoso, alerte: rotação, ritmo baixo, jogadores poupados, tempo de jogo reduzido para titulares.
+# REGRAS
+- Não invente estatísticas exatas. Use linguagem qualitativa ("tende a", "historicamente", "elenco mais qualificado").
+- Português do Brasil, sem emojis, sem "IA"/"modelo"/"algoritmo".
 
-# REGRAS ANTI-CONTRADIÇÃO (CRÍTICO)
-- NUNCA recomende Handicap Asiático positivo (+0.5/+1) para o favorito do mercado.
-- NUNCA recomende Handicap Asiático negativo (-0.5/-1) para o azarão.
-- Para favorito: prefira Vitória reta, Dupla Chance favorito+empate ou Handicap -0.25.
-- Para azarão: prefira Dupla Chance azarão+empate, Empate Anula Aposta ou Handicap +0.5/+1.
+# REGRAS ANTI-CONTRADIÇÃO
+- NUNCA Handicap + para o favorito; NUNCA Handicap − para o azarão.
+- Favorito: Vitória reta, Dupla Chance favorito+empate ou Handicap -0.25.
+- Azarão: Dupla Chance azarão+empate, Empate Anula Aposta ou Handicap +0.5/+1.
 
-# SAÍDA
-Devolva APENAS um JSON válido, sem markdown, no formato:
-{
-  "cenario": "1 a 3 frases. Tipo de jogo, contexto, quem é favorito segundo o consenso e o porquê.",
-  "pontoAtencao": "Começa OBRIGATORIAMENTE com: 'Leitura baseada em pesquisa externa (sem histórico estatístico interno desta partida).' Depois 1 a 3 frases sobre fatores como rotação, desfalques, intensidade esperada.",
-  "veredito": "1 a 3 frases. Mercado/tendência sugerida com base no seu conhecimento. Pode dizer 'sem valor claro' se for o caso.",
-  "risco": "baixo" | "medio" | "alto"
-}`;
+${DETAIL_SCHEMA_BLOCK}`;
 
 function pickFavorito(probs: { home?: number; draw?: number; away?: number } | null | undefined): string | null {
   if (!probs) return null;
@@ -261,7 +267,6 @@ function buildUserPayload(input: any): string {
 function safeParseAnalyst(raw: string): any | null {
   if (!raw) return null;
   let txt = raw.trim();
-  // remove cercas markdown se vierem
   txt = txt.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   const start = txt.indexOf("{");
   const end = txt.lastIndexOf("}");
@@ -274,7 +279,42 @@ function safeParseAnalyst(raw: string): any | null {
     const veredito = String(obj.veredito || "").trim();
     const risco = ["baixo", "medio", "alto"].includes(obj.risco) ? obj.risco : "medio";
     if (!cenario || !pontoAtencao || !veredito) return null;
-    return { cenario, pontoAtencao, veredito, risco };
+    const pickStr = (v: any) => (typeof v === "string" ? v.trim() : "");
+    const cd = obj.contextoDetalhado || obj.contexto_detalhado || {};
+    const mk = obj.mercados || {};
+    const od = obj.oddsReferencia || obj.odds_referencia || {};
+    return {
+      cenario,
+      pontoAtencao,
+      veredito,
+      risco,
+      contextoDetalhado: {
+        desfalques: pickStr(cd.desfalques),
+        arbitro: pickStr(cd.arbitro),
+        clima: pickStr(cd.clima),
+        motivacao: pickStr(cd.motivacao),
+      },
+      mercados: {
+        vitoria: pickStr(mk.vitoria),
+        duplaChance: pickStr(mk.duplaChance || mk.dupla_chance),
+        handicap: pickStr(mk.handicap),
+        overUnderGols: pickStr(mk.overUnderGols || mk.over_under_gols),
+        btts: pickStr(mk.btts),
+        escanteios: pickStr(mk.escanteios),
+        cartoes: pickStr(mk.cartoes),
+        placarExato: pickStr(mk.placarExato || mk.placar_exato),
+      },
+      oddsReferencia: {
+        casa: pickStr(od.casa),
+        empate: pickStr(od.empate),
+        fora: pickStr(od.fora),
+        over25: pickStr(od.over25),
+        under25: pickStr(od.under25),
+        bttsSim: pickStr(od.bttsSim || od.btts_sim),
+        escanteiosOver9: pickStr(od.escanteiosOver9 || od.escanteios_over9),
+        cartoesOver4: pickStr(od.cartoesOver4 || od.cartoes_over4),
+      },
+    };
   } catch {
     return null;
   }

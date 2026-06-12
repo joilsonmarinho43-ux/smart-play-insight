@@ -12,6 +12,32 @@ export interface AnalystReading {
   pontoAtencao: string;
   veredito: string;
   risco: "baixo" | "medio" | "alto";
+  contextoDetalhado?: {
+    desfalques?: string;
+    arbitro?: string;
+    clima?: string;
+    motivacao?: string;
+  };
+  mercados?: {
+    vitoria?: string;
+    duplaChance?: string;
+    handicap?: string;
+    overUnderGols?: string;
+    btts?: string;
+    escanteios?: string;
+    cartoes?: string;
+    placarExato?: string;
+  };
+  oddsReferencia?: {
+    casa?: string;
+    empate?: string;
+    fora?: string;
+    over25?: string;
+    under25?: string;
+    bttsSim?: string;
+    escanteiosOver9?: string;
+    cartoesOver4?: string;
+  };
 }
 
 interface State {

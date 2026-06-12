@@ -309,79 +309,79 @@ const AnalystBlock = ({
         </div>
       )}
       {analyst && (
-        <div className="space-y-2.5 text-[14px] leading-relaxed text-foreground">
+        <div className="space-y-3 text-[16px] leading-7 text-foreground">
           <div>
-            <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block mb-0.5">
+            <span className="text-xs uppercase tracking-wider font-bold text-primary block mb-1">
               Cenário
             </span>
             <p>{analyst.cenario}</p>
           </div>
           <div>
-            <span className="text-[10px] uppercase tracking-wider font-bold text-amber-400/90 block mb-0.5">
+            <span className="text-xs uppercase tracking-wider font-bold text-amber-300 block mb-1">
               Ponto de Atenção
             </span>
             <p>{analyst.pontoAtencao}</p>
           </div>
 
           {analyst.contextoDetalhado && (
-            <div className="rounded-lg border border-border bg-background/40 p-2.5 space-y-1.5">
-              <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block">
+            <div className="rounded-lg border border-border bg-background/70 p-3 space-y-2">
+              <span className="text-xs uppercase tracking-wider font-bold text-primary block">
                 Contexto Detalhado
               </span>
               {analyst.contextoDetalhado.desfalques && (
-                <p><span className="font-bold text-foreground">Desfalques:</span> {analyst.contextoDetalhado.desfalques}</p>
+                <p><span className="font-bold text-primary">Desfalques:</span> {analyst.contextoDetalhado.desfalques}</p>
               )}
               {analyst.contextoDetalhado.arbitro && (
-                <p><span className="font-bold text-foreground">Árbitro:</span> {analyst.contextoDetalhado.arbitro}</p>
+                <p><span className="font-bold text-primary">Árbitro:</span> {analyst.contextoDetalhado.arbitro}</p>
               )}
               {analyst.contextoDetalhado.clima && (
-                <p><span className="font-bold text-foreground">Clima:</span> {analyst.contextoDetalhado.clima}</p>
+                <p><span className="font-bold text-primary">Clima:</span> {analyst.contextoDetalhado.clima}</p>
               )}
               {analyst.contextoDetalhado.motivacao && (
-                <p><span className="font-bold text-foreground">Motivação:</span> {analyst.contextoDetalhado.motivacao}</p>
+                <p><span className="font-bold text-primary">Motivação:</span> {analyst.contextoDetalhado.motivacao}</p>
               )}
             </div>
           )}
 
           {analyst.mercados && (
-            <div className="rounded-lg border border-primary/30 bg-background/40 p-2.5 space-y-1.5">
-              <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block">
+            <div className="rounded-lg border border-primary/40 bg-background/70 p-3 space-y-2">
+              <span className="text-xs uppercase tracking-wider font-bold text-primary block">
                 Análise por Mercado
               </span>
-              {analyst.mercados.vitoria && (<p><span className="font-bold text-foreground">Vitória (1X2):</span> {analyst.mercados.vitoria}</p>)}
-              {analyst.mercados.duplaChance && (<p><span className="font-bold text-foreground">Dupla Chance:</span> {analyst.mercados.duplaChance}</p>)}
-              {analyst.mercados.handicap && (<p><span className="font-bold text-foreground">Handicap Asiático:</span> {analyst.mercados.handicap}</p>)}
-              {analyst.mercados.overUnderGols && (<p><span className="font-bold text-foreground">Over/Under Gols:</span> {analyst.mercados.overUnderGols}</p>)}
-              {analyst.mercados.btts && (<p><span className="font-bold text-foreground">Ambas Marcam:</span> {analyst.mercados.btts}</p>)}
-              {analyst.mercados.escanteios && (<p><span className="font-bold text-foreground">Escanteios:</span> {analyst.mercados.escanteios}</p>)}
-              {analyst.mercados.cartoes && (<p><span className="font-bold text-foreground">Cartões:</span> {analyst.mercados.cartoes}</p>)}
-              {analyst.mercados.placarExato && (<p><span className="font-bold text-foreground">Placar Provável:</span> {analyst.mercados.placarExato}</p>)}
+              {analyst.mercados.vitoria && (<p><span className="font-bold text-primary">Vitória (1X2):</span> {analyst.mercados.vitoria}</p>)}
+              {analyst.mercados.duplaChance && (<p><span className="font-bold text-primary">Dupla Chance:</span> {analyst.mercados.duplaChance}</p>)}
+              {analyst.mercados.handicap && (<p><span className="font-bold text-primary">Handicap Asiático:</span> {analyst.mercados.handicap}</p>)}
+              {analyst.mercados.overUnderGols && (<p><span className="font-bold text-primary">Over/Under Gols:</span> {analyst.mercados.overUnderGols}</p>)}
+              {analyst.mercados.btts && (<p><span className="font-bold text-primary">Ambas Marcam:</span> {analyst.mercados.btts}</p>)}
+              {analyst.mercados.escanteios && (<p><span className="font-bold text-primary">Escanteios:</span> {analyst.mercados.escanteios}</p>)}
+              {analyst.mercados.cartoes && (<p><span className="font-bold text-primary">Cartões:</span> {analyst.mercados.cartoes}</p>)}
+              {analyst.mercados.placarExato && (<p><span className="font-bold text-primary">Placar Provável:</span> {analyst.mercados.placarExato}</p>)}
             </div>
           )}
 
           {analyst.oddsReferencia && Object.values(analyst.oddsReferencia).some(Boolean) && (
-            <div className="rounded-lg border border-border bg-background/40 p-2.5">
-              <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block mb-1.5">
+            <div className="rounded-lg border border-primary/40 bg-background/80 p-3">
+              <span className="text-xs uppercase tracking-wider font-bold text-primary block mb-2">
                 Odds Justas Estimadas
               </span>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[13px]">
-                {analyst.oddsReferencia.casa && (<div><span className="text-muted-foreground">Casa:</span> <span className="font-display font-bold">{analyst.oddsReferencia.casa}</span></div>)}
-                {analyst.oddsReferencia.empate && (<div><span className="text-muted-foreground">Empate:</span> <span className="font-display font-bold">{analyst.oddsReferencia.empate}</span></div>)}
-                {analyst.oddsReferencia.fora && (<div><span className="text-muted-foreground">Fora:</span> <span className="font-display font-bold">{analyst.oddsReferencia.fora}</span></div>)}
-                {analyst.oddsReferencia.over25 && (<div><span className="text-muted-foreground">Over 2.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.over25}</span></div>)}
-                {analyst.oddsReferencia.under25 && (<div><span className="text-muted-foreground">Under 2.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.under25}</span></div>)}
-                {analyst.oddsReferencia.bttsSim && (<div><span className="text-muted-foreground">BTTS Sim:</span> <span className="font-display font-bold">{analyst.oddsReferencia.bttsSim}</span></div>)}
-                {analyst.oddsReferencia.escanteiosOver9 && (<div><span className="text-muted-foreground">Esc. +9.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.escanteiosOver9}</span></div>)}
-                {analyst.oddsReferencia.cartoesOver4 && (<div><span className="text-muted-foreground">Cart. +4.5:</span> <span className="font-display font-bold">{analyst.oddsReferencia.cartoesOver4}</span></div>)}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[15px]">
+                {analyst.oddsReferencia.casa && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Casa:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.casa}</span></div>)}
+                {analyst.oddsReferencia.empate && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Empate:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.empate}</span></div>)}
+                {analyst.oddsReferencia.fora && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Fora:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.fora}</span></div>)}
+                {analyst.oddsReferencia.over25 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Over 2.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.over25}</span></div>)}
+                {analyst.oddsReferencia.under25 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Under 2.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.under25}</span></div>)}
+                {analyst.oddsReferencia.bttsSim && (<div className="flex justify-between gap-2"><span className="text-foreground/90">BTTS Sim:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.bttsSim}</span></div>)}
+                {analyst.oddsReferencia.escanteiosOver9 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Esc. +9.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.escanteiosOver9}</span></div>)}
+                {analyst.oddsReferencia.cartoesOver4 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Cart. +4.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.cartoesOver4}</span></div>)}
               </div>
             </div>
           )}
 
-          <div>
-            <span className="text-[10px] uppercase tracking-wider font-bold text-primary/80 block mb-0.5">
+          <div className="rounded-lg border border-amber-400/50 bg-amber-500/10 p-3">
+            <span className="text-xs uppercase tracking-wider font-bold text-amber-300 block mb-1">
               Veredito de Valor
             </span>
-            <p className="font-medium">{analyst.veredito}</p>
+            <p className="font-semibold text-foreground">{analyst.veredito}</p>
           </div>
         </div>
       )}

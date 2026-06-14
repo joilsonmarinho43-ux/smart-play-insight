@@ -48,6 +48,8 @@ const Diagnostics = () => {
   const [matchesByDate, setMatchesByDate] = useState<Record<string, MatchData[]>>({});
   const [log, setLog] = useState(getProviderLog());
   const [alerts, setAlerts] = useState<HealthAlert[]>(getAlerts());
+  const [wcSignals, setWcSignals] = useState<any[]>([]);
+  const [wcLoading, setWcLoading] = useState(false);
 
   const dates = useMemo(() => buildDates(DAYS), []);
   const sources = useMemo(() => listSources(), []);

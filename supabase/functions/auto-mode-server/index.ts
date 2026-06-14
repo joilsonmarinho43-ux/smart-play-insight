@@ -61,6 +61,10 @@ const UNSTABLE_PATTERNS = [
 function getLeagueWeight(league: string): number {
   const l = (league || '').toLowerCase();
   if (!l) return 0;
+  // 🌍 Copa do Mundo FIFA tem prioridade ABSOLUTA — passa por cima de
+  // qualquer match em UNSTABLE_PATTERNS (ex: "Friendlies International"
+  // de preparação para a Copa) e recebe o maior peso possível.
+  if (isWorldCupLeague(l)) return 6;
   if (ELITE_LEAGUES.some((k) => l.includes(k))) return 5;
   if (UNSTABLE_PATTERNS.some((k) => l.includes(k))) return -5;
   return 0;

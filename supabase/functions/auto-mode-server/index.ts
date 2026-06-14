@@ -390,6 +390,10 @@ Deno.serve(async (req) => {
     const nowTs = Date.now();
     for (const match of matches) {
       const s = extractStats(match);
+      const isWC = isWorldCupLeague(s.league);
+      if (isWC) {
+        console.log(`[WORLD_CUP_DETECTED] ${s.homeTeam} vs ${s.awayTeam} | liga="${s.league}" min:${s.minute} sog:${s.sog} da:${s.da}${s.daEstimated?'≈':''} score:${s.homeGoals}-${s.awayGoals}`);
+      }
       if (s.hasStats) {
         console.log(`[AUTO-MODE-SERVER] ${s.homeTeam} vs ${s.awayTeam} | min:${s.minute} sog:${s.sog} da:${s.da}${s.daEstimated?'≈':''} crn:${s.corners} poss:${s.dominantPoss} prs:${Math.round(s.pressure)} score:${s.homeGoals}-${s.awayGoals}`);
       }

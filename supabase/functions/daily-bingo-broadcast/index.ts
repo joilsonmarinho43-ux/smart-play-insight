@@ -6,6 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, escapeHtml, enqueueTelegramOutbox } from '../_shared/telegram.ts';
 import { brTodayDate, brTime, brDate, brHour, APP_TZ } from '../_shared/timezone.ts';
+import { isWorldCupLeague } from '../_shared/worldCup.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -142,13 +143,19 @@ async function fetchLearningAdjustments(sb: any): Promise<LearnAdjust> {
 function analyzeMatch(m: any): MatchAnalysis | null {
   const league = (m.league?.name || m.league || '').toString();
   if (!league) return null;
-  if (UNSTABLE.some(t => league.toLowerCase().includes(t))) return null;
+  // 🌍 Copa do Mundo FIFA tem prioridade absoluta — bypass do filtro UNSTABLE
+  // (que normalmente bloqueia "Friendlies International", "Amistosos", etc.)
+  const isWC = isWorldCupLeague(league);
+  if (!isWC && UNSTABLE.some(t => league.toLowerCase().includes(t))) return null;
+  if (isWC) console.log(`[WORLD_CUP_DETECTED] bingo analyze: ${m.teams?.home?.name || ''} vs ${m.teams?.away?.name || ''} • liga="${league}"`);
 
   const hStats = m.homeStats || {};
   const aStats = m.awayStats || {};
   const hGames = safeNum(hStats.gamesCount);
   const aGames = safeNum(aStats.gamesCount);
-  if (hGames < 3 || aGames < 3) return null;
+  // Seleções normalmente têm pouquíssimos jogos no ciclo da Copa — relaxa o mínimo.
+  const minGames = isWC ? 1 : 3;
+  if (hGames < minGames || aGames < minGames) return null;
 
   const leagueAvg = safeNum(hStats.leagueAvg || aStats.leagueAvg, 1.30);
   const k = 3;
@@ -417,9 +424,16 @@ Deno.serve(async (req) => {
       return h > nowBrtH || (h === nowBrtH && Number.isFinite(mn) && mn >= 0);
     });
 
-    upcoming.sort((a, b) => b.premiumScore - a.premiumScore);
+    // 🌍 PRIORIDADE: Copa do Mundo FIFA primeiro, depois premiumScore
+    upcoming.sort((a, b) => {
+      const wcA = isWorldCupLeague(a.league) ? 1 : 0;
+      const wcB = isWorldCupLeague(b.league) ? 1 : 0;
+      if (wcA !== wcB) return wcB - wcA;
+      return b.premiumScore - a.premiumScore;
+    });
     const top = upcoming.slice(0, 8);
-    console.log(`[BINGO] qualified=${analyses.length} upcoming=${upcoming.length} top=${top.length}`);
+    const wcInTop = top.filter(t => isWorldCupLeague(t.league)).length;
+    console.log(`[BINGO] qualified=${analyses.length} upcoming=${upcoming.length} top=${top.length} world_cup=${wcInTop}`);
 
     if (top.length === 0) {
       return new Response(JSON.stringify({ ok: true, picks: 0, message: 'no qualified picks' }), {
@@ -469,10 +483,13 @@ Deno.serve(async (req) => {
       }
 
       const text = buildPremiumMessage(a);
+      const isWC = isWorldCupLeague(a.league);
+      if (isWC) console.log(`[WORLD_CUP_SIGNAL_GENERATED] bingo match_id=${a.matchId} match="${a.homeTeam} vs ${a.awayTeam}" liga="${a.league}" markets=${evMarkets.length}`);
       const r = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, { tag: 'BINGO-PREMIUM' });
 
       if (r.ok) {
         sent++;
+        if (isWC) console.log(`[WORLD_CUP_TELEGRAM_SENT] bingo match_id=${a.matchId} match="${a.homeTeam} vs ${a.awayTeam}" liga="${a.league}"`);
         const msgId = r.data?.result?.message_id ?? null;
 
         const rows = evMarkets.map(mk => ({
@@ -483,7 +500,7 @@ Deno.serve(async (req) => {
           minute: 0,
           confidence: Math.round(mk.adjustedProb),
           score: '0-0',
-          reason: 'daily-bingo-premium',
+          reason: isWC ? 'daily-bingo-premium • 🌍 World Cup' : 'daily-bingo-premium',
           sensitivity: 'PRE',
           success: null,
           status: 'pendente',
@@ -497,11 +514,13 @@ Deno.serve(async (req) => {
         const { error: insErr } = await sb.from('telegram_signals').insert(rows);
         if (insErr) {
           console.error('[BINGO] insert signals failed:', insErr.message);
+          if (isWC) console.error(`[WORLD_CUP_ERROR] bingo insert falhou match="${a.homeTeam} vs ${a.awayTeam}": ${insErr.message}`);
         } else {
           signalsSaved += rows.length;
         }
       } else {
         console.error('[TELEGRAM] fail:', r.status, r.error || JSON.stringify(r.data || {}));
+        if (isWC) console.error(`[WORLD_CUP_ERROR] bingo envio Telegram falhou match="${a.homeTeam} vs ${a.awayTeam}" liga="${a.league}": ${r.error || JSON.stringify(r.data || {})}`);
         await enqueueTelegramOutbox(sb, {
           chat_id: TELEGRAM_CHAT_ID, text, source: 'daily-bingo-broadcast',
           last_error: r.error || JSON.stringify(r.data || {}),

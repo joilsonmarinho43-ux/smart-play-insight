@@ -11,7 +11,8 @@ import {
 import { getAlerts, clearAlerts, runHealthCheck, type HealthAlert } from '@/services/dataProvider/healthAlerts';
 import { getTodayInPara, APP_TIMEZONE } from '@/lib/timezone';
 import { MatchData } from '@/types/match';
-import { Bell, Trash2 } from 'lucide-react';
+import { Bell, Trash2, Trophy } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const DAYS = 3;
 
@@ -47,6 +48,8 @@ const Diagnostics = () => {
   const [matchesByDate, setMatchesByDate] = useState<Record<string, MatchData[]>>({});
   const [log, setLog] = useState(getProviderLog());
   const [alerts, setAlerts] = useState<HealthAlert[]>(getAlerts());
+  const [wcSignals, setWcSignals] = useState<any[]>([]);
+  const [wcLoading, setWcLoading] = useState(false);
 
   const dates = useMemo(() => buildDates(DAYS), []);
   const sources = useMemo(() => listSources(), []);
@@ -70,8 +73,26 @@ const Diagnostics = () => {
     }
   };
 
+  const loadWorldCup = async () => {
+    setWcLoading(true);
+    try {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('telegram_signals')
+        .select('id, created_at, match_id, match_name, market, minute, confidence, success, status, reason, error_message')
+        .or('reason.ilike.%world cup%,reason.ilike.%🌍%,match_name.ilike.%fifa%')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!error) setWcSignals(data || []);
+    } finally {
+      setWcLoading(false);
+    }
+  };
+
   useEffect(() => {
     run();
+    loadWorldCup();
     const onAlert = () => setAlerts(getAlerts());
     window.addEventListener('dp:health-alert', onAlert);
     return () => window.removeEventListener('dp:health-alert', onAlert);
@@ -199,6 +220,68 @@ const Diagnostics = () => {
             </div>
           )}
         </section>
+
+        {/* 🌍 Monitor Copa do Mundo FIFA — sinais detectados/enviados nos últimos 7 dias */}
+        <section className="bg-gradient-to-br from-amber-950/40 to-zinc-900/60 border border-amber-500/30 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-400" />
+              Copa do Mundo FIFA — Sinais Telegram (7d)
+            </h2>
+            <button
+              onClick={loadWorldCup}
+              disabled={wcLoading}
+              className="text-xs px-3 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 disabled:opacity-50 flex items-center gap-1"
+            >
+              {wcLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Atualizar
+            </button>
+          </div>
+          {(() => {
+            const total = wcSignals.length;
+            const sent = wcSignals.filter(s => s.success === true).length;
+            const failed = wcSignals.filter(s => s.success === false).length;
+            const pending = total - sent - failed;
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3 text-sm">
+                <div className="bg-black/30 rounded p-2"><div className="text-[10px] text-amber-300/70">Total</div><div className="font-bold text-amber-200">{total}</div></div>
+                <div className="bg-black/30 rounded p-2"><div className="text-[10px] text-emerald-300/70">Enviados</div><div className="font-bold text-emerald-300">{sent}</div></div>
+                <div className="bg-black/30 rounded p-2"><div className="text-[10px] text-red-300/70">Falhas</div><div className="font-bold text-red-300">{failed}</div></div>
+                <div className="bg-black/30 rounded p-2"><div className="text-[10px] text-yellow-300/70">Pendentes</div><div className="font-bold text-yellow-300">{pending}</div></div>
+              </div>
+            );
+          })()}
+          {wcSignals.length === 0 ? (
+            <div className="text-sm text-amber-300/60 py-3">
+              Nenhum sinal da Copa do Mundo registrado nos últimos 7 dias. {' '}
+              <span className="text-amber-400/80">Verifique os logs do edge function <code className="text-xs bg-black/40 px-1">auto-mode-server</code> e <code className="text-xs bg-black/40 px-1">daily-bingo-broadcast</code> filtrando por <code className="text-xs bg-black/40 px-1">[WORLD_CUP_</code>.</span>
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto divide-y divide-amber-900/30 text-sm">
+              {wcSignals.map(s => (
+                <div key={s.id} className="py-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-amber-100 truncate">⚽ {s.match_name}</div>
+                    <div className="text-xs text-amber-300/70 truncate">{s.market} · min {s.minute ?? '—'} · conf {s.confidence ?? '—'}%</div>
+                    {s.error_message && <div className="text-[10px] text-red-300 truncate">{s.error_message}</div>}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                      s.success === true ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
+                      s.success === false ? 'bg-red-500/20 text-red-300 border-red-500/40' :
+                      'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
+                    }`}>
+                      {s.success === true ? 'enviado' : s.success === false ? 'falha' : (s.status || 'pendente')}
+                    </span>
+                    <div className="text-[10px] text-amber-300/50 mt-0.5">{new Date(s.created_at).toLocaleString('pt-BR')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+
 
         {/* Fontes registradas */}
         <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4">

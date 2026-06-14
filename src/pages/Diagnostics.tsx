@@ -73,6 +73,23 @@ const Diagnostics = () => {
     }
   };
 
+  const loadWorldCup = async () => {
+    setWcLoading(true);
+    try {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('telegram_signals')
+        .select('id, created_at, match_id, match_name, market, minute, confidence, success, status, reason, error_message')
+        .or('reason.ilike.%world cup%,reason.ilike.%🌍%,match_name.ilike.%fifa%')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!error) setWcSignals(data || []);
+    } finally {
+      setWcLoading(false);
+    }
+  };
+
   useEffect(() => {
     run();
     const onAlert = () => setAlerts(getAlerts());

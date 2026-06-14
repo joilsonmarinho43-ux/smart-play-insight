@@ -483,10 +483,13 @@ Deno.serve(async (req) => {
       }
 
       const text = buildPremiumMessage(a);
+      const isWC = isWorldCupLeague(a.league);
+      if (isWC) console.log(`[WORLD_CUP_SIGNAL_GENERATED] bingo match_id=${a.matchId} match="${a.homeTeam} vs ${a.awayTeam}" liga="${a.league}" markets=${evMarkets.length}`);
       const r = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, { tag: 'BINGO-PREMIUM' });
 
       if (r.ok) {
         sent++;
+        if (isWC) console.log(`[WORLD_CUP_TELEGRAM_SENT] bingo match_id=${a.matchId} match="${a.homeTeam} vs ${a.awayTeam}" liga="${a.league}"`);
         const msgId = r.data?.result?.message_id ?? null;
 
         const rows = evMarkets.map(mk => ({
@@ -497,7 +500,7 @@ Deno.serve(async (req) => {
           minute: 0,
           confidence: Math.round(mk.adjustedProb),
           score: '0-0',
-          reason: 'daily-bingo-premium',
+          reason: isWC ? 'daily-bingo-premium • 🌍 World Cup' : 'daily-bingo-premium',
           sensitivity: 'PRE',
           success: null,
           status: 'pendente',
@@ -511,11 +514,13 @@ Deno.serve(async (req) => {
         const { error: insErr } = await sb.from('telegram_signals').insert(rows);
         if (insErr) {
           console.error('[BINGO] insert signals failed:', insErr.message);
+          if (isWC) console.error(`[WORLD_CUP_ERROR] bingo insert falhou match="${a.homeTeam} vs ${a.awayTeam}": ${insErr.message}`);
         } else {
           signalsSaved += rows.length;
         }
       } else {
         console.error('[TELEGRAM] fail:', r.status, r.error || JSON.stringify(r.data || {}));
+        if (isWC) console.error(`[WORLD_CUP_ERROR] bingo envio Telegram falhou match="${a.homeTeam} vs ${a.awayTeam}" liga="${a.league}": ${r.error || JSON.stringify(r.data || {})}`);
         await enqueueTelegramOutbox(sb, {
           chat_id: TELEGRAM_CHAT_ID, text, source: 'daily-bingo-broadcast',
           last_error: r.error || JSON.stringify(r.data || {}),

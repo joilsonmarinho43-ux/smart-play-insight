@@ -142,13 +142,19 @@ async function fetchLearningAdjustments(sb: any): Promise<LearnAdjust> {
 function analyzeMatch(m: any): MatchAnalysis | null {
   const league = (m.league?.name || m.league || '').toString();
   if (!league) return null;
-  if (UNSTABLE.some(t => league.toLowerCase().includes(t))) return null;
+  // 🌍 Copa do Mundo FIFA tem prioridade absoluta — bypass do filtro UNSTABLE
+  // (que normalmente bloqueia "Friendlies International", "Amistosos", etc.)
+  const isWC = isWorldCupLeague(league);
+  if (!isWC && UNSTABLE.some(t => league.toLowerCase().includes(t))) return null;
+  if (isWC) console.log(`[WORLD_CUP_DETECTED] bingo analyze: ${m.teams?.home?.name || ''} vs ${m.teams?.away?.name || ''} • liga="${league}"`);
 
   const hStats = m.homeStats || {};
   const aStats = m.awayStats || {};
   const hGames = safeNum(hStats.gamesCount);
   const aGames = safeNum(aStats.gamesCount);
-  if (hGames < 3 || aGames < 3) return null;
+  // Seleções normalmente têm pouquíssimos jogos no ciclo da Copa — relaxa o mínimo.
+  const minGames = isWC ? 1 : 3;
+  if (hGames < minGames || aGames < minGames) return null;
 
   const leagueAvg = safeNum(hStats.leagueAvg || aStats.leagueAvg, 1.30);
   const k = 3;

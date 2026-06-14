@@ -424,9 +424,16 @@ Deno.serve(async (req) => {
       return h > nowBrtH || (h === nowBrtH && Number.isFinite(mn) && mn >= 0);
     });
 
-    upcoming.sort((a, b) => b.premiumScore - a.premiumScore);
+    // 🌍 PRIORIDADE: Copa do Mundo FIFA primeiro, depois premiumScore
+    upcoming.sort((a, b) => {
+      const wcA = isWorldCupLeague(a.league) ? 1 : 0;
+      const wcB = isWorldCupLeague(b.league) ? 1 : 0;
+      if (wcA !== wcB) return wcB - wcA;
+      return b.premiumScore - a.premiumScore;
+    });
     const top = upcoming.slice(0, 8);
-    console.log(`[BINGO] qualified=${analyses.length} upcoming=${upcoming.length} top=${top.length}`);
+    const wcInTop = top.filter(t => isWorldCupLeague(t.league)).length;
+    console.log(`[BINGO] qualified=${analyses.length} upcoming=${upcoming.length} top=${top.length} world_cup=${wcInTop}`);
 
     if (top.length === 0) {
       return new Response(JSON.stringify({ ok: true, picks: 0, message: 'no qualified picks' }), {

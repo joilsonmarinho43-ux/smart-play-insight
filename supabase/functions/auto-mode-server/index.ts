@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynamicConfidence.ts';
+import { isWorldCupLeague } from '../_shared/worldCup.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

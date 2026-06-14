@@ -438,14 +438,31 @@ Deno.serve(async (req) => {
       signal.filtersValidated = `${signal.filtersValidated} • lw${leagueWeight >= 0 ? '+' : ''}${leagueWeight} • mom${safeMomentum >= 0 ? '+' : ''}${safeMomentum}`;
 
       signalsToSend.push(signal);
+      if (isWorldCupLeague(signal.league)) {
+        console.log(`[WORLD_CUP_SIGNAL_GENERATED] match_id=${signal.matchId} match="${signal.match}" liga="${signal.league}" min=${signal.minute} market="${signal.market}" conf=${signal.confidence}% tier=${signal.tier}`);
+      }
       if (signalsToSend.length + dailyCount >= 25) break;
     }
 
+    // 🌍 PRIORIDADE DE ENVIO: Copa do Mundo > Internacionais > Ligas Nacionais.
+    // Reordena signalsToSend para que partidas da Copa sejam disparadas primeiro
+    // (importante quando o limite diário de 25 está próximo).
+    const leagueRank = (l: string): number => {
+      if (isWorldCupLeague(l)) return 0;
+      const lc = (l || '').toLowerCase();
+      if (lc.includes('champions') || lc.includes('europa') || lc.includes('libertad') || lc.includes('sudameric') || lc.includes('uefa') || lc.includes('conmebol')) return 1;
+      return 2;
+    };
+    signalsToSend.sort((a, b) => leagueRank(a.league) - leagueRank(b.league));
+
     console.log(`[AUTO-MODE-SERVER] ${signalsToSend.length} aprovados, ${rmaBlocked} bloqueados pelo RMA`);
+    const wcCount = signalsToSend.filter(s => isWorldCupLeague(s.league)).length;
+    if (wcCount > 0) console.log(`[WORLD_CUP_DETECTED] ${wcCount} sinais da Copa do Mundo serão enviados primeiro`);
 
     // 5. Send each signal via telegram-signal edge function
     let sentCount = 0;
     for (const signal of signalsToSend) {
+      const isWC = isWorldCupLeague(signal.league);
       try {
         const score = `${signal.homeGoals} x ${signal.awayGoals}`;
 
@@ -458,7 +475,7 @@ Deno.serve(async (req) => {
           sensitivity: signal.tier === 'SUPER_SNIPER' ? 'premium' : signal.tier === 'SNIPER' ? 'agressivo' : 'moderado',
           minute: signal.minute,
           score,
-          reason: `Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,
+          reason: `${isWC ? '🌍 World Cup • ' : ''}Auto-Mode • ${signal.label} • Pressão ${signal.pressure} • DA ${signal.dangerousAttacks}${signal.daEstimated ? '≈' : ''}`,
           pressure: signal.pressure,
           dangerousAttacks: signal.dangerousAttacks,
           totalShots: signal.totalShots,
@@ -479,12 +496,15 @@ Deno.serve(async (req) => {
         if (tgRes.ok && tgData.success) {
           sentCount++;
           console.log(`[AUTO-MODE-SERVER] ✅ ${signal.match} • ${signal.label}`);
+          if (isWC) console.log(`[WORLD_CUP_TELEGRAM_SENT] match_id=${signal.matchId} match="${signal.match}" liga="${signal.league}" min=${signal.minute} market="${signal.market}" conf=${signal.confidence}%`);
         } else {
           console.log(`[AUTO-MODE-SERVER] ❌ ${signal.match} • ${JSON.stringify(tgData)}`);
+          if (isWC) console.error(`[WORLD_CUP_ERROR] envio Telegram falhou match="${signal.match}" liga="${signal.league}" → ${JSON.stringify(tgData)}`);
         }
 
       } catch (err) {
         console.error(`[AUTO-MODE-SERVER] Erro ao enviar sinal:`, err);
+        if (isWC) console.error(`[WORLD_CUP_ERROR] exceção ao enviar match="${signal.match}" liga="${signal.league}":`, err);
       }
     }
 

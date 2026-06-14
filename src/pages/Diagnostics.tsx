@@ -92,6 +92,7 @@ const Diagnostics = () => {
 
   useEffect(() => {
     run();
+    loadWorldCup();
     const onAlert = () => setAlerts(getAlerts());
     window.addEventListener('dp:health-alert', onAlert);
     return () => window.removeEventListener('dp:health-alert', onAlert);

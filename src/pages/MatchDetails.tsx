@@ -38,8 +38,8 @@ const MatchDetails = () => {
   // Normalização: pré-jogo vem com m.fixture / m.teams; live vem com flat fields
   const view = useMemo(() => {
     if (!match) return null;
-    const homeTeam = match.homeTeam || match.teams?.home?.name || 'Casa';
-    const awayTeam = match.awayTeam || match.teams?.away?.name || 'Fora';
+    const homeTeam = localizeTeamName(match.homeTeam || match.teams?.home?.name) || 'Casa';
+    const awayTeam = localizeTeamName(match.awayTeam || match.teams?.away?.name) || 'Fora';
     const league = match.league?.name || match.league || '';
     const isLive = !!(match.minute || match.liveScore || match.liveStats);
     const dateIso = match.fixture?.date || match.date || null;

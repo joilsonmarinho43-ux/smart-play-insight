@@ -15,34 +15,45 @@ const isPreview =
 if ("serviceWorker" in navigator && !isInIframe && !isPreview) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js").then((reg) => {
-      // Listen for updates and trigger immediate activation
+      // Quando houver nova versão, ativa só quando a aba estiver oculta
+      // (evita "recarrega sozinho" no meio do uso)
       reg.addEventListener("updatefound", () => {
         const newWorker = reg.installing;
         if (!newWorker) return;
         newWorker.addEventListener("statechange", () => {
           if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-            newWorker.postMessage({ type: "SKIP_WAITING" });
+            const activateWhenHidden = () => {
+              if (document.visibilityState === "hidden") {
+                newWorker.postMessage({ type: "SKIP_WAITING" });
+                document.removeEventListener("visibilitychange", activateWhenHidden);
+              }
+            };
+            if (document.visibilityState === "hidden") {
+              newWorker.postMessage({ type: "SKIP_WAITING" });
+            } else {
+              document.addEventListener("visibilitychange", activateWhenHidden);
+            }
           }
         });
       });
     }).catch(() => {});
 
-    // Reload once when the new SW takes control (after activate)
+    // Só recarrega quando o usuário não está olhando a tela
     let reloaded = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (reloaded) return;
-      reloaded = true;
-      window.location.reload();
-    });
-
-    // React to SW broadcast messages
-    navigator.serviceWorker.addEventListener("message", (event) => {
-      if (event.data?.type === "SW_UPDATED") {
-        // Already handled by controllerchange in most cases; no-op fallback
-      }
+      const tryReload = () => {
+        if (document.visibilityState === "hidden") {
+          reloaded = true;
+          window.location.reload();
+        }
+      };
+      tryReload();
+      document.addEventListener("visibilitychange", tryReload);
     });
   });
 } else if (isInIframe || isPreview) {
+
   navigator.serviceWorker?.getRegistrations().then((regs) =>
     regs.forEach((r) => r.unregister())
   );

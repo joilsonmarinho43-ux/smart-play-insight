@@ -5,35 +5,30 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
   );
-  // Force the new SW to take over immediately on install
-  self.skipWaiting();
+  // NÃO chamar skipWaiting aqui — só ativa quando o cliente mandar a mensagem
+  // (evita reload automático no meio do uso)
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      // Drop ALL old caches (any name != current)
       const keys = await caches.keys();
       await Promise.all(
         keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
       );
-      // Take control of all open clients without requiring a reload
-      await self.clients.claim();
-      // Notify all clients so they can reload to pick up the new shell
-      const clients = await self.clients.matchAll({ type: "window" });
-      for (const client of clients) {
-        client.postMessage({ type: "SW_UPDATED", cache: CACHE_NAME });
-      }
+      // NÃO chamar clients.claim() — deixa a aba atual seguir com o SW antigo
+      // até ela ser fechada/recarregada naturalmente
     })()
   );
 });
 
-// Allow page to trigger immediate activation if needed
+// Página pode pedir ativação imediata quando achar seguro
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
 });
+
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;

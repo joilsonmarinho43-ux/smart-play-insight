@@ -5,6 +5,7 @@ import { ArrowLeft, BookOpen, Loader2 } from 'lucide-react';
 import { fetchLiveMatches, fetchMultiDayMatches } from '@/services/footballApi';
 import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from '@/components/MatchReadingModal';
+import { localizeTeamName } from '@/lib/teamI18n';
 
 
 const MatchDetails = () => {

@@ -114,8 +114,8 @@ const Index = () => {
 
       return {
         ...m,
-        homeTeam: m.teams?.home?.name || m.homeTeam || 'Casa',
-        awayTeam: m.teams?.away?.name || m.awayTeam || 'Fora',
+        homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
+        awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
         homeLogo: m.teams?.home?.logo,
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',

@@ -447,7 +447,7 @@ const LivePro = () => {
   const matchOptions = useMemo(() => {
     return (matches as any[]).map(m => ({
       id: String(m?.fixture?.id || m?.id),
-      label: `${m?.teams?.home?.name || m?.homeTeam || 'Casa'} vs ${m?.teams?.away?.name || m?.awayTeam || 'Fora'}`,
+      label: `${localizeTeamName(m?.teams?.home?.name || m?.homeTeam) || 'Casa'} vs ${localizeTeamName(m?.teams?.away?.name || m?.awayTeam) || 'Fora'}`,
       minute: m?.fixture?.status?.elapsed || m?.minute || 0,
       home: m?.goals?.home ?? 0, away: m?.goals?.away ?? 0,
     }));

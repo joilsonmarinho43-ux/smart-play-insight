@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Crosshair } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
+import { localizeTeamName } from '@/lib/teamI18n';
 import ScannerProPanel from '@/components/ScannerProPanel';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 

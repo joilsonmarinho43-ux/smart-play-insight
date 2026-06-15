@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMultiDayMatches, isOfflineMode, getOfflineSince } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
+import { localizeTeamName } from '@/lib/teamI18n';
 // World Cup matches are now shown on the Home tab as well (user request)
 
 import { useAuth } from '@/hooks/useAuth';

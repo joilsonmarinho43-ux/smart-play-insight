@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, Trophy } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
+import { localizeTeamName } from '@/lib/teamI18n';
 import TopWinsSuggestion from '@/components/TopWinsSuggestion';
 
 const Bingo = () => {
@@ -13,8 +14,8 @@ const Bingo = () => {
 
   const safeMatches = (matches || []).filter((m: any) => !isWorldCupLeague(m.league)).map((m: any) => ({
     ...m,
-    homeTeam: m.teams?.home?.name || m.homeTeam || 'Casa',
-    awayTeam: m.teams?.away?.name || m.awayTeam || 'Fora',
+    homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
+    awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
     homeLogo: m.teams?.home?.logo,
     awayLogo: m.teams?.away?.logo,
     league: m.league?.name || m.league || '',

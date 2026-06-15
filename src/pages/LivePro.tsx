@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { fetchLiveMatches } from '@/services/footballApi';
 import { analyzeLivePressure, generateLiveStrategy, recordPISnapshot, type PressureData, type PISnapshot, type LiveStrategy } from '@/lib/pressureEngine';
+import { localizeTeamName } from '@/lib/teamI18n';
 import { getCalibrationProfile, type CalibrationProfile } from '@/lib/calibrationEngine';
 import { calculateAPWindows, calculateLiveOddsDeviation, projectCornersByPeriod, type AttackPressureWindows, type OddsDeviation, type CornerPeriod } from '@/lib/eliteMetrics';
 import { classifyHybridSignal, type HybridSignal } from '@/lib/hybridEngine';
@@ -446,7 +447,7 @@ const LivePro = () => {
   const matchOptions = useMemo(() => {
     return (matches as any[]).map(m => ({
       id: String(m?.fixture?.id || m?.id),
-      label: `${m?.teams?.home?.name || m?.homeTeam || 'Casa'} vs ${m?.teams?.away?.name || m?.awayTeam || 'Fora'}`,
+      label: `${localizeTeamName(m?.teams?.home?.name || m?.homeTeam) || 'Casa'} vs ${localizeTeamName(m?.teams?.away?.name || m?.awayTeam) || 'Fora'}`,
       minute: m?.fixture?.status?.elapsed || m?.minute || 0,
       home: m?.goals?.home ?? 0, away: m?.goals?.away ?? 0,
     }));

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMultiDayMatches, isOfflineMode, getOfflineSince } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
+import { localizeTeamName } from '@/lib/teamI18n';
 // World Cup matches are now shown on the Home tab as well (user request)
 
 import { useAuth } from '@/hooks/useAuth';
@@ -113,8 +114,8 @@ const Index = () => {
 
       return {
         ...m,
-        homeTeam: m.teams?.home?.name || m.homeTeam || 'Casa',
-        awayTeam: m.teams?.away?.name || m.awayTeam || 'Fora',
+        homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
+        awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
         homeLogo: m.teams?.home?.logo,
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',

@@ -5,6 +5,7 @@ import MatchCard from '@/components/MatchCard';
 import { Loader2, RefreshCw, Trash2, WifiOff, Trophy, Info } from 'lucide-react';
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from "@/lib/timezone";
+import { localizeTeamName } from "@/lib/teamI18n";
 
 /** Identifica jogos da Copa do Mundo / Eliminatórias / Amistosos de seleções. */
 const WC_LEAGUE_PATTERNS = [
@@ -90,8 +91,8 @@ const WorldCup = () => {
 
         return {
           ...m,
-          homeTeam: m.teams?.home?.name || m.homeTeam || 'Casa',
-          awayTeam: m.teams?.away?.name || m.awayTeam || 'Fora',
+          homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
+          awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
           homeLogo: m.teams?.home?.logo,
           awayLogo: m.teams?.away?.logo,
           league: m.league?.name || m.league || '',

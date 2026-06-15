@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Crosshair } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
+import { localizeTeamName } from '@/lib/teamI18n';
 import ScannerProPanel from '@/components/ScannerProPanel';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
@@ -16,8 +17,8 @@ const Scanner = () => {
 
   const safeMatches = (matches || []).filter((m: any) => !isWorldCupLeague(m.league)).map((m: any) => ({
     ...m,
-    homeTeam: m.teams?.home?.name || m.homeTeam || 'Casa',
-    awayTeam: m.teams?.away?.name || m.awayTeam || 'Fora',
+    homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
+    awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
     league: m.league?.name || m.league || '',
     time: m.fixture?.date
       ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))

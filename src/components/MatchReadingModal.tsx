@@ -34,6 +34,55 @@ interface Props {
   context?: MatchContext | null;
   analyst?: AnalystReading | null;
   analystLoading?: boolean;
+  fallback?: {
+    source: string;
+    confidence_score: number;
+    lowConfidence: boolean;
+    missing: string[];
+  } | null;
+}
+
+const sourceLabel: Record<string, string> = {
+  "api-football": "API oficial",
+  "thesportsdb": "Fonte alternativa",
+  "historical": "Histórico armazenado",
+  "mixed": "Fontes combinadas",
+  "none": "Sem dados",
+};
+
+function ConfidenceBadge({
+  fallback,
+}: {
+  fallback: NonNullable<Props["fallback"]>;
+}) {
+  const { confidence_score, source, lowConfidence, missing } = fallback;
+  if (confidence_score >= 100) return null; // API-Football fresh = sem badge
+  const cls = lowConfidence
+    ? "bg-red-500/15 text-red-300 border-red-500/40"
+    : confidence_score >= 90
+      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+      : "bg-amber-500/15 text-amber-300 border-amber-500/40";
+  return (
+    <div className={`mt-2 rounded-lg border px-3 py-2 text-[11px] ${cls}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold uppercase tracking-wider">
+          Confiança {confidence_score}%
+        </span>
+        <span className="opacity-80">{sourceLabel[source] ?? source}</span>
+      </div>
+      {lowConfidence && (
+        <div className="mt-1 opacity-90">
+          Dados parciais — análise conservadora. Sinais automáticos suspensos.
+        </div>
+      )}
+      {!lowConfidence && missing && missing.length > 0 && (
+        <div className="mt-1 opacity-75">
+          Sem dado para: {missing.slice(0, 3).join(", ")}
+          {missing.length > 3 ? "…" : ""}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const Section = ({

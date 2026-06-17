@@ -191,6 +191,7 @@ function buildUserPayload(input: any): string {
   const r = input.reading || {};
   const c = input.context || {};
   const odds = c.odds || {};
+  const fb = input.fallbackStats || null;
 
   const probsPct = normalizeProbs(m.matchProbabilities);
   const favModelo = pickFavorito(probsPct);

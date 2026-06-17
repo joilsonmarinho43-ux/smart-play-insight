@@ -113,6 +113,45 @@ export type Database = {
         }
         Relationships: []
       }
+      fallback_logs: {
+        Row: {
+          api_football_failed: boolean
+          cache_hit: boolean
+          confidence_score: number | null
+          created_at: string
+          error_message: string | null
+          id: string
+          latency_ms: number | null
+          match_id: string | null
+          signals_generated: number
+          source_used: string
+        }
+        Insert: {
+          api_football_failed?: boolean
+          cache_hit?: boolean
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          match_id?: string | null
+          signals_generated?: number
+          source_used: string
+        }
+        Update: {
+          api_football_failed?: boolean
+          cache_hit?: boolean
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          match_id?: string | null
+          signals_generated?: number
+          source_used?: string
+        }
+        Relationships: []
+      }
       hybrid_entries: {
         Row: {
           away_goals: number
@@ -188,6 +227,81 @@ export type Database = {
           total_shots?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      match_stats_fallback: {
+        Row: {
+          avg_corners: number | null
+          avg_goals: number | null
+          away_form: string | null
+          away_team: string
+          btts_pct: number | null
+          clean_sheets_pct: number | null
+          confidence_score: number
+          created_at: string
+          h2h_json: Json | null
+          home_form: string | null
+          home_team: string
+          id: string
+          kickoff_at: string | null
+          league: string | null
+          match_id: string
+          over05_pct: number | null
+          over15_pct: number | null
+          over25_pct: number | null
+          over35_pct: number | null
+          raw_payload: Json | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          avg_corners?: number | null
+          avg_goals?: number | null
+          away_form?: string | null
+          away_team: string
+          btts_pct?: number | null
+          clean_sheets_pct?: number | null
+          confidence_score: number
+          created_at?: string
+          h2h_json?: Json | null
+          home_form?: string | null
+          home_team: string
+          id?: string
+          kickoff_at?: string | null
+          league?: string | null
+          match_id: string
+          over05_pct?: number | null
+          over15_pct?: number | null
+          over25_pct?: number | null
+          over35_pct?: number | null
+          raw_payload?: Json | null
+          source: string
+          updated_at?: string
+        }
+        Update: {
+          avg_corners?: number | null
+          avg_goals?: number | null
+          away_form?: string | null
+          away_team?: string
+          btts_pct?: number | null
+          clean_sheets_pct?: number | null
+          confidence_score?: number
+          created_at?: string
+          h2h_json?: Json | null
+          home_form?: string | null
+          home_team?: string
+          id?: string
+          kickoff_at?: string | null
+          league?: string | null
+          match_id?: string
+          over05_pct?: number | null
+          over15_pct?: number | null
+          over25_pct?: number | null
+          over35_pct?: number | null
+          raw_payload?: Json | null
+          source?: string
+          updated_at?: string
         }
         Relationships: []
       }

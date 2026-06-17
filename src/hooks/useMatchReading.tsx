@@ -40,6 +40,14 @@ export interface AnalystReading {
   };
 }
 
+export interface FallbackStats {
+  stats: Record<string, any>;
+  source: string;
+  confidence_score: number;
+  lowConfidence: boolean;
+  missing: string[];
+}
+
 interface State {
   loading: boolean;
   reading: MatchReadingV2 | null;
@@ -47,12 +55,15 @@ interface State {
   error: string | null;
   analyst: AnalystReading | null;
   analystLoading: boolean;
+  fallback: FallbackStats | null;
 }
 
 const memCache = new Map<string, { ts: number; ctx: MatchContext }>();
 const analystCache = new Map<string, { ts: number; data: AnalystReading }>();
+const fallbackCache = new Map<string, { ts: number; data: FallbackStats }>();
 const TTL = 8 * 60 * 1000; // 8 min — alinhar com TTL do servidor para odds frescas
 const ANALYST_TTL = 30 * 60 * 1000; // 30 min
+const FALLBACK_TTL = 60 * 60 * 1000; // 1h
 
 export function useMatchReading(match: MatchData, enabled: boolean) {
   const [state, setState] = useState<State>({

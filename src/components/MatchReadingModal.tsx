@@ -448,6 +448,7 @@ export const MatchReadingModal = ({
   context,
   analyst,
   analystLoading,
+  fallback,
 }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -459,6 +460,7 @@ export const MatchReadingModal = ({
           <DialogDescription className="text-xs text-muted-foreground">
             {homeTeam} <span className="opacity-60">vs</span> {awayTeam}
           </DialogDescription>
+          {fallback && <ConfidenceBadge fallback={fallback} />}
         </DialogHeader>
 
         {loading && (

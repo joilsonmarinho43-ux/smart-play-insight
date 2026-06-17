@@ -1,113 +1,77 @@
-## Objetivo
 
-Transformar o modal "📖 Leitura do Jogo" em uma análise pré-jogo premium, contextual e humana, combinando estatísticas internas + contexto externo (escalações, lesões, motivação, clima, odds) + interpretação narrativa profissional.
+# Fallback Estatístico Inteligente
 
----
+Sistema que mantém o app funcionando quando API-Football falha, usando cache, histórico no banco e TheSportsDB — sem nunca inventar dados.
 
-## Arquitetura em 3 camadas
+## 1. Banco de dados (1 migração)
 
-```text
-[ Camada 1 - Dados internos ]   →  já temos (Poisson, xG, forma, H2H, médias)
-[ Camada 2 - Contexto externo ]  →  nova edge function `match-context`
-[ Camada 3 - Interpretação ]     →  novo motor `readingEngine.ts` (texto humano)
-```
+**Nova tabela `match_stats_fallback`** — estatísticas normalizadas de qualquer fonte:
 
----
+- `match_id` (text, unique) · `home_team` · `away_team` · `league` · `kickoff_at`
+- Estatísticas: `avg_goals`, `avg_corners`, `btts_pct`, `over05_pct`, `over15_pct`, `over25_pct`, `over35_pct`, `clean_sheets_pct`
+- Forma: `home_form` (text "WWDWL"), `away_form`
+- H2H: `h2h_json` (jsonb)
+- Meta: `source` ('api-football' | 'thesportsdb' | 'historical' | 'mixed'), `confidence_score` (int 0-100), `raw_payload` (jsonb)
+- Timestamps + índice por `match_id` e `kickoff_at`
+- RLS: leitura `authenticated`, escrita só `service_role`
 
-## Camada 1 — Dados Internos (já existe)
+**Nova tabela `fallback_logs`** — observabilidade:
+- `source_used`, `latency_ms`, `cache_hit`, `api_football_failed`, `signals_generated`, `created_at`
+- RLS: leitura admin
 
-Mantém o que `matchReading.ts` já lê: médias ofensivas/defensivas, regressão bayesiana, Poisson, mercados de `analyzeMarkets`, amostra de jogos, escanteios, cartões.
+## 2. Edge function `match-stats-resolver` (nova)
 
----
-
-## Camada 2 — Contexto Externo (nova edge function)
-
-Criar `supabase/functions/match-context/index.ts` que recebe `{ fixtureId, leagueId, season, homeId, awayId, kickoffISO, venueCity }` e retorna:
-
-```ts
-{
-  lineups:      { home: {probable, missing[]}, away: {probable, missing[]}, source: 'api-sports'|'estimated' },
-  injuries:     { home: Player[], away: Player[], impact: 'baixo'|'médio'|'alto' },
-  motivation:   { home: string, away: string, stake: 'título'|'classificação'|'rebaixamento'|'meio-tabela'|'amistoso' },
-  fatigue:      { home: {gamesLast10d, restDays, travel}, away: {...} },
-  weather:      { tempC, condition, rainMm, wind, pitchImpact: 'normal'|'pesado' } | null,
-  oddsMovement: { home: {open, current, drift}, draw, away, over25, btts, signal: 'estável'|'caindo favorito'|'subindo azarão' } | null,
-  reliability:  'completo' | 'parcial' | 'limitado'
-}
-```
-
-Fontes (somente API-Sports, já configurada via secret existente):
-- `/fixtures/lineups` → escalações prováveis
-- `/injuries?fixture=…` → lesões e suspensões
-- `/fixtures/headtohead`, `/teams/statistics`, `/fixtures?team=…&last=10` → desgaste/calendário
-- `/odds?fixture=…` (pré-jogo, snapshot atual; comparar com `/odds/live` para detectar drift quando disponível)
-- Clima: opcional, só se já houver chave externa; caso contrário retorna `null` e a interpretação ignora a seção.
-
-A função tem cache em `cache_api` (chave `ctx:{fixtureId}`, TTL 30 min) seguindo o padrão atual.
-
----
-
-## Camada 3 — Interpretação Humana (novo motor)
-
-Criar `src/lib/readingEngine.ts` que recebe `MatchData` + `MatchContext` e devolve `MatchReadingV2` com 10 seções:
-
-```ts
-interface MatchReadingV2 {
-  summary: string;             // 1. Resumo contextual humano
-  tactical: string;            // 2. Leitura tática
-  indicators: string[];        // 3. Indicadores RELEVANTES (filtrados)
-  marketRead: string;          // 4. Leitura do mercado (valor/armadilhas)
-  opportunities: Opportunity[];// 5. Melhores oportunidades
-  alerts: string[];            // 6. Alertas inteligentes
-  likelyScores: string[];      // 7. Placares prováveis (Poisson + ajuste contexto)
-  timing: { pressure, acceleration, opening };  // 8. Timing
-  predictability: 'verde' | 'amarelo' | 'vermelho'; // 9. Nível
-  verdict: string;             // 10. Veredito final
-  contextQuality: 'completo' | 'parcial' | 'limitado';
-}
-```
-
-Geração do texto:
-- Templates compostos por fragmentos variáveis (não repetitivos) baseados em faixas reais: `λ_total`, diferença `home-away`, `BTTS%`, `Over2.5%`, `impacto_lesoes`, `motivacao`, `drift_odds`.
-- Cada seção monta a frase a partir do **estado real** dos dados — sem placeholders genéricos. Se contexto externo não veio, a leitura usa só Camada 1 e marca `contextQuality: 'limitado'`.
-- Proibido: "IA", "algoritmo", "robô", "Poisson", "λ", "regressão". Texto soa como analista humano.
-- Veredito final usa árvore de decisão simples: combina favoritismo real × valor de odd × confiabilidade de contexto.
-
-Nível de previsibilidade:
-- 🟢 verde: amostra ≥5, lesões impacto baixo, odds estáveis, λ_total coerente
-- 🟡 amarelo: amostra parcial OU lesões médias OU drift moderado
-- 🔴 vermelho: contexto limitado OU lesões altas em titulares OU drift forte
-
----
-
-## Frontend
-
-- `MatchReadingModal.tsx`: reescrito para renderizar as 10 seções do `MatchReadingV2`, mantendo o tema escuro atual e tipografia já em uso. Badge de previsibilidade (🟢🟡🔴) no topo + chip de `contextQuality`.
-- `MatchCard.tsx`: o botão "📖 Leitura do Jogo" já existe; passa a chamar um hook `useMatchReading(match)` que:
-  1. busca contexto via `supabase.functions.invoke('match-context', …)` (cache local 30 min)
-  2. monta a leitura com `buildReadingV2(match, context)`
-  3. retorna estado `{ loading, reading, error }`
-- Skeleton enquanto carrega o contexto.
-
----
-
-## Entregáveis
+Orquestra a cascata na ordem do briefing:
 
 ```text
-supabase/functions/match-context/index.ts       (NEW)
-src/lib/readingEngine.ts                         (NEW - substitui matchReading.ts)
-src/hooks/useMatchReading.tsx                    (NEW)
-src/components/MatchReadingModal.tsx             (REWRITE - 10 seções)
-src/components/MatchCard.tsx                     (pequeno: usar o novo hook)
-src/lib/matchReading.ts                          (DEPRECATE / re-export para compat)
+1) cache_api (TTL por tipo: jogos do dia 6h, classificação 24h,
+              stats históricas 7d, H2H 30d)
+2) match_stats_fallback no banco (se < TTL)
+3) API-Football (via football-api existente) — fonte primária quando viva
+4) TheSportsDB (lookuptable/eventslast/eventsh2h) — fallback
+5) Histórico no banco (qualquer idade) — último recurso
 ```
 
-Sem mudanças no Live, no Bingo, no Scanner ou em qualquer engine existente.
+A cada sucesso: normaliza para o schema padrão, grava em `match_stats_fallback` com `source` e `confidence_score`, atualiza `cache_api`, registra em `fallback_logs`.
 
----
+**Score de confiança:**
+- 100 = API-Football fresh
+- 90 = TheSportsDB completo (todos campos preenchidos)
+- 80 = misto (TheSportsDB + histórico)
+- 70 = só histórico
+- < 70 = retorna `lowConfidence: true` e bloqueia geração automática de sinais
 
-## Pontos a confirmar antes de codar
+## 3. Integração com código existente
 
-1. **Clima**: não há conector de clima configurado hoje. Posso (a) deixar a seção opcional e omitir quando ausente, ou (b) você adiciona uma chave OpenWeather. Sigo com (a) por padrão.
-2. **Movimento de odds**: API-Sports devolve apenas snapshot pré-jogo por casa; o "drift" será calculado comparando snapshots em cache (primeira leitura = baseline). Aceitável?
-3. **Custo de API**: cada abertura do modal pode disparar 3–4 calls (lineups, injuries, fixtures recentes, odds). O cache de 30 min em `cache_api` mitiga, mas confirma se posso adicionar essa carga.
+- **`src/services/dataProvider`** — já tem cascata para listagem de jogos; adicionar campo `__confidence` por jogo vindo do resolver.
+- **`useMatchReading` / `match-analyst`** — antes de chamar a IA, busca stats pelo resolver; passa `confidence_score` no prompt. IA recebe instrução explícita: "use APENAS números fornecidos; se um campo estiver ausente, diga 'sem dado'".
+- **`auto-mode-server` / `scanner-pro-server` / `bingoEngine`** — antes de emitir sinal automático, ler `confidence_score`. Se < 70, pular sinal e logar em `fallback_logs.signals_generated=0`.
+- **UI (Home, Bingo, Elite, Scanner, MatchReadingModal)** — badge discreto "Confiança: 80%" quando < 100, e aviso amarelo "Baixa confiança — dados parciais" quando < 70.
+
+## 4. Cache inteligente
+
+Reaproveitar `cache_api` (já existe) com chaves novas e TTL por tipo:
+- `mstats_day_{date}` → 6h
+- `mstats_standings_{leagueId}` → 24h
+- `mstats_team_{teamId}` → 7d
+- `mstats_h2h_{homeId}_{awayId}` → 30d
+
+## 5. Garantias
+
+- API-Football continua sendo a fonte primária — nada muda quando ela funciona.
+- IA nunca inventa: prompts do `match-analyst` ganham guard rail explícito.
+- Toda escrita registra origem em `source`; auditável no painel Admin.
+- TheSportsDB é a única fonte alternativa nesta fase (estável, sem scraping).
+
+## Detalhes técnicos
+
+- Mapeamento TheSportsDB → schema padrão: `eventsh2h.php` para H2H, `eventslast.php?id={teamId}` para forma (últimos 5), `lookuptable.php?l={leagueId}` para classificação. Cálculo de `avg_goals` = média de gols nos últimos 5 jogos. Campos não cobertos pelo TheSportsDB (xG, escanteios detalhados) ficam `null` — IA tratará como "sem dado".
+- `confidence_score` calculado por % de campos não-nulos × peso da fonte.
+- TTLs aplicados via `ultima_atualizacao` em `cache_api` + nova coluna lógica no resolver.
+- Sem novas dependências npm.
+
+## Fora de escopo (fases futuras)
+
+- SofaScore/FlashScore/FootyStats/Forebet (sem API oficial — só scraping; recusado).
+- Live Trader PRO (live exige dados em tempo real; fallback histórico seria enganoso).
+- SportMonks/RapidAPI (aguardando você indicar se tem chave).

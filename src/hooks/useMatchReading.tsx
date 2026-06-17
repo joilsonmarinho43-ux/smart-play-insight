@@ -196,6 +196,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
               },
               reading,
               context: ctx,
+              fallbackStats: fallback,
               pesquisaWeb: dadosInsuficientes,
             },
           },

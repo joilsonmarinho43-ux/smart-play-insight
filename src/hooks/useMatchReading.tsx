@@ -131,6 +131,36 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       // toda a leitura técnica enviando o payload completo ao analyst.
       const dadosInsuficientes = !reading;
 
+      // Resolver fallback estatístico em paralelo (cache → DB → TheSportsDB → histórico)
+      let fallback: FallbackStats | null = null;
+      const fkey = String(fixtureId || `${match.homeTeam}-${match.awayTeam}`);
+      const cachedF = fallbackCache.get(fkey);
+      if (cachedF && Date.now() - cachedF.ts < FALLBACK_TTL) {
+        fallback = cachedF.data;
+      } else if (fixtureId || (match.homeTeam && match.awayTeam)) {
+        try {
+          const { data: fdata, error: ferror } = await supabase.functions.invoke(
+            "match-stats-resolver",
+            {
+              body: {
+                matchId: String(fixtureId || fkey),
+                homeTeam: match.homeTeam,
+                awayTeam: match.awayTeam,
+                league: match.league,
+                kickoffISO: m.fixture?.date,
+              },
+            },
+          );
+          if (!ferror && fdata && !fdata.error) {
+            fallback = fdata as FallbackStats;
+            fallbackCache.set(fkey, { ts: Date.now(), data: fallback });
+          }
+        } catch (e) {
+          console.warn("match-stats-resolver invoke fail", e);
+        }
+      }
+      if (cancel) return;
+
       setState({
         loading: false,
         reading,
@@ -138,6 +168,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
         error: null,
         analyst: null,
         analystLoading: true, // sempre tentamos analyst (modo pesquisa se necessário)
+        fallback,
       });
 
       // Camada de análise humana via Lovable AI

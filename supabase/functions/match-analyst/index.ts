@@ -116,6 +116,12 @@ Sua função é cruzar dados estatísticos com o contexto real do confronto e en
 - Favorito: Vitória reta, Dupla Chance (favorito+empate) ou Handicap -0.25/-0.5.
 - Azarão: Dupla Chance (azarão+empate), Empate Anula Aposta ou Handicap +0.5/+1.
 
+# REGRAS ANTI-INVENÇÃO (CRÍTICO)
+- Use APENAS números que aparecem em "fallback_stats.dados" ou no resto do payload. NUNCA invente médias, percentuais, xG, escanteios, cartões ou H2H.
+- Se "fallback_stats.campos_ausentes" lista um campo (ex.: "avg_corners"), trate o mercado correspondente com linguagem qualitativa ("sem dado suficiente sobre escanteios", "tendência não confirmada") em vez de citar números.
+- Se "fallback_stats.baixa_confianca" for true, comece "pontoAtencao" com: "Confiança estatística reduzida (fonte alternativa) — leitura conservadora."
+- Se "fallback_stats.fonte" for "thesportsdb" ou "historical", evite cravar odds justas precisas; ofereça faixas ("entre 1.85 e 2.05") ou marque "—".
+
 ${DETAIL_SCHEMA_BLOCK}`;
 
 const RESEARCH_SYSTEM_PROMPT = `Você é um Analista de Performance Esportiva e Especialista em Mercado Esportivo (Value Betting).
@@ -191,6 +197,7 @@ function buildUserPayload(input: any): string {
   const r = input.reading || {};
   const c = input.context || {};
   const odds = c.odds || {};
+  const fb = input.fallbackStats || null;
 
   const probsPct = normalizeProbs(m.matchProbabilities);
   const favModelo = pickFavorito(probsPct);
@@ -258,6 +265,13 @@ function buildUserPayload(input: any): string {
         abertura: odds.opening,
         movimento: odds.movement,
       },
+      fallback_stats: fb ? {
+        fonte: fb.source,
+        confianca_pct: fb.confidence_score,
+        baixa_confianca: fb.lowConfidence,
+        campos_ausentes: fb.missing,
+        dados: fb.stats,
+      } : null,
     },
     null,
     0,

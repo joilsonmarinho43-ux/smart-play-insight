@@ -259,6 +259,13 @@ function buildUserPayload(input: any): string {
         abertura: odds.opening,
         movimento: odds.movement,
       },
+      fallback_stats: fb ? {
+        fonte: fb.source,
+        confianca_pct: fb.confidence_score,
+        baixa_confianca: fb.lowConfidence,
+        campos_ausentes: fb.missing,
+        dados: fb.stats,
+      } : null,
     },
     null,
     0,

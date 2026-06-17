@@ -189,6 +189,7 @@ const MatchDetails = () => {
         context={readingContext}
         analyst={analyst}
         analystLoading={analystLoading}
+        fallback={fallback}
       />
 
     </div>

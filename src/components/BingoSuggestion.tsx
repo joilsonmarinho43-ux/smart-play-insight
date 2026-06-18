@@ -132,6 +132,14 @@ const BingoSuggestion = ({ matches }: Props) => {
                   <p className="text-[10px] text-muted-foreground mt-0.5">{bm.league} • {bm.time}</p>
                 </div>
                 <div className="flex items-center gap-1">
+                  {bm.confidenceMode === 'conservative' && (
+                    <span
+                      className="text-[8px] font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-1.5 py-0.5 rounded uppercase"
+                      title={`Confiança moderada (${bm.confidenceScore}%) — filtro reforçado`}
+                    >
+                      🟡 Conservador
+                    </span>
+                  )}
                   <span className="text-[9px] text-muted-foreground font-medium">{Math.round(bm.avgConfidence)}%</span>
                   <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                 </div>

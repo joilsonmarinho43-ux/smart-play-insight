@@ -432,6 +432,29 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // ─── CONFIDENCE POLICY GATE ─────────────────────────────────
+      const conf = await resolveMatchConfidence(supabaseUrl, supabaseKey, {
+        matchId: signal.matchId, homeTeam: s.homeTeam, awayTeam: s.awayTeam, league: signal.league,
+      });
+      const policy = classifyConfidence(conf.score);
+      logConfidenceDecision('AUTO-MODE', signal.match, conf.score, policy.mode, conf.source);
+      if (policy.mode === 'discard' || policy.mode === 'info_only') {
+        console.log(`[AUTO-MODE-SERVER] ${policy.mode === 'discard' ? '🔴' : '🔵'} CONFIDENCE ${policy.mode}: ${signal.match} score=${conf.score}`);
+        continue;
+      }
+      if (policy.conservative) {
+        // Modo conservador: só SUPER_SNIPER e SNIPER (sem SEMI) + confiança ≥80
+        if (signal.tier === 'SEMI') {
+          console.log(`[AUTO-MODE-SERVER] 🟡 CONSERVADOR rebaixou (skip SEMI): ${signal.match} score=${conf.score}`);
+          continue;
+        }
+        if (signal.confidence < 80) {
+          console.log(`[AUTO-MODE-SERVER] 🟡 CONSERVADOR rebaixou (conf<80): ${signal.match} conf=${signal.confidence}`);
+          continue;
+        }
+        signal.filtersValidated = `${signal.filtersValidated} • 🟡cons(${conf.score})`;
+      }
+
       // Aplica league_weight + momentum na confiança final (boost reduzido p/ evitar inflação)
       // Só permite boost positivo de momentum se houver SoG real (não inflar com pressão)
       const safeMomentum = signal.shotsOnGoal >= 3 ? momentumDelta : Math.min(momentumDelta, 0);
@@ -444,6 +467,7 @@ Deno.serve(async (req) => {
       }
       if (signalsToSend.length + dailyCount >= 25) break;
     }
+
 
     // 🌍 PRIORIDADE DE ENVIO: Copa do Mundo > Internacionais > Ligas Nacionais.
     // Reordena signalsToSend para que partidas da Copa sejam disparadas primeiro

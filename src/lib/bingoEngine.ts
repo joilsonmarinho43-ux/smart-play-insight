@@ -44,23 +44,45 @@ export interface BingoResult {
   markets: MarketAnalysis[];
   allMarkets: MarketAnalysis[];
   avgConfidence: number;
+  confidenceMode?: 'normal' | 'conservative' | 'info_only' | 'discard';
+  confidenceScore?: number;
 }
 
 /** Tipo exportado para componentes */
 export interface BingoMatchData extends MatchData {
   selectedMarkets: MarketAnalysis[];
   avgConfidence: number;
+  confidenceMode?: 'normal' | 'conservative' | 'info_only' | 'discard';
+  confidenceScore?: number;
 }
 
-export function generatePreGameBingo(match: MatchData): BingoResult | null {
+export function generatePreGameBingo(match: MatchData, confidenceScore?: number): BingoResult | null {
   if (!isStableLeague(match)) return null;
   if (!hasReliableData(match)) return null;
+
+  // ─── CONFIDENCE POLICY ────────────────────────────────────────
+  // ≥85 normal | 70-84 conservador (limiar 80%) | 50-69 info_only | <50 discard
+  let mode: 'normal' | 'conservative' | 'info_only' | 'discard' = 'normal';
+  if (typeof confidenceScore === 'number') {
+    if (confidenceScore < 50) mode = 'discard';
+    else if (confidenceScore < 70) mode = 'info_only';
+    else if (confidenceScore < 85) mode = 'conservative';
+  }
+  if (mode === 'discard' || mode === 'info_only') {
+    // eslint-disable-next-line no-console
+    console.log(`[BINGO][CONFIDENCE] ${mode === 'discard' ? '🔴' : '🔵'} ${match.homeTeam} vs ${match.awayTeam} score=${confidenceScore} → ${mode}`);
+    return null;
+  }
 
   const allMarkets = analyzeMarkets(match);
   if (!allMarkets || allMarkets.length === 0) return null;
 
-  // Filtro Elite: confiança >= 72% para incluir mais mercados viáveis
-  const highValueMarkets = allMarkets.filter(m => m.probability >= 72 && m.probability <= 98);
+  // Conservador: limiar mínimo 80% (vs 72% normal) — exige mais confluência
+  const minProb = mode === 'conservative' ? 80 : 72;
+  const secondMinProb = mode === 'conservative' ? 85 : 78;
+  const maxMarkets = mode === 'conservative' ? 4 : 6;
+
+  const highValueMarkets = allMarkets.filter(m => m.probability >= minProb && m.probability <= 98);
   if (highValueMarkets.length === 0) return null;
 
   // Prioridade por categoria — pega o melhor de cada
@@ -73,20 +95,24 @@ export function generatePreGameBingo(match: MatchData): BingoResult | null {
       .sort((a, b) => b.probability - a.probability);
     if (catMarkets.length > 0) {
       bestByCategory.push(catMarkets[0]);
-      if (catMarkets.length > 1 && catMarkets[1].probability >= 78) {
+      if (catMarkets.length > 1 && catMarkets[1].probability >= secondMinProb) {
         bestByCategory.push(catMarkets[1]);
       }
     }
   }
 
-  // Ordena por probabilidade e limita a 6 melhores
   const selected = bestByCategory
     .sort((a, b) => b.probability - a.probability)
-    .slice(0, 6);
+    .slice(0, maxMarkets);
 
   if (selected.length === 0) return null;
 
   const avgConfidence = selected.reduce((sum, m) => sum + m.probability, 0) / selected.length;
+
+  if (mode === 'conservative') {
+    // eslint-disable-next-line no-console
+    console.log(`[BINGO][CONFIDENCE] 🟡 ${match.homeTeam} vs ${match.awayTeam} score=${confidenceScore} → conservador (min ${minProb}%, ${selected.length} mercados)`);
+  }
 
   return {
     over15: findProb(allMarkets, 'Over 1.5 Gols'),
@@ -95,8 +121,11 @@ export function generatePreGameBingo(match: MatchData): BingoResult | null {
     markets: selected,
     allMarkets: highValueMarkets,
     avgConfidence,
+    confidenceMode: mode,
+    confidenceScore,
   };
 }
+
 
 function findProb(markets: MarketAnalysis[], name: string): number {
   const found = markets.find(m => m.market === name);

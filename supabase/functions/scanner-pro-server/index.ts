@@ -397,11 +397,47 @@ Deno.serve(async (req) => {
       .eq('success', true);
 
     const signaledKeys = new Set((existingSignals || []).map((s: any) => `${s.match_id}-${s.market}`));
-    const newSignals = sniperSignals.filter(s => !signaledKeys.has(`${s.matchId}-${s.market}`));
+    let newSignals = sniperSignals.filter(s => !signaledKeys.has(`${s.matchId}-${s.market}`));
+
+    // ─── CONFIDENCE POLICY GATE ────────────────────────────────────
+    // Resolve confidence_score por jogo (paralelo) e aplica política:
+    //   ≥85 normal | 70-84 conservador | 50-69 info_only (skip) | <50 discard
+    const confidenceMap = new Map<string, { score: number; mode: string; source: string }>();
+    const uniqueMatches = Array.from(new Map(newSignals.map(s => [s.matchId, s])).values());
+    const confResults = await Promise.all(uniqueMatches.map(async (s) => {
+      const [h, a] = s.match.split(' vs ');
+      const r = await resolveMatchConfidence(supabaseUrl, supabaseKey, {
+        matchId: s.matchId, homeTeam: h, awayTeam: a, league: s.league,
+      });
+      const policy = classifyConfidence(r.score);
+      logConfidenceDecision('SNIPER-DUAL', s.match, r.score, policy.mode, r.source);
+      return { matchId: s.matchId, score: r.score, mode: policy.mode, source: r.source };
+    }));
+    for (const c of confResults) confidenceMap.set(c.matchId, c);
+
+    let confDiscarded = 0, confInfo = 0, confConservative = 0;
+    newSignals = newSignals.filter(s => {
+      const c = confidenceMap.get(s.matchId);
+      if (!c) return true; // sem resolver = assume normal
+      if (c.mode === 'discard')   { confDiscarded++; return false; }
+      if (c.mode === 'info_only') { confInfo++; return false; }
+      if (c.mode === 'conservative') {
+        // Modo conservador: exige confiança ≥85 + RMA CONFIRMADO + EV > 0.03
+        if (s.probability < 85 || s.rmaVerdict !== 'CONFIRMADO' || s.ev <= 0.03) {
+          confConservative++;
+          console.log(`[SNIPER-DUAL][CONFIDENCE] 🟡 conservador descartou ${s.match} ${s.market} (prob=${s.probability}, rma=${s.rmaVerdict}, ev=${s.ev})`);
+          return false;
+        }
+      }
+      return true;
+    });
+    console.log(`[SNIPER-DUAL][CONFIDENCE] discard=${confDiscarded} info_only=${confInfo} conservative_skip=${confConservative} keep=${newSignals.length}`);
 
     // RMA gate — block BLOQUEADO
     const blocked = newSignals.filter(s => s.rmaVerdict === 'BLOQUEADO');
     const approved = newSignals.filter(s => s.rmaVerdict !== 'BLOQUEADO');
+
+
 
     // Log blocked
     for (const s of blocked) {

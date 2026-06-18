@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { generatePreGameBingo, formatBingoWhatsApp, CATEGORY_META, BingoMatchData } from '@/lib/bingoEngine';
+import { resolveConfidence } from '@/lib/confidencePolicy';
 import { Trophy, Copy, ChevronDown, ChevronUp, MessageCircle, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,24 +34,48 @@ function getProbColor(prob: number): string {
 
 const BingoSuggestion = ({ matches }: Props) => {
   const [expanded, setExpanded] = useState(true);
+  const [confMap, setConfMap] = useState<Record<string, number>>({});
+
+  // Resolve confiança por jogo em paralelo (cache 10min interno do resolver)
+  useEffect(() => {
+    if (!matches || matches.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(matches.slice(0, 20).map(async (m) => {
+        const r = await resolveConfidence({
+          matchId: String((m as any).id),
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
+          league: m.league || null,
+        });
+        return [String((m as any).id), r.score] as const;
+      }));
+      if (cancelled) return;
+      setConfMap(Object.fromEntries(results));
+    })();
+    return () => { cancelled = true; };
+  }, [matches]);
 
   const bingoData = useMemo<BingoMatchData[]>(() => {
     if (!matches || matches.length === 0) return [];
 
     return matches
       .map(match => {
-        const result = generatePreGameBingo(match);
+        const score = confMap[String((match as any).id)];
+        const result = generatePreGameBingo(match, score);
         if (!result || !result.markets.length) return null;
         return {
           ...match,
           selectedMarkets: result.markets,
           avgConfidence: result.avgConfidence,
+          confidenceMode: result.confidenceMode,
+          confidenceScore: result.confidenceScore,
         } as BingoMatchData;
       })
       .filter((m): m is BingoMatchData => m !== null)
       .sort((a, b) => b.avgConfidence - a.avgConfidence)
       .slice(0, 12);
-  }, [matches]);
+  }, [matches, confMap]);
 
   if (bingoData.length === 0) return null;
 

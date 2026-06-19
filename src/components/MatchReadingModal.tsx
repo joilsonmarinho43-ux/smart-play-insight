@@ -34,6 +34,7 @@ interface Props {
   context?: MatchContext | null;
   analyst?: AnalystReading | null;
   analystLoading?: boolean;
+  analystError?: "rate_limited" | "credits_exhausted" | "ai_error" | "parse_fail" | null;
   fallback?: {
     source: string;
     confidence_score: number;
@@ -52,11 +53,18 @@ const sourceLabel: Record<string, string> = {
 
 function ConfidenceBadge({
   fallback,
+  readingComplete,
 }: {
   fallback: NonNullable<Props["fallback"]>;
+  readingComplete: boolean;
 }) {
   const { confidence_score, source, lowConfidence, missing } = fallback;
-  if (confidence_score >= 100) return null; // API-Football fresh = sem badge
+  // Oculta quando: não há dado real (none/0), API oficial fresca, ou leitura
+  // interna já está completa (fallback é apenas enriquecimento).
+  if (source === "none" || confidence_score <= 0) return null;
+  if (confidence_score >= 100) return null;
+  if (readingComplete && confidence_score < 80) return null;
+
   const cls = lowConfidence
     ? "bg-red-500/15 text-red-300 border-red-500/40"
     : confidence_score >= 90
@@ -72,7 +80,7 @@ function ConfidenceBadge({
       </div>
       {lowConfidence && (
         <div className="mt-1 opacity-90">
-          Dados parciais — análise conservadora. Sinais automáticos suspensos.
+          Dados parciais — leitura conservadora.
         </div>
       )}
       {!lowConfidence && missing && missing.length > 0 && (

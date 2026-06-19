@@ -205,24 +205,33 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
           },
         );
         if (cancel) return;
-        if (!error && data && data.cenario && data.veredito) {
+        const errCode: State["analystError"] =
+          (data && typeof data === "object" && (data as any).error) ||
+          (error && (error as any).message?.includes("429") ? "rate_limited" : null) ||
+          (error ? "ai_error" : null);
+        if (!error && data && (data as any).cenario && (data as any).veredito) {
           const a: AnalystReading = {
-            cenario: data.cenario,
-            pontoAtencao: data.pontoAtencao,
-            veredito: data.veredito,
-            risco: data.risco || "medio",
-            contextoDetalhado: data.contextoDetalhado,
-            mercados: data.mercados,
-            oddsReferencia: data.oddsReferencia,
+            cenario: (data as any).cenario,
+            pontoAtencao: (data as any).pontoAtencao,
+            veredito: (data as any).veredito,
+            risco: (data as any).risco || "medio",
+            contextoDetalhado: (data as any).contextoDetalhado,
+            mercados: (data as any).mercados,
+            oddsReferencia: (data as any).oddsReferencia,
           };
           analystCache.set(akey, { ts: Date.now(), data: a });
-          setState((s) => ({ ...s, analyst: a, analystLoading: false }));
+          setState((s) => ({ ...s, analyst: a, analystLoading: false, analystError: null }));
         } else {
-          setState((s) => ({ ...s, analystLoading: false }));
+          const safeErr: State["analystError"] =
+            errCode === "rate_limited" || errCode === "credits_exhausted" ||
+            errCode === "ai_error" || errCode === "parse_fail"
+              ? errCode
+              : "ai_error";
+          setState((s) => ({ ...s, analystLoading: false, analystError: safeErr }));
         }
       } catch (e) {
         console.warn("match-analyst invoke fail", e);
-        if (!cancel) setState((s) => ({ ...s, analystLoading: false }));
+        if (!cancel) setState((s) => ({ ...s, analystLoading: false, analystError: "ai_error" }));
       }
     }
 

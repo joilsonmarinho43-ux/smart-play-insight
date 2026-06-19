@@ -55,15 +55,16 @@ interface State {
   error: string | null;
   analyst: AnalystReading | null;
   analystLoading: boolean;
+  analystError: "rate_limited" | "credits_exhausted" | "ai_error" | "parse_fail" | null;
   fallback: FallbackStats | null;
 }
 
 const memCache = new Map<string, { ts: number; ctx: MatchContext }>();
 const analystCache = new Map<string, { ts: number; data: AnalystReading }>();
 const fallbackCache = new Map<string, { ts: number; data: FallbackStats }>();
-const TTL = 8 * 60 * 1000; // 8 min — alinhar com TTL do servidor para odds frescas
-const ANALYST_TTL = 30 * 60 * 1000; // 30 min
-const FALLBACK_TTL = 60 * 60 * 1000; // 1h
+const TTL = 8 * 60 * 1000;
+const ANALYST_TTL = 30 * 60 * 1000;
+const FALLBACK_TTL = 60 * 60 * 1000;
 
 export function useMatchReading(match: MatchData, enabled: boolean) {
   const [state, setState] = useState<State>({
@@ -73,6 +74,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
     error: null,
     analyst: null,
     analystLoading: false,
+    analystError: null,
     fallback: null,
   });
 
@@ -167,7 +169,8 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
         context: ctx,
         error: null,
         analyst: null,
-        analystLoading: true, // sempre tentamos analyst (modo pesquisa se necessário)
+        analystLoading: true,
+        analystError: null,
         fallback,
       });
 
@@ -202,24 +205,33 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
           },
         );
         if (cancel) return;
-        if (!error && data && data.cenario && data.veredito) {
+        const errCode: State["analystError"] =
+          (data && typeof data === "object" && (data as any).error) ||
+          (error && (error as any).message?.includes("429") ? "rate_limited" : null) ||
+          (error ? "ai_error" : null);
+        if (!error && data && (data as any).cenario && (data as any).veredito) {
           const a: AnalystReading = {
-            cenario: data.cenario,
-            pontoAtencao: data.pontoAtencao,
-            veredito: data.veredito,
-            risco: data.risco || "medio",
-            contextoDetalhado: data.contextoDetalhado,
-            mercados: data.mercados,
-            oddsReferencia: data.oddsReferencia,
+            cenario: (data as any).cenario,
+            pontoAtencao: (data as any).pontoAtencao,
+            veredito: (data as any).veredito,
+            risco: (data as any).risco || "medio",
+            contextoDetalhado: (data as any).contextoDetalhado,
+            mercados: (data as any).mercados,
+            oddsReferencia: (data as any).oddsReferencia,
           };
           analystCache.set(akey, { ts: Date.now(), data: a });
-          setState((s) => ({ ...s, analyst: a, analystLoading: false }));
+          setState((s) => ({ ...s, analyst: a, analystLoading: false, analystError: null }));
         } else {
-          setState((s) => ({ ...s, analystLoading: false }));
+          const safeErr: State["analystError"] =
+            errCode === "rate_limited" || errCode === "credits_exhausted" ||
+            errCode === "ai_error" || errCode === "parse_fail"
+              ? errCode
+              : "ai_error";
+          setState((s) => ({ ...s, analystLoading: false, analystError: safeErr }));
         }
       } catch (e) {
         console.warn("match-analyst invoke fail", e);
-        if (!cancel) setState((s) => ({ ...s, analystLoading: false }));
+        if (!cancel) setState((s) => ({ ...s, analystLoading: false, analystError: "ai_error" }));
       }
     }
 

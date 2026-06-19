@@ -55,15 +55,16 @@ interface State {
   error: string | null;
   analyst: AnalystReading | null;
   analystLoading: boolean;
+  analystError: "rate_limited" | "credits_exhausted" | "ai_error" | "parse_fail" | null;
   fallback: FallbackStats | null;
 }
 
 const memCache = new Map<string, { ts: number; ctx: MatchContext }>();
 const analystCache = new Map<string, { ts: number; data: AnalystReading }>();
 const fallbackCache = new Map<string, { ts: number; data: FallbackStats }>();
-const TTL = 8 * 60 * 1000; // 8 min — alinhar com TTL do servidor para odds frescas
-const ANALYST_TTL = 30 * 60 * 1000; // 30 min
-const FALLBACK_TTL = 60 * 60 * 1000; // 1h
+const TTL = 8 * 60 * 1000;
+const ANALYST_TTL = 30 * 60 * 1000;
+const FALLBACK_TTL = 60 * 60 * 1000;
 
 export function useMatchReading(match: MatchData, enabled: boolean) {
   const [state, setState] = useState<State>({

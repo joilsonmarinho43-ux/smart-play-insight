@@ -486,6 +486,7 @@ const MatchCard = ({ match, isPremium }: Props) => {
         context={context}
         analyst={analyst}
         analystLoading={analystLoading}
+        analystError={analystError}
         fallback={fallback}
       />
 

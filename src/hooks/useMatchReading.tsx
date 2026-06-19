@@ -169,7 +169,8 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
         context: ctx,
         error: null,
         analyst: null,
-        analystLoading: true, // sempre tentamos analyst (modo pesquisa se necessário)
+        analystLoading: true,
+        analystError: null,
         fallback,
       });
 

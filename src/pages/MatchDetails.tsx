@@ -67,7 +67,7 @@ const MatchDetails = () => {
       league: view.league,
     } as any;
   }, [match, view, id]);
-  const { reading, loading: readingLoading, context: readingContext, analyst, analystLoading, fallback } = useMatchReading(
+  const { reading, loading: readingLoading, context: readingContext, analyst, analystLoading, analystError, fallback } = useMatchReading(
     (normalizedMatch || (match as any)) ?? ({ homeTeam: '', awayTeam: '', id: '' } as any),
     readingOpen && !!normalizedMatch,
   );

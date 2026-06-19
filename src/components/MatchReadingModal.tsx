@@ -456,8 +456,18 @@ export const MatchReadingModal = ({
   context,
   analyst,
   analystLoading,
+  analystError,
   fallback,
 }: Props) => {
+  const readingComplete = !!reading && reading.contextQuality === "completo";
+  const analystErrorMessage =
+    analystError === "rate_limited"
+      ? "Limite temporário da análise por IA atingido. Tente novamente em alguns instantes."
+      : analystError === "credits_exhausted"
+        ? "Créditos de IA esgotados. A análise por IA está temporariamente indisponível."
+        : analystError === "ai_error" || analystError === "parse_fail"
+          ? "Não foi possível gerar a análise por IA agora. Os dados estatísticos continuam disponíveis abaixo."
+          : null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg w-[95vw] max-h-[88vh] overflow-y-auto bg-background border-primary/20 p-4 sm:p-5">
@@ -468,7 +478,9 @@ export const MatchReadingModal = ({
           <DialogDescription className="text-xs text-muted-foreground">
             {homeTeam} <span className="opacity-60">vs</span> {awayTeam}
           </DialogDescription>
-          {fallback && <ConfidenceBadge fallback={fallback} />}
+          {fallback && (
+            <ConfidenceBadge fallback={fallback} readingComplete={readingComplete} />
+          )}
         </DialogHeader>
 
         {loading && (
@@ -477,6 +489,12 @@ export const MatchReadingModal = ({
             <div className="text-sm text-muted-foreground">
               Coletando contexto e montando a análise...
             </div>
+          </div>
+        )}
+
+        {analystErrorMessage && !loading && (
+          <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+            {analystErrorMessage}
           </div>
         )}
 
@@ -498,6 +516,7 @@ export const MatchReadingModal = ({
             Esta partida ainda não possui histórico estatístico suficiente para
             gerar uma leitura real.
           </div>
+
         )}
 
         {!loading && reading && (

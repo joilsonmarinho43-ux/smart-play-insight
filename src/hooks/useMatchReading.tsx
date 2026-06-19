@@ -74,6 +74,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
     error: null,
     analyst: null,
     analystLoading: false,
+    analystError: null,
     fallback: null,
   });
 

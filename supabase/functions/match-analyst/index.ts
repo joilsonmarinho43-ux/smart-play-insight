@@ -355,10 +355,11 @@ serve(async (req) => {
       }
     }
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!geminiKey && !lovableKey) {
       return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY ausente" }),
+        JSON.stringify({ error: "GEMINI_API_KEY ausente" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -393,50 +394,78 @@ serve(async (req) => {
       : buildUserPayload(body);
 
     const systemPrompt = pesquisaWeb ? RESEARCH_SYSTEM_PROMPT : SYSTEM_PROMPT;
-    const model = pesquisaWeb ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
     const userPrefix = pesquisaWeb
       ? "Analise a partida abaixo em MODO PESQUISA usando seu conhecimento sobre as equipes. Devolva apenas o JSON.\n\n"
       : "Analise a partida abaixo seguindo o fluxo. Devolva apenas o JSON.\n\n";
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrefix + userPayload },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (resp.status === 429) {
-      return new Response(JSON.stringify({ error: "rate_limited" }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Provedor: Gemini (Google AI Studio) direto se GEMINI_API_KEY presente; senão Lovable AI.
+    let content = "";
+    if (geminiKey) {
+      const model = pesquisaWeb ? "gemini-2.5-pro" : "gemini-2.5-flash";
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: "user", parts: [{ text: userPrefix + userPayload }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.6,
+          },
+        }),
       });
-    }
-    if (resp.status === 402) {
-      return new Response(JSON.stringify({ error: "credits_exhausted" }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (resp.status === 429) {
+        return new Response(JSON.stringify({ error: "rate_limited" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!resp.ok) {
+        const txt = await resp.text();
+        console.error("Gemini API error", resp.status, txt);
+        return new Response(
+          JSON.stringify({ error: "ai_error", status: resp.status }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const data = await resp.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      content = parts.map((p: any) => p?.text || "").join("");
+    } else {
+      const model = pesquisaWeb ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrefix + userPayload },
+          ],
+          response_format: { type: "json_object" },
+        }),
       });
+      if (resp.status === 429) {
+        return new Response(JSON.stringify({ error: "rate_limited" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (resp.status === 402) {
+        return new Response(JSON.stringify({ error: "credits_exhausted" }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!resp.ok) {
+        const txt = await resp.text();
+        console.error("AI gateway error", resp.status, txt);
+        return new Response(
+          JSON.stringify({ error: "ai_error", status: resp.status }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const data = await resp.json();
+      content = data?.choices?.[0]?.message?.content || "";
     }
-    if (!resp.ok) {
-      const txt = await resp.text();
-      console.error("AI gateway error", resp.status, txt);
-      return new Response(
-        JSON.stringify({ error: "ai_error", status: resp.status }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const data = await resp.json();
-    const content = data?.choices?.[0]?.message?.content || "";
     const parsed = safeParseAnalyst(content);
     if (!parsed) {
       console.warn("analyst parse fail", content?.slice(0, 300));

@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v6"; // bump: análise detalhada por mercado (1x2, dupla chance, handicap, gols, btts, escanteios, cartões), desfalques, árbitro e odds de referência
+const PROMPT_VERSION = "v7"; // odds de referência sempre numéricas, mesmo sem odds da API
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;

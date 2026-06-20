@@ -78,14 +78,14 @@ Formato exato:
     "placarExato": "1 a 3 placares mais prováveis, separados por vírgula (ex: '1-1, 2-1, 0-1')."
   },
   "oddsReferencia": {
-    "casa": "Odd justa estimada para vitória da casa (ex: '2.10') ou '—'.",
-    "empate": "Odd justa estimada para empate.",
-    "fora": "Odd justa estimada para vitória visitante.",
-    "over25": "Odd justa estimada para Over 2.5.",
-    "under25": "Odd justa estimada para Under 2.5.",
-    "bttsSim": "Odd justa estimada para ambas marcam Sim.",
-    "escanteiosOver9": "Odd justa estimada para Over 9.5 escanteios.",
-    "cartoesOver4": "Odd justa estimada para Over 4.5 cartões."
+    "casa": "Odd justa estimada para vitória da casa, SEMPRE numérica (ex: '2.10'). Nunca '—'.",
+    "empate": "Odd justa estimada para empate, sempre numérica.",
+    "fora": "Odd justa estimada para vitória visitante, sempre numérica.",
+    "over25": "Odd justa estimada para Over 2.5, sempre numérica.",
+    "under25": "Odd justa estimada para Under 2.5, sempre numérica.",
+    "bttsSim": "Odd justa estimada para ambas marcam Sim, sempre numérica.",
+    "escanteiosOver9": "Odd justa estimada para Over 9.5 escanteios, sempre numérica.",
+    "cartoesOver4": "Odd justa estimada para Over 4.5 cartões, sempre numérica."
   }
 }`;
 

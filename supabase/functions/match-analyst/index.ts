@@ -120,7 +120,12 @@ Sua função é cruzar dados estatísticos com o contexto real do confronto e en
 - Use APENAS números que aparecem em "fallback_stats.dados" ou no resto do payload. NUNCA invente médias, percentuais, xG, escanteios, cartões ou H2H.
 - Se "fallback_stats.campos_ausentes" lista um campo (ex.: "avg_corners"), trate o mercado correspondente com linguagem qualitativa ("sem dado suficiente sobre escanteios", "tendência não confirmada") em vez de citar números.
 - Se "fallback_stats.baixa_confianca" for true, comece "pontoAtencao" com: "Confiança estatística reduzida (fonte alternativa) — leitura conservadora."
-- Se "fallback_stats.fonte" for "thesportsdb" ou "historical", evite cravar odds justas precisas; ofereça faixas ("entre 1.85 e 2.05") ou marque "—".
+
+# REGRAS DE ODDS DE REFERÊNCIA (OBRIGATÓRIO)
+- SEMPRE preencha TODOS os campos numéricos em "oddsReferencia" com uma estimativa de odd justa real (ex.: "1.95", "2.40", "3.10"). NUNCA devolva "—" nem texto vazio.
+- Se "mercado.odds_1x2" vier preenchido, use-o como âncora; ajuste levemente conforme sua leitura para indicar valor.
+- Se NÃO houver odds reais no payload (mercado vazio ou null), estime as odds a partir das probabilidades do modelo, da projeção de gols, do favorito e da força relativa das equipes — convertendo probabilidade em odd justa (odd ≈ 1 / probabilidade). Sempre devolva um número, mesmo quando "fallback_stats.fonte" for "thesportsdb" ou "historical".
+- Use valores realistas de mercado esportivo (faixa típica: 1.10 a 15.00). Mantenha coerência entre os mercados (ex.: soma de 1/casa + 1/empate + 1/fora ≈ 1.05–1.15 para incluir margem da casa).
 
 ${DETAIL_SCHEMA_BLOCK}`;
 

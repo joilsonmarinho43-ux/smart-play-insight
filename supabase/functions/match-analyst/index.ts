@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
-const PROMPT_VERSION = "v6"; // bump: análise detalhada por mercado (1x2, dupla chance, handicap, gols, btts, escanteios, cartões), desfalques, árbitro e odds de referência
+const PROMPT_VERSION = "v7"; // odds de referência sempre numéricas, mesmo sem odds da API
 
 function sb() {
   const url = Deno.env.get("SUPABASE_URL")!;
@@ -78,14 +78,14 @@ Formato exato:
     "placarExato": "1 a 3 placares mais prováveis, separados por vírgula (ex: '1-1, 2-1, 0-1')."
   },
   "oddsReferencia": {
-    "casa": "Odd justa estimada para vitória da casa (ex: '2.10') ou '—'.",
-    "empate": "Odd justa estimada para empate.",
-    "fora": "Odd justa estimada para vitória visitante.",
-    "over25": "Odd justa estimada para Over 2.5.",
-    "under25": "Odd justa estimada para Under 2.5.",
-    "bttsSim": "Odd justa estimada para ambas marcam Sim.",
-    "escanteiosOver9": "Odd justa estimada para Over 9.5 escanteios.",
-    "cartoesOver4": "Odd justa estimada para Over 4.5 cartões."
+    "casa": "Odd justa estimada para vitória da casa, SEMPRE numérica (ex: '2.10'). Nunca '—'.",
+    "empate": "Odd justa estimada para empate, sempre numérica.",
+    "fora": "Odd justa estimada para vitória visitante, sempre numérica.",
+    "over25": "Odd justa estimada para Over 2.5, sempre numérica.",
+    "under25": "Odd justa estimada para Under 2.5, sempre numérica.",
+    "bttsSim": "Odd justa estimada para ambas marcam Sim, sempre numérica.",
+    "escanteiosOver9": "Odd justa estimada para Over 9.5 escanteios, sempre numérica.",
+    "cartoesOver4": "Odd justa estimada para Over 4.5 cartões, sempre numérica."
   }
 }`;
 
@@ -120,7 +120,12 @@ Sua função é cruzar dados estatísticos com o contexto real do confronto e en
 - Use APENAS números que aparecem em "fallback_stats.dados" ou no resto do payload. NUNCA invente médias, percentuais, xG, escanteios, cartões ou H2H.
 - Se "fallback_stats.campos_ausentes" lista um campo (ex.: "avg_corners"), trate o mercado correspondente com linguagem qualitativa ("sem dado suficiente sobre escanteios", "tendência não confirmada") em vez de citar números.
 - Se "fallback_stats.baixa_confianca" for true, comece "pontoAtencao" com: "Confiança estatística reduzida (fonte alternativa) — leitura conservadora."
-- Se "fallback_stats.fonte" for "thesportsdb" ou "historical", evite cravar odds justas precisas; ofereça faixas ("entre 1.85 e 2.05") ou marque "—".
+
+# REGRAS DE ODDS DE REFERÊNCIA (OBRIGATÓRIO)
+- SEMPRE preencha TODOS os campos numéricos em "oddsReferencia" com uma estimativa de odd justa real (ex.: "1.95", "2.40", "3.10"). NUNCA devolva "—" nem texto vazio.
+- Se "mercado.odds_1x2" vier preenchido, use-o como âncora; ajuste levemente conforme sua leitura para indicar valor.
+- Se NÃO houver odds reais no payload (mercado vazio ou null), estime as odds a partir das probabilidades do modelo, da projeção de gols, do favorito e da força relativa das equipes — convertendo probabilidade em odd justa (odd ≈ 1 / probabilidade). Sempre devolva um número, mesmo quando "fallback_stats.fonte" for "thesportsdb" ou "historical".
+- Use valores realistas de mercado esportivo (faixa típica: 1.10 a 15.00). Mantenha coerência entre os mercados (ex.: soma de 1/casa + 1/empate + 1/fora ≈ 1.05–1.15 para incluir margem da casa).
 
 ${DETAIL_SCHEMA_BLOCK}`;
 

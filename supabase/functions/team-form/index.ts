@@ -76,7 +76,7 @@ async function resolveTeamId(name: string): Promise<string | null> {
 
   // Tenta nome bruto, alias em inglês e normalizado
   const alias = TEAM_ALIASES[k];
-  const variants = Array.from(new Set([name.trim(), alias, k].filter(Boolean)));
+  const variants = Array.from(new Set([alias, name.trim(), k].filter(Boolean)));
   for (const q of variants) {
     const j = await tsdb(`/searchteams.php?t=${encodeURIComponent(q)}`);
     const teams: any[] = j?.teams || [];

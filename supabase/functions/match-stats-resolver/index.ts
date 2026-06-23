@@ -138,7 +138,7 @@ async function tsdbFindTeam(name: string): Promise<string | null> {
   const cached = await cacheGet(cacheKey, 30 * 86400);
   if (cached?.teamId) return cached.teamId as string;
   const alias = TEAM_ALIASES[key];
-  const variants = Array.from(new Set([name, alias, key].filter(Boolean)));
+  const variants = Array.from(new Set([alias, name, key].filter(Boolean)));
   for (const q of variants) {
     const j = await tsdbFetch(`https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=${encodeURIComponent(q)}`);
     const teams: any[] = j?.teams || [];

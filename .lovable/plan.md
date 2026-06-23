@@ -1,77 +1,61 @@
+## Objetivo
+Substituir a API-Football (API-Sports) como fonte principal por 3 APIs gratuitas, mantendo toda a estrutura do app (Pré-Jogo, Live, Scanner, Elite, Bingo, Match Reading) funcionando sem quebrar contratos internos.
 
-# Fallback Estatístico Inteligente
+## APIs a integrar
 
-Sistema que mantém o app funcionando quando API-Football falha, usando cache, histórico no banco e TheSportsDB — sem nunca inventar dados.
+1. **Football-Data.org** (token: `abb2fff02b464deeb79e7ba3151c1f9a`)
+   - Plano free: 10 req/min, ligas principais (PL, La Liga, Serie A, Bundesliga, Ligue 1, CL, etc.)
+   - Header: `X-Auth-Token`
+   - Cobertura: pré-jogo (fixtures/scheduled), placares ao vivo (sem stats avançadas)
+   
+2. **SportsRC / API-Football alternativo** (token: `abb2fff02b464deeb79e7ba3151c1f9a`)
+   - Vou validar o endpoint real antes (o domínio "SportsRC" não é canônico — pode ser um proxy de API-Sports). Se token + base URL não responderem, marco como inativa e documento.
+   
+3. **TheSportsDB v1 free (key `123`)**
+   - Já parcialmente integrado em `dataProvider/sources.ts`.
+   - Cobertura: eventos do dia, escudos, ligas, sem estatísticas live ricas.
 
-## 1. Banco de dados (1 migração)
+## Estratégia (não-destrutiva)
 
-**Nova tabela `match_stats_fallback`** — estatísticas normalizadas de qualquer fonte:
-
-- `match_id` (text, unique) · `home_team` · `away_team` · `league` · `kickoff_at`
-- Estatísticas: `avg_goals`, `avg_corners`, `btts_pct`, `over05_pct`, `over15_pct`, `over25_pct`, `over35_pct`, `clean_sheets_pct`
-- Forma: `home_form` (text "WWDWL"), `away_form`
-- H2H: `h2h_json` (jsonb)
-- Meta: `source` ('api-football' | 'thesportsdb' | 'historical' | 'mixed'), `confidence_score` (int 0-100), `raw_payload` (jsonb)
-- Timestamps + índice por `match_id` e `kickoff_at`
-- RLS: leitura `authenticated`, escrita só `service_role`
-
-**Nova tabela `fallback_logs`** — observabilidade:
-- `source_used`, `latency_ms`, `cache_hit`, `api_football_failed`, `signals_generated`, `created_at`
-- RLS: leitura admin
-
-## 2. Edge function `match-stats-resolver` (nova)
-
-Orquestra a cascata na ordem do briefing:
+Mantemos o **Data Provider Unificado** (`src/services/dataProvider/`) como orquestrador. Cada API vira um `MatchSource` com prioridade. A Edge Function `football-api` deixa de ser fonte primária e passa a um modo dormente (fallback opcional via secret), enquanto os novos sources passam a alimentar Pré-Jogo direto do cliente.
 
 ```text
-1) cache_api (TTL por tipo: jogos do dia 6h, classificação 24h,
-              stats históricas 7d, H2H 30d)
-2) match_stats_fallback no banco (se < TTL)
-3) API-Football (via football-api existente) — fonte primária quando viva
-4) TheSportsDB (lookuptable/eventslast/eventsh2h) — fallback
-5) Histórico no banco (qualquer idade) — último recurso
+Pré-Jogo (Home / Index)
+  ├─ 1. football-data-org      (priority 1)  ← novo
+  ├─ 2. sportsrc               (priority 2)  ← novo (se endpoint validado)
+  ├─ 3. thesportsdb-public     (priority 3)  ← já existe
+  └─ 99. stale-local-cache     (último recurso)
 ```
 
-A cada sucesso: normaliza para o schema padrão, grava em `match_stats_fallback` com `source` e `confidence_score`, atualiza `cache_api`, registra em `fallback_logs`.
+Live / Scanner / Elite continuam usando a Edge `football-api` até a Fase 2, porque dependem de stats ricas (dangerous attacks, SOT, possession) que **nenhuma das 3 free oferece**. Vou avisar isso claramente.
 
-**Score de confiança:**
-- 100 = API-Football fresh
-- 90 = TheSportsDB completo (todos campos preenchidos)
-- 80 = misto (TheSportsDB + histórico)
-- 70 = só histórico
-- < 70 = retorna `lowConfidence: true` e bloqueia geração automática de sinais
+## Mudanças por arquivo
 
-## 3. Integração com código existente
+### Novos
+- `src/services/dataProvider/sources/footballDataOrg.ts` — fetch via proxy edge (evita CORS + esconde token).
+- `src/services/dataProvider/sources/sportsRc.ts` — idem.
+- `supabase/functions/free-football-proxy/index.ts` — proxy único que recebe `{provider, path, params}` e injeta o token correto a partir dos secrets. Centraliza rate-limit e cache curto.
 
-- **`src/services/dataProvider`** — já tem cascata para listagem de jogos; adicionar campo `__confidence` por jogo vindo do resolver.
-- **`useMatchReading` / `match-analyst`** — antes de chamar a IA, busca stats pelo resolver; passa `confidence_score` no prompt. IA recebe instrução explícita: "use APENAS números fornecidos; se um campo estiver ausente, diga 'sem dado'".
-- **`auto-mode-server` / `scanner-pro-server` / `bingoEngine`** — antes de emitir sinal automático, ler `confidence_score`. Se < 70, pular sinal e logar em `fallback_logs.signals_generated=0`.
-- **UI (Home, Bingo, Elite, Scanner, MatchReadingModal)** — badge discreto "Confiança: 80%" quando < 100, e aviso amarelo "Baixa confiança — dados parciais" quando < 70.
+### Editados
+- `src/services/dataProvider/sources.ts` — registra os 2 novos sources e re-prioriza.
+- `src/services/footballApi.ts` — `fetchMatches` passa a delegar 100% ao Data Provider (remove dependência direta da edge antiga para pré-jogo). `fetchLiveMatches` permanece igual.
+- `src/hooks/useApiKeyValidator.tsx` — valida as 3 novas chaves em vez da antiga.
+- `src/pages/Index.tsx` — banner offline cita a nova ordem de fontes.
+- Secrets via `add_secret`: `FOOTBALL_DATA_ORG_KEY`, `SPORTSRC_KEY` (TheSportsDB usa `123` público — não precisa secret).
 
-## 4. Cache inteligente
+### Não tocados
+- Live Trader PRO, Scanner PRO server, Elite, Bingo, Match-Analyst — continuam usando API-Sports. Faço uma nota explícita.
 
-Reaproveitar `cache_api` (já existe) com chaves novas e TTL por tipo:
-- `mstats_day_{date}` → 6h
-- `mstats_standings_{leagueId}` → 24h
-- `mstats_team_{teamId}` → 7d
-- `mstats_h2h_{homeId}_{awayId}` → 30d
+## Limitações importantes (vou avisar o usuário)
+1. **Stats live (SOT, dangerous attacks, possession, corners ao vivo)** não existem nas 3 APIs gratuitas → Scanner/Elite/Live só funcionam plenamente se a API-Sports voltar.
+2. **Football-Data.org** limita a ~12 ligas grandes; jogos de divisões inferiores e amistosos podem sumir.
+3. **Rate limit free** (10 req/min) → cache agressivo de 6-12h por data.
 
-## 5. Garantias
+## Validação
+- Health-check no boot pingando cada provider.
+- Painel `/diagnostics` (já existe) mostra qual fonte serviu cada data.
+- Teste manual: carrega Home e confirma jogos do dia.
 
-- API-Football continua sendo a fonte primária — nada muda quando ela funciona.
-- IA nunca inventa: prompts do `match-analyst` ganham guard rail explícito.
-- Toda escrita registra origem em `source`; auditável no painel Admin.
-- TheSportsDB é a única fonte alternativa nesta fase (estável, sem scraping).
-
-## Detalhes técnicos
-
-- Mapeamento TheSportsDB → schema padrão: `eventsh2h.php` para H2H, `eventslast.php?id={teamId}` para forma (últimos 5), `lookuptable.php?l={leagueId}` para classificação. Cálculo de `avg_goals` = média de gols nos últimos 5 jogos. Campos não cobertos pelo TheSportsDB (xG, escanteios detalhados) ficam `null` — IA tratará como "sem dado".
-- `confidence_score` calculado por % de campos não-nulos × peso da fonte.
-- TTLs aplicados via `ultima_atualizacao` em `cache_api` + nova coluna lógica no resolver.
-- Sem novas dependências npm.
-
-## Fora de escopo (fases futuras)
-
-- SofaScore/FlashScore/FootyStats/Forebet (sem API oficial — só scraping; recusado).
-- Live Trader PRO (live exige dados em tempo real; fallback histórico seria enganoso).
-- SportMonks/RapidAPI (aguardando você indicar se tem chave).
+## Fora de escopo (não vou fazer agora)
+- Reescrever Scanner/Live para sobreviver sem stats ricas.
+- Remover a Edge `football-api` (fica como fallback dormente).

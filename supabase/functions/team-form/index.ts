@@ -77,12 +77,14 @@ async function resolveTeamId(name: string): Promise<string | null> {
   // Tenta nome bruto, alias em inglês e normalizado
   const alias = TEAM_ALIASES[k];
   const variants = Array.from(new Set([alias, name.trim(), k].filter(Boolean)));
+  let fallbackPick: any = null;
   for (const q of variants) {
     const j = await tsdb(`/searchteams.php?t=${encodeURIComponent(q)}`);
     const teams: any[] = j?.teams || [];
     // Prefere times de futebol
     const soccer = teams.filter((t) => /soccer|football/i.test(t?.strSport || ''));
-    const pool = soccer.length ? soccer : teams;
+    if (!fallbackPick && teams[0]) fallbackPick = teams[0];
+    const pool = soccer;
     if (!pool.length) continue;
 
     // Match exato normalizado
@@ -93,6 +95,10 @@ async function resolveTeamId(name: string): Promise<string | null> {
       teamIdByName.set(k, pick.idTeam);
       return pick.idTeam;
     }
+  }
+  if (fallbackPick?.idTeam) {
+    teamIdByName.set(k, fallbackPick.idTeam);
+    return fallbackPick.idTeam;
   }
   return null;
 }

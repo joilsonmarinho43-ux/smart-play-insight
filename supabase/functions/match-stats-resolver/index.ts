@@ -139,11 +139,13 @@ async function tsdbFindTeam(name: string): Promise<string | null> {
   if (cached?.teamId) return cached.teamId as string;
   const alias = TEAM_ALIASES[key];
   const variants = Array.from(new Set([alias, name, key].filter(Boolean)));
+  let fallbackTeam: any = null;
   for (const q of variants) {
     const j = await tsdbFetch(`https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=${encodeURIComponent(q)}`);
     const teams: any[] = j?.teams || [];
     const soccer = teams.filter((t: any) => /soccer|football/i.test(t?.strSport || ""));
-    const pool = soccer.length ? soccer : teams;
+    if (!fallbackTeam && teams[0]) fallbackTeam = teams[0];
+    const pool = soccer;
     const team = pool.find((t: any) => normalizeName(t?.strTeam || "") === key || (alias && normalizeName(t?.strTeam || "") === normalizeName(alias)))
       || pool.find((t: any) => normalizeName(t?.strTeam || "").includes(key) || key.includes(normalizeName(t?.strTeam || "")))
       || pool[0];
@@ -151,6 +153,10 @@ async function tsdbFindTeam(name: string): Promise<string | null> {
       await cacheSet(cacheKey, { teamId: team.idTeam });
       return team.idTeam as string;
     }
+  }
+  if (fallbackTeam?.idTeam) {
+    await cacheSet(cacheKey, { teamId: fallbackTeam.idTeam });
+    return fallbackTeam.idTeam as string;
   }
   return null;
 }

@@ -1,61 +1,63 @@
-## Objetivo
-Substituir a API-Football (API-Sports) como fonte principal por 3 APIs gratuitas, mantendo toda a estrutura do app (Pré-Jogo, Live, Scanner, Elite, Bingo, Match Reading) funcionando sem quebrar contratos internos.
+# Refatoração final: remover API-Sports da camada de dados
 
-## APIs a integrar
+## Escopo
+Eliminar completamente a API-Sports (provider, edge function, secrets, fallbacks, health checks) e migrar todos os engines (match-analysis, reading, scanner, live-goal, pressure, bingo) para a stack:
 
-1. **Football-Data.org** (token: `abb2fff02b464deeb79e7ba3151c1f9a`)
-   - Plano free: 10 req/min, ligas principais (PL, La Liga, Serie A, Bundesliga, Ligue 1, CL, etc.)
-   - Header: `X-Auth-Token`
-   - Cobertura: pré-jogo (fixtures/scheduled), placares ao vivo (sem stats avançadas)
-   
-2. **SportsRC / API-Football alternativo** (token: `abb2fff02b464deeb79e7ba3151c1f9a`)
-   - Vou validar o endpoint real antes (o domínio "SportsRC" não é canônico — pode ser um proxy de API-Sports). Se token + base URL não responderem, marco como inativa e documento.
-   
-3. **TheSportsDB v1 free (key `123`)**
-   - Já parcialmente integrado em `dataProvider/sources.ts`.
-   - Cobertura: eventos do dia, escudos, ligas, sem estatísticas live ricas.
+1. **SportsRC** (primária — fixtures, stats, incidents, h2h, lineups, graph)
+2. **Football-Data.org** (secundária — fixtures, standings, competitions)
+3. **TheSportsDB** (terciária — metadados, logos, last events)
+4. **Cache local** (último recurso)
 
-## Estratégia (não-destrutiva)
+## Mudanças
 
-Mantemos o **Data Provider Unificado** (`src/services/dataProvider/`) como orquestrador. Cada API vira um `MatchSource` com prioridade. A Edge Function `football-api` deixa de ser fonte primária e passa a um modo dormente (fallback opcional via secret), enquanto os novos sources passam a alimentar Pré-Jogo direto do cliente.
+### 1. Remoções
+- `supabase/functions/football-api/` (deletar — era proxy API-Sports)
+- Source `football-api-edge` em `src/services/dataProvider/sources.ts`
+- Função `fetchMatches` em `src/services/footballApi.ts` (e arquivo todo, se só esse uso)
+- Secret `API_FUTEBOL_KEY` (delete_secret) e referências
+- Validações/health checks de API-Sports em `useApiKeyValidator.tsx` e `useDataProviderHealthMonitor.ts`
+- Chamadas diretas a `footballApi.ts` nos engines/páginas (substituir por `getMatchesByDate` ou `match-stats-resolver`)
 
-```text
-Pré-Jogo (Home / Index)
-  ├─ 1. football-data-org      (priority 1)  ← novo
-  ├─ 2. sportsrc               (priority 2)  ← novo (se endpoint validado)
-  ├─ 3. thesportsdb-public     (priority 3)  ← já existe
-  └─ 99. stale-local-cache     (último recurso)
+### 2. Edge functions a atualizar (remover API-Sports, usar SportsRC)
+- `match-stats-resolver` — já tem SportsRC; remover branch API-Sports
+- `scanner-pro-server` — migrar para SportsRC (`type=matches&status=live` + `type=stats&id=`)
+- `auto-mode-server` — idem
+- `match-analyst`, `match-context` — usar SportsRC `type=detail|stats|h2h|standing`
+- `healthcheck` — checar SportsRC + Football-Data.org + TheSportsDB
+
+### 3. Engines client-side
+- `pressureEngine.ts`, `eliteMetrics.ts`, `liveGoalEngine.ts`, `readingEngine.ts`, `scannerEngine.ts`, `bingoEngine.ts`, `matchAnalysis.ts` — confirmar que recebem `LiveStats` puro (já são agnósticos ao provider). Adaptar mappers em `sportsrc.ts` para entregar o shape esperado (shotsOnGoal, totalShots, corners, possession, dangerousAttacks, xG).
+
+### 4. Métricas derivadas (quando SportsRC/FD.org/TSDB não fornecem)
+| Métrica | Fonte direta | Derivação se ausente |
+|---|---|---|
+| Dangerous Attacks | SportsRC `stats` | `shots*1.5 + corners*2` (já existe em eliteMetrics) |
+| xG | SportsRC `graph` | `shotsOnTarget*0.32 + shotsOff*0.06 + corners*0.04` |
+| Pressão (PI) | derivada | `stats + incidents + graph` (engine atual) |
+| Momentum | SportsRC `graph` series | janela móvel 5min sobre attacks/shots |
+| Força ofensiva | derivada | `xG*0.5 + shots/jogo*0.3 + standing.goalsFor*0.2` |
+| Risco de gol | derivada | `momentum*0.4 + shotmap_density*0.4 + incidents.recent*0.2` |
+| BTTS / Over | derivada | agregação de `last_matches` + `h2h` (já feita) |
+
+### 5. Relatório de cobertura
+Criar `docs/data-coverage.md` com tabela métrica × fornecedor × derivação.
+
+### 6. Prioridades em `sources.ts`
+```ts
+registerSource({ name: 'sportsrc',         priority: 1, fetchByDate: fetchSportsRC });
+registerSource({ name: 'football-data-org',priority: 2, fetchByDate: fetchFootballDataOrg });
+registerSource({ name: 'thesportsdb-public',priority: 3, fetchByDate: fetchTheSportsDB });
+// stale-cache local fica em prioridade 99 (último recurso)
 ```
 
-Live / Scanner / Elite continuam usando a Edge `football-api` até a Fase 2, porque dependem de stats ricas (dangerous attacks, SOT, possession) que **nenhuma das 3 free oferece**. Vou avisar isso claramente.
-
-## Mudanças por arquivo
-
-### Novos
-- `src/services/dataProvider/sources/footballDataOrg.ts` — fetch via proxy edge (evita CORS + esconde token).
-- `src/services/dataProvider/sources/sportsRc.ts` — idem.
-- `supabase/functions/free-football-proxy/index.ts` — proxy único que recebe `{provider, path, params}` e injeta o token correto a partir dos secrets. Centraliza rate-limit e cache curto.
-
-### Editados
-- `src/services/dataProvider/sources.ts` — registra os 2 novos sources e re-prioriza.
-- `src/services/footballApi.ts` — `fetchMatches` passa a delegar 100% ao Data Provider (remove dependência direta da edge antiga para pré-jogo). `fetchLiveMatches` permanece igual.
-- `src/hooks/useApiKeyValidator.tsx` — valida as 3 novas chaves em vez da antiga.
-- `src/pages/Index.tsx` — banner offline cita a nova ordem de fontes.
-- Secrets via `add_secret`: `FOOTBALL_DATA_ORG_KEY`, `SPORTSRC_KEY` (TheSportsDB usa `123` público — não precisa secret).
-
-### Não tocados
-- Live Trader PRO, Scanner PRO server, Elite, Bingo, Match-Analyst — continuam usando API-Sports. Faço uma nota explícita.
-
-## Limitações importantes (vou avisar o usuário)
-1. **Stats live (SOT, dangerous attacks, possession, corners ao vivo)** não existem nas 3 APIs gratuitas → Scanner/Elite/Live só funcionam plenamente se a API-Sports voltar.
-2. **Football-Data.org** limita a ~12 ligas grandes; jogos de divisões inferiores e amistosos podem sumir.
-3. **Rate limit free** (10 req/min) → cache agressivo de 6-12h por data.
-
 ## Validação
-- Health-check no boot pingando cada provider.
-- Painel `/diagnostics` (já existe) mostra qual fonte serviu cada data.
-- Teste manual: carrega Home e confirma jogos do dia.
+- Build limpo (sem imports quebrados de `footballApi`).
+- `probeAllSources(today)` retorna 3 fontes, nenhuma `api-sports`.
+- Healthcheck edge function responde OK para as 3 novas fontes.
+- Pré-Jogo, Scanner, Live Trader e Bingo continuam carregando dados.
 
-## Fora de escopo (não vou fazer agora)
-- Reescrever Scanner/Live para sobreviver sem stats ricas.
-- Remover a Edge `football-api` (fica como fallback dormente).
+## Riscos
+- Scanner/Live dependem de `dangerousAttacks` e SOT em tempo real. SportsRC fornece via `type=stats&id={match_id}` mas custa 1 req por jogo. Mitigação: batching de 3 jogos em paralelo + cache 90s (mesma política atual).
+- Se SportsRC `type=stats` não entregar SOT em alguma liga, fallback usa derivação Poisson já implementada no `eliteMetrics.ts` (proxy DA).
+
+Aprovar para eu executar tudo de uma vez.

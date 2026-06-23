@@ -22,6 +22,36 @@ function normalize(name: string): string {
     .trim();
 }
 
+const TEAM_ALIASES: Record<string, string> = {
+  'argelia': 'Algeria',
+  'inglaterra': 'England',
+  'jordania': 'Jordan',
+  'colombia': 'Colombia',
+  'rd congo': 'DR Congo',
+  'republica democratica do congo': 'DR Congo',
+  'uzbequistao': 'Uzbekistan',
+  'gana': 'Ghana',
+  'panama': 'Panama',
+  'croacia': 'Croatia',
+  'alemanha': 'Germany',
+  'espanha': 'Spain',
+  'italia': 'Italy',
+  'franca': 'France',
+  'paises baixos': 'Netherlands',
+  'holanda': 'Netherlands',
+  'belgica': 'Belgium',
+  'suica': 'Switzerland',
+  'suecia': 'Sweden',
+  'dinamarca': 'Denmark',
+  'polonia': 'Poland',
+  'marrocos': 'Morocco',
+  'egito': 'Egypt',
+  'japao': 'Japan',
+  'coreia do sul': 'South Korea',
+  'estados unidos': 'United States',
+  'eua': 'United States',
+};
+
 async function tsdb(path: string): Promise<any | null> {
   try {
     const ctrl = new AbortController();
@@ -44,24 +74,31 @@ async function resolveTeamId(name: string): Promise<string | null> {
   if (!k) return null;
   if (teamIdByName.has(k)) return teamIdByName.get(k)!;
 
-  // Tenta com o nome bruto primeiro, depois com normalizado
-  const variants = [name.trim(), k];
+  // Tenta nome bruto, alias em inglês e normalizado
+  const alias = TEAM_ALIASES[k];
+  const variants = Array.from(new Set([alias, name.trim(), k].filter(Boolean)));
+  let fallbackPick: any = null;
   for (const q of variants) {
     const j = await tsdb(`/searchteams.php?t=${encodeURIComponent(q)}`);
     const teams: any[] = j?.teams || [];
     // Prefere times de futebol
     const soccer = teams.filter((t) => /soccer|football/i.test(t?.strSport || ''));
-    const pool = soccer.length ? soccer : teams;
+    if (!fallbackPick && teams[0]) fallbackPick = teams[0];
+    const pool = soccer;
     if (!pool.length) continue;
 
     // Match exato normalizado
-    let pick = pool.find((t) => normalize(t?.strTeam || '') === k)
+    let pick = pool.find((t) => normalize(t?.strTeam || '') === k || (alias && normalize(t?.strTeam || '') === normalize(alias)))
             || pool.find((t) => normalize(t?.strTeam || '').includes(k) || k.includes(normalize(t?.strTeam || '')))
             || pool[0];
     if (pick?.idTeam) {
       teamIdByName.set(k, pick.idTeam);
       return pick.idTeam;
     }
+  }
+  if (fallbackPick?.idTeam) {
+    teamIdByName.set(k, fallbackPick.idTeam);
+    return fallbackPick.idTeam;
   }
   return null;
 }

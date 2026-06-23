@@ -67,6 +67,14 @@ const ANALYST_TTL = 30 * 60 * 1000;
 const FALLBACK_TTL = 60 * 60 * 1000;
 
 export function useMatchReading(match: MatchData, enabled: boolean) {
+  const statsSignature = [
+    match.modelData?.homeGoalsAvg,
+    match.modelData?.awayGoalsAvg,
+    match.modelData?.homeGoalsAgainstAvg,
+    match.modelData?.awayGoalsAgainstAvg,
+    match.sampleSize?.homeGames,
+    match.sampleSize?.awayGames,
+  ].join("|");
   const [state, setState] = useState<State>({
     loading: false,
     reading: null,
@@ -131,7 +139,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       // Pesquisa web SOMENTE quando não há reading (sem stats internas).
       // Se existe reading — mesmo com contextQuality "limitado" — preservamos
       // toda a leitura técnica enviando o payload completo ao analyst.
-      const dadosInsuficientes = !reading;
+      let dadosInsuficientes = !reading;
 
       // Resolver fallback estatístico em paralelo (cache → DB → TheSportsDB → histórico)
       let fallback: FallbackStats | null = null;
@@ -163,6 +171,14 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       }
       if (cancel) return;
 
+      const fallbackHasStats = Boolean(
+        fallback?.confidence_score &&
+        fallback.confidence_score > 0 &&
+        fallback.stats &&
+        Object.values(fallback.stats).some((v) => v !== null && v !== undefined && v !== "")
+      );
+      dadosInsuficientes = !reading && !fallbackHasStats;
+
       setState({
         loading: false,
         reading,
@@ -175,7 +191,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       });
 
       // Camada de análise humana via Lovable AI
-      const akey = String(fixtureId || `${match.homeTeam}-${match.awayTeam}`);
+      const akey = `${String(fixtureId || `${match.homeTeam}-${match.awayTeam}`)}:${dadosInsuficientes ? "research" : "stats"}:${fallback?.source || "none"}:${statsSignature}`;
       const cachedA = analystCache.get(akey);
       if (cachedA && Date.now() - cachedA.ts < ANALYST_TTL) {
         if (!cancel)
@@ -240,7 +256,7 @@ export function useMatchReading(match: MatchData, enabled: boolean) {
       cancel = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, (match as any).fixture?.id || match.id]);
+  }, [enabled, (match as any).fixture?.id || match.id, statsSignature]);
 
   return state;
 }

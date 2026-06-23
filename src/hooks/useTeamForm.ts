@@ -29,7 +29,8 @@ export function useTeamForm(match: MatchData | null | undefined) {
 
   // Só busca se a partida ainda não tem modelData populado
   const alreadyHas = Boolean(
-    match?.modelData?.homeGoalsAvg && match?.modelData?.awayGoalsAvg
+    Number(match?.modelData?.homeGoalsAvg || 0) > 0 &&
+    Number(match?.modelData?.awayGoalsAvg || 0) > 0
   );
 
   return useQuery<TeamFormResponse>({
@@ -56,14 +57,19 @@ export function mergeFormIntoMatch(match: MatchData, form?: TeamFormResponse | n
   const md = match.modelData || ({} as any);
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
+  const useForm = (current: any, incoming: number) => {
+    const cur = Number(current || 0);
+    return incoming > 0 && cur <= 0 ? incoming : current ?? incoming;
+  };
+  const sample = match.sampleSize;
   return {
     ...match,
     modelData: {
       ...md,
-      homeGoalsAvg: md.homeGoalsAvg ?? h.goalsForAvg,
-      awayGoalsAvg: md.awayGoalsAvg ?? a.goalsForAvg,
-      homeGoalsAgainstAvg: (md as any).homeGoalsAgainstAvg ?? h.goalsAgainstAvg,
-      awayGoalsAgainstAvg: (md as any).awayGoalsAgainstAvg ?? a.goalsAgainstAvg,
+      homeGoalsAvg: useForm(md.homeGoalsAvg, h.goalsForAvg),
+      awayGoalsAvg: useForm(md.awayGoalsAvg, a.goalsForAvg),
+      homeGoalsAgainstAvg: useForm((md as any).homeGoalsAgainstAvg, h.goalsAgainstAvg),
+      awayGoalsAgainstAvg: useForm((md as any).awayGoalsAgainstAvg, a.goalsAgainstAvg),
       homeCornersAvg: md.homeCornersAvg ?? null,
       awayCornersAvg: md.awayCornersAvg ?? null,
       homeCardsAvg: md.homeCardsAvg ?? null,
@@ -73,13 +79,13 @@ export function mergeFormIntoMatch(match: MatchData, form?: TeamFormResponse | n
       homeCardsVariance: md.homeCardsVariance ?? null,
       awayCardsVariance: md.awayCardsVariance ?? null,
     },
-    sampleSize: match.sampleSize ?? {
-      homeGames: h.games,
-      awayGames: a.games,
-      homeWithStats: h.games,
-      awayWithStats: a.games,
+    sampleSize: {
+      homeGames: Math.max(sample?.homeGames || 0, h.games),
+      awayGames: Math.max(sample?.awayGames || 0, a.games),
+      homeWithStats: Math.max(sample?.homeWithStats || 0, h.games),
+      awayWithStats: Math.max(sample?.awayWithStats || 0, a.games),
     },
-    homeStats: { ...hs, recentGoalsFor: hs.recentGoalsFor?.length ? hs.recentGoalsFor : h.recentGoalsFor },
-    awayStats: { ...as_, recentGoalsFor: as_.recentGoalsFor?.length ? as_.recentGoalsFor : a.recentGoalsFor },
+    homeStats: { ...hs, goalsFor: useForm(hs.goalsFor, h.goalsForAvg), goalsAgainst: useForm(hs.goalsAgainst, h.goalsAgainstAvg), gamesCount: Math.max(hs.gamesCount || 0, h.games), recentGoalsFor: hs.recentGoalsFor?.length ? hs.recentGoalsFor : h.recentGoalsFor, recentGoalsAgainst: hs.recentGoalsAgainst?.length ? hs.recentGoalsAgainst : h.recentGoalsAgainst },
+    awayStats: { ...as_, goalsFor: useForm(as_.goalsFor, a.goalsForAvg), goalsAgainst: useForm(as_.goalsAgainst, a.goalsAgainstAvg), gamesCount: Math.max(as_.gamesCount || 0, a.games), recentGoalsFor: as_.recentGoalsFor?.length ? as_.recentGoalsFor : a.recentGoalsFor, recentGoalsAgainst: as_.recentGoalsAgainst?.length ? as_.recentGoalsAgainst : a.recentGoalsAgainst },
   } as MatchData;
 }

@@ -417,9 +417,10 @@ serve(async (req) => {
       }
     }
 
+    const groqKey = Deno.env.get("GROQ_API_KEY");
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!geminiKey && !lovableKey) {
+    if (!groqKey && !geminiKey && !lovableKey) {
       return new Response(JSON.stringify(localAnalyst(body, "no_ai_key")), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -460,83 +461,126 @@ serve(async (req) => {
       ? "Analise a partida abaixo em MODO PESQUISA usando seu conhecimento sobre as equipes. Devolva apenas o JSON.\n\n"
       : "Analise a partida abaixo seguindo o fluxo. Devolva apenas o JSON.\n\n";
 
-    // Provedor: Gemini (Google AI Studio) direto se GEMINI_API_KEY presente; senão Lovable AI.
-    let content = "";
-    if (geminiKey) {
-      const model = pesquisaWeb ? "gemini-2.5-pro" : "gemini-2.5-flash";
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userPrefix + userPayload }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.6,
-          },
-        }),
-      });
-      if (resp.status === 429) {
-        return new Response(JSON.stringify(localAnalyst(body, "rate_limited")), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    type ProviderResult = { content: string; source: string } | null;
+
+    async function tryGroq(): Promise<ProviderResult> {
+      if (!groqKey) return null;
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 18000);
+        const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          signal: ctrl.signal,
+          headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.5,
+            max_tokens: 3000,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrefix + userPayload },
+            ],
+          }),
         });
+        clearTimeout(t);
+        if (!resp.ok) {
+          console.warn("[match-analyst] Groq fail", resp.status, (await resp.text()).slice(0, 200));
+          return null;
+        }
+        const data = await resp.json();
+        const content = data?.choices?.[0]?.message?.content || "";
+        return content ? { content, source: "groq" } : null;
+      } catch (e) {
+        console.warn("[match-analyst] Groq exception", e);
+        return null;
       }
-      if (!resp.ok) {
-        const txt = await resp.text();
-        console.error("Gemini API error", resp.status, txt);
-        return new Response(
-          JSON.stringify({ error: "ai_error", status: resp.status }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      const data = await resp.json();
-      const parts = data?.candidates?.[0]?.content?.parts || [];
-      content = parts.map((p: any) => p?.text || "").join("");
-    } else {
-      const model = pesquisaWeb ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrefix + userPayload },
-          ],
-          response_format: { type: "json_object" },
-        }),
-      });
-      if (resp.status === 429) {
-        return new Response(JSON.stringify(localAnalyst(body, "rate_limited")), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (resp.status === 402) {
-        return new Response(JSON.stringify({ error: "credits_exhausted" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (!resp.ok) {
-        const txt = await resp.text();
-        console.error("AI gateway error", resp.status, txt);
-        return new Response(
-          JSON.stringify({ error: "ai_error", status: resp.status }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      const data = await resp.json();
-      content = data?.choices?.[0]?.message?.content || "";
     }
-    const parsed = safeParseAnalyst(content);
-    if (!parsed) {
-      console.warn("analyst parse fail", content?.slice(0, 300));
-      return new Response(JSON.stringify(localAnalyst(body, "parse_fail")), {
+
+    async function tryGemini(): Promise<ProviderResult> {
+      if (!geminiKey) return null;
+      try {
+        const model = pesquisaWeb ? "gemini-2.5-pro" : "gemini-2.5-flash";
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: "user", parts: [{ text: userPrefix + userPayload }] }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.6 },
+          }),
+        });
+        if (!resp.ok) {
+          console.warn("[match-analyst] Gemini fail", resp.status, (await resp.text()).slice(0, 200));
+          return null;
+        }
+        const data = await resp.json();
+        const parts = data?.candidates?.[0]?.content?.parts || [];
+        const content = parts.map((p: any) => p?.text || "").join("");
+        return content ? { content, source: "gemini" } : null;
+      } catch (e) {
+        console.warn("[match-analyst] Gemini exception", e);
+        return null;
+      }
+    }
+
+    async function tryLovable(): Promise<ProviderResult> {
+      if (!lovableKey) return null;
+      try {
+        const model = pesquisaWeb ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+        const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrefix + userPayload },
+            ],
+            response_format: { type: "json_object" },
+          }),
+        });
+        if (!resp.ok) {
+          console.warn("[match-analyst] Lovable fail", resp.status, (await resp.text()).slice(0, 200));
+          return null;
+        }
+        const data = await resp.json();
+        const content = data?.choices?.[0]?.message?.content || "";
+        return content ? { content, source: "lovable" } : null;
+      } catch (e) {
+        console.warn("[match-analyst] Lovable exception", e);
+        return null;
+      }
+    }
+
+    // Cadeia: Groq → Gemini → Lovable Gateway → localAnalyst
+    let result = await tryGroq();
+    if (!result) result = await tryGemini();
+    if (!result) result = await tryLovable();
+
+    if (!result) {
+      console.warn("[match-analyst] todos provedores falharam → localAnalyst");
+      const local = localAnalyst(body, "ai_error");
+      if (cacheKey) await cacheSet(cacheKey, local);
+      return new Response(JSON.stringify({ ...local, _source: "local" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const parsed = safeParseAnalyst(result.content);
+    if (!parsed) {
+      console.warn("[match-analyst] parse fail src=", result.source, result.content?.slice(0, 300));
+      const local = localAnalyst(body, "parse_fail");
+      if (cacheKey) await cacheSet(cacheKey, local);
+      return new Response(JSON.stringify({ ...local, _source: "local" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    (parsed as any)._source = result.source;
     if (cacheKey) await cacheSet(cacheKey, parsed);
 
     return new Response(JSON.stringify(parsed), {

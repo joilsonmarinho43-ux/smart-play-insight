@@ -251,6 +251,113 @@ async function fromTheSportsDB(home: string, away: string): Promise<Stats | null
   return fieldsFilled(stats) > 0 ? stats : null;
 }
 
+// ── SportsRC v2 (prioridade 1) ───────────────────────────────────
+const SPORTSRC_KEY = Deno.env.get("SPORTSRC_API_KEY") || "";
+
+async function sportsrcFetch(type: string, id?: string): Promise<any | null> {
+  if (!SPORTSRC_KEY) return null;
+  const url = new URL("https://api.sportsrc.org/v2/");
+  url.searchParams.set("type", type);
+  if (id) url.searchParams.set("id", id);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(url.toString(), {
+      headers: { "X-API-KEY": SPORTSRC_KEY, "Accept": "application/json" },
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { clearTimeout(t); return null; }
+}
+
+function aggregateFromMatches(list: any[], teamName: string) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const slice = list.slice(0, 5);
+  let form = ""; let totalGoals = 0; let counted = 0;
+  let btts = 0, o05 = 0, o15 = 0, o25 = 0, o35 = 0, cs = 0;
+  for (const ev of slice) {
+    const home = ev?.teams?.home?.name || ev?.home || "";
+    const away = ev?.teams?.away?.name || ev?.away || "";
+    const gh = Number(ev?.score?.current?.home ?? ev?.score?.home ?? NaN);
+    const ga = Number(ev?.score?.current?.away ?? ev?.score?.away ?? NaN);
+    if (Number.isNaN(gh) || Number.isNaN(ga)) continue;
+    const isHome = String(home).toLowerCase() === teamName.toLowerCase();
+    const isAway = String(away).toLowerCase() === teamName.toLowerCase();
+    if (!isHome && !isAway) continue;
+    counted++;
+    const my = isHome ? gh : ga; const opp = isHome ? ga : gh;
+    form += my > opp ? "W" : my === opp ? "D" : "L";
+    const tot = gh + ga; totalGoals += tot;
+    if (gh > 0 && ga > 0) btts++;
+    if (tot > 0) o05++; if (tot > 1) o15++; if (tot > 2) o25++; if (tot > 3) o35++;
+    if (opp === 0) cs++;
+  }
+  if (counted === 0) return null;
+  return {
+    form, avgGoals: totalGoals / counted,
+    btts: (btts / counted) * 100,
+    over05: (o05 / counted) * 100, over15: (o15 / counted) * 100,
+    over25: (o25 / counted) * 100, over35: (o35 / counted) * 100,
+    cleanSheets: (cs / counted) * 100,
+  };
+}
+
+async function fromSportsRC(matchId: string, home: string, away: string): Promise<Stats | null> {
+  // matchId pode vir prefixado pelo front (srcv2-<id>) ou cru.
+  const rawId = matchId.replace(/^srcv2-/, "");
+  const [lastJ, h2hJ] = await Promise.all([
+    sportsrcFetch("last_matches", rawId),
+    sportsrcFetch("h2h", rawId),
+  ]);
+  if (!lastJ && !h2hJ) return null;
+  const stats = emptyStats();
+
+  // last_matches geralmente devolve { data: { home: [...], away: [...] } } ou listas planas
+  const lastHome = lastJ?.data?.home || lastJ?.data?.last_home || [];
+  const lastAway = lastJ?.data?.away || lastJ?.data?.last_away || [];
+  const flat = Array.isArray(lastJ?.data) ? lastJ.data : [];
+
+  const hAgg = aggregateFromMatches(lastHome.length ? lastHome : flat, home);
+  const aAgg = aggregateFromMatches(lastAway.length ? lastAway : flat, away);
+
+  if (hAgg) {
+    stats.home_form = hAgg.form;
+    stats.avg_goals = hAgg.avgGoals; stats.btts_pct = hAgg.btts;
+    stats.over05_pct = hAgg.over05; stats.over15_pct = hAgg.over15;
+    stats.over25_pct = hAgg.over25; stats.over35_pct = hAgg.over35;
+    stats.clean_sheets_pct = hAgg.cleanSheets;
+  }
+  if (aAgg) {
+    stats.away_form = aAgg.form;
+    if (stats.avg_goals !== null) {
+      stats.avg_goals = (stats.avg_goals + aAgg.avgGoals) / 2;
+      stats.btts_pct = ((stats.btts_pct ?? 0) + aAgg.btts) / 2;
+      stats.over05_pct = ((stats.over05_pct ?? 0) + aAgg.over05) / 2;
+      stats.over15_pct = ((stats.over15_pct ?? 0) + aAgg.over15) / 2;
+      stats.over25_pct = ((stats.over25_pct ?? 0) + aAgg.over25) / 2;
+      stats.over35_pct = ((stats.over35_pct ?? 0) + aAgg.over35) / 2;
+      stats.clean_sheets_pct = ((stats.clean_sheets_pct ?? 0) + aAgg.cleanSheets) / 2;
+    } else {
+      stats.avg_goals = aAgg.avgGoals; stats.btts_pct = aAgg.btts;
+      stats.over05_pct = aAgg.over05; stats.over15_pct = aAgg.over15;
+      stats.over25_pct = aAgg.over25; stats.over35_pct = aAgg.over35;
+      stats.clean_sheets_pct = aAgg.cleanSheets;
+    }
+  }
+
+  const h2hList = h2hJ?.data?.matches || h2hJ?.data || [];
+  if (Array.isArray(h2hList) && h2hList.length > 0) {
+    stats.h2h = h2hList.slice(0, 10).map((e: any) => ({
+      date: e?.date || e?.timestamp || null,
+      home: e?.teams?.home?.name || e?.home || null,
+      away: e?.teams?.away?.name || e?.away || null,
+      score: `${e?.score?.current?.home ?? e?.score?.home ?? "-"}-${e?.score?.current?.away ?? e?.score?.away ?? "-"}`,
+    }));
+  }
+  return fieldsFilled(stats) > 0 ? stats : null;
+
 // ── Persistência ─────────────────────────────────────────────────
 async function loadFromDb(matchId: string, maxAgeSec: number): Promise<any | null> {
   const { data } = await sb()

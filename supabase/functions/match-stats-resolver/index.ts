@@ -102,6 +102,25 @@ async function cacheSet(key: string, value: any) {
 }
 
 // ── TheSportsDB ──────────────────────────────────────────────────
+function normalizeName(name: string): string {
+  return String(name || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const TEAM_ALIASES: Record<string, string> = {
+  argelia: "Algeria", inglaterra: "England", jordania: "Jordan",
+  colombia: "Colombia", "rd congo": "DR Congo", uzbequistao: "Uzbekistan",
+  gana: "Ghana", panama: "Panama", croacia: "Croatia",
+  alemanha: "Germany", espanha: "Spain", italia: "Italy", franca: "France",
+  "paises baixos": "Netherlands", holanda: "Netherlands", belgica: "Belgium",
+  suica: "Switzerland", suecia: "Sweden", dinamarca: "Denmark", polonia: "Poland",
+  marrocos: "Morocco", egito: "Egypt", japao: "Japan", "coreia do sul": "South Korea",
+  "estados unidos": "United States", eua: "United States",
+};
+
 async function tsdbFetch(url: string, timeoutMs = 6000): Promise<any | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -114,16 +133,26 @@ async function tsdbFetch(url: string, timeoutMs = 6000): Promise<any | null> {
 }
 
 async function tsdbFindTeam(name: string): Promise<string | null> {
-  const cacheKey = `tsdb_team_${name.toLowerCase()}`;
+  const key = normalizeName(name);
+  const cacheKey = `tsdb_team_${key}`;
   const cached = await cacheGet(cacheKey, 30 * 86400);
   if (cached?.teamId) return cached.teamId as string;
-  const j = await tsdbFetch(
-    `https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=${encodeURIComponent(name)}`,
-  );
-  const team = j?.teams?.find((t: any) => /soccer/i.test(t?.strSport)) || j?.teams?.[0];
-  if (!team?.idTeam) return null;
-  await cacheSet(cacheKey, { teamId: team.idTeam });
-  return team.idTeam as string;
+  const alias = TEAM_ALIASES[key];
+  const variants = Array.from(new Set([name, alias, key].filter(Boolean)));
+  for (const q of variants) {
+    const j = await tsdbFetch(`https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=${encodeURIComponent(q)}`);
+    const teams: any[] = j?.teams || [];
+    const soccer = teams.filter((t: any) => /soccer|football/i.test(t?.strSport || ""));
+    const pool = soccer.length ? soccer : teams;
+    const team = pool.find((t: any) => normalizeName(t?.strTeam || "") === key || (alias && normalizeName(t?.strTeam || "") === normalizeName(alias)))
+      || pool.find((t: any) => normalizeName(t?.strTeam || "").includes(key) || key.includes(normalizeName(t?.strTeam || "")))
+      || pool[0];
+    if (team?.idTeam) {
+      await cacheSet(cacheKey, { teamId: team.idTeam });
+      return team.idTeam as string;
+    }
+  }
+  return null;
 }
 
 async function tsdbLastEvents(teamId: string): Promise<any[]> {

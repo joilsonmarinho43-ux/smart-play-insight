@@ -533,14 +533,16 @@ serve(async (req) => {
       try {
         const model = pesquisaWeb ? "gemini-2.5-pro" : "gemini-2.5-flash";
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        const reqBody: any = {
+          system_instruction: { parts: [{ text: systemPrompt + (pesquisaWeb ? "\n\nIMPORTANTE: Use a ferramenta google_search para buscar ODDS REAIS atuais (Bet365, Pinnacle, Betfair, OddsPortal, SofaScore, Academia das Apostas) e estatísticas recentes das equipes nesta partida específica. Preencha 'oddsReferencia' com odds reais encontradas. Devolva SOMENTE JSON puro (sem markdown, sem ```), começando com { e terminando com }." : "") }] },
+          contents: [{ role: "user", parts: [{ text: userPrefix + userPayload }] }],
+          generationConfig: { temperature: 0.6, ...(pesquisaWeb ? {} : { responseMimeType: "application/json" }) },
+          ...(pesquisaWeb ? { tools: [{ google_search: {} }] } : {}),
+        };
         const resp = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: "user", parts: [{ text: userPrefix + userPayload }] }],
-            generationConfig: { responseMimeType: "application/json", temperature: 0.6 },
-          }),
+          body: JSON.stringify(reqBody),
         });
         if (!resp.ok) {
           console.warn("[match-analyst] Gemini fail", resp.status, (await resp.text()).slice(0, 200));
@@ -585,10 +587,17 @@ serve(async (req) => {
       }
     }
 
-    // Cadeia: Groq → Gemini → Lovable Gateway → localAnalyst
-    let result = await tryGroq();
-    if (!result) result = await tryGemini();
-    if (!result) result = await tryLovable();
+    // Cadeia: em pesquisaWeb, Gemini primeiro (tem google_search). Caso contrário, Groq → Gemini → Lovable.
+    let result: ProviderResult = null;
+    if (pesquisaWeb) {
+      result = await tryGemini();
+      if (!result) result = await tryLovable();
+      if (!result) result = await tryGroq();
+    } else {
+      result = await tryGroq();
+      if (!result) result = await tryGemini();
+      if (!result) result = await tryLovable();
+    }
 
     if (!result) {
       console.warn("[match-analyst] todos provedores falharam → localAnalyst");

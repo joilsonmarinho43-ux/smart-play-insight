@@ -216,6 +216,9 @@ async function fetchWithAuth(endpoint: string, apiKey: string): Promise<any> {
     }
     const json = await res.json();
     await cbSuccess();
+    if (json?.errors && (Array.isArray(json.errors) ? json.errors.length : Object.keys(json.errors).length) > 0) {
+      console.warn(`[api-sports] ${endpoint} errors:`, JSON.stringify(json.errors), 'results=', json.results);
+    }
     return json;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

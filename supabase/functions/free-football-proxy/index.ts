@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, data: json }), {
+    return new Response(JSON.stringify({ ok: true, data: json, provider: body.provider, latency_ms: Date.now() - t0 }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {

@@ -616,6 +616,51 @@ export type Database = {
           },
         ]
       }
+      superbet_captures: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          market_hint: string | null
+          parsed_json: Json | null
+          parser_version: string | null
+          raw_image_url: string | null
+          raw_text: string | null
+          source_url: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          market_hint?: string | null
+          parsed_json?: Json | null
+          parser_version?: string | null
+          raw_image_url?: string | null
+          raw_text?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          market_hint?: string | null
+          parsed_json?: Json | null
+          parser_version?: string | null
+          raw_image_url?: string | null
+          raw_text?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       telegram_alert_state: {
         Row: {
           alert_key: string

@@ -28,6 +28,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import AutoPilot from "./pages/AutoPilot";
 import WorldCup from "./pages/WorldCup";
+import SuperbetConnect from "./pages/SuperbetConnect";
 import { AppLayout } from "./components/AppLayout";
 
 import { Loader2 } from "lucide-react";
@@ -100,6 +101,8 @@ const App = () => {
             <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
             <Route path="/autopilot" element={<ProtectedRoute><AppLayout><AutoPilot /></AppLayout></ProtectedRoute>} />
             <Route path="/world-cup" element={<ProtectedRoute><AppLayout><WorldCup /></AppLayout></ProtectedRoute>} />
+            <Route path="/superbet-connect" element={<ProtectedRoute><AppLayout><SuperbetConnect /></AppLayout></ProtectedRoute>} />
+            
             
             {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
             <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />

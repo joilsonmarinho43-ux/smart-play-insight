@@ -207,23 +207,14 @@ const Index = () => {
 
         </div>
 
-        {/* Banner Modo Offline / API suspensa */}
+        {/* Banner Modo Offline */}
         {offline && (
           <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200">
             <WifiOff className="w-4 h-4 shrink-0" />
             <div className="text-xs leading-tight">
-              {getOfflineReason() === 'api_suspended' ? (
-                <>
-                  <strong className="font-bold">API-Football suspensa</strong> — a conta do provedor de dados está bloqueada
-                  (verifique em <span className="underline">dashboard.api-football.com</span>). Exibindo último pré-jogo salvo.
-                </>
-              ) : (
-                <>
-                  <strong className="font-bold">Modo offline</strong> — exibindo último pré-jogo salvo
-                  {getOfflineSince() && ` (desde ${new Date(getOfflineSince()!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`}.
-                  API de futebol indisponível ou sem cota.
-                </>
-              )}
+              <strong className="font-bold">Modo offline</strong> — exibindo último pré-jogo salvo
+              {getOfflineSince() && ` (desde ${new Date(getOfflineSince()!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`}.
+              Provedores atuais temporariamente indisponíveis.
             </div>
           </div>
         )}

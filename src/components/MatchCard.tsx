@@ -6,6 +6,7 @@ import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, 
 import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from './MatchReadingModal';
 import { useTeamForm, mergeFormIntoMatch } from '@/hooks/useTeamForm';
+import { useTeamStatsAI, mergeAIStatsIntoMatch } from '@/hooks/useTeamStatsAI';
 
 
 
@@ -198,7 +199,9 @@ function StatsTab({ match }: { match: MatchData }) {
     <div>
       <div className="flex items-center justify-between px-2 pb-1 mb-1 border-b border-border/30">
         <span className="text-[10px] font-bold text-[hsl(170,55%,42%)] uppercase tracking-wider">{match.homeTeam}</span>
-        <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">Média 5 jogos</span>
+        <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">
+          {(match as any).statsSource?.startsWith('ai') ? 'Estimativa IA · 5 jogos' : 'Média 5 jogos'}
+        </span>
         <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{match.awayTeam}</span>
       </div>
 
@@ -379,7 +382,9 @@ const MatchCard = ({ match: rawMatch, isPremium }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
   const [readingOpen, setReadingOpen] = useState(false);
   const { data: form } = useTeamForm(rawMatch);
-  const match = useMemo(() => mergeFormIntoMatch(rawMatch, form), [rawMatch, form]);
+  const matchWithForm = useMemo(() => mergeFormIntoMatch(rawMatch, form), [rawMatch, form]);
+  const { data: aiStats } = useTeamStatsAI(matchWithForm);
+  const match = useMemo(() => mergeAIStatsIntoMatch(matchWithForm, aiStats), [matchWithForm, aiStats]);
   const { reading, loading, context, analyst, analystLoading, analystError, fallback } = useMatchReading(match, readingOpen);
 
 

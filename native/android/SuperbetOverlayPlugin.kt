@@ -37,6 +37,7 @@ class SuperbetOverlayPlugin : Plugin() {
         const val ACTION_CAPTURED = "app.lovable.superbet.CAPTURED"
         const val ACTION_ERROR = "app.lovable.superbet.ERROR"
         const val ACTION_STATE = "app.lovable.superbet.STATE"
+        const val ACTION_AUTO_DETECTED = "app.lovable.superbet.AUTO_DETECTED"
         const val EXTRA_IMAGE_BASE64 = "imageBase64"
         const val EXTRA_TIMESTAMP = "timestamp"
         const val EXTRA_CODE = "code"
@@ -62,6 +63,13 @@ class SuperbetOverlayPlugin : Plugin() {
                     data.put("running", intent.getBooleanExtra(EXTRA_RUNNING, false))
                     notifyListeners("overlayState", data)
                 }
+                ACTION_AUTO_DETECTED -> {
+                    data.put("matchLabel", intent.getStringExtra("matchLabel"))
+                    data.put("hasScore", intent.getBooleanExtra("hasScore", false))
+                    data.put("hasMinute", intent.getBooleanExtra("hasMinute", false))
+                    data.put("timestamp", intent.getLongExtra("timestamp", System.currentTimeMillis()))
+                    notifyListeners("overlayAutoDetected", data)
+                }
             }
         }
     }
@@ -71,6 +79,7 @@ class SuperbetOverlayPlugin : Plugin() {
             addAction(ACTION_CAPTURED)
             addAction(ACTION_ERROR)
             addAction(ACTION_STATE)
+            addAction(ACTION_AUTO_DETECTED)
         }
         LocalBroadcastManager.getInstance(context).registerReceiver(receiver, filter)
     }

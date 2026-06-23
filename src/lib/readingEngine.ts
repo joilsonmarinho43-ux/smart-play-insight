@@ -539,9 +539,63 @@ export function buildMatchReadingV2(
     } else if (m.market === "Vitória Fora") {
       reasons.push(`${away} chega mais produtivo e ${home} tem fragilidades expostas`);
       if (oddA) reasons.push(`mercado precifica em ${oddA.toFixed(2)}`);
+    } else if (/^1X\b|Casa ou Empate/i.test(m.market)) {
+      // Dupla chance casa+empate — favorita o mandante e protege empate
+      if (statFav === "home")
+        reasons.push(`${home} é favorito estatístico — derrota como mandante é o cenário menos provável`);
+      else if (balanced)
+        reasons.push(`jogo equilibrado em casa: ${home} raramente perde sem reagir`);
+      else
+        reasons.push(`${home} não vem dando espaço fácil em casa, mesmo sem ser favorito`);
+      if (oddH && oddD) {
+        const fairOdd = 1 / (1 / oddH + 1 / oddD);
+        reasons.push(`odd justa estimada ${fairOdd.toFixed(2)} (1 ${oddH.toFixed(2)} / X ${oddD.toFixed(2)})`);
+      } else if (oddA && oddA >= 2.4) {
+        reasons.push(`visitante precificado em ${oddA.toFixed(2)} — vitória dele exige cenário ideal`);
+      }
+    } else if (/^X2\b|Empate ou Fora/i.test(m.market)) {
+      // Dupla chance empate+visitante — protege azarão competente
+      if (statFav === "away")
+        reasons.push(`${away} chega com vantagem estatística — perde dificilmente em jogo equilibrado`);
+      else if (balanced)
+        reasons.push(`equilíbrio dos dois lados — empate ou reação visitante é cenário plausível`);
+      else
+        reasons.push(`${away} costuma escapar do revés mesmo fora de casa`);
+      if (oddA && oddD) {
+        const fairOdd = 1 / (1 / oddA + 1 / oddD);
+        reasons.push(`odd justa estimada ${fairOdd.toFixed(2)} (X ${oddD.toFixed(2)} / 2 ${oddA.toFixed(2)})`);
+      } else if (oddH && oddH >= 2.4) {
+        reasons.push(`mandante precificado em ${oddH.toFixed(2)} — vitória dele não é tranquila`);
+      }
+    } else if (/^12\b|Casa ou Fora/i.test(m.market)) {
+      reasons.push(`as duas equipes chegam buscando o resultado — perfil de jogo aberto reduz peso do empate`);
+      if (oddH && oddA) reasons.push(`mercado abre as duas pontas (${oddH.toFixed(2)} × ${oddA.toFixed(2)})`);
+    } else if (/Handicap/i.test(m.market)) {
+      // Handicap — explica o lado e a linha
+      const isPlus = /\+/.test(m.market);
+      const isMinus = /-/.test(m.market) && !isPlus;
+      const isFora = /Fora|Visitante/i.test(m.market);
+      const isCasa = /Casa|Mandante/i.test(m.market);
+      if (isPlus && isFora) {
+        reasons.push(`linha protege ${away} contra derrota por margem larga`);
+        if (Math.abs(diff) < 0.6) reasons.push(`diferença técnica curta — equilíbrio joga a favor do +`);
+        else if (oddA && oddA >= 2.2) reasons.push(`mercado precifica visitante em ${oddA.toFixed(2)} — competitivo`);
+      } else if (isPlus && isCasa) {
+        reasons.push(`linha protege ${home} contra derrota acentuada em casa`);
+        if (oddH) reasons.push(`mandante precificado em ${oddH.toFixed(2)}`);
+      } else if (isMinus && isCasa) {
+        reasons.push(`${home} chega forte como mandante — projeção sustenta vitória com folga`);
+        if (oddH) reasons.push(`vitória reta precificada em ${oddH.toFixed(2)}`);
+      } else if (isMinus && isFora) {
+        reasons.push(`${away} chega superior tecnicamente — projeção sustenta vitória com folga`);
+        if (oddA) reasons.push(`vitória reta precificada em ${oddA.toFixed(2)}`);
+      } else {
+        reasons.push(`linha de handicap coerente com o cenário projetado`);
+      }
     } else {
-      reasons.push(`leitura combinada aponta ${m.probability}% de chance`);
+      reasons.push(`projeção combinada sustenta probabilidade de ${m.probability}% neste mercado específico`);
     }
+
     return { market: m.market, confidence: dampen(m.probability, m.market), reasons: reasons.slice(0, 3) };
   });
 

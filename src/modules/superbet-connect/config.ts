@@ -10,7 +10,7 @@ export const SUPERBET_CONNECT_ENABLED: boolean = (() => {
   return true; // ON por padrão (beta)
 })();
 
-export const PARSER_VERSION = 'v0.3.0-ocr';
+export const PARSER_VERSION = 'v0.4.0-resilient';
 
 // Confiança mínima do OCR local antes de aceitar texto sem fallback Vision.
 export const OCR_MIN_CONFIDENCE = 60;

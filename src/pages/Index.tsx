@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchMultiDayMatches, isOfflineMode, getOfflineSince } from '@/services/footballApi';
+import { fetchMultiDayMatches, isOfflineMode, getOfflineSince, getOfflineReason } from '@/services/footballApi';
 import MatchCard from '@/components/MatchCard';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
 import { localizeTeamName } from '@/lib/teamI18n';

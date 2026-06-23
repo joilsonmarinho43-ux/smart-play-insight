@@ -1,7 +1,7 @@
-// Superbet Connect — Parser de texto e URL (Fase 2)
+// Superbet Connect — Parser de texto e URL (Fases 2–4)
 // Regex + heurísticas. Zero dependências de runtime — compatível com Deno.
 
-export const PARSER_VERSION = "v0.2.0-text-url";
+export const PARSER_VERSION = "v0.4.0-resilient";
 
 const STRIP_ACCENTS = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");

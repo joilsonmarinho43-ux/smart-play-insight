@@ -44,6 +44,15 @@ export function getOfflineSince(): number | null {
   return t ? Number(t) : null;
 }
 
+const OFFLINE_REASON_KEY = 'football_offline_reason';
+export function getOfflineReason(): string | null {
+  return localStorage.getItem(OFFLINE_REASON_KEY);
+}
+function setOfflineReason(r: string | null) {
+  if (r) localStorage.setItem(OFFLINE_REASON_KEY, r);
+  else localStorage.removeItem(OFFLINE_REASON_KEY);
+}
+
 function getStorageCache(key: string, timeKey: string, cooldown: number) {
   const data = localStorage.getItem(key);
   const time = localStorage.getItem(timeKey);

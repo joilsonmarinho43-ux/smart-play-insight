@@ -119,9 +119,10 @@ const Index = () => {
         homeLogo: m.teams?.home?.logo,
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',
-        time: m.fixture?.date
-          ? formatTimePara(m.fixture.date)
-          : m.time || '',
+        time: (() => {
+          const iso = m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : null);
+          return iso ? formatTimePara(iso) : (m.time || '');
+        })(),
         modelData: {
           homeGoalsAvg: hGF,
           awayGoalsAvg: aGF,

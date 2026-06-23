@@ -1,7 +1,7 @@
 // =====================================================================
 // HEALTH ALERTS — Monitora saúde do Data Provider e dispara notificações
 // ao admin quando:
-//  • A API principal (football-api-edge) fica indisponível
+//  • A API principal (SportsRC) fica indisponível
 //  • O risco de tela vazia cai para BAIXA resiliência
 //
 // Funciona apenas client-side, sem alterar UX dos usuários finais.

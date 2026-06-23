@@ -6,7 +6,7 @@ const STORAGE_KEY = 'api_key_validated_at';
 const REVALIDATE_AFTER = 1000 * 60 * 60 * 6; // 6h
 
 /**
- * Validação automática da API_FUTEBOL_KEY no boot do app.
+ * Validação automática da chave SportsRC no boot do app.
  * Faz um ping leve no edge function football-api e exibe toast caso falhe.
  * Cacheia sucesso por 6h para não desperdiçar cota.
  */

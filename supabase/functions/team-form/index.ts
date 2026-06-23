@@ -1,108 +1,94 @@
-// team-form: Últimos 5 jogos por time via Football-Data.org (FDO).
-//
-// Estratégia:
-//  1. Mantém em memória um mapa <nomeNormalizado, idFDO> populado sob
-//     demanda a partir das ligas grátis do FDO (PL, BL1, FL1, SA, PD,
-//     DED, PPL, BSA, CL, WC, EC).
-//  2. Para cada time da request, busca seus jogos finalizados nos
-//     últimos ~240 dias e devolve agregados dos 5 mais recentes.
+// team-form: Últimos 5 jogos por time via TheSportsDB (free, key '123').
+// FDO foi desativado (conta bloqueada). TSDB cobre praticamente todas as ligas
+// e não exige chave paga.
 //
 // Body: { home: string; away: string }
 // Resp: { ok, home: SideForm, away: SideForm }
 
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const FD_KEY = Deno.env.get('FOOTBALL_DATA_ORG_KEY') || '';
-const FD_BASE = 'https://api.football-data.org/v4';
+const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 
-const COMP_CODES = ['PL', 'BL1', 'FL1', 'SA', 'PD', 'DED', 'PPL', 'BSA', 'CL', 'EC', 'WC', 'ELC', 'CLI', 'PD2', 'SA2', 'BL2'];
-
-// Cache em memória (vive enquanto a instância do worker estiver quente)
-const teamIdByName = new Map<string, number>();
-const compFetched = new Set<string>();
-const matchesCache = new Map<number, { ts: number; data: any[] }>();
-const TTL_MATCHES = 1000 * 60 * 60 * 6; // 6h
+const teamIdByName = new Map<string, string>();
+const lastEventsCache = new Map<string, { ts: number; data: any[] }>();
+const TTL = 1000 * 60 * 60 * 6;
 
 function normalize(name: string): string {
   return String(name || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(/\b(fc|cf|sc|ac|afc|cfc|club|clube|de|do|da)\b/g, ' ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
 
-async function fd(path: string): Promise<any | null> {
-  if (!FD_KEY) return null;
+async function tsdb(path: string): Promise<any | null> {
   try {
     const ctrl = new AbortController();
     const to = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(FD_BASE + path, {
-      headers: { 'X-Auth-Token': FD_KEY, 'Accept': 'application/json' },
-      signal: ctrl.signal,
-    });
+    const res = await fetch(TSDB_BASE + path, { signal: ctrl.signal });
     clearTimeout(to);
-    if (!res.ok) return null;
-    return await res.json().catch(() => null);
-  } catch { return null; }
-}
-
-async function loadCompetitionTeams(code: string) {
-  if (compFetched.has(code)) return;
-  compFetched.add(code);
-  const j = await fd(`/competitions/${code}/teams`);
-  const teams: any[] = j?.teams || [];
-  for (const t of teams) {
-    if (!t?.id) continue;
-    const names = [t.name, t.shortName, t.tla].filter(Boolean);
-    for (const n of names) {
-      const k = normalize(n);
-      if (k && !teamIdByName.has(k)) teamIdByName.set(k, t.id);
+    if (!res.ok) {
+      console.warn(`[team-form] TSDB ${path} -> ${res.status}`);
+      return null;
     }
+    return await res.json().catch(() => null);
+  } catch (e) {
+    console.warn('[team-form] tsdb error', path, String(e));
+    return null;
   }
 }
 
-async function resolveTeamId(name: string): Promise<number | null> {
+async function resolveTeamId(name: string): Promise<string | null> {
   const k = normalize(name);
   if (!k) return null;
   if (teamIdByName.has(k)) return teamIdByName.get(k)!;
-  // Tenta carregar competições uma por uma até achar
-  for (const code of COMP_CODES) {
-    if (!compFetched.has(code)) {
-      await loadCompetitionTeams(code);
-      if (teamIdByName.has(k)) return teamIdByName.get(k)!;
+
+  // Tenta com o nome bruto primeiro, depois com normalizado
+  const variants = [name.trim(), k];
+  for (const q of variants) {
+    const j = await tsdb(`/searchteams.php?t=${encodeURIComponent(q)}`);
+    const teams: any[] = j?.teams || [];
+    // Prefere times de futebol
+    const soccer = teams.filter((t) => /soccer|football/i.test(t?.strSport || ''));
+    const pool = soccer.length ? soccer : teams;
+    if (!pool.length) continue;
+
+    // Match exato normalizado
+    let pick = pool.find((t) => normalize(t?.strTeam || '') === k)
+            || pool.find((t) => normalize(t?.strTeam || '').includes(k) || k.includes(normalize(t?.strTeam || '')))
+            || pool[0];
+    if (pick?.idTeam) {
+      teamIdByName.set(k, pick.idTeam);
+      return pick.idTeam;
     }
-  }
-  // Match por substring se ainda não bateu
-  for (const [stored, id] of teamIdByName.entries()) {
-    if (stored.length >= 4 && (stored.includes(k) || k.includes(stored))) return id;
   }
   return null;
 }
 
-async function lastMatchesFor(teamId: number): Promise<any[]> {
-  const cached = matchesCache.get(teamId);
-  if (cached && Date.now() - cached.ts < TTL_MATCHES) return cached.data;
-  const now = new Date();
-  const dateTo = now.toISOString().slice(0, 10);
-  const from = new Date(now.getTime() - 240 * 24 * 60 * 60 * 1000);
-  const dateFrom = from.toISOString().slice(0, 10);
-  const j = await fd(`/teams/${teamId}/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`);
-  const matches: any[] = j?.matches || [];
-  matchesCache.set(teamId, { ts: Date.now(), data: matches });
-  return matches;
+async function lastEvents(teamId: string): Promise<any[]> {
+  const cached = lastEventsCache.get(teamId);
+  if (cached && Date.now() - cached.ts < TTL) return cached.data;
+  const j = await tsdb(`/eventslast.php?id=${teamId}`);
+  const evts: any[] = j?.results || [];
+  lastEventsCache.set(teamId, { ts: Date.now(), data: evts });
+  return evts;
 }
 
-function summarize(teamId: number, matches: any[]) {
-  // Mais recentes primeiro
-  const sorted = [...matches].sort((a, b) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime());
+function summarize(teamId: string, evts: any[]) {
+  const sorted = [...evts].sort((a, b) => {
+    const da = new Date(a?.dateEvent || 0).getTime();
+    const db = new Date(b?.dateEvent || 0).getTime();
+    return db - da;
+  });
   const last5 = sorted.slice(0, 5);
   const gf: number[] = [];
   const ga: number[] = [];
-  for (const m of last5) {
-    const hs = m?.score?.fullTime?.home;
-    const as = m?.score?.fullTime?.away;
-    if (typeof hs !== 'number' || typeof as !== 'number') continue;
-    const isHome = m?.homeTeam?.id === teamId;
+  for (const e of last5) {
+    const hs = Number(e?.intHomeScore);
+    const as = Number(e?.intAwayScore);
+    if (!Number.isFinite(hs) || !Number.isFinite(as)) continue;
+    const isHome = String(e?.idHomeTeam) === String(teamId);
     gf.push(isHome ? hs : as);
     ga.push(isHome ? as : hs);
   }
@@ -119,8 +105,8 @@ function summarize(teamId: number, matches: any[]) {
 async function formFor(name: string) {
   const id = await resolveTeamId(name);
   if (!id) return { games: 0, goalsForAvg: 0, goalsAgainstAvg: 0, recentGoalsFor: [], recentGoalsAgainst: [], teamId: null };
-  const matches = await lastMatchesFor(id);
-  return { ...summarize(id, matches), teamId: id };
+  const evts = await lastEvents(id);
+  return { ...summarize(id, evts), teamId: id };
 }
 
 Deno.serve(async (req) => {
@@ -130,7 +116,9 @@ Deno.serve(async (req) => {
     const home = String(body?.home || '').trim();
     const away = String(body?.away || '').trim();
     if (!home || !away) {
-      return new Response(JSON.stringify({ error: 'missing_teams' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'missing_teams' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     const [h, a] = await Promise.all([formFor(home), formFor(away)]);
     return new Response(JSON.stringify({ ok: true, home: h, away: a }), {

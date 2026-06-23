@@ -661,6 +661,62 @@ export type Database = {
         }
         Relationships: []
       }
+      superbet_parser_health: {
+        Row: {
+          capture_id: string | null
+          confidence: number | null
+          created_at: string
+          fallbacks_used: string[]
+          id: string
+          kind: string | null
+          missing_fields: string[]
+          notes: string | null
+          parser_version: string
+          payload: Json | null
+          sportsrc_matched: boolean
+          sportsrc_used: boolean
+          vision_used: boolean
+        }
+        Insert: {
+          capture_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          fallbacks_used?: string[]
+          id?: string
+          kind?: string | null
+          missing_fields?: string[]
+          notes?: string | null
+          parser_version: string
+          payload?: Json | null
+          sportsrc_matched?: boolean
+          sportsrc_used?: boolean
+          vision_used?: boolean
+        }
+        Update: {
+          capture_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          fallbacks_used?: string[]
+          id?: string
+          kind?: string | null
+          missing_fields?: string[]
+          notes?: string | null
+          parser_version?: string
+          payload?: Json | null
+          sportsrc_matched?: boolean
+          sportsrc_used?: boolean
+          vision_used?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "superbet_parser_health_capture_id_fkey"
+            columns: ["capture_id"]
+            isOneToOne: false
+            referencedRelation: "superbet_captures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_alert_state: {
         Row: {
           alert_key: string

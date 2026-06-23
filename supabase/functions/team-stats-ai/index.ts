@@ -194,7 +194,7 @@ Forneça as médias dos últimos 5 jogos OFICIAIS de cada equipe (qualquer compe
     const out = { home: clean(parsed.home), away: clean(parsed.away) };
     await cacheSet(key, out);
 
-    return new Response(JSON.stringify({ ok: true, source: 'ai', ...out }), {
+    return new Response(JSON.stringify({ ok: true, source: usedSource, ...out }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {

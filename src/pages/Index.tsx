@@ -86,6 +86,8 @@ const Index = () => {
   const safeMatches = useMemo(() =>
     (rawMatches || [])
       .map((m: any) => {
+      const sourceIso = getMatchIso(m);
+      const dateKey = getMatchDateKey(m);
       const hStats = m.homeStats || {};
       const aStats = m.awayStats || {};
       const hGF = hStats.goalsFor || 0;
@@ -128,10 +130,8 @@ const Index = () => {
         homeLogo: m.teams?.home?.logo,
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',
-        time: (() => {
-          const iso = m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : null);
-          return iso ? formatTimePara(iso) : (m.time || '');
-        })(),
+        date: dateKey,
+        time: sourceIso ? formatTimePara(sourceIso) : (m.time || ''),
         modelData: {
           homeGoalsAvg: hGF,
           awayGoalsAvg: aGF,
@@ -157,8 +157,7 @@ const Index = () => {
   const dayMatches = useMemo(() => {
     if (!selectedDate) return safeMatches;
     return safeMatches.filter((m: any) => {
-      const iso = m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : null);
-      const matchDate = iso ? paraDateString(new Date(iso)) : (m.date || '');
+      const matchDate = m.date || getMatchDateKey(m);
       return matchDate === selectedDate;
     });
   }, [safeMatches, selectedDate]);

@@ -134,7 +134,7 @@ async function tsdbFetch(url: string, timeoutMs = 6000): Promise<any | null> {
 
 async function tsdbFindTeam(name: string): Promise<string | null> {
   const key = normalizeName(name);
-  const cacheKey = `tsdb_team_${key}`;
+  const cacheKey = `tsdb_team_v2_${key}`;
   const cached = await cacheGet(cacheKey, 30 * 86400);
   if (cached?.teamId) return cached.teamId as string;
   const alias = TEAM_ALIASES[key];

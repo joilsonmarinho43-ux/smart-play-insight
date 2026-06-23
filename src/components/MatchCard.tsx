@@ -6,6 +6,7 @@ import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, 
 import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from './MatchReadingModal';
 import { useTeamForm, mergeFormIntoMatch } from '@/hooks/useTeamForm';
+import { useTeamStatsAI, mergeAIStatsIntoMatch } from '@/hooks/useTeamStatsAI';
 
 
 
@@ -379,7 +380,9 @@ const MatchCard = ({ match: rawMatch, isPremium }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
   const [readingOpen, setReadingOpen] = useState(false);
   const { data: form } = useTeamForm(rawMatch);
-  const match = useMemo(() => mergeFormIntoMatch(rawMatch, form), [rawMatch, form]);
+  const matchWithForm = useMemo(() => mergeFormIntoMatch(rawMatch, form), [rawMatch, form]);
+  const { data: aiStats } = useTeamStatsAI(matchWithForm);
+  const match = useMemo(() => mergeAIStatsIntoMatch(matchWithForm, aiStats), [matchWithForm, aiStats]);
   const { reading, loading, context, analyst, analystLoading, analystError, fallback } = useMatchReading(match, readingOpen);
 
 

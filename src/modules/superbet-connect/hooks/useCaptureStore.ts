@@ -7,6 +7,7 @@ interface SubmitInput {
   sourceUrl?: string;
   imageBase64?: string;
   marketHint?: string;
+  ocrConfidence?: number;
 }
 
 export function useCaptureStore() {
@@ -63,6 +64,7 @@ export function useCaptureStore() {
           sourceUrl: input.sourceUrl ?? null,
           imageBase64: input.imageBase64 ?? null,
           marketHint: input.marketHint ?? null,
+          ocrConfidence: input.ocrConfidence ?? null,
         },
       });
       if (fnErr) throw fnErr;

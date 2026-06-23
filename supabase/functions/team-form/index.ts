@@ -32,7 +32,7 @@ function normalize(name: string): string {
 }
 
 async function fd(path: string): Promise<any | null> {
-  if (!FD_KEY) return null;
+  if (!FD_KEY) { console.warn('[team-form] no FD_KEY'); return null; }
   try {
     const ctrl = new AbortController();
     const to = setTimeout(() => ctrl.abort(), 8000);
@@ -41,9 +41,13 @@ async function fd(path: string): Promise<any | null> {
       signal: ctrl.signal,
     });
     clearTimeout(to);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.warn(`[team-form] FD ${path} -> ${res.status} ${txt.slice(0, 150)}`);
+      return null;
+    }
     return await res.json().catch(() => null);
-  } catch { return null; }
+  } catch (e) { console.warn('[team-form] fd error', path, e); return null; }
 }
 
 async function loadCompetitionTeams(code: string) {

@@ -30,8 +30,8 @@ const CACHE_TTL = {
   STATS_FINAL: 7 * 24 * 60 * 60 * 1000, // 7d
 };
 
-const LIVE_STATUSES = new Set(["1H", "2H", "HT", "ET", "P", "LIVE", "INPROGRESS", "IN_PROGRESS", "HALFTIME"]);
-const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "FINISHED", "ENDED"]);
+const LIVE_STATUSES = new Set(["1H", "2H", "HT", "ET", "P", "LIVE", "INPROGRESS", "IN_PROGRESS", "HALFTIME", "1ST HALF", "2ND HALF", "FIRSTHALF", "SECONDHALF"]);
+const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "FINISHED", "ENDED", "FULL TIME", "FULLTIME", "FULL-TIME"]);
 
 function getSb() {
   return createClient(
@@ -94,9 +94,20 @@ async function srcFetch(params: Record<string, string>): Promise<any> {
 
 function normStatus(raw: any): { short: string; elapsed: number | null } {
   const s = String(raw || "").toUpperCase().trim();
-  if (LIVE_STATUSES.has(s)) return { short: s === "INPROGRESS" || s === "IN_PROGRESS" || s === "LIVE" ? "1H" : s.replace("HALFTIME", "HT"), elapsed: null };
+  if (!s) return { short: "NS", elapsed: null };
+  // Live mapping
+  if (s === "1ST HALF" || s === "FIRSTHALF" || s === "1H") return { short: "1H", elapsed: null };
+  if (s === "2ND HALF" || s === "SECONDHALF" || s === "2H") return { short: "2H", elapsed: null };
+  if (s === "HALFTIME" || s === "HT" || s === "HALF TIME" || s === "HALF-TIME") return { short: "HT", elapsed: 45 };
+  if (s === "ET" || s === "EXTRA TIME") return { short: "ET", elapsed: 90 };
+  if (s === "PENALTIES" || s === "P" || s === "PEN") return { short: "P", elapsed: 120 };
+  if (s === "LIVE" || s === "INPROGRESS" || s === "IN_PROGRESS") return { short: "1H", elapsed: null };
+  // Finished
   if (FINISHED_STATUSES.has(s)) return { short: "FT", elapsed: 90 };
-  if (!s || s === "NS" || s === "SCHEDULED") return { short: "NS", elapsed: null };
+  // Scheduled
+  if (s === "NS" || s === "SCHEDULED" || s === "NOT STARTED" || s === "NOT_STARTED" || s === "TBD") return { short: "NS", elapsed: null };
+  // Cancelled / Postponed
+  if (s === "CANC" || s === "CANCELED" || s === "CANCELLED" || s === "PST" || s === "POSTPONED") return { short: "CANC", elapsed: null };
   return { short: s, elapsed: null };
 }
 
@@ -208,29 +219,44 @@ async function fetchFixtureStats(fixtureId: string | number): Promise<any> {
   const cached = await cacheGet(key, CACHE_TTL.STATS_LIVE);
   if (cached) return cached;
 
+  // SportsRC FREE plan: type=stats requires paid plan.
+  // Use type=detail (free) to extract scores + half-time + status.
+  // Statistics (shots, corners, possession) ficam vazios; engines aplicam
+  // derivações (proxy DA, Poisson) automaticamente.
   let json: any = null;
-  try { json = await srcFetch({ type: "stats", id: String(fixtureId) }); }
+  try { json = await srcFetch({ type: "detail", id: String(fixtureId) }); }
   catch (e) {
-    console.warn("[football-api] stats error", e instanceof Error ? e.message : e);
+    console.warn("[football-api] detail error", e instanceof Error ? e.message : e);
     const stale = await cacheGetStale(key);
     return stale ?? { response: [] };
   }
 
-  // SportsRC stats payload: tenta vários formatos
-  const d = json?.data || json;
-  const homeSide = d?.home || d?.stats?.home || d?.statistics?.home || null;
-  const awaySide = d?.away || d?.stats?.away || d?.statistics?.away || null;
-  const homeTeam = d?.teams?.home || d?.home_team || { id: null, name: null };
-  const awayTeam = d?.teams?.away || d?.away_team || { id: null, name: null };
+  const mi = json?.data?.match_info || {};
+  const teamsRaw = mi?.teams || {};
+  const score = mi?.score || {};
+  const cur = score?.current || {};
+  const period1: string = String(score?.period_1 || "");
+  const [ht1, ht2] = period1.includes("-") ? period1.split("-").map((s) => Number(s.trim())) : [null, null];
 
+  const homeTeam = { id: null, name: teamsRaw?.home?.name || null };
+  const awayTeam = { id: null, name: teamsRaw?.away?.name || null };
+  // Stats vazios — engines derivam de outras métricas
   const out = {
     response: [
-      toApiSportsStats(homeTeam, homeSide),
-      toApiSportsStats(awayTeam, awaySide),
+      toApiSportsStats(homeTeam, null),
+      toApiSportsStats(awayTeam, null),
     ],
+    extra: {
+      goals: { home: cur?.home ?? null, away: cur?.away ?? null },
+      halftime: { home: ht1 ?? null, away: ht2 ?? null },
+      status: mi?.status_detail || mi?.status || null,
+      venue: mi?.venue || null,
+    },
+    provider: "sportsrc",
   };
 
-  await cacheSet(key, out, "STATS");
+  const ttl = String(mi?.status || "").toLowerCase() === "finished" ? "STATS" : "LIVE";
+  await cacheSet(key, out, ttl);
   return out;
 }
 

@@ -138,6 +138,105 @@ const Section = ({
   </div>
 );
 
+interface SideForm {
+  games: number;
+  goalsForAvg: number;
+  goalsAgainstAvg: number;
+  recentGoalsFor: number[];
+  recentGoalsAgainst: number[];
+  recentResults?: Array<{ result: "W" | "D" | "L"; gf: number; ga: number; opp?: string; date?: string }>;
+}
+
+function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: string }) {
+  const [data, setData] = useState<{ home: SideForm; away: SideForm } | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancel = false;
+    setLoading(true);
+    supabase.functions
+      .invoke("team-form", { body: { home: homeTeam, away: awayTeam } })
+      .then(({ data: res }) => {
+        if (cancel) return;
+        if (res?.ok) setData({ home: res.home, away: res.away });
+        else setData(null);
+      })
+      .catch(() => !cancel && setData(null))
+      .finally(() => !cancel && setLoading(false));
+    return () => {
+      cancel = true;
+    };
+  }, [homeTeam, awayTeam]);
+
+  const renderSide = (label: string, side: SideForm | undefined) => {
+    const games = side?.games || 0;
+    const gf = side?.recentGoalsFor || [];
+    const ga = side?.recentGoalsAgainst || [];
+    const results: Array<"W" | "D" | "L"> =
+      side?.recentResults?.map((r) => r.result) ||
+      gf.map((g, i) => {
+        const a = ga[i] ?? 0;
+        return g > a ? "W" : g < a ? "L" : "D";
+      });
+    return (
+      <div className="rounded-lg bg-secondary/40 border border-border p-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-bold text-foreground">{label}</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            {games} jogo{games === 1 ? "" : "s"}
+          </span>
+        </div>
+        {games === 0 ? (
+          <div className="text-[11px] text-muted-foreground italic">
+            Sem histórico recente disponível
+          </div>
+        ) : (
+          <>
+            <div className="flex gap-1 mb-1.5">
+              {results.slice(0, 5).map((r, i) => (
+                <span
+                  key={i}
+                  className={`w-6 h-6 rounded text-[11px] font-bold flex items-center justify-center ${
+                    r === "W"
+                      ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/40"
+                      : r === "D"
+                        ? "bg-amber-500/25 text-amber-300 border border-amber-500/40"
+                        : "bg-red-500/25 text-red-300 border border-red-500/40"
+                  }`}
+                >
+                  {r}
+                </span>
+              ))}
+            </div>
+            <div className="text-[11px] text-foreground/80">
+              Gols: {gf.join("-") || "—"} <span className="opacity-50">/</span>{" "}
+              Sofridos: {ga.join("-") || "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              Média: {(side?.goalsForAvg ?? 0).toFixed(1)} marcados ·{" "}
+              {(side?.goalsAgainstAvg ?? 0).toFixed(1)} sofridos
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Section icon={TrendingUp} title="Últimos 5 jogos">
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="w-3 h-3 animate-spin" /> Buscando histórico…
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {renderSide(homeTeam, data?.home)}
+          {renderSide(awayTeam, data?.away)}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 const predBadge = {
   verde: { color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40", label: "🟢 Jogo previsível" },
   amarelo: { color: "bg-amber-500/20 text-amber-300 border-amber-500/40", label: "🟡 Jogo sensível" },

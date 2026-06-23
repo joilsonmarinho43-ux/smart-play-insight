@@ -501,9 +501,26 @@ export const MatchReadingModal = ({
           <DialogDescription className="text-xs text-muted-foreground">
             {homeTeam} <span className="opacity-60">vs</span> {awayTeam}
           </DialogDescription>
-          {fallback && (
-            <ConfidenceBadge fallback={fallback} readingComplete={readingComplete} />
-          )}
+          {fallback && (() => {
+            const indicatorsText = (reading?.indicators ?? []).join(" ").toLowerCase();
+            const coveredByReading: Record<string, boolean> = {
+              avg_corners: /escante|canto|corner/.test(indicatorsText),
+              avg_goals: typeof reading?.projectedGoals === "number",
+              avg_goals_for: /marca\s+\d/.test(indicatorsText),
+              avg_goals_against: /sofre\s+\d/.test(indicatorsText),
+              home_form: /\b(últimas|forma)\b/.test(indicatorsText),
+              away_form: /\b(últimas|forma)\b/.test(indicatorsText),
+            };
+            const filteredMissing = (fallback.missing || []).filter(
+              (k) => !coveredByReading[k],
+            );
+            return (
+              <ConfidenceBadge
+                fallback={{ ...fallback, missing: filteredMissing }}
+                readingComplete={readingComplete}
+              />
+            );
+          })()}
         </DialogHeader>
 
         {loading && (

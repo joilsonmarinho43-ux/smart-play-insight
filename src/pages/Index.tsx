@@ -32,6 +32,15 @@ const LEAGUE_LABELS: Record<string, string> = {
   'Champions League': '🏆 Champions',
 };
 
+function getMatchIso(match: any): string | null {
+  return match?.fixture?.date || (typeof match?.time === 'string' && match.time.includes('T') ? match.time : null);
+}
+
+function getMatchDateKey(match: any): string {
+  const iso = getMatchIso(match);
+  return iso ? paraDateString(new Date(iso)) : (match?.date || '');
+}
+
 const Index = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();

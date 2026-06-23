@@ -30,8 +30,8 @@ const CACHE_TTL = {
   STATS_FINAL: 7 * 24 * 60 * 60 * 1000, // 7d
 };
 
-const LIVE_STATUSES = new Set(["1H", "2H", "HT", "ET", "P", "LIVE", "INPROGRESS", "IN_PROGRESS", "HALFTIME"]);
-const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "FINISHED", "ENDED"]);
+const LIVE_STATUSES = new Set(["1H", "2H", "HT", "ET", "P", "LIVE", "INPROGRESS", "IN_PROGRESS", "HALFTIME", "1ST HALF", "2ND HALF", "FIRSTHALF", "SECONDHALF"]);
+const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "FINISHED", "ENDED", "FULL TIME", "FULLTIME", "FULL-TIME"]);
 
 function getSb() {
   return createClient(
@@ -94,9 +94,20 @@ async function srcFetch(params: Record<string, string>): Promise<any> {
 
 function normStatus(raw: any): { short: string; elapsed: number | null } {
   const s = String(raw || "").toUpperCase().trim();
-  if (LIVE_STATUSES.has(s)) return { short: s === "INPROGRESS" || s === "IN_PROGRESS" || s === "LIVE" ? "1H" : s.replace("HALFTIME", "HT"), elapsed: null };
+  if (!s) return { short: "NS", elapsed: null };
+  // Live mapping
+  if (s === "1ST HALF" || s === "FIRSTHALF" || s === "1H") return { short: "1H", elapsed: null };
+  if (s === "2ND HALF" || s === "SECONDHALF" || s === "2H") return { short: "2H", elapsed: null };
+  if (s === "HALFTIME" || s === "HT" || s === "HALF TIME" || s === "HALF-TIME") return { short: "HT", elapsed: 45 };
+  if (s === "ET" || s === "EXTRA TIME") return { short: "ET", elapsed: 90 };
+  if (s === "PENALTIES" || s === "P" || s === "PEN") return { short: "P", elapsed: 120 };
+  if (s === "LIVE" || s === "INPROGRESS" || s === "IN_PROGRESS") return { short: "1H", elapsed: null };
+  // Finished
   if (FINISHED_STATUSES.has(s)) return { short: "FT", elapsed: 90 };
-  if (!s || s === "NS" || s === "SCHEDULED") return { short: "NS", elapsed: null };
+  // Scheduled
+  if (s === "NS" || s === "SCHEDULED" || s === "NOT STARTED" || s === "NOT_STARTED" || s === "TBD") return { short: "NS", elapsed: null };
+  // Cancelled / Postponed
+  if (s === "CANC" || s === "CANCELED" || s === "CANCELLED" || s === "PST" || s === "POSTPONED") return { short: "CANC", elapsed: null };
   return { short: s, elapsed: null };
 }
 

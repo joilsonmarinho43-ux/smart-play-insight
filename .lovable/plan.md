@@ -1,99 +1,108 @@
-# Superbet Connect — Captura via Compartilhamento Android
+# Superbet Connect — Fase 5: Overlay Flutuante (Bolha)
 
-Módulo isolado em `src/modules/superbet-connect/` + edge function `superbet-parse`. **Não altera** Live, Pré-Jogo, Scanner ou Elite — apenas adiciona uma nova fonte ao `DataProvider` quando o usuário envia dados.
+Substitui o fluxo de Share Intent (que não funciona porque a Superbet não tem botão Compartilhar) por uma **bolha flutuante estilo Messenger** que fica por cima da Superbet e captura a tela atual com um toque.
 
-## Pré-requisitos (sem isso nada funciona)
-
-1. **Capacitor instalado** no projeto (`@capacitor/core`, `/cli`, `/android`, `/share`, `/camera`, `/filesystem`). Hoje o projeto é só web — vou adicionar a camada Android.
-2. Usuário precisa **exportar pro GitHub → `npx cap add android` → Android Studio** para gerar o APK. Lovable não compila APK; só prepara o código.
-3. Share Target nativo Android (intent-filter `SEND` para `text/plain`, `image/*`, `application/pdf`).
-
-## Fluxo do usuário
+## Como o usuário vai usar
 
 ```text
-Superbet app ─▶ botão Compartilhar ─▶ "Match Insight Pro"
-                                          │
-              ┌───────────────────────────┼───────────────────────────┐
-              ▼                           ▼                           ▼
-      texto/URL compartilhada       screenshot (PNG/JPG)        múltiplas imagens
-              │                           │                           │
-              ▼                           ▼                           ▼
-       Parser de URL/HTML          OCR (Tesseract.js WASM)     OCR em batch
-              │                           │                           │
-              └───────────────┬───────────┴───────────────┬───────────┘
-                              ▼                           ▼
-                      Normalizador (Zod schemas)   Detector de mercado
-                                      │
-                                      ▼
-                      Tabela `superbet_captures` (Lovable Cloud)
-                                      │
-                                      ▼
-               Registrado como `MatchSource` priority=0 (override Superbet)
-                                      │
-                                      ▼
-                      Engines existentes consomem normalmente
+1. Abre o Analista Joilson → tela "Superbet Connect" → toca "Ativar bolha"
+2. Sistema pede 2 permissões (uma vez só):
+     • "Exibir sobre outros apps"   (SYSTEM_ALERT_WINDOW)
+     • "Permitir gravação de tela"  (MediaProjection)
+3. Bolha laranja aparece na borda da tela e fica visível em qualquer app
+4. Usuário abre a Superbet, navega até o jogo desejado
+5. Toca na bolha → flash de captura → screenshot vai pro Match Insight Pro
+6. Notificação: "Jogo Flamengo x Palmeiras capturado — toque para ver análise"
+7. Toque longo na bolha = menu (mover, ocultar, capturar+abrir leitura)
 ```
 
-## Fases
+## Arquitetura
 
-### Fase 1 — Fundação (esta entrega)
-- Instalar Capacitor + plugins (`@capacitor/share`, `@capacitor/filesystem`, `@capacitor-community/share-target`).
-- `capacitor.config.ts` com appId/appName + hot-reload pro sandbox.
-- Página `/superbet-connect` com:
-  - Onboarding (passos pra instalar APK).
-  - Tela "Aguardando compartilhamento" + área de drop manual (web fallback).
-  - Botão "Colar texto da Superbet" (funciona até no web).
-- Tabela `superbet_captures` (id, user_id, raw_text, raw_image_url, parsed_json, source_url, market_hint, status, created_at) com RLS por user_id.
-- Edge function `superbet-parse` (stub) que aceita `{ text?, imageBase64? }` e devolve JSON normalizado.
+```text
+┌─────────────────────────────────────────────────────────┐
+│  APP ANDROID (Capacitor)                                │
+│                                                         │
+│  ┌──────────────────┐    ┌─────────────────────────┐   │
+│  │ React UI         │◄──►│ Plugin Capacitor Custom │   │
+│  │ /superbet-connect│    │ SuperbetOverlay         │   │
+│  └──────────────────┘    └───────────┬─────────────┘   │
+│                                      │                  │
+│                          ┌───────────▼───────────┐     │
+│                          │ Android Native (Kotlin)│    │
+│                          │                        │    │
+│                          │ • OverlayService       │    │
+│                          │   (bubble + WindowMgr) │    │
+│                          │ • CaptureService       │    │
+│                          │   (MediaProjection)    │    │
+│                          │ • PermissionActivity   │    │
+│                          └───────────┬────────────┘    │
+└──────────────────────────────────────┼─────────────────┘
+                                       │ screenshot PNG (base64)
+                                       ▼
+                          ┌────────────────────────┐
+                          │ Edge: superbet-parse   │
+                          │ (já existe — v0.4.0)   │
+                          │ OCR → Vision → SportsRC│
+                          └────────────────────────┘
+```
 
-### Fase 2 — Parser de texto/URL
-- Regex + heurísticas pra extrair: nomes dos times, mercados (Over/Under, Handicap, Escanteios, BTTS), odds (1.xx–999), placar, minuto.
-- URL parser: detecta `superbet.bet.br/.../{slug-do-jogo}` e extrai slug → nomes normalizados.
-- Schemas Zod por tipo de captura: `OddsBlock`, `StatsBlock`, `H2HBlock`, `LineupBlock`, `IncidentsBlock`.
-- Detector de tipo: olha keywords ("escanteios", "finalizações", "posse", "cartões", "H2H", "escalações") e roteia.
+## Entregáveis
 
-### Fase 3 — OCR de screenshots
-- Tesseract.js v5 WASM no cliente (sem servidor) com idioma `por+eng`.
-- Pré-processamento: grayscale + threshold (Canvas API) pra melhorar leitura de odds.
-- ROI detection simples: divide a imagem em bandas e roda OCR por banda.
-- Fallback: se OCR cliente <60% confiança, envia base64 pro edge function que chama Gemini Vision (já temos `GEMINI_API_KEY`) com prompt estruturado pedindo JSON.
+### 1. Plugin Capacitor nativo
+- `android/app/src/main/java/.../SuperbetOverlayPlugin.kt`
+  - `requestPermissions()` — pede SYSTEM_ALERT_WINDOW + MediaProjection
+  - `startOverlay()` / `stopOverlay()`
+  - `captureNow()` — força captura via JS (caso o user prefira disparar do app)
+  - Event `overlayCaptured` → devolve `{ imageBase64, timestamp }` pro JS
 
-### Fase 4 — Extratores resilientes (sua spec original adaptada)
-- **Nível 1** Parser estruturado de URL/slug Superbet.
-- **Nível 2** Regex/keyword matching no texto colado/compartilhado.
-- **Nível 3** OCR cliente (Tesseract) → OCR servidor (Gemini Vision).
-- **Nível 4** Fallback SportsRC (já existe — só amarrar como último nível).
-- Cada nível retorna `{ ok, confidence, data, missingFields[] }`. Orquestrador escolhe maior confiança.
+### 2. Services Android (Kotlin)
+- `OverlayService` (Foreground Service)
+  - Cria a bolha com `WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY)`
+  - Arrastável (touch listener), snap nas bordas
+  - Toque curto = captura, toque longo = menu
+- `CaptureService` (Foreground Service tipo `mediaProjection`)
+  - Mantém o `MediaProjection` vivo entre capturas
+  - Pega frame via `ImageReader` → converte pra PNG → base64
+  - Notificação persistente obrigatória (Android exige pra MediaProjection)
 
-### Fase 5 — Normalização e injeção nos engines
-- `superbetNormalize.ts`: mapeia times via `normalizeTeamName` existente, ligas via dicionário interno, mercados pro vocabulário interno (`over_2_5`, `corners_9_5`, etc).
-- Registrar `MatchSource { name: 'superbet-shared', priority: 0 }` no `dataProvider/sources.ts` — só dispara quando há captura recente do user pro mesmo jogo.
-- Hook `useSuperbetEnrichment(matchId)` que injeta odds/stats no Modal de Leitura e Live.
+### 3. Camada JS (`src/modules/superbet-connect/`)
+- `native/overlayBridge.ts` — wrapper do plugin
+- `hooks/useOverlay.ts` — `{ enabled, permissionStatus, enable(), disable(), lastCapture }`
+- `components/OverlayControl.tsx` — card de ativação na página `/superbet-connect`
+  - Estado da permissão (com instruções se negada)
+  - Toggle ON/OFF
+  - Última captura (preview + status do parser)
+  - Fallback web: se não estiver no APK Android, mostra "Disponível apenas no app Android"
 
-### Fase 6 — Monitor de mudanças
-- Tabela `superbet_parser_health` (parser_version, field, success_count, fail_count, last_fail_sample, last_fail_at).
-- Toda captura atualiza contadores por campo. Se `fail_count/(success+fail) > 30%` em 24h → alerta no painel admin (`/admin`) com sample do texto que falhou.
-- Reaproveita `dp:health-alert` event + `useDataProviderHealthMonitor` que já existem.
-- Versionamento de parser: bumpa `parser_version` quando regex muda → métricas resetam.
+### 4. Integração com pipeline existente
+- Captura → chama `useCaptureStore.submit({ imageBase64 })` (já existe)
+- `superbet-parse` v0.4.0 já trata imagem: OCR client-side → Vision → SportsRC
+- Sem mudanças no edge function
+
+### 5. Atualizar AndroidManifest
+- `SYSTEM_ALERT_WINDOW`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION`, `POST_NOTIFICATIONS`
+- Declarar os 2 services
+
+### 6. Remover / aposentar Share Receiver
+- `ShareReceiver.tsx` deixa de ser destaque (vira fallback escondido)
+- Documentação no topo da página explica o novo fluxo com bolha
+
+## Detalhes técnicos
+
+- **MediaProjection**: usuário precisa autorizar a cada cold-start do app (limitação do Android, sem volta). A bolha vai indicar visualmente quando a permissão expirou e precisa reautorizar.
+- **Bolha sobrevive em qualquer app** porque `OverlayService` roda como foreground service. Não morre quando o user troca pra Superbet.
+- **Captura é silenciosa** — não aparece notificação de "tela sendo gravada" piscando (Android 14+ exige a notif persistente, que já vai estar lá).
+- **Sandbox Lovable não roda Android**: vou deixar tudo pronto no código. Pra testar: `git pull` → `npm install` → `npx cap sync android` → `npx cap run android` no Android Studio.
+- **Web/preview**: a página `/superbet-connect` detecta `Capacitor.isNativePlatform()`. Se for web, mostra apenas o `ManualPaste` (já implementado) e oculta o controle de overlay.
 
 ## Limitações que você precisa aceitar
-- **Não funciona dentro do app web normal** — só no APK Android compilado. No navegador, só a parte de "colar texto" funciona.
-- **OCR não é perfeito** — odds estilizadas (com sombra/gradiente) erram ~10–20%. Por isso o fallback Gemini Vision.
-- **Superbet pode mudar layout** — por isso fases 4 e 6. Mas mudança grande exige você (ou eu, num pedido novo) ajustar regex.
-- **Compilação do APK é fora do Lovable** — Android Studio na sua máquina ou serviço de CI.
 
-## Esta entrega (Fase 1 apenas)
+- **Só Android**. iOS não permite overlays sobre outros apps (limitação da Apple, sem fallback).
+- **Permissão SYSTEM_ALERT_WINDOW** abre tela de configurações do sistema — a Play Store pode pedir justificativa se você publicar lá. Pra distribuição interna (APK direto) não tem problema.
+- **MediaProjection captura a tela inteira**, não só a área da Superbet. O OCR/Vision já filtra o que importa.
+- **Não compilo APK aqui** — só preparo o código. Você compila no Android Studio.
 
-Vou implementar **só a Fase 1** agora pra não despejar 30 arquivos meio-prontos. Você testa a estrutura, valida o fluxo de share, e me dá OK pra seguir pras fases 2–6 uma por vez.
-
-Arquivos criados na Fase 1:
-- `capacitor.config.ts`
-- `src/modules/superbet-connect/{index.ts, types.ts, config.ts}`
-- `src/modules/superbet-connect/components/{SuperbetConnectCard, ShareReceiver, ManualPaste}.tsx`
-- `src/modules/superbet-connect/hooks/{useShareTarget, useCaptureStore}.ts`
-- `src/pages/SuperbetConnect.tsx` + rota
-- `supabase/functions/superbet-parse/index.ts` (stub que ecoa o input + valida shape)
-- Migration: tabela `superbet_captures` + RLS + GRANTs
-- Item no `AppSidebar` "Superbet Connect" (beta)
-
-Depois você me chama pra Fase 2.
+## Fora de escopo desta fase
+- Auto-captura inteligente (detectar mudança de tela e disparar sozinho)
+- Captura de vídeo / momentum (só foto por enquanto)
+- Reconhecimento automático de quando o user está na Superbet vs outro app

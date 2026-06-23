@@ -701,6 +701,10 @@ export const MatchReadingModal = ({
               </ul>
             </Section>
 
+            <RecentFormBlock homeTeam={homeTeam} awayTeam={awayTeam} />
+
+
+
             <Section icon={Target} title="Leitura do Mercado">
               <p>{reading.marketRead}</p>
             </Section>

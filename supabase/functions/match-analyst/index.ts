@@ -420,10 +420,10 @@ serve(async (req) => {
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!geminiKey && !lovableKey) {
-      return new Response(
-        JSON.stringify({ error: "GEMINI_API_KEY ausente" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify(localAnalyst(body, "no_ai_key")), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Em modo pesquisa, payload mínimo (sem reading/context vazios) + odds se houver
@@ -531,10 +531,10 @@ serve(async (req) => {
     const parsed = safeParseAnalyst(content);
     if (!parsed) {
       console.warn("analyst parse fail", content?.slice(0, 300));
-      return new Response(
-        JSON.stringify({ error: "parse_fail" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify(localAnalyst(body, "parse_fail")), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (cacheKey) await cacheSet(cacheKey, parsed);

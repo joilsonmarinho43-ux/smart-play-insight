@@ -1,7 +1,7 @@
 // =====================================================================
 // HEALTH ALERTS — Monitora saúde do Data Provider e dispara notificações
 // ao admin quando:
-//  • A API principal (football-api-edge) fica indisponível
+//  • A API principal (SportsRC) fica indisponível
 //  • O risco de tela vazia cai para BAIXA resiliência
 //
 // Funciona apenas client-side, sem alterar UX dos usuários finais.
@@ -84,12 +84,13 @@ export async function runHealthCheck(): Promise<HealthAlert[]> {
   const byName: Record<string, SourceProbe> = {};
   for (const p of probes) byName[p.source] = p;
 
-  const primary = byName['football-api-edge'];
-  const secondary = byName['thesportsdb-public'];
+  const primary = byName['sportsrc'];
+  const fdo = byName['football-data-org'];
+  const tsdb = byName['thesportsdb-public'];
   const stale = byName['stale-local-cache'];
 
   const primaryDown = !primary || primary.status === 'error' || (primary.status === 'empty' && (primary.durationMs ?? 0) > 0);
-  const fallbackTotal = (secondary?.count || 0) + (stale?.count || 0);
+  const fallbackTotal = (fdo?.count || 0) + (tsdb?.count || 0) + (stale?.count || 0);
   const resilience: HealthState['resilience'] =
     fallbackTotal >= 20 ? 'alta' : fallbackTotal >= 5 ? 'média' : 'baixa';
 
@@ -101,10 +102,11 @@ export async function runHealthCheck(): Promise<HealthAlert[]> {
     newAlerts.push(pushAlert({
       type: 'primary_down',
       severity: 'critical',
-      message: 'API principal (football-api-edge) indisponível. Sistema operando em fallback.',
+      message: 'API principal (SportsRC) indisponível. Sistema operando em fallback (Football-Data.org / TheSportsDB).',
       details: {
         error: primary?.error,
-        secondaryCount: secondary?.count || 0,
+        footballDataOrgCount: fdo?.count || 0,
+        theSportsDbCount: tsdb?.count || 0,
         staleCount: stale?.count || 0,
       },
     }));
@@ -116,7 +118,7 @@ export async function runHealthCheck(): Promise<HealthAlert[]> {
       type: 'resilience_low',
       severity: 'critical',
       message: `Risco de tela vazia ALTO — resiliência BAIXA (fallback total: ${fallbackTotal} partidas).`,
-      details: { primary: primary?.count || 0, secondary: secondary?.count || 0, stale: stale?.count || 0 },
+      details: { primary: primary?.count || 0, fdo: fdo?.count || 0, tsdb: tsdb?.count || 0, stale: stale?.count || 0 },
     }));
   }
 

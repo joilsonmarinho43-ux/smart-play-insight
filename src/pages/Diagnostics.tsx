@@ -37,7 +37,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const SOURCE_COLOR: Record<string, string> = {
-  'football-api-edge': 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+  'sportsrc': 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+  'football-data-org': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
   'thesportsdb-public': 'bg-sky-500/20 text-sky-300 border-sky-500/40',
   'stale-local-cache': 'bg-gray-500/20 text-gray-300 border-gray-500/40',
 };
@@ -127,8 +128,8 @@ const Diagnostics = () => {
       bySource[s] = (bySource[s] || 0) + 1;
       (leaguesBySource[s] = leaguesBySource[s] || new Set()).add(m.league || '—');
     }
-    const primary = bySource['football-api-edge'] || 0;
-    const secondary = bySource['thesportsdb-public'] || 0;
+    const primary = bySource['sportsrc'] || 0;
+    const secondary = (bySource['football-data-org'] || 0) + (bySource['thesportsdb-public'] || 0);
     const stale = bySource['stale-local-cache'] || 0;
     // Cobertura: % de jogos da secundária em relação à primária
     const coverage = primary > 0 ? Math.round((secondary / primary) * 100) : (secondary > 0 ? 100 : 0);
@@ -328,8 +329,8 @@ const Diagnostics = () => {
                 <tr><th className="py-2">#</th><th>Métrica</th><th>Valor</th></tr>
               </thead>
               <tbody>
-                <tr className="border-t border-zinc-800"><td className="py-2">1</td><td>Partidas via football-api-edge</td><td className="font-mono">{audit.primary}</td></tr>
-                <tr className="border-t border-zinc-800"><td className="py-2">2</td><td>Partidas via thesportsdb-public</td><td className="font-mono">{audit.secondary}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">1</td><td>Partidas via SportsRC (primária)</td><td className="font-mono">{audit.primary}</td></tr>
+                <tr className="border-t border-zinc-800"><td className="py-2">2</td><td>Partidas via Football-Data.org + TheSportsDB</td><td className="font-mono">{audit.secondary}</td></tr>
                 <tr className="border-t border-zinc-800"><td className="py-2">3</td><td>Exclusivas da secundária (preencheram lacunas)</td><td className="font-mono">{audit.exclusiveSecondary}</td></tr>
                 <tr className="border-t border-zinc-800"><td className="py-2">4</td><td>Partidas via stale-local-cache</td><td className="font-mono">{audit.stale}</td></tr>
                 <tr className="border-t border-zinc-800"><td className="py-2">5</td><td>Tempo médio por fonte</td><td className="font-mono text-xs">{Object.entries(aggregate).map(([n,a])=>`${n}: ${a.runs?Math.round(a.totalMs/a.runs):0}ms`).join(' · ')}</td></tr>

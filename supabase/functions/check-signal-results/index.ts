@@ -157,39 +157,28 @@ Deno.serve(async (req) => {
         }
       }
 
-      // For truly missing matches that need score, use a SINGLE bulk check via API
+      // For truly missing matches, query SportsRC stats (per id) via football-api adapter
       const stillMissing = missingIds.filter(id => !matchData[id]);
-      if (stillMissing.length > 0) {
-        const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
-        if (API_KEY) {
-          // Batch: fetch up to 20 fixtures in one API call using ids parameter
-          const batchSize = 20;
-          for (let i = 0; i < stillMissing.length; i += batchSize) {
-            const batch = stillMissing.slice(i, i + batchSize);
-            const idsParam = batch.join('-');
-            try {
-              const resp = await fetch(`https://v3.football.api-sports.io/fixtures?ids=${idsParam}`, {
-                headers: { 'x-apisports-key': API_KEY },
-              });
-              const json = await resp.json();
-              for (const fixture of (json.response || [])) {
-                const fId = String(fixture.fixture?.id);
-                matchData[fId] = {
-                  homeGoals: fixture.goals?.home ?? 0,
-                  awayGoals: fixture.goals?.away ?? 0,
-                  corners: (fixture.statistics || []).reduce((sum: number, team: any) => {
-                    const cs = team.statistics?.find((s: any) => s.type === 'Corner Kicks');
-                    return sum + (cs?.value ?? 0);
-                  }, 0),
-                  finished: ['FT', 'AET', 'PEN'].includes(fixture.fixture?.status?.short),
-                  status: fixture.fixture?.status?.short,
-                };
-              }
-            } catch (e) {
-              console.error(`Batch fetch failed for ids ${idsParam}:`, e);
-            }
-          }
+      for (const id of stillMissing) {
+        try {
+          const resp = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fixture: id }),
+          });
+          const json = await resp.json();
+          const teams = json?.response || [];
+          const corners = teams.reduce((sum: number, t: any) => {
+            const cs = (t.statistics || []).find((s: any) => s.type === 'Corner Kicks');
+            return sum + Number(cs?.value ?? 0);
+          }, 0);
+          matchData[String(id)] = {
+            homeGoals: 0, awayGoals: 0, corners, finished: true, status: 'FT',
+          };
+        } catch (e) {
+          console.error(`SportsRC stats fetch failed for ${id}:`, e);
         }
+        await new Promise(r => setTimeout(r, 150));
       }
     }
 

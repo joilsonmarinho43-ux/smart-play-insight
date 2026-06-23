@@ -1,14 +1,12 @@
 // Registro de fontes de dados. Importado uma vez no bootstrap.
-// Ordem oficial (MATCH DATA):
+// Ordem oficial (MATCH DATA) — API-Sports REMOVIDA do projeto:
 //   1) sportsrc           (SportsRC v2 — 1000 req/dia, cobertura ampla)
 //   2) football-data-org  (Football-Data.org — ligas principais)
 //   3) thesportsdb-public (TheSportsDB — fallback público)
-//   4) football-api-edge  (API-Sports via Edge Function — fallback rico)
 //  99) stale-local-cache  (último recurso)
 
 import { MatchData } from '@/types/match';
 import { registerSource } from './index';
-import { fetchMatches } from '../footballApi';
 import { fetchFootballDataOrg } from './sources/footballDataOrg';
 import { fetchSportsRC } from './sources/sportsrc';
 
@@ -33,17 +31,6 @@ registerSource({
   priority: 2,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchFootballDataOrg(date);
-  },
-});
-
-// =====================================================================
-// FONTE 4 (LEGADA): Edge Function football-api (API-Sports)
-// =====================================================================
-registerSource({
-  name: 'football-api-edge',
-  priority: 4,
-  fetchByDate: async (date: string): Promise<MatchData[]> => {
-    return await fetchMatches(date);
   },
 });
 

@@ -97,8 +97,7 @@ Deno.serve(async (req) => {
     const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const API_KEY = Deno.env.get('API_FUTEBOL_KEY');
-    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_KEY) throw new Error('env missing');
+    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey) throw new Error('env missing');
 
     const sb = createClient(supabaseUrl, supabaseKey);
     const since = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
@@ -115,30 +114,39 @@ Deno.serve(async (req) => {
 
     if (pending && pending.length > 0) {
       const ids = [...new Set(pending.map(s => s.match_id).filter(Boolean))];
+      // Usa o adapter football-api (SportsRC) para obter goals/stats
       for (const id of ids) {
         try {
-          const r = await fetch(`https://v3.football.api-sports.io/fixtures?id=${id}`, {
-            headers: { 'x-apisports-key': API_KEY },
+          const sr = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fixture: id }),
           });
-          const j = await r.json();
-          const f = j.response?.[0];
-          if (!f) continue;
-          const stats = f.statistics || [];
-          const corners = stats.reduce((s: number, t: any) =>
-            s + (t.statistics?.find((x: any) => x.type === 'Corner Kicks')?.value ?? 0), 0);
-          const yellows = stats.reduce((s: number, t: any) =>
-            s + (t.statistics?.find((x: any) => x.type === 'Yellow Cards')?.value ?? 0), 0);
-          const reds = stats.reduce((s: number, t: any) =>
-            s + (t.statistics?.find((x: any) => x.type === 'Red Cards')?.value ?? 0), 0);
+          const sJson = await sr.json();
+          const teams = sJson?.response || [];
+          const corners = teams.reduce((s: number, t: any) =>
+            s + Number((t.statistics || []).find((x: any) => x.type === 'Corner Kicks')?.value ?? 0), 0);
+          const yellows = teams.reduce((s: number, t: any) =>
+            s + Number((t.statistics || []).find((x: any) => x.type === 'Yellow Cards')?.value ?? 0), 0);
+          const reds = teams.reduce((s: number, t: any) =>
+            s + Number((t.statistics || []).find((x: any) => x.type === 'Red Cards')?.value ?? 0), 0);
+          // Busca placar via live cache
+          const liveResp = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ live: true }),
+          });
+          const liveJson = await liveResp.json();
+          const f = (liveJson?.matches || []).find((m: any) => String(m.id) === String(id));
           fixtures[id] = {
-            homeGoals: f.goals?.home ?? 0,
-            awayGoals: f.goals?.away ?? 0,
-            htHomeGoals: f.score?.halftime?.home ?? 0,
-            htAwayGoals: f.score?.halftime?.away ?? 0,
+            homeGoals: f?.goals?.home ?? 0,
+            awayGoals: f?.goals?.away ?? 0,
+            htHomeGoals: 0,
+            htAwayGoals: 0,
             corners, cards: yellows + reds,
-            finished: ['FT', 'AET', 'PEN'].includes(f.fixture?.status?.short),
-            homeName: f.teams?.home?.name,
-            awayName: f.teams?.away?.name,
+            finished: f ? ['FT', 'AET', 'PEN'].includes(f.fixture?.status?.short) : true,
+            homeName: f?.teams?.home?.name,
+            awayName: f?.teams?.away?.name,
           };
         } catch (e) {
           console.error(`[VAL] fetch ${id}`, e);

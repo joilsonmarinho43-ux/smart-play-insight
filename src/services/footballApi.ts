@@ -36,6 +36,14 @@ function setOfflineMode(active: boolean) {
 }
 
 export function isOfflineMode(): boolean {
+  // Limpa estado legado deixado pela antiga API-Sports/API-Football.
+  // O app agora usa SportsRC → Football-Data.org → TheSportsDB → Cache.
+  const reason = localStorage.getItem(OFFLINE_REASON_KEY);
+  if (reason && reason !== 'provider_unavailable') {
+    setOfflineMode(false);
+    setOfflineReason(null);
+    return false;
+  }
   return localStorage.getItem(OFFLINE_FLAG_KEY) === '1';
 }
 
@@ -99,14 +107,10 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
     const raw = Array.isArray(data?.matches) ? data.matches : [];
     const result = raw.filter((m: any) => (m.id || m.fixture?.id) && (m.homeTeam || m.teams?.home?.name));
 
-    // API retornou erro estruturado (ex.: conta suspensa)
-    if (data?.error === 'api_suspended' || data?.warning === 'api_suspended') {
-      setOfflineMode(true);
-      setOfflineReason('api_suspended');
-    } else if (result.length > 0) {
+    if (result.length > 0) {
       localStorage.setItem(cacheKey, JSON.stringify(result));
       localStorage.setItem(cacheTimeKey, String(Date.now()));
-      setOfflineMode(false); // API ok → sai do offline
+      setOfflineMode(false); // Fonte ok → sai do offline
       setOfflineReason(null);
     }
 

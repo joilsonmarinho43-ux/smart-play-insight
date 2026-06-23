@@ -1,35 +1,47 @@
 // Registro de fontes de dados. Importado uma vez no bootstrap.
-// Ordem real hoje:
-//   1) football-api-edge  (API-Sports via Edge Function — fonte rica)
-//   2) thesportsdb-public (fonte pública independente — fallback real)
+// Ordem oficial (MATCH DATA):
+//   1) sportsrc           (SportsRC v2 — 1000 req/dia, cobertura ampla)
+//   2) football-data-org  (Football-Data.org — ligas principais)
+//   3) thesportsdb-public (TheSportsDB — fallback público)
+//   4) football-api-edge  (API-Sports via Edge Function — fallback rico)
 //  99) stale-local-cache  (último recurso)
 
 import { MatchData } from '@/types/match';
 import { registerSource } from './index';
 import { fetchMatches } from '../footballApi';
 import { fetchFootballDataOrg } from './sources/footballDataOrg';
+import { fetchSportsRC } from './sources/sportsrc';
 
 // =====================================================================
-// FONTE 1 (PRIMÁRIA): Football-Data.org (free, ligas principais)
-// Via edge proxy `free-football-proxy`. Excelente cobertura de fixtures
-// das principais ligas europeias + CL. Sem stats avançadas live.
+// FONTE 1 (PRIMÁRIA): SportsRC v2 — https://api.sportsrc.org/v2
+// 1000 requisições/dia no plano FREE. Cobre fixtures, status live,
+// odds, stats, lineups, incidents, h2h, etc. Via edge proxy.
+// =====================================================================
+registerSource({
+  name: 'sportsrc',
+  priority: 1,
+  fetchByDate: async (date: string): Promise<MatchData[]> => {
+    return await fetchSportsRC(date);
+  },
+});
+
+// =====================================================================
+// FONTE 2: Football-Data.org (free, ligas principais)
 // =====================================================================
 registerSource({
   name: 'football-data-org',
-  priority: 1,
+  priority: 2,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchFootballDataOrg(date);
   },
 });
 
 // =====================================================================
-// FONTE 2 (LEGADA / DORMENTE): Edge Function football-api (API-Sports)
-// Mantida como fallback caso a conta API-Sports volte. Rebaixada de
-// prioridade — entra apenas se a free não cobriu a partida.
+// FONTE 4 (LEGADA): Edge Function football-api (API-Sports)
 // =====================================================================
 registerSource({
   name: 'football-api-edge',
-  priority: 5,
+  priority: 4,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchMatches(date);
   },

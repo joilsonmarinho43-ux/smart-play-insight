@@ -17,26 +17,35 @@ export function useApiKeyValidator() {
 
     const validate = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('football-api', {
-          body: { health: true },
+        // Health-check do novo proxy (Football-Data.org)
+        const today = new Date().toISOString().slice(0, 10);
+        const { data, error } = await supabase.functions.invoke('free-football-proxy', {
+          body: {
+            provider: 'football-data-org',
+            path: '/v4/matches',
+            params: { dateFrom: today, dateTo: today },
+          },
         });
 
         if (error) {
-          toast.error('Falha na validação da API de futebol', {
-            description: error.message || 'Verifique a chave API_FUTEBOL_KEY.',
+          toast.error('Falha ao validar provedor de futebol', {
+            description: error.message || 'Verifique FOOTBALL_DATA_ORG_KEY.',
             duration: 8000,
           });
           return;
         }
 
-        // Se voltou error explícito da configuração
-        if (data?.error || data?.errors || data?.apiKeyConfigured === false) {
-          const msg =
-            typeof data.error === 'string'
-              ? data.error
-              : data.errors?.token || data.errors?.requests || 'Chave da API não configurada.';
-          toast.error('API de futebol indisponível', {
-            description: String(msg),
+        if (data?.error === 'missing_key') {
+          toast.error('Chave Football-Data.org ausente', {
+            description: 'Configure FOOTBALL_DATA_ORG_KEY nos secrets.',
+            duration: 8000,
+          });
+          return;
+        }
+
+        if (data?.error === 'upstream_error') {
+          toast.error('Provedor de futebol respondeu com erro', {
+            description: `Status ${data.status} — verifique a chave ou o limite diário.`,
             duration: 8000,
           });
           return;

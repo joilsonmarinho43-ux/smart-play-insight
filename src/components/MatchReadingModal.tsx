@@ -20,6 +20,8 @@ import {
   Share2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
 import type { AnalystReading } from "@/hooks/useMatchReading";
 import { BookmakerFinder } from "@/components/BookmakerFinder";

@@ -587,10 +587,17 @@ serve(async (req) => {
       }
     }
 
-    // Cadeia: Groq → Gemini → Lovable Gateway → localAnalyst
-    let result = await tryGroq();
-    if (!result) result = await tryGemini();
-    if (!result) result = await tryLovable();
+    // Cadeia: em pesquisaWeb, Gemini primeiro (tem google_search). Caso contrário, Groq → Gemini → Lovable.
+    let result: ProviderResult = null;
+    if (pesquisaWeb) {
+      result = await tryGemini();
+      if (!result) result = await tryLovable();
+      if (!result) result = await tryGroq();
+    } else {
+      result = await tryGroq();
+      if (!result) result = await tryGemini();
+      if (!result) result = await tryLovable();
+    }
 
     if (!result) {
       console.warn("[match-analyst] todos provedores falharam → localAnalyst");

@@ -219,29 +219,44 @@ async function fetchFixtureStats(fixtureId: string | number): Promise<any> {
   const cached = await cacheGet(key, CACHE_TTL.STATS_LIVE);
   if (cached) return cached;
 
+  // SportsRC FREE plan: type=stats requires paid plan.
+  // Use type=detail (free) to extract scores + half-time + status.
+  // Statistics (shots, corners, possession) ficam vazios; engines aplicam
+  // derivações (proxy DA, Poisson) automaticamente.
   let json: any = null;
-  try { json = await srcFetch({ type: "stats", id: String(fixtureId) }); }
+  try { json = await srcFetch({ type: "detail", id: String(fixtureId) }); }
   catch (e) {
-    console.warn("[football-api] stats error", e instanceof Error ? e.message : e);
+    console.warn("[football-api] detail error", e instanceof Error ? e.message : e);
     const stale = await cacheGetStale(key);
     return stale ?? { response: [] };
   }
 
-  // SportsRC stats payload: tenta vários formatos
-  const d = json?.data || json;
-  const homeSide = d?.home || d?.stats?.home || d?.statistics?.home || null;
-  const awaySide = d?.away || d?.stats?.away || d?.statistics?.away || null;
-  const homeTeam = d?.teams?.home || d?.home_team || { id: null, name: null };
-  const awayTeam = d?.teams?.away || d?.away_team || { id: null, name: null };
+  const mi = json?.data?.match_info || {};
+  const teamsRaw = mi?.teams || {};
+  const score = mi?.score || {};
+  const cur = score?.current || {};
+  const period1: string = String(score?.period_1 || "");
+  const [ht1, ht2] = period1.includes("-") ? period1.split("-").map((s) => Number(s.trim())) : [null, null];
 
+  const homeTeam = { id: null, name: teamsRaw?.home?.name || null };
+  const awayTeam = { id: null, name: teamsRaw?.away?.name || null };
+  // Stats vazios — engines derivam de outras métricas
   const out = {
     response: [
-      toApiSportsStats(homeTeam, homeSide),
-      toApiSportsStats(awayTeam, awaySide),
+      toApiSportsStats(homeTeam, null),
+      toApiSportsStats(awayTeam, null),
     ],
+    extra: {
+      goals: { home: cur?.home ?? null, away: cur?.away ?? null },
+      halftime: { home: ht1 ?? null, away: ht2 ?? null },
+      status: mi?.status_detail || mi?.status || null,
+      venue: mi?.venue || null,
+    },
+    provider: "sportsrc",
   };
 
-  await cacheSet(key, out, "STATS");
+  const ttl = String(mi?.status || "").toLowerCase() === "finished" ? "STATS" : "LIVE";
+  await cacheSet(key, out, ttl);
   return out;
 }
 

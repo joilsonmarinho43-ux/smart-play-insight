@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2, Brain } from 'lucide-react';
 import { fetchLiveMatches, fetchMultiDayMatches } from '@/services/footballApi';
 import { useMatchReading } from '@/hooks/useMatchReading';
+import { useLiveAIReading } from '@/hooks/useLiveAIReading';
 import { MatchReadingModal } from '@/components/MatchReadingModal';
 import { localizeTeamName } from '@/lib/teamI18n';
+
 
 
 const MatchDetails = () => {
@@ -134,30 +136,34 @@ const MatchDetails = () => {
 
 
           {view.isLive && (
-            <div className="grid grid-cols-2 gap-3">
-              <StatBox
-                label="Posse de bola"
-                home={match.liveStats?.possession?.[0] ?? 0}
-                away={match.liveStats?.possession?.[1] ?? 0}
-                suffix="%"
-              />
-              <StatBox
-                label="Escanteios"
-                home={match.liveStats?.corners?.[0] ?? 0}
-                away={match.liveStats?.corners?.[1] ?? 0}
-              />
-              <StatBox
-                label="Ataques perigosos"
-                home={match.liveStats?.dangerousAttacks?.[0] ?? 0}
-                away={match.liveStats?.dangerousAttacks?.[1] ?? 0}
-              />
-              <StatBox
-                label="Pressão (PI)"
-                home={match.liveStats?.pressureIndex?.[0] ?? 0}
-                away={match.liveStats?.pressureIndex?.[1] ?? 0}
-              />
-            </div>
+            <>
+              <LiveAIBlock match={normalizedMatch || match} />
+              <div className="grid grid-cols-2 gap-3">
+                <StatBox
+                  label="Posse de bola"
+                  home={match.liveStats?.possession?.[0] ?? 0}
+                  away={match.liveStats?.possession?.[1] ?? 0}
+                  suffix="%"
+                />
+                <StatBox
+                  label="Escanteios"
+                  home={match.liveStats?.corners?.[0] ?? 0}
+                  away={match.liveStats?.corners?.[1] ?? 0}
+                />
+                <StatBox
+                  label="Ataques perigosos"
+                  home={match.liveStats?.dangerousAttacks?.[0] ?? 0}
+                  away={match.liveStats?.dangerousAttacks?.[1] ?? 0}
+                />
+                <StatBox
+                  label="Pressão (PI)"
+                  home={match.liveStats?.pressureIndex?.[0] ?? 0}
+                  away={match.liveStats?.pressureIndex?.[1] ?? 0}
+                />
+              </div>
+            </>
           )}
+
 
           {!view.isLive && (
             <div className="bg-secondary/30 border border-border rounded-xl p-4 text-center text-sm text-muted-foreground">
@@ -226,4 +232,43 @@ const StatBox = ({
   </div>
 );
 
+const LiveAIBlock = ({ match }: { match: any }) => {
+  const { data, loading, error, generate } = useLiveAIReading();
+  return (
+    <div className="bg-secondary/40 border border-primary/30 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-primary" />
+          <span className="text-xs uppercase font-bold tracking-wider text-primary">Leitura IA ao Vivo</span>
+        </div>
+        <button
+          onClick={() => generate(match)}
+          disabled={loading}
+          className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+        >
+          {loading ? 'Analisando…' : data ? 'Atualizar' : 'Analisar'}
+        </button>
+      </div>
+      {loading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="w-3 h-3 animate-spin" /> Gerando análise tática…
+        </div>
+      )}
+      {error && <div className="text-xs text-red-400">{error}</div>}
+      {data && !loading && (
+        <>
+          <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{data.text}</p>
+          <div className="text-[10px] text-muted-foreground mt-2 uppercase">
+            Fonte: {data.source === 'groq' ? 'Groq Llama 3.3 70B' : 'Gemini 2.5 Flash'}
+          </div>
+        </>
+      )}
+      {!data && !loading && !error && (
+        <p className="text-xs text-muted-foreground">Clique em "Analisar" para gerar uma leitura tática baseada nos dados ao vivo.</p>
+      )}
+    </div>
+  );
+};
+
 export default MatchDetails;
+

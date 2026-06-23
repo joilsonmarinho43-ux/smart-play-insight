@@ -138,6 +138,37 @@ Deno.serve(async (req) => {
     const bars = Math.max(0, Math.min(5, Math.round(payload.confidence / 20)));
     const confBar = '🟢'.repeat(bars) + '⚪'.repeat(5 - bars);
 
+    // 🧠 Leitura IA (Groq → Gemini fallback) — best-effort, nunca bloqueia o sinal
+    let aiReading: string | null = null;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 6000);
+      const aiRes = await fetch(`${supabaseUrl}/functions/v1/ai-signal-analyst`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}` },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          mode: 'telegram',
+          match: payload.match,
+          minute: payload.minute,
+          score: payload.score,
+          market: payload.market,
+          confidence: payload.confidence,
+          reason: payload.reason,
+          pressure: payload.pressure !== undefined ? { home: payload.pressure, away: 0 } : undefined,
+          dangerousAttacks: payload.dangerousAttacks !== undefined ? { home: payload.dangerousAttacks, away: 0 } : undefined,
+          shotsOnGoal: payload.shotsOnGoal !== undefined ? { home: payload.shotsOnGoal, away: 0 } : undefined,
+        }),
+      });
+      clearTimeout(t);
+      if (aiRes.ok) {
+        const j = await aiRes.json();
+        if (j?.ok && j?.text) aiReading = String(j.text).slice(0, 260);
+      }
+    } catch (e) {
+      console.warn('[TELEGRAM-SIGNAL] AI reading skipped:', e instanceof Error ? e.message : e);
+    }
+
     // 🔒 HTML escape em todos os campos dinâmicos — evita erro 400 do Telegram
     const text = [
       `${emoji} <b>${escapeHtml(payload.market)}</b>`,
@@ -147,9 +178,12 @@ Deno.serve(async (req) => {
       ``,
       `${confBar} <b>${payload.confidence}%</b>`,
       payload.janela ? `🕐 ${escapeHtml(payload.janela)}` : null,
+      aiReading ? `` : null,
+      aiReading ? `🧠 <i>${escapeHtml(aiReading)}</i>` : null,
       ``,
       `🤖 <i>Nexus 33</i>`,
     ].filter(Boolean).join('\n');
+
 
     // Envio via helper compartilhado (timeout, retry exponencial, detecção de erro permanente)
     const result = await sendTelegramMessage(CHAT_ID, text, {

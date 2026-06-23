@@ -38,7 +38,8 @@ function setOfflineMode(active: boolean) {
 export function isOfflineMode(): boolean {
   // Limpa estado legado deixado pela antiga API-Sports/API-Football.
   // O app agora usa SportsRC → Football-Data.org → TheSportsDB → Cache.
-  if (localStorage.getItem(OFFLINE_REASON_KEY) === 'api_suspended') {
+  const reason = localStorage.getItem(OFFLINE_REASON_KEY);
+  if (reason && reason !== 'provider_unavailable') {
     setOfflineMode(false);
     setOfflineReason(null);
     return false;

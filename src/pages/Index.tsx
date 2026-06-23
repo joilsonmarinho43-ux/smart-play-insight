@@ -119,9 +119,10 @@ const Index = () => {
         homeLogo: m.teams?.home?.logo,
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',
-        time: m.fixture?.date
-          ? formatTimePara(m.fixture.date)
-          : m.time || '',
+        time: (() => {
+          const iso = m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : null);
+          return iso ? formatTimePara(iso) : (m.time || '');
+        })(),
         modelData: {
           homeGoalsAvg: hGF,
           awayGoalsAvg: aGF,
@@ -147,7 +148,8 @@ const Index = () => {
   const dayMatches = useMemo(() => {
     if (!selectedDate) return safeMatches;
     return safeMatches.filter((m: any) => {
-      const matchDate = m.fixture?.date ? paraDateString(new Date(m.fixture.date)) : m.date || '';
+      const iso = m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : null);
+      const matchDate = iso ? paraDateString(new Date(iso)) : (m.date || '');
       return matchDate === selectedDate;
     });
   }, [safeMatches, selectedDate]);
@@ -221,7 +223,8 @@ const Index = () => {
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           {dayOptions.map(day => {
             const count = safeMatches.filter((m: any) => {
-              const md = m.fixture?.date ? paraDateString(new Date(m.fixture.date)) : m.date || '';
+              const iso = m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : null);
+              const md = iso ? paraDateString(new Date(iso)) : (m.date || '');
               return md === day.date;
             }).length;
             return (

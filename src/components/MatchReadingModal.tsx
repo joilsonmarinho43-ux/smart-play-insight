@@ -108,7 +108,7 @@ function ConfidenceBadge({
       )}
       {!lowConfidence && missing && missing.length > 0 && (
         <div className="mt-1 opacity-75">
-          Sem dado para: {missing.slice(0, 3).join(", ")}
+          Sem dado para: {missing.slice(0, 3).map(formatMissing).join(", ")}
           {missing.length > 3 ? "…" : ""}
         </div>
       )}

@@ -7,14 +7,29 @@
 import { MatchData } from '@/types/match';
 import { registerSource } from './index';
 import { fetchMatches } from '../footballApi';
+import { fetchFootballDataOrg } from './sources/footballDataOrg';
 
 // =====================================================================
-// FONTE 1 (PRIMÁRIA — ATIVA): Edge Function football-api (API-Sports)
-// Já implementa retry, cache 24h e fallback offline para stale-cache.
+// FONTE 1 (PRIMÁRIA): Football-Data.org (free, ligas principais)
+// Via edge proxy `free-football-proxy`. Excelente cobertura de fixtures
+// das principais ligas europeias + CL. Sem stats avançadas live.
+// =====================================================================
+registerSource({
+  name: 'football-data-org',
+  priority: 1,
+  fetchByDate: async (date: string): Promise<MatchData[]> => {
+    return await fetchFootballDataOrg(date);
+  },
+});
+
+// =====================================================================
+// FONTE 2 (LEGADA / DORMENTE): Edge Function football-api (API-Sports)
+// Mantida como fallback caso a conta API-Sports volte. Rebaixada de
+// prioridade — entra apenas se a free não cobriu a partida.
 // =====================================================================
 registerSource({
   name: 'football-api-edge',
-  priority: 1,
+  priority: 5,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchMatches(date);
   },

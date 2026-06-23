@@ -17,39 +17,35 @@ export function useApiKeyValidator() {
 
     const validate = async () => {
       try {
-        // Health-check do novo proxy (Football-Data.org)
-        const today = new Date().toISOString().slice(0, 10);
+        // Health-check do provider primário (SportsRC v2)
         const { data, error } = await supabase.functions.invoke('free-football-proxy', {
-          body: {
-            provider: 'football-data-org',
-            path: '/v4/matches',
-            params: { dateFrom: today, dateTo: today },
-          },
+          body: { provider: 'sportsrc', path: '/', params: { type: 'account' } },
         });
 
         if (error) {
-          toast.error('Falha ao validar provedor de futebol', {
-            description: error.message || 'Verifique FOOTBALL_DATA_ORG_KEY.',
+          toast.error('Falha ao validar SportsRC', {
+            description: error.message || 'Verifique SPORTSRC_API_KEY.',
             duration: 8000,
           });
           return;
         }
 
         if (data?.error === 'missing_key') {
-          toast.error('Chave Football-Data.org ausente', {
-            description: 'Configure FOOTBALL_DATA_ORG_KEY nos secrets.',
+          toast.error('Chave SportsRC ausente', {
+            description: 'Configure SPORTSRC_API_KEY nos secrets.',
             duration: 8000,
           });
           return;
         }
 
         if (data?.error === 'upstream_error') {
-          toast.error('Provedor de futebol respondeu com erro', {
+          toast.error('SportsRC respondeu com erro', {
             description: `Status ${data.status} — verifique a chave ou o limite diário.`,
             duration: 8000,
           });
           return;
         }
+
 
         localStorage.setItem(STORAGE_KEY, String(Date.now()));
       } catch (err: any) {

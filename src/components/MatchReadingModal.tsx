@@ -51,6 +51,29 @@ const sourceLabel: Record<string, string> = {
   "none": "Sem dados",
 };
 
+const missingLabel: Record<string, string> = {
+  avg_corners: "média de escanteios",
+  avg_cards: "média de cartões",
+  avg_goals: "média de gols",
+  avg_goals_for: "gols marcados",
+  avg_goals_against: "gols sofridos",
+  xg: "xG (gols esperados)",
+  xg_for: "xG ofensivo",
+  xg_against: "xG defensivo",
+  possession: "posse de bola",
+  shots: "finalizações",
+  shots_on_target: "chutes ao gol",
+  form: "forma recente",
+  h2h: "confrontos diretos",
+  injuries: "desfalques",
+  lineups: "escalações",
+  referee: "árbitro",
+  weather: "clima",
+};
+
+const formatMissing = (k: string) =>
+  missingLabel[k] ?? k.replace(/_/g, " ").toLowerCase();
+
 function ConfidenceBadge({
   fallback,
   readingComplete,

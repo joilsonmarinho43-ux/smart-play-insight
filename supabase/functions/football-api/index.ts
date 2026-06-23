@@ -216,8 +216,14 @@ async function fetchWithAuth(endpoint: string, apiKey: string): Promise<any> {
     }
     const json = await res.json();
     await cbSuccess();
-    if (json?.errors && (Array.isArray(json.errors) ? json.errors.length : Object.keys(json.errors).length) > 0) {
-      console.warn(`[api-sports] ${endpoint} errors:`, JSON.stringify(json.errors), 'results=', json.results);
+    const errs = json?.errors;
+    const hasErrs = errs && (Array.isArray(errs) ? errs.length : Object.keys(errs).length) > 0;
+    if (hasErrs) {
+      console.warn(`[api-sports] ${endpoint} errors:`, JSON.stringify(errs), 'results=', json.results);
+      const accessMsg = (errs.access || errs.token || errs.requests || '').toString().toLowerCase();
+      if (accessMsg.includes('suspend') || accessMsg.includes('disable') || accessMsg.includes('invalid') || accessMsg.includes('subscri')) {
+        return { response: [], _access_blocked: true, _access_error: errs };
+      }
     }
     return json;
   } catch (e) {

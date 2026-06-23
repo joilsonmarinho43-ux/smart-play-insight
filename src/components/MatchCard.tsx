@@ -375,9 +375,11 @@ function PoissonTab({ match }: { match: MatchData }) {
 }
 
 // ─── MAIN COMPONENT ───
-const MatchCard = ({ match, isPremium }: Props) => {
+const MatchCard = ({ match: rawMatch, isPremium }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
   const [readingOpen, setReadingOpen] = useState(false);
+  const { data: form } = useTeamForm(rawMatch);
+  const match = useMemo(() => mergeFormIntoMatch(rawMatch, form), [rawMatch, form]);
   const { reading, loading, context, analyst, analystLoading, analystError, fallback } = useMatchReading(match, readingOpen);
 
 

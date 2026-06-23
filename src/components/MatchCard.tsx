@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MatchData } from '@/types/match';
 import TicketSuggestionCard from './TicketSuggestion';
 import GoalSparkline from './GoalSparkline';
 import { Clock, Trophy, BarChart3, TrendingUp, Target, Database, AlertTriangle, Flame, Crosshair, BookOpen } from 'lucide-react';
 import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from './MatchReadingModal';
+import { useTeamForm, mergeFormIntoMatch } from '@/hooks/useTeamForm';
 
 
 
@@ -374,9 +375,11 @@ function PoissonTab({ match }: { match: MatchData }) {
 }
 
 // ─── MAIN COMPONENT ───
-const MatchCard = ({ match, isPremium }: Props) => {
+const MatchCard = ({ match: rawMatch, isPremium }: Props) => {
   const [activeTab, setActiveTab] = useState<TabKey>('stats');
   const [readingOpen, setReadingOpen] = useState(false);
+  const { data: form } = useTeamForm(rawMatch);
+  const match = useMemo(() => mergeFormIntoMatch(rawMatch, form), [rawMatch, form]);
   const { reading, loading, context, analyst, analystLoading, analystError, fallback } = useMatchReading(match, readingOpen);
 
 

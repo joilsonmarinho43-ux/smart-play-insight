@@ -478,8 +478,8 @@ serve(async (req) => {
         }),
       });
       if (resp.status === 429) {
-        return new Response(JSON.stringify({ error: "rate_limited" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify(localAnalyst(body, "rate_limited")), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (!resp.ok) {
@@ -508,8 +508,8 @@ serve(async (req) => {
         }),
       });
       if (resp.status === 429) {
-        return new Response(JSON.stringify({ error: "rate_limited" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify(localAnalyst(body, "rate_limited")), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (resp.status === 402) {

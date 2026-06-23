@@ -339,6 +339,63 @@ function safeParseAnalyst(raw: string): any | null {
   }
 }
 
+function localAnalyst(input: any, reason = "rate_limited") {
+  const m = input?.match || {};
+  const s = input?.fallbackStats?.stats || {};
+  const home = m.homeTeam || "Mandante";
+  const away = m.awayTeam || "Visitante";
+  const avgGoals = Number(s.avg_goals ?? input?.reading?.projectedGoals ?? 2.2);
+  const over25 = Number(s.over25_pct ?? 50);
+  const btts = Number(s.btts_pct ?? 50);
+  const homeForm = s.home_form || "sem sequência confirmada";
+  const awayForm = s.away_form || "sem sequência confirmada";
+  const h2hCount = Array.isArray(s.h2h) ? s.h2h.length : 0;
+  const risk = input?.fallbackStats?.lowConfidence ? "alto" : avgGoals >= 2.8 || over25 >= 60 ? "medio" : "baixo";
+  const overLean = over25 >= 58 ? "Over 2.5" : avgGoals <= 2.1 ? "Under 2.5" : "Over 1.5";
+  const bttsLean = btts >= 55 ? "BTTS Sim" : "BTTS Não/entrada conservadora";
+  const overProb = Math.min(0.78, Math.max(0.28, over25 / 100 || avgGoals / 4.8));
+  const bttsProb = Math.min(0.76, Math.max(0.25, btts / 100 || 0.5));
+  const homeProb = Math.min(0.55, Math.max(0.28, 0.38 + (String(homeForm).replace(/[^W]/g, "").length - String(awayForm).replace(/[^W]/g, "").length) * 0.04));
+  const awayProb = Math.min(0.48, Math.max(0.22, 0.34 + (String(awayForm).replace(/[^W]/g, "").length - String(homeForm).replace(/[^W]/g, "").length) * 0.04));
+  const drawProb = Math.max(0.18, 1 - homeProb - awayProb);
+  const odd = (p: number) => (1 / Math.min(0.9, Math.max(0.08, p))).toFixed(2);
+  const sourceText = reason === "rate_limited"
+    ? "Leitura gerada pelo motor estatístico local porque o provedor externo atingiu limite temporário."
+    : "Leitura gerada pelo motor estatístico local.";
+  return {
+    cenario: `${home} x ${away} tem média recente de ${avgGoals.toFixed(1)} gols e formas ${homeForm} x ${awayForm}. ${sourceText} O confronto direto possui ${h2hCount} registro(s) úteis na base quando disponível.`,
+    pontoAtencao: `${input?.fallbackStats?.missing?.length ? `Campos ausentes: ${input.fallbackStats.missing.join(", ")}. ` : ""}Sem dado completo de escanteios/cartões, esses mercados devem ser tratados com stake menor. A leitura principal fica concentrada em gols, BTTS e proteção de resultado.`,
+    veredito: `Entrada principal sugerida: ${overLean}, com ${bttsLean} como leitura secundária. Evite forçar vencedor seco se a odd não estiver acima da odd justa estimada.`,
+    risco: risk,
+    contextoDetalhado: {
+      desfalques: "Sem desfalques relevantes confirmados na base estatística atual.",
+      arbitro: "Árbitro não confirmado; mercado de cartões sem validação numérica suficiente.",
+      clima: "Sem informação climática relevante integrada ao jogo.",
+      motivacao: "Motivação avaliada pelo tipo de competição e momento recente das equipes.",
+    },
+    mercados: {
+      vitoria: `Casa ${odd(homeProb)}, empate ${odd(drawProb)} e fora ${odd(awayProb)} como referência justa; prefira proteção se houver divergência de mercado.`,
+      duplaChance: homeProb >= awayProb ? "1X é a proteção mais coerente pelo recorte estatístico." : "X2 é a proteção mais coerente pelo recorte estatístico.",
+      handicap: homeProb >= awayProb ? "Favorito: handicap -0.25 apenas se o preço pagar o risco; alternativa conservadora 0.0." : "Visitante/azarão: handicap +0.5 ou empate anula aposta.",
+      overUnderGols: `Tendência principal em ${overLean}; média recente ${avgGoals.toFixed(1)} e Over 2.5 em ${over25.toFixed(1)}%.`,
+      btts: `${bttsLean}; ambas marcam aparece em ${btts.toFixed(1)}% no recorte disponível.`,
+      escanteios: "Sem média confiável de escanteios; aguardar leitura ao vivo de pressão/laterais antes de entrada.",
+      cartoes: "Sem árbitro e sem média confiável de cartões; evitar linha pré-jogo agressiva.",
+      placarExato: avgGoals >= 2.7 ? "2-1, 1-2, 2-2" : "1-1, 1-0, 0-1",
+    },
+    oddsReferencia: {
+      casa: odd(homeProb),
+      empate: odd(drawProb),
+      fora: odd(awayProb),
+      over25: odd(overProb),
+      under25: odd(1 - overProb),
+      bttsSim: odd(bttsProb),
+      escanteiosOver9: "2.05",
+      cartoesOver4: "2.10",
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 

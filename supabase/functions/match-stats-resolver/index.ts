@@ -357,6 +357,7 @@ async function fromSportsRC(matchId: string, home: string, away: string): Promis
     }));
   }
   return fieldsFilled(stats) > 0 ? stats : null;
+}
 
 // ── Persistência ─────────────────────────────────────────────────
 async function loadFromDb(matchId: string, maxAgeSec: number): Promise<any | null> {

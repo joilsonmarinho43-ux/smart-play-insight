@@ -95,9 +95,32 @@ class SuperbetOverlayPlugin : Plugin() {
         ret.put("overlayPermission", Settings.canDrawOverlays(context))
         ret.put("projectionReady", CaptureService.isReady())
         ret.put("overlayRunning", OverlayService.isRunning())
+        ret.put("accessibilityConnected", AutoDetectService.isConnected())
+        val prefs = context.getSharedPreferences(AutoDetectService.PREF, Context.MODE_PRIVATE)
+        ret.put("autoCaptureEnabled", prefs.getBoolean(AutoDetectService.KEY_ENABLED, false))
         ret.put("platform", "android")
         ret.put("sdk", Build.VERSION.SDK_INT)
         call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun setAutoCapture(call: PluginCall) {
+        val enabled = call.getBoolean("enabled", false) ?: false
+        val prefs = context.getSharedPreferences(AutoDetectService.PREF, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(AutoDetectService.KEY_ENABLED, enabled).apply()
+        val ret = JSObject().apply {
+            put("enabled", enabled)
+            put("accessibilityConnected", AutoDetectService.isConnected())
+        }
+        call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun openAccessibilitySettings(call: PluginCall) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        call.resolve(JSObject().apply { put("opened", true) })
     }
 
     @PluginMethod

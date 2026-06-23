@@ -7,6 +7,8 @@ export interface OverlayStatus {
   overlayPermission: boolean;
   projectionReady: boolean;
   overlayRunning: boolean;
+  accessibilityConnected: boolean;
+  autoCaptureEnabled: boolean;
   platform: 'android' | 'ios' | 'web';
   sdk?: number;
 }
@@ -25,25 +27,26 @@ export interface OverlayStatePayload {
   running: boolean;
 }
 
+export interface AutoDetectedPayload {
+  matchLabel: string | null;
+  hasScore: boolean;
+  hasMinute: boolean;
+  timestamp: number;
+}
+
 interface SuperbetOverlayPlugin {
   getStatus(): Promise<OverlayStatus>;
   requestOverlayPermission(): Promise<{ granted: boolean; opened?: boolean }>;
   requestProjectionPermission(): Promise<{ opened: boolean }>;
+  openAccessibilitySettings(): Promise<{ opened: boolean }>;
+  setAutoCapture(opts: { enabled: boolean }): Promise<{ enabled: boolean; accessibilityConnected: boolean }>;
   startOverlay(): Promise<void>;
   stopOverlay(): Promise<void>;
   captureNow(): Promise<void>;
-  addListener(
-    event: 'overlayCaptured',
-    cb: (p: CapturedPayload) => void,
-  ): Promise<PluginListenerHandle>;
-  addListener(
-    event: 'overlayError',
-    cb: (p: OverlayErrorPayload) => void,
-  ): Promise<PluginListenerHandle>;
-  addListener(
-    event: 'overlayState',
-    cb: (p: OverlayStatePayload) => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(event: 'overlayCaptured', cb: (p: CapturedPayload) => void): Promise<PluginListenerHandle>;
+  addListener(event: 'overlayError', cb: (p: OverlayErrorPayload) => void): Promise<PluginListenerHandle>;
+  addListener(event: 'overlayState', cb: (p: OverlayStatePayload) => void): Promise<PluginListenerHandle>;
+  addListener(event: 'overlayAutoDetected', cb: (p: AutoDetectedPayload) => void): Promise<PluginListenerHandle>;
 }
 
 export const isOverlaySupported = (): boolean =>
@@ -55,6 +58,8 @@ const UNSUPPORTED_STATUS: OverlayStatus = {
   overlayPermission: false,
   projectionReady: false,
   overlayRunning: false,
+  accessibilityConnected: false,
+  autoCaptureEnabled: false,
   platform: (Capacitor.getPlatform() as OverlayStatus['platform']) ?? 'web',
 };
 
@@ -75,6 +80,16 @@ export const OverlayBridge = {
   async requestProjectionPermission() {
     if (!isOverlaySupported()) return { opened: false };
     return Native.requestProjectionPermission();
+  },
+
+  async openAccessibilitySettings() {
+    if (!isOverlaySupported()) return { opened: false };
+    return Native.openAccessibilitySettings();
+  },
+
+  async setAutoCapture(enabled: boolean) {
+    if (!isOverlaySupported()) return { enabled: false, accessibilityConnected: false };
+    return Native.setAutoCapture({ enabled });
   },
 
   async start() {
@@ -105,5 +120,10 @@ export const OverlayBridge = {
   onState(cb: (p: OverlayStatePayload) => void): Promise<PluginListenerHandle> | null {
     if (!isOverlaySupported()) return null;
     return Native.addListener('overlayState', cb);
+  },
+
+  onAutoDetected(cb: (p: AutoDetectedPayload) => void): Promise<PluginListenerHandle> | null {
+    if (!isOverlaySupported()) return null;
+    return Native.addListener('overlayAutoDetected', cb);
   },
 };

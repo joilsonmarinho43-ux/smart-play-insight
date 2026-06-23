@@ -74,10 +74,10 @@ function dedupe(matches: MatchData[]): MatchData[] {
   for (const m of matches) {
     const home = (m as any).teams?.home?.name || (m as any).homeTeam || '';
     const away = (m as any).teams?.away?.name || (m as any).awayTeam || '';
-    const date = (m as any).fixture?.date || (m as any).date || '';
+    const date = (m as any).fixture?.date || (m as any).date || (m as any).time || '';
     const id = (m as any).id || (m as any).fixture?.id;
-    // Prioriza ID quando disponível, senão usa assinatura normalizada
-    const key = id ? `id:${id}` : matchSignature(home, away, date);
+    // Fontes diferentes usam IDs diferentes para o mesmo jogo; times + data é mais estável.
+    const key = home && away ? matchSignature(home, away, date) : `id:${id}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(m);

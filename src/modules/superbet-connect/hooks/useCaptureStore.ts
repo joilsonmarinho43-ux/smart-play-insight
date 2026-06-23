@@ -7,6 +7,7 @@ interface SubmitInput {
   sourceUrl?: string;
   imageBase64?: string;
   marketHint?: string;
+  ocrConfidence?: number;
 }
 
 export function useCaptureStore() {

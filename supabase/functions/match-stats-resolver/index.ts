@@ -462,7 +462,7 @@ serve(async (req) => {
     // 1) Banco fresco (< 7 dias) — atende cache + DB de uma vez.
     //    Ignora registros vazios ("none"/0) para não bloquear nova tentativa.
     const fresh = await loadFromDb(matchId, TTL.team_stats);
-    const freshHasData = fresh && fresh.source !== "none" && Number(fresh.confidence_score || 0) > 0;
+    const freshHasData = fresh && fresh.source !== "none" && Number(fresh.confidence_score || 0) > 0 && fresh.home_form && fresh.away_form;
     if (freshHasData) {
       await log({
         match_id: matchId, source_used: fresh.source, latency_ms: Date.now() - t0,

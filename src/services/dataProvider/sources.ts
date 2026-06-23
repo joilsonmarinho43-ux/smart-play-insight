@@ -81,7 +81,7 @@ function tsdbToMatch(ev: any): MatchData | null {
 
 registerSource({
   name: 'thesportsdb-public',
-  priority: 2,
+  priority: 3,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     // cache curto (6h) para evitar bater no endpoint repetidamente
     try {

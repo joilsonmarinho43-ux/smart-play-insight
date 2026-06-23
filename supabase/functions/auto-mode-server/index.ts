@@ -335,9 +335,8 @@ Deno.serve(async (req) => {
     const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const API_FUTEBOL_KEY = Deno.env.get('API_FUTEBOL_KEY');
 
-    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey || !API_FUTEBOL_KEY) {
+    if (!TELEGRAM_CHAT_ID || !supabaseUrl || !supabaseKey) {
       throw new Error('Variáveis de ambiente não configuradas');
     }
 

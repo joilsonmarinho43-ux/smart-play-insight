@@ -453,7 +453,28 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 2) TheSportsDB (fallback público estável)
+    // 2) SportsRC v2 (provider primário — prioridade 1)
+    const src = await fromSportsRC(matchId, homeTeam, awayTeam);
+    if (src) {
+      const score = computeConfidence(src, "api-football"); // peso máximo
+      await persist({
+        match_id: matchId, home_team: homeTeam, away_team: awayTeam,
+        league, kickoff_at: kickoffISO,
+        stats: src, source: "sportsrc", confidence_score: score,
+      });
+      await log({
+        match_id: matchId, source_used: "sportsrc", latency_ms: Date.now() - t0,
+        cache_hit: false, confidence_score: score,
+      });
+      console.info(`[match-stats-resolver] provider_used=sportsrc latency=${Date.now() - t0}ms confidence=${score}`);
+      return new Response(JSON.stringify({
+        stats: src, source: "sportsrc", confidence_score: score,
+        lowConfidence: score < 70, missing: missingFields(src), cached: false,
+        provider_used: "sportsrc", provider_latency: Date.now() - t0, provider_confidence: score,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // 3) TheSportsDB (fallback público estável)
     const tsdb = await fromTheSportsDB(homeTeam, awayTeam);
     if (tsdb) {
       const score = computeConfidence(tsdb, "thesportsdb");
@@ -466,9 +487,11 @@ serve(async (req) => {
         match_id: matchId, source_used: "thesportsdb", latency_ms: Date.now() - t0,
         cache_hit: false, api_football_failed: true, confidence_score: score,
       });
+      console.info(`[match-stats-resolver] provider_used=thesportsdb latency=${Date.now() - t0}ms confidence=${score}`);
       return new Response(JSON.stringify({
         stats: tsdb, source: "thesportsdb", confidence_score: score,
         lowConfidence: score < 70, missing: missingFields(tsdb), cached: false,
+        provider_used: "thesportsdb", provider_latency: Date.now() - t0, provider_confidence: score,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

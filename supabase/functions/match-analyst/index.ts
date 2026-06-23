@@ -154,6 +154,8 @@ Sua função é cruzar dados estatísticos com o contexto real do confronto e en
 - Se NÃO houver odds reais no payload (mercado vazio ou null), estime as odds a partir das probabilidades do modelo, da projeção de gols, do favorito e da força relativa das equipes — convertendo probabilidade em odd justa (odd ≈ 1 / probabilidade). Sempre devolva um número, mesmo quando "fallback_stats.fonte" for "thesportsdb" ou "historical".
 - Use valores realistas de mercado esportivo (faixa típica: 1.10 a 15.00). Mantenha coerência entre os mercados (ex.: soma de 1/casa + 1/empate + 1/fora ≈ 1.05–1.15 para incluir margem da casa).
 
+${SENIOR_ANALYST_DIRECTIVES}
+
 ${DETAIL_SCHEMA_BLOCK}`;
 
 const RESEARCH_SYSTEM_PROMPT = `Você é um Analista de Performance Esportiva e Especialista em Mercado Esportivo (Value Betting).
@@ -183,6 +185,8 @@ const RESEARCH_SYSTEM_PROMPT = `Você é um Analista de Performance Esportiva e 
 - NUNCA Handicap + para o favorito; NUNCA Handicap − para o azarão.
 - Favorito: Vitória reta, Dupla Chance favorito+empate ou Handicap -0.25.
 - Azarão: Dupla Chance azarão+empate, Empate Anula Aposta ou Handicap +0.5/+1.
+
+${SENIOR_ANALYST_DIRECTIVES}
 
 ${DETAIL_SCHEMA_BLOCK}`;
 

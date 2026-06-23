@@ -8,7 +8,7 @@
 
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const TSDB = 'https://www.thesportsdb.com/api/v1/json/123';
+const TSDB = 'https://www.thesportsdb.com/api/v1/json/3';
 
 // Cache em memória do edge worker (vida curta, por instância)
 const memCache = new Map<string, { ts: number; data: any }>();

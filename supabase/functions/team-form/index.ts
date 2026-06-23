@@ -121,13 +121,23 @@ function summarize(teamId: string, evts: any[]) {
   const last5 = sorted.slice(0, 5);
   const gf: number[] = [];
   const ga: number[] = [];
+  const recentResults: Array<{ result: "W" | "D" | "L"; gf: number; ga: number; opp: string; date: string }> = [];
   for (const e of last5) {
     const hs = Number(e?.intHomeScore);
     const as = Number(e?.intAwayScore);
     if (!Number.isFinite(hs) || !Number.isFinite(as)) continue;
     const isHome = String(e?.idHomeTeam) === String(teamId);
-    gf.push(isHome ? hs : as);
-    ga.push(isHome ? as : hs);
+    const f = isHome ? hs : as;
+    const a = isHome ? as : hs;
+    gf.push(f);
+    ga.push(a);
+    recentResults.push({
+      result: f > a ? "W" : f < a ? "L" : "D",
+      gf: f,
+      ga: a,
+      opp: String((isHome ? e?.strAwayTeam : e?.strHomeTeam) || ""),
+      date: String(e?.dateEvent || ""),
+    });
   }
   const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
   return {
@@ -136,12 +146,13 @@ function summarize(teamId: string, evts: any[]) {
     goalsAgainstAvg: Number(avg(ga).toFixed(2)),
     recentGoalsFor: gf,
     recentGoalsAgainst: ga,
+    recentResults,
   };
 }
 
 async function formFor(name: string) {
   const id = await resolveTeamId(name);
-  if (!id) return { games: 0, goalsForAvg: 0, goalsAgainstAvg: 0, recentGoalsFor: [], recentGoalsAgainst: [], teamId: null };
+  if (!id) return { games: 0, goalsForAvg: 0, goalsAgainstAvg: 0, recentGoalsFor: [], recentGoalsAgainst: [], recentResults: [], teamId: null };
   const evts = await lastEvents(id);
   return { ...summarize(id, evts), teamId: id };
 }

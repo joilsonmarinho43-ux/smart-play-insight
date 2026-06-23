@@ -37,6 +37,7 @@ class SuperbetOverlayPlugin : Plugin() {
         const val ACTION_CAPTURED = "app.lovable.superbet.CAPTURED"
         const val ACTION_ERROR = "app.lovable.superbet.ERROR"
         const val ACTION_STATE = "app.lovable.superbet.STATE"
+        const val ACTION_AUTO_DETECTED = "app.lovable.superbet.AUTO_DETECTED"
         const val EXTRA_IMAGE_BASE64 = "imageBase64"
         const val EXTRA_TIMESTAMP = "timestamp"
         const val EXTRA_CODE = "code"
@@ -62,6 +63,13 @@ class SuperbetOverlayPlugin : Plugin() {
                     data.put("running", intent.getBooleanExtra(EXTRA_RUNNING, false))
                     notifyListeners("overlayState", data)
                 }
+                ACTION_AUTO_DETECTED -> {
+                    data.put("matchLabel", intent.getStringExtra("matchLabel"))
+                    data.put("hasScore", intent.getBooleanExtra("hasScore", false))
+                    data.put("hasMinute", intent.getBooleanExtra("hasMinute", false))
+                    data.put("timestamp", intent.getLongExtra("timestamp", System.currentTimeMillis()))
+                    notifyListeners("overlayAutoDetected", data)
+                }
             }
         }
     }
@@ -71,6 +79,7 @@ class SuperbetOverlayPlugin : Plugin() {
             addAction(ACTION_CAPTURED)
             addAction(ACTION_ERROR)
             addAction(ACTION_STATE)
+            addAction(ACTION_AUTO_DETECTED)
         }
         LocalBroadcastManager.getInstance(context).registerReceiver(receiver, filter)
     }
@@ -86,9 +95,32 @@ class SuperbetOverlayPlugin : Plugin() {
         ret.put("overlayPermission", Settings.canDrawOverlays(context))
         ret.put("projectionReady", CaptureService.isReady())
         ret.put("overlayRunning", OverlayService.isRunning())
+        ret.put("accessibilityConnected", AutoDetectService.isConnected())
+        val prefs = context.getSharedPreferences(AutoDetectService.PREF, Context.MODE_PRIVATE)
+        ret.put("autoCaptureEnabled", prefs.getBoolean(AutoDetectService.KEY_ENABLED, false))
         ret.put("platform", "android")
         ret.put("sdk", Build.VERSION.SDK_INT)
         call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun setAutoCapture(call: PluginCall) {
+        val enabled = call.getBoolean("enabled", false) ?: false
+        val prefs = context.getSharedPreferences(AutoDetectService.PREF, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(AutoDetectService.KEY_ENABLED, enabled).apply()
+        val ret = JSObject().apply {
+            put("enabled", enabled)
+            put("accessibilityConnected", AutoDetectService.isConnected())
+        }
+        call.resolve(ret)
+    }
+
+    @PluginMethod
+    fun openAccessibilitySettings(call: PluginCall) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        call.resolve(JSObject().apply { put("opened", true) })
     }
 
     @PluginMethod

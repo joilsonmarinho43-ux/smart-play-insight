@@ -118,7 +118,7 @@ export async function runHealthCheck(): Promise<HealthAlert[]> {
       type: 'resilience_low',
       severity: 'critical',
       message: `Risco de tela vazia ALTO — resiliência BAIXA (fallback total: ${fallbackTotal} partidas).`,
-      details: { primary: primary?.count || 0, secondary: secondary?.count || 0, stale: stale?.count || 0 },
+      details: { primary: primary?.count || 0, fdo: fdo?.count || 0, tsdb: tsdb?.count || 0, stale: stale?.count || 0 },
     }));
   }
 

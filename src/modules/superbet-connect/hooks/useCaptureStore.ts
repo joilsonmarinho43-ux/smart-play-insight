@@ -63,7 +63,9 @@ export function useCaptureStore() {
           text: input.rawText ?? null,
           sourceUrl: input.sourceUrl ?? null,
           imageBase64: input.imageBase64 ?? null,
+          imageBase64: input.imageBase64 ?? null,
           marketHint: input.marketHint ?? null,
+          ocrConfidence: input.ocrConfidence ?? null,
         },
       });
       if (fnErr) throw fnErr;

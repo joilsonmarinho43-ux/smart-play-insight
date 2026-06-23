@@ -216,6 +216,15 @@ async function fetchWithAuth(endpoint: string, apiKey: string): Promise<any> {
     }
     const json = await res.json();
     await cbSuccess();
+    const errs = json?.errors;
+    const hasErrs = errs && (Array.isArray(errs) ? errs.length : Object.keys(errs).length) > 0;
+    if (hasErrs) {
+      console.warn(`[api-sports] ${endpoint} errors:`, JSON.stringify(errs), 'results=', json.results);
+      const accessMsg = (errs.access || errs.token || errs.requests || '').toString().toLowerCase();
+      if (accessMsg.includes('suspend') || accessMsg.includes('disable') || accessMsg.includes('invalid') || accessMsg.includes('subscri')) {
+        return { response: [], _access_blocked: true, _access_error: errs };
+      }
+    }
     return json;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -691,13 +700,24 @@ serve(async (req) => {
     let fixtures = fixturesData?.response || [];
     console.log(`Got ${fixtures.length} total fixtures`);
 
-    // Fallback: API vazia/bloqueada por quota → serve cache stale se existir
+    // Fallback: API vazia/bloqueada (quota/conta suspensa) → serve cache stale, ou erro estruturado
     if (fixtures.length === 0) {
       const stale = await dbCacheGetStale(preCk);
       if (stale && Array.isArray(stale.matches) && stale.matches.length > 0) {
         console.log(`[stale-fallback] Serving ${stale.matches.length} cached matches for ${date} (API empty/quota)`);
         memSet(`date_v14_${date}`, stale);
-        return new Response(JSON.stringify(stale), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const payload = fixturesData?._access_blocked
+          ? { ...stale, warning: 'api_suspended' }
+          : stale;
+        return new Response(JSON.stringify(payload), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (fixturesData?._access_blocked) {
+        return new Response(JSON.stringify({
+          matches: [],
+          error: 'api_suspended',
+          message: 'Conta API-Football suspensa. Verifique em dashboard.api-football.com.',
+          details: fixturesData?._access_error || null,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 

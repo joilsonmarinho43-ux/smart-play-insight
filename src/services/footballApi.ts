@@ -44,6 +44,15 @@ export function getOfflineSince(): number | null {
   return t ? Number(t) : null;
 }
 
+const OFFLINE_REASON_KEY = 'football_offline_reason';
+export function getOfflineReason(): string | null {
+  return localStorage.getItem(OFFLINE_REASON_KEY);
+}
+function setOfflineReason(r: string | null) {
+  if (r) localStorage.setItem(OFFLINE_REASON_KEY, r);
+  else localStorage.removeItem(OFFLINE_REASON_KEY);
+}
+
 function getStorageCache(key: string, timeKey: string, cooldown: number) {
   const data = localStorage.getItem(key);
   const time = localStorage.getItem(timeKey);
@@ -90,10 +99,15 @@ export async function fetchMatches(date: string): Promise<MatchData[]> {
     const raw = Array.isArray(data?.matches) ? data.matches : [];
     const result = raw.filter((m: any) => (m.id || m.fixture?.id) && (m.homeTeam || m.teams?.home?.name));
 
-    if (result.length > 0) {
+    // API retornou erro estruturado (ex.: conta suspensa)
+    if (data?.error === 'api_suspended' || data?.warning === 'api_suspended') {
+      setOfflineMode(true);
+      setOfflineReason('api_suspended');
+    } else if (result.length > 0) {
       localStorage.setItem(cacheKey, JSON.stringify(result));
       localStorage.setItem(cacheTimeKey, String(Date.now()));
       setOfflineMode(false); // API ok → sai do offline
+      setOfflineReason(null);
     }
 
     return result;

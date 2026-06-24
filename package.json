@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "native:android": "node scripts/integrate-superbet-native.mjs",
+    "cap:sync": "cap sync android && node scripts/integrate-superbet-native.mjs"
   },
   "dependencies": {
     "@capacitor/clipboard": "^8.0.1",

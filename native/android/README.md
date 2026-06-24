@@ -1,93 +1,49 @@
-# Superbet Connect — Native Android Files
+# Superbet Connect — Native Android
 
-Implementa **bolha flutuante** (MediaProjection) e **captura automática**
-(AccessibilityService) que detecta o card do jogo na Superbet e tira
-screenshot direto pro OCR — sem precisar tocar na bolha.
+Bolha flutuante (MediaProjection) + captura automática (AccessibilityService)
+que detecta o card do jogo na Superbet e dispara o screenshot pro OCR.
 
-Estes arquivos NÃO são copiados pelo `npx cap sync`. Copie uma única vez
-após `npx cap add android`.
+## Integração automática (recomendado)
 
-## Pré-requisitos
-1. Exportar projeto pro GitHub → `git pull`
-2. `npm install`
-3. `npx cap add android`
-
-## Setup (one-time)
+Após `npx cap add android` (rodado **uma vez** na sua máquina, fora do sandbox
+do Lovable), basta usar o npm script — é **idempotente**, pode rodar quantas
+vezes precisar e funciona como `postcap sync`:
 
 ```bash
-PKG_DIR="android/app/src/main/java/app/lovable/_03101480d5c041dd93e7913b636c81b0"
-mkdir -p "$PKG_DIR/superbet"
-cp native/android/SuperbetOverlayPlugin.kt "$PKG_DIR/superbet/"
-cp native/android/OverlayService.kt        "$PKG_DIR/superbet/"
-cp native/android/CaptureService.kt        "$PKG_DIR/superbet/"
-cp native/android/PermissionActivity.kt    "$PKG_DIR/superbet/"
-cp native/android/AutoDetectService.kt     "$PKG_DIR/superbet/"
-
-mkdir -p android/app/src/main/res/xml
-cp native/android/auto_detect_config.xml android/app/src/main/res/xml/
+git pull                       # pega o código mais recente do Lovable
+npm install
+npx cap add android            # apenas na 1ª vez
+npm run build
+npm run cap:sync               # roda `cap sync android` + integra os nativos
+npx cap run android
 ```
 
-> Se a pasta gerada pelo `cap add android` tiver nome diferente, ajuste o
-> `package ...` no topo dos `.kt`.
+`npm run cap:sync` executa `scripts/integrate-superbet-native.mjs`, que:
 
-### Registrar plugin no `MainActivity`
+1. Copia `SuperbetOverlayPlugin.kt`, `OverlayService.kt`, `CaptureService.kt`,
+   `AutoDetectService.kt` e `PermissionActivity.kt` para
+   `android/app/src/main/java/<seu-pkg>/superbet/` (reescreve o `package` no
+   topo de cada arquivo automaticamente, então não importa qual nome o
+   Capacitor gerou).
+2. Copia `auto_detect_config.xml` para `android/app/src/main/res/xml/`.
+3. Adiciona ao `AndroidManifest.xml` (idempotente):
+   - permissões `SYSTEM_ALERT_WINDOW`, `FOREGROUND_SERVICE`,
+     `FOREGROUND_SERVICE_MEDIA_PROJECTION`,
+     `FOREGROUND_SERVICE_SPECIAL_USE`, `POST_NOTIFICATIONS`;
+   - `<service>` para `OverlayService`, `CaptureService`, `AutoDetectService`;
+   - `<activity>` `PermissionActivity` translúcida.
+4. Registra `SuperbetOverlayPlugin` no `MainActivity` (Java **ou** Kotlin).
+5. Adiciona `superbet_auto_description` / `superbet_auto_summary` em
+   `res/values/strings.xml`.
 
-```java
-// dentro de onCreate, antes de super.onCreate(...)
-registerPlugin(SuperbetOverlayPlugin.class);
-```
+> Se rodar `npx cap sync` direto (sem o `npm run cap:sync`), execute depois
+> `npm run native:android` para reaplicar a integração — o `cap sync` pode
+> sobrescrever o `AndroidManifest.xml`.
 
-### Adicionar strings em `android/app/src/main/res/values/strings.xml`
+## Setup manual (fallback)
 
-```xml
-<string name="superbet_auto_description">Detecta o card do jogo na Superbet para enriquecer a análise.</string>
-<string name="superbet_auto_summary">Captura automática Superbet → Analista Joilson</string>
-```
-
-### Mesclar `AndroidManifest.xml`
-
-Permissões (dentro de `<manifest>`):
-```xml
-<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-```
-
-Dentro de `<application>`:
-```xml
-<service
-    android:name=".superbet.OverlayService"
-    android:foregroundServiceType="specialUse"
-    android:exported="false" />
-
-<service
-    android:name=".superbet.CaptureService"
-    android:foregroundServiceType="mediaProjection"
-    android:exported="false" />
-
-<service
-    android:name=".superbet.AutoDetectService"
-    android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-    android:exported="false">
-    <intent-filter>
-        <action android:name="android.accessibilityservice.AccessibilityService" />
-    </intent-filter>
-    <meta-data
-        android:name="android.accessibilityservice"
-        android:resource="@xml/auto_detect_config" />
-</service>
-
-<activity
-    android:name=".superbet.PermissionActivity"
-    android:theme="@android:style/Theme.Translucent.NoTitleBar"
-    android:exported="false" />
-```
-
-### Build
-```bash
-npm run build && npx cap sync android && npx cap run android
-```
+Caso prefira fazer à mão, veja `scripts/integrate-superbet-native.mjs` — cada
+etapa está documentada lá em comentários.
 
 ## Como funciona a captura automática
 
@@ -115,18 +71,11 @@ Usuário abre Superbet → AutoDetectService recebe AccessibilityEvent
               → screenshot vai pro OCR → engines
 ```
 
-- **Privacidade**: o XML restringe o service aos pacotes da Superbet apenas.
-  Não recebemos eventos de WhatsApp, banco, etc.
-- **Bateria**: filtros nativos + debounce + early-return tornam o custo
-  mínimo. Service só processa quando Superbet está em foreground.
-- **Toggle**: o usuário liga/desliga via switch no app. Estado fica em
-  `SharedPreferences` (`superbet_auto.enabled`). Mesmo com Acessibilidade
-  ativa, nada é capturado se o switch estiver OFF.
-
 ## Limitações
+
 - iOS sem suporte (Apple não permite Acessibilidade pra outros apps nem overlays).
-- Play Store exige justificativa pra Acessibilidade + MediaProjection. Pra APK
-  distribuído direto, sem problema.
+- Play Store exige justificativa pra Acessibilidade + MediaProjection.
+  Pra APK distribuído direto, sem problema.
 - MediaProjection expira no cold-start do app — usuário precisa reautorizar.
 - Mudança grande no layout/textos da Superbet pode quebrar a heurística;
-  ajustar regex em `AutoDetectService.kt`.
+  ajuste regex em `AutoDetectService.kt`.

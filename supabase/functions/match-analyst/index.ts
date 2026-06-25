@@ -543,19 +543,39 @@ serve(async (req) => {
           generationConfig: { temperature: 0.6, ...(pesquisaWeb ? {} : { responseMimeType: "application/json" }) },
           ...(pesquisaWeb ? { tools: [{ google_search: {} }] } : {}),
         };
+        const t0 = Date.now();
         const resp = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(reqBody),
         });
+        const rawText = await resp.text();
+        console.log("[match-analyst][gemini] request", JSON.stringify({
+          model,
+          endpoint: url.replace(geminiKey, "***"),
+          pesquisaWeb,
+          usesGoogleSearch: !!pesquisaWeb,
+          usesGrounding: !!pesquisaWeb,
+          retries: 0,
+          callsPerAnalysis: 1,
+          status: resp.status,
+          statusText: resp.statusText,
+          durationMs: Date.now() - t0,
+        }));
         if (!resp.ok) {
-          console.warn("[match-analyst] Gemini fail", resp.status, (await resp.text()).slice(0, 200));
+          // FULL payload (no truncation) so we can diagnose quota/rate/billing/etc.
+          console.error("[match-analyst][gemini] ERROR_FULL_PAYLOAD", rawText);
+          try {
+            const errJson = JSON.parse(rawText);
+            console.error("[match-analyst][gemini] ERROR_PARSED", JSON.stringify(errJson, null, 2));
+          } catch { /* not json */ }
           return null;
         }
-        const data = await resp.json();
+        const data = JSON.parse(rawText);
         const parts = data?.candidates?.[0]?.content?.parts || [];
         const content = parts.map((p: any) => p?.text || "").join("");
         return content ? { content, source: "gemini" } : null;
+
       } catch (e) {
         console.warn("[match-analyst] Gemini exception", e);
         return null;

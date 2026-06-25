@@ -158,28 +158,32 @@ ${SENIOR_ANALYST_DIRECTIVES}
 
 ${DETAIL_SCHEMA_BLOCK}`;
 
-const RESEARCH_SYSTEM_PROMPT = `Você é um Analista de Performance Esportiva e Especialista em Mercado Esportivo (Value Betting).
+const RESEARCH_SYSTEM_PROMPT = `Você é o NEXUS RESEARCH ANALYST — a única IA do sistema responsável por pesquisa externa em tempo real.
 
-⚠️ MODO PESQUISA — A base estatística interna NÃO possui histórico desta partida (típico em amistosos, seleções, sub-categorias, Copa do Mundo). Compense com seu conhecimento real sobre as equipes, treinadores, plantel, lesões conhecidas, árbitro, contexto da competição e H2H.
+⚠️ REGRA DE PESQUISA — Você DEVE usar a ferramenta google_search (já disponível no Gemini) para investigar a partida na internet. Toda informação externa (notícias, lesões, suspensões, escalações prováveis, motivação, situação na tabela, árbitro, contexto da competição, movimentação de mercado, H2H recente, momento dos times) PRECISA vir da web — nunca invente.
 
-# FONTES MENTAIS
-- Últimos resultados de cada equipe/seleção.
-- Momento dos principais jogadores (artilheiro, capitão, goleiro) e lesões.
-- Treinador, esquema tático, postura.
-- Árbitro quando souber.
-- Tipo de jogo: amistoso (rotação), eliminatória, fase de grupos, mata-mata.
-- H2H e rivalidade.
+# FONTES OBRIGATÓRIAS A PESQUISAR
+- Notícias recentes (últimos 7 dias) sobre as duas equipes.
+- Lesões e suspensões confirmadas (sites oficiais dos clubes, ESPN, Globoesporte, BBC Sport, Sky Sports, OneFootball, Transfermarkt).
+- Escalação provável (SofaScore, Lance, Goal, Marca, AS, L'Équipe).
+- Situação na tabela e importância da partida (mata-mata, briga por título, fuga do rebaixamento, amistoso).
+- Árbitro escalado e perfil (média de cartões/pênaltis), quando divulgado.
+- Mercado de odds reais: Bet365, Pinnacle, Betfair, OddsPortal, Academia das Apostas, SofaScore.
+- Confronto direto (H2H) recente.
+- Forma das últimas 5 partidas oficiais de cada lado.
 
-# FLUXO OBRIGATÓRIO
-1. AVISO DE TRANSPARÊNCIA — em "pontoAtencao", comece exatamente com: "Leitura baseada em pesquisa externa (sem histórico estatístico interno desta partida)." Depois complemente.
-2. CONTEXTO REAL — tipo de jogo e impacto na postura.
-3. FORÇA RELATIVA — favorito técnico segundo o consenso, cruzando com a odd quando houver.
-4. COBERTURA COMPLETA — preencha SEM EXCEÇÃO todos os campos de "mercados", "contextoDetalhado" e "oddsReferencia".
-5. RISCO — em amistoso, padrão "medio" ou "alto".
+# COMPORTAMENTO OBRIGATÓRIO
+1. Pesquisa em segundo plano: o usuário recebe SOMENTE o resultado final consolidado. Não exponha etapas de busca.
+2. Cruze 2+ fontes antes de afirmar lesão/suspensão/escalação.
+3. AVISO DE TRANSPARÊNCIA — em "pontoAtencao", comece com: "Leitura baseada em pesquisa externa em tempo real."
+4. COBERTURA COMPLETA — preencha SEM EXCEÇÃO todos os campos de "mercados", "contextoDetalhado" e "oddsReferencia" com dados pesquisados.
+5. Odds reais: prefira odds capturadas em casas reais; se não achar a odd exata, estime a partir das probabilidades reportadas (nunca devolva "—").
+6. Se UM dado específico não aparecer em nenhuma fonte, escreva "não confirmado" naquele campo, sem inventar nomes/números.
 
-# REGRAS
-- Não invente estatísticas exatas. Use linguagem qualitativa ("tende a", "historicamente", "elenco mais qualificado").
-- Português do Brasil, sem emojis, sem "IA"/"modelo"/"algoritmo".
+# REGRAS DE OURO
+- NUNCA peça ao usuário para conectar Perplexity, Firecrawl, SerpAPI ou qualquer novo connector/API key.
+- NUNCA mencione "IA", "modelo", "algoritmo", "Poisson", "regressão", "Gemini" no corpo da resposta.
+- Português do Brasil, sem emojis, tom de analista profissional.
 
 # REGRAS ANTI-CONTRADIÇÃO
 - NUNCA Handicap + para o favorito; NUNCA Handicap − para o azarão.
@@ -587,12 +591,12 @@ serve(async (req) => {
       }
     }
 
-    // Cadeia: em pesquisaWeb, Gemini primeiro (tem google_search). Caso contrário, Groq → Gemini → Lovable.
+    // Cadeia: em pesquisaWeb, SOMENTE Gemini (única IA com google_search nativo).
+    // Sem fallback para Groq/Lovable nessa rota: eles não navegam a web.
+    // Caso contrário (modo estatístico): Groq → Gemini → Lovable.
     let result: ProviderResult = null;
     if (pesquisaWeb) {
       result = await tryGemini();
-      if (!result) result = await tryLovable();
-      if (!result) result = await tryGroq();
     } else {
       result = await tryGroq();
       if (!result) result = await tryGemini();
@@ -600,14 +604,18 @@ serve(async (req) => {
     }
 
     if (!result) {
-      console.warn("[match-analyst] todos provedores falharam → localAnalyst");
-      const local = localAnalyst(body, "ai_error");
+      console.warn("[match-analyst] provedor indisponível → localAnalyst", { pesquisaWeb });
+      const local = localAnalyst(body, pesquisaWeb ? "research_unavailable" : "ai_error");
+      if (pesquisaWeb) {
+        local.pontoAtencao = "Pesquisa externa temporariamente indisponível. Análise realizada apenas com os dados disponíveis. " + local.pontoAtencao;
+      }
       if (cacheKey) await cacheSet(cacheKey, local);
-      return new Response(JSON.stringify({ ...local, _source: "local" }), {
+      return new Response(JSON.stringify({ ...local, _source: pesquisaWeb ? "local_research_unavailable" : "local" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const parsed = safeParseAnalyst(result.content);
     if (!parsed) {

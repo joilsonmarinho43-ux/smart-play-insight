@@ -591,12 +591,12 @@ serve(async (req) => {
       }
     }
 
-    // Cadeia: em pesquisaWeb, Gemini primeiro (tem google_search). Caso contrário, Groq → Gemini → Lovable.
+    // Cadeia: em pesquisaWeb, SOMENTE Gemini (única IA com google_search nativo).
+    // Sem fallback para Groq/Lovable nessa rota: eles não navegam a web.
+    // Caso contrário (modo estatístico): Groq → Gemini → Lovable.
     let result: ProviderResult = null;
     if (pesquisaWeb) {
       result = await tryGemini();
-      if (!result) result = await tryLovable();
-      if (!result) result = await tryGroq();
     } else {
       result = await tryGroq();
       if (!result) result = await tryGemini();
@@ -604,14 +604,18 @@ serve(async (req) => {
     }
 
     if (!result) {
-      console.warn("[match-analyst] todos provedores falharam → localAnalyst");
-      const local = localAnalyst(body, "ai_error");
+      console.warn("[match-analyst] provedor indisponível → localAnalyst", { pesquisaWeb });
+      const local = localAnalyst(body, pesquisaWeb ? "research_unavailable" : "ai_error");
+      if (pesquisaWeb) {
+        local.pontoAtencao = "Pesquisa externa temporariamente indisponível. Análise realizada apenas com os dados disponíveis. " + local.pontoAtencao;
+      }
       if (cacheKey) await cacheSet(cacheKey, local);
-      return new Response(JSON.stringify({ ...local, _source: "local" }), {
+      return new Response(JSON.stringify({ ...local, _source: pesquisaWeb ? "local_research_unavailable" : "local" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const parsed = safeParseAnalyst(result.content);
     if (!parsed) {

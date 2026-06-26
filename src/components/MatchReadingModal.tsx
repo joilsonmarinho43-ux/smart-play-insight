@@ -233,8 +233,10 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
     );
   };
 
+  const maxGames = Math.max(data?.home?.games || 0, data?.away?.games || 0);
+  const titleSuffix = maxGames > 0 && maxGames < 5 ? `${maxGames} jogo${maxGames === 1 ? "" : "s"}` : "5 jogos";
   return (
-    <Section icon={TrendingUp} title="Últimos 5 jogos">
+    <Section icon={TrendingUp} title={`Últimos ${titleSuffix}`}>
       {loading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" /> Buscando histórico…

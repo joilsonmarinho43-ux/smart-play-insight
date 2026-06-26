@@ -434,18 +434,48 @@ function localAnalyst(input: any, reason = "rate_limited") {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const t0 = Date.now();
+  const auditLog: Record<string, any> = {
+    stage: "init", match_id: null, league: null, home_team: null, away_team: null,
+    pesquisaWeb: false, missing_fields: [], fallback_source: null,
+    fallback_confidence: null, fallback_low_confidence: null,
+    gemini_status: "not_called", groq_status: "not_called", lovable_status: "not_called",
+    provider_used: null, fallback_reason: null, execution_time_ms: 0,
+  };
+  const emitAudit = (extra: Record<string, any> = {}) => {
+    Object.assign(auditLog, extra, { execution_time_ms: Date.now() - t0 });
+    console.log("[match-analyst][AUDIT]", JSON.stringify(auditLog));
+  };
+
   try {
     const body = await req.json();
     const fixtureId = body?.match?.id || body?.fixtureId;
     const pesquisaWeb = body?.pesquisaWeb === true;
     const modeTag = pesquisaWeb ? "research" : "standard";
-    const cacheKey = fixtureId
-      ? `analyst:${PROMPT_VERSION}:${modeTag}:${fixtureId}`
-      : null;
+    const cacheKey = fixtureId ? `analyst:${PROMPT_VERSION}:${modeTag}:${fixtureId}` : null;
+
+    auditLog.match_id = fixtureId ?? null;
+    auditLog.league = body?.match?.league ?? null;
+    auditLog.home_team = body?.match?.homeTeam ?? null;
+    auditLog.away_team = body?.match?.awayTeam ?? null;
+    auditLog.pesquisaWeb = pesquisaWeb;
+    auditLog.missing_fields = body?.fallbackStats?.missing ?? [];
+    auditLog.fallback_source = body?.fallbackStats?.source ?? null;
+    auditLog.fallback_confidence = body?.fallbackStats?.confidence_score ?? null;
+    auditLog.fallback_low_confidence = body?.fallbackStats?.lowConfidence ?? null;
+
+    console.log("[match-analyst][stage=received]", JSON.stringify({
+      match_id: auditLog.match_id, home: auditLog.home_team, away: auditLog.away_team,
+      league: auditLog.league, pesquisaWeb,
+      fallback_source: auditLog.fallback_source, missing_fields: auditLog.missing_fields,
+      reading_keys: Object.keys(body?.reading || {}),
+      context_keys: Object.keys(body?.context || {}),
+    }));
 
     if (cacheKey) {
       const cached = await cacheGet(cacheKey);
       if (cached) {
+        emitAudit({ stage: "cache_hit", provider_used: cached._source || "cache" });
         return new Response(JSON.stringify({ ...cached, cached: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -456,38 +486,25 @@ serve(async (req) => {
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!groqKey && !geminiKey && !lovableKey) {
-      return new Response(JSON.stringify(localAnalyst(body, "no_ai_key")), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const local = localAnalyst(body, "no_ai_key");
+      emitAudit({ stage: "no_keys", provider_used: "local", fallback_reason: "no_ai_key" });
+      return new Response(JSON.stringify({ ...local, _source: "local", _fallback_reason: "no_ai_key" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Em modo pesquisa, payload mínimo (sem reading/context vazios) + odds se houver
     const userPayload = pesquisaWeb
       ? JSON.stringify({
           partida: {
-            casa: body?.match?.homeTeam,
-            fora: body?.match?.awayTeam,
-            liga: body?.match?.league,
-            horario: body?.match?.time,
-            estadio: body?.match?.venue,
-            fase: body?.match?.fixtureType,
+            casa: body?.match?.homeTeam, fora: body?.match?.awayTeam,
+            liga: body?.match?.league, horario: body?.match?.time,
+            estadio: body?.match?.venue, fase: body?.match?.fixtureType,
           },
-          mercado: body?.context?.odds
-            ? {
-                odds_1x2: {
-                  casa: body.context.odds.home,
-                  empate: body.context.odds.draw,
-                  fora: body.context.odds.away,
-                },
-                over_under_25: {
-                  over: body.context.odds.over25,
-                  under: body.context.odds.under25,
-                },
-              }
-            : null,
-          observacao:
-            "Sem histórico estatístico interno. Use seu conhecimento sobre as equipes/seleções.",
+          mercado: body?.context?.odds ? {
+            odds_1x2: { casa: body.context.odds.home, empate: body.context.odds.draw, fora: body.context.odds.away },
+            over_under_25: { over: body.context.odds.over25, under: body.context.odds.under25 },
+          } : null,
+          observacao: "Sem histórico estatístico interno. Use seu conhecimento sobre as equipes/seleções.",
         })
       : buildUserPayload(body);
 
@@ -496,21 +513,24 @@ serve(async (req) => {
       ? "Analise a partida abaixo em MODO PESQUISA usando seu conhecimento sobre as equipes. Devolva apenas o JSON.\n\n"
       : "Analise a partida abaixo seguindo o fluxo. Devolva apenas o JSON.\n\n";
 
+    console.log("[match-analyst][stage=prompt_built]", JSON.stringify({
+      mode: modeTag, system_prompt_chars: systemPrompt.length, user_payload_chars: userPayload.length,
+    }));
+
     type ProviderResult = { content: string; source: string } | null;
+    const failureReasons: Record<string, string> = {};
 
     async function tryGroq(): Promise<ProviderResult> {
-      if (!groqKey) return null;
+      if (!groqKey) { auditLog.groq_status = "no_key"; return null; }
+      const tg = Date.now();
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 18000);
         const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          signal: ctrl.signal,
+          method: "POST", signal: ctrl.signal,
           headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            temperature: 0.5,
-            max_tokens: 3000,
+            model: "llama-3.3-70b-versatile", temperature: 0.5, max_tokens: 3000,
             response_format: { type: "json_object" },
             messages: [
               { role: "system", content: systemPrompt },
@@ -519,21 +539,30 @@ serve(async (req) => {
           }),
         });
         clearTimeout(t);
+        auditLog.groq_status = `http_${resp.status}`;
         if (!resp.ok) {
-          console.warn("[match-analyst] Groq fail", resp.status, (await resp.text()).slice(0, 200));
+          const errBody = await resp.text();
+          const reason = resp.status === 429 ? "rate_limit"
+            : resp.status === 401 ? "auth_error"
+            : (resp.status === 408 || resp.status === 504) ? "timeout"
+            : `provider_error:${resp.status}`;
+          failureReasons.groq = reason;
+          console.warn("[match-analyst][groq] ERROR_FULL_PAYLOAD", errBody);
           return null;
         }
         const data = await resp.json();
         const content = data?.choices?.[0]?.message?.content || "";
+        console.log("[match-analyst][groq] ok", JSON.stringify({ ms: Date.now() - tg, chars: content.length }));
         return content ? { content, source: "groq" } : null;
-      } catch (e) {
-        console.warn("[match-analyst] Groq exception", e);
+      } catch (e: any) {
+        auditLog.groq_status = e?.name === "AbortError" ? "timeout" : "exception";
+        failureReasons.groq = e?.name === "AbortError" ? "timeout" : `exception:${e?.message || e}`;
         return null;
       }
     }
 
     async function tryGemini(): Promise<ProviderResult> {
-      if (!geminiKey) return null;
+      if (!geminiKey) { auditLog.gemini_status = "no_key"; return null; }
       try {
         const model = pesquisaWeb ? "gemini-2.5-pro" : "gemini-2.5-flash";
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
@@ -543,47 +572,50 @@ serve(async (req) => {
           generationConfig: { temperature: 0.6, ...(pesquisaWeb ? {} : { responseMimeType: "application/json" }) },
           ...(pesquisaWeb ? { tools: [{ google_search: {} }] } : {}),
         };
-        const t0 = Date.now();
+        const tgem = Date.now();
         const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(reqBody),
         });
         const rawText = await resp.text();
+        auditLog.gemini_status = `http_${resp.status}`;
         console.log("[match-analyst][gemini] request", JSON.stringify({
-          model,
-          endpoint: url.replace(geminiKey, "***"),
-          pesquisaWeb,
-          usesGoogleSearch: !!pesquisaWeb,
-          usesGrounding: !!pesquisaWeb,
-          retries: 0,
-          callsPerAnalysis: 1,
-          status: resp.status,
-          statusText: resp.statusText,
-          durationMs: Date.now() - t0,
+          model, endpoint: url.replace(geminiKey, "***"),
+          pesquisaWeb, usesGoogleSearch: !!pesquisaWeb, usesGrounding: !!pesquisaWeb,
+          retries: 0, callsPerAnalysis: 1,
+          status: resp.status, statusText: resp.statusText, durationMs: Date.now() - tgem,
         }));
         if (!resp.ok) {
-          // FULL payload (no truncation) so we can diagnose quota/rate/billing/etc.
           console.error("[match-analyst][gemini] ERROR_FULL_PAYLOAD", rawText);
+          let detailedReason = `provider_error:${resp.status}`;
           try {
             const errJson = JSON.parse(rawText);
+            const code = errJson?.error?.code;
+            const status = errJson?.error?.status;
             console.error("[match-analyst][gemini] ERROR_PARSED", JSON.stringify(errJson, null, 2));
+            if (status === "RESOURCE_EXHAUSTED" || code === 429) detailedReason = "quota_exceeded";
+            else if (status === "PERMISSION_DENIED") detailedReason = "permission_denied";
+            else if (status === "UNAUTHENTICATED" || code === 401) detailedReason = "auth_error";
+            else if (status === "INVALID_ARGUMENT") detailedReason = "invalid_argument";
+            else if (status === "FAILED_PRECONDITION") detailedReason = "billing_required";
           } catch { /* not json */ }
+          failureReasons.gemini = detailedReason;
           return null;
         }
         const data = JSON.parse(rawText);
         const parts = data?.candidates?.[0]?.content?.parts || [];
         const content = parts.map((p: any) => p?.text || "").join("");
+        if (!content) failureReasons.gemini = "empty_response";
         return content ? { content, source: "gemini" } : null;
-
-      } catch (e) {
-        console.warn("[match-analyst] Gemini exception", e);
+      } catch (e: any) {
+        auditLog.gemini_status = e?.name === "AbortError" ? "timeout" : "exception";
+        failureReasons.gemini = e?.name === "AbortError" ? "timeout" : `exception:${e?.message || e}`;
         return null;
       }
     }
 
     async function tryLovable(): Promise<ProviderResult> {
-      if (!lovableKey) return null;
+      if (!lovableKey) { auditLog.lovable_status = "no_key"; return null; }
       try {
         const model = pesquisaWeb ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
         const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -598,22 +630,23 @@ serve(async (req) => {
             response_format: { type: "json_object" },
           }),
         });
+        auditLog.lovable_status = `http_${resp.status}`;
         if (!resp.ok) {
-          console.warn("[match-analyst] Lovable fail", resp.status, (await resp.text()).slice(0, 200));
+          const txt = await resp.text();
+          failureReasons.lovable = resp.status === 429 ? "rate_limit" : `provider_error:${resp.status}`;
+          console.warn("[match-analyst][lovable] fail", resp.status, txt.slice(0, 200));
           return null;
         }
         const data = await resp.json();
         const content = data?.choices?.[0]?.message?.content || "";
         return content ? { content, source: "lovable" } : null;
-      } catch (e) {
-        console.warn("[match-analyst] Lovable exception", e);
+      } catch (e: any) {
+        auditLog.lovable_status = "exception";
+        failureReasons.lovable = `exception:${e?.message || e}`;
         return null;
       }
     }
 
-    // Cadeia: em pesquisaWeb, SOMENTE Gemini (única IA com google_search nativo).
-    // Sem fallback para Groq/Lovable nessa rota: eles não navegam a web.
-    // Caso contrário (modo estatístico): Groq → Gemini → Lovable.
     let result: ProviderResult = null;
     if (pesquisaWeb) {
       result = await tryGemini();
@@ -624,41 +657,51 @@ serve(async (req) => {
     }
 
     if (!result) {
-      console.warn("[match-analyst] provedor indisponível → localAnalyst", { pesquisaWeb });
-      const local = localAnalyst(body, pesquisaWeb ? "research_unavailable" : "ai_error");
+      const reason = pesquisaWeb
+        ? (failureReasons.gemini || "research_unavailable")
+        : (failureReasons.groq || failureReasons.gemini || failureReasons.lovable || "ai_error");
+      const hasStats = !!(body?.fallbackStats?.stats && Object.values(body.fallbackStats.stats).some((v: any) => v !== null && v !== undefined));
+      const local = localAnalyst(body, reason);
       if (pesquisaWeb) {
         local.pontoAtencao = "Pesquisa externa temporariamente indisponível. Análise realizada apenas com os dados disponíveis. " + local.pontoAtencao;
       }
-      if (cacheKey) await cacheSet(cacheKey, local);
-      return new Response(JSON.stringify({ ...local, _source: pesquisaWeb ? "local_research_unavailable" : "local" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      emitAudit({
+        stage: "fallback_local", provider_used: "local",
+        fallback_reason: reason, provider_failure_reasons: failureReasons, has_real_stats: hasStats,
       });
+      if (cacheKey) await cacheSet(cacheKey, local);
+      return new Response(JSON.stringify({
+        ...local,
+        _source: pesquisaWeb ? "local_research_unavailable" : "local",
+        _fallback_reason: reason,
+        _provider_failures: failureReasons,
+        _generic_warning: !hasStats,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
 
     const parsed = safeParseAnalyst(result.content);
     if (!parsed) {
-      console.warn("[match-analyst] parse fail src=", result.source, result.content?.slice(0, 300));
+      console.warn("[match-analyst][parse_fail] src=", result.source, result.content?.slice(0, 300));
       const local = localAnalyst(body, "parse_fail");
+      emitAudit({ stage: "parse_fail", provider_used: "local", fallback_reason: "parse_fail", attempted_source: result.source });
       if (cacheKey) await cacheSet(cacheKey, local);
-      return new Response(JSON.stringify({ ...local, _source: "local" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ ...local, _source: "local", _fallback_reason: "parse_fail", _attempted_source: result.source }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     (parsed as any)._source = result.source;
     if (cacheKey) await cacheSet(cacheKey, parsed);
+    emitAudit({ stage: "success", provider_used: result.source });
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
-    console.error("match-analyst fatal", e);
+    console.error("[match-analyst][fatal]", e);
+    emitAudit({ stage: "fatal", fallback_reason: `fatal:${e?.message || e}` });
     return new Response(JSON.stringify({ error: String(e?.message || e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

@@ -347,8 +347,10 @@ export function buildMatchReadingV2(
 
   // ─── 3. INDICADORES (apenas os relevantes) ──────────────────
   const indicators: string[] = [];
-  indicators.push(`${home}: marca ${fmt(hGF)} e sofre ${fmt(hGA)} por jogo (últimas ${homeN}).`);
-  indicators.push(`${away}: marca ${fmt(aGF)} e sofre ${fmt(aGA)} por jogo (últimas ${awayN}).`);
+  const fmtGames = (n: number) =>
+    n === 1 ? "último 1 jogo" : `últimos ${n} jogos`;
+  indicators.push(`${home}: marca ${fmt(hGF)} e sofre ${fmt(hGA)} por jogo (${fmtGames(homeN)}).`);
+  indicators.push(`${away}: marca ${fmt(aGF)} e sofre ${fmt(aGA)} por jogo (${fmtGames(awayN)}).`);
   if (openProfile)
     indicators.push(`Projeção combinada elevada — ${fmt(total)} gols esperados na soma.`);
   if (lowScoringProfile)

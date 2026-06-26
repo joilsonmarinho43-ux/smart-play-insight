@@ -47,11 +47,23 @@ interface Props {
 
 const sourceLabel: Record<string, string> = {
   "api-football": "API oficial",
-  "thesportsdb": "Fonte alternativa",
+  "thesportsdb": "Base externa (TheSportsDB)",
   "historical": "Histórico armazenado",
   "mixed": "Fontes combinadas",
   "none": "Sem dados",
 };
+
+// Sanitiza textos do analista: clampa percentuais impossíveis (≥ 100%) para 95%.
+// Modelos às vezes devolvem "100% de chance" — irreal em mercado de futebol.
+function sanitizePercents(text?: string): string | undefined {
+  if (!text) return text;
+  return text.replace(/(\d{2,3})\s?%/g, (m, n) => {
+    const v = parseInt(n, 10);
+    if (!Number.isFinite(v)) return m;
+    if (v >= 100) return "95%";
+    return m;
+  });
+}
 
 const missingLabel: Record<string, string> = {
   avg_corners: "média de escanteios",
@@ -221,8 +233,10 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
     );
   };
 
+  const maxGames = Math.max(data?.home?.games || 0, data?.away?.games || 0);
+  const titleSuffix = maxGames > 0 && maxGames < 5 ? `${maxGames} jogo${maxGames === 1 ? "" : "s"}` : "5 jogos";
   return (
-    <Section icon={TrendingUp} title="Últimos 5 jogos">
+    <Section icon={TrendingUp} title={`Últimos ${titleSuffix}`}>
       {loading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" /> Buscando histórico…
@@ -529,13 +543,13 @@ const AnalystBlock = ({
               <span className="text-xs uppercase tracking-wider font-bold text-primary block">
                 Análise por Mercado
               </span>
-              {analyst.mercados.vitoria && (<p><span className="font-bold text-primary">Vitória (1X2):</span> {analyst.mercados.vitoria}</p>)}
-              {analyst.mercados.duplaChance && (<p><span className="font-bold text-primary">Dupla Chance:</span> {analyst.mercados.duplaChance}</p>)}
-              {analyst.mercados.handicap && (<p><span className="font-bold text-primary">Handicap Asiático:</span> {analyst.mercados.handicap}</p>)}
-              {analyst.mercados.overUnderGols && (<p><span className="font-bold text-primary">Over/Under Gols:</span> {analyst.mercados.overUnderGols}</p>)}
-              {analyst.mercados.btts && (<p><span className="font-bold text-primary">Ambas Marcam:</span> {analyst.mercados.btts}</p>)}
-              {analyst.mercados.escanteios && (<p><span className="font-bold text-primary">Escanteios:</span> {analyst.mercados.escanteios}</p>)}
-              {analyst.mercados.cartoes && (<p><span className="font-bold text-primary">Cartões:</span> {analyst.mercados.cartoes}</p>)}
+              {analyst.mercados.vitoria && (<p><span className="font-bold text-primary">Vitória (1X2):</span> {sanitizePercents(analyst.mercados.vitoria)}</p>)}
+              {analyst.mercados.duplaChance && (<p><span className="font-bold text-primary">Dupla Chance:</span> {sanitizePercents(analyst.mercados.duplaChance)}</p>)}
+              {analyst.mercados.handicap && (<p><span className="font-bold text-primary">Handicap Asiático:</span> {sanitizePercents(analyst.mercados.handicap)}</p>)}
+              {analyst.mercados.overUnderGols && (<p><span className="font-bold text-primary">Over/Under Gols:</span> {sanitizePercents(analyst.mercados.overUnderGols)}</p>)}
+              {analyst.mercados.btts && (<p><span className="font-bold text-primary">Ambas Marcam:</span> {sanitizePercents(analyst.mercados.btts)}</p>)}
+              {analyst.mercados.escanteios && (<p><span className="font-bold text-primary">Escanteios:</span> {sanitizePercents(analyst.mercados.escanteios)}</p>)}
+              {analyst.mercados.cartoes && (<p><span className="font-bold text-primary">Cartões:</span> {sanitizePercents(analyst.mercados.cartoes)}</p>)}
               {analyst.mercados.placarExato && (<p><span className="font-bold text-primary">Placar Provável:</span> {analyst.mercados.placarExato}</p>)}
             </div>
           )}

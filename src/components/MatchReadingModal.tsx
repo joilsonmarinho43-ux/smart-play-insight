@@ -47,11 +47,23 @@ interface Props {
 
 const sourceLabel: Record<string, string> = {
   "api-football": "API oficial",
-  "thesportsdb": "Fonte alternativa",
+  "thesportsdb": "Base externa (TheSportsDB)",
   "historical": "Histórico armazenado",
   "mixed": "Fontes combinadas",
   "none": "Sem dados",
 };
+
+// Sanitiza textos do analista: clampa percentuais impossíveis (≥ 100%) para 95%.
+// Modelos às vezes devolvem "100% de chance" — irreal em mercado de futebol.
+function sanitizePercents(text?: string): string | undefined {
+  if (!text) return text;
+  return text.replace(/(\d{2,3})\s?%/g, (m, n) => {
+    const v = parseInt(n, 10);
+    if (!Number.isFinite(v)) return m;
+    if (v >= 100) return "95%";
+    return m;
+  });
+}
 
 const missingLabel: Record<string, string> = {
   avg_corners: "média de escanteios",

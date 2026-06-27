@@ -158,8 +158,15 @@ function isPlayed(e: any): boolean {
 function currentSeasons(): string[] {
   const now = new Date();
   const y = now.getFullYear();
-  // Cobre ligas calendário (2025, 2026) e europeu (2025-2026, 2024-2025)
-  return [`${y}-${y + 1}`, `${y - 1}-${y}`, String(y), String(y - 1)];
+  // Cobre ligas calendário (anos puros) e europeias (split). Vai 3 anos para trás
+  // para garantir histórico em seleções (eliminatórias/amistosos esparsos).
+  const out: string[] = [];
+  for (let d = 0; d <= 3; d++) {
+    out.push(String(y - d));
+    out.push(`${y - d}-${y - d + 1}`);
+    out.push(`${y - d - 1}-${y - d}`);
+  }
+  return Array.from(new Set(out));
 }
 
 async function lastEventsBase(teamId: string): Promise<any[]> {
@@ -172,7 +179,6 @@ async function teamLeagues(teamId: string): Promise<string[]> {
   const t = j?.teams?.[0];
   const ids = new Set<string>();
   if (t?.idLeague) ids.add(String(t.idLeague));
-  // ligas adicionais (copa nacional, internacional)
   for (let i = 2; i <= 7; i++) {
     const v = t?.[`idLeague${i}`];
     if (v) ids.add(String(v));
@@ -180,45 +186,48 @@ async function teamLeagues(teamId: string): Promise<string[]> {
   return Array.from(ids);
 }
 
-async function eventsFromSeason(teamId: string, leagueId: string): Promise<any[]> {
+// Agrega TODAS as temporadas configuradas (não para na primeira que retorna algo).
+// A chave free do TSDB devolve no máximo 15 eventos por chamada — agregar é essencial
+// para fechar histórico de seleções que distribuem jogos em várias competições/anos.
+async function eventsFromSeason(teamId: string, leagueId: string, target: Map<string, any>, stopAtPlayed = 8): Promise<void> {
   for (const s of currentSeasons()) {
+    const playedSoFar = Array.from(target.values()).filter(isPlayed).length;
+    if (playedSoFar >= stopAtPlayed) return;
     const j = await tsdb(`/eventsseason.php?id=${leagueId}&s=${s}`);
     const list: any[] = j?.events || [];
-    const mine = list.filter((e) => String(e?.idHomeTeam) === teamId || String(e?.idAwayTeam) === teamId);
-    if (mine.length) return mine;
+    for (const e of list) {
+      if (!e?.idEvent) continue;
+      if (String(e.idHomeTeam) !== teamId && String(e.idAwayTeam) !== teamId) continue;
+      target.set(String(e.idEvent), e);
+    }
   }
-  return [];
 }
 
 async function lastEvents(teamId: string): Promise<any[]> {
   const cached = lastEventsCache.get(teamId);
   if (cached && Date.now() - cached.ts < TTL) return cached.data;
 
-  // 1) Base: últimos eventos diretos
-  const base = await lastEventsBase(teamId);
   const merged = new Map<string, any>();
+  // 1) Base: últimos eventos diretos (free key devolve só 1, mas é o mais recente)
+  const base = await lastEventsBase(teamId);
   for (const e of base) if (e?.idEvent) merged.set(String(e.idEvent), e);
 
-  let playedCount = Array.from(merged.values()).filter(isPlayed).length;
-
-  // 2) Fallback: se <5 jogados, busca temporada das ligas do time
-  if (playedCount < 5) {
-    try {
-      const leagues = await teamLeagues(teamId);
-      for (const lid of leagues) {
-        if (playedCount >= 5) break;
-        const evs = await eventsFromSeason(teamId, lid);
-        for (const e of evs) {
-          if (e?.idEvent) merged.set(String(e.idEvent), e);
-        }
-        playedCount = Array.from(merged.values()).filter(isPlayed).length;
-      }
-    } catch (e) {
-      console.warn("[team-form] season fallback error", String(e));
+  // 2) Enriquecimento: agrega TODAS as ligas do time × TODAS as temporadas até
+  // termos pelo menos 5 jogos jogados (alvo 8 para sobrar margem).
+  try {
+    const leagues = await teamLeagues(teamId);
+    for (const lid of leagues) {
+      const played = Array.from(merged.values()).filter(isPlayed).length;
+      if (played >= 8) break;
+      await eventsFromSeason(teamId, lid, merged, 8);
     }
+  } catch (e) {
+    console.warn("[team-form] season fallback error", String(e));
   }
 
   const out = Array.from(merged.values());
+  const playedFinal = out.filter(isPlayed).length;
+  console.log(`[team-form] team=${teamId} total=${out.length} played=${playedFinal}`);
   lastEventsCache.set(teamId, { ts: Date.now(), data: out });
   return out;
 }

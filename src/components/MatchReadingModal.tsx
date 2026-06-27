@@ -252,7 +252,9 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
   };
 
   const maxGames = Math.max(data?.home?.games || 0, data?.away?.games || 0);
+  const minGames = Math.min(data?.home?.games || 0, data?.away?.games || 0);
   const titleSuffix = maxGames > 0 && maxGames < 5 ? `${maxGames} jogo${maxGames === 1 ? "" : "s"}` : "5 jogos";
+  const limited = !loading && maxGames > 0 && minGames < 5;
   return (
     <Section icon={TrendingUp} title={`Últimos ${titleSuffix}`}>
       {loading ? (
@@ -260,10 +262,17 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
           <Loader2 className="w-3 h-3 animate-spin" /> Buscando histórico…
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {renderSide(homeTeam, data?.home)}
-          {renderSide(awayTeam, data?.away)}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {renderSide(homeTeam, data?.home)}
+            {renderSide(awayTeam, data?.away)}
+          </div>
+          {limited && (
+            <div className="mt-2 text-[10.5px] text-muted-foreground/80 italic leading-snug">
+              Base pública (TheSportsDB free) limita o histórico de seleções e ligas menores ao último jogo. Para clubes em ligas principais aparecem até 5.
+            </div>
+          )}
+        </>
       )}
     </Section>
   );

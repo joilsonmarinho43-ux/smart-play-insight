@@ -155,79 +155,28 @@ function isPlayed(e: any): boolean {
   return Number.isFinite(hs) && Number.isFinite(as);
 }
 
-function currentSeasons(): string[] {
-  const now = new Date();
-  const y = now.getFullYear();
-  // Cobre ligas calendário (anos puros) e europeias (split). Vai 3 anos para trás
-  // para garantir histórico em seleções (eliminatórias/amistosos esparsos).
-  const out: string[] = [];
-  for (let d = 0; d <= 3; d++) {
-    out.push(String(y - d));
-    out.push(`${y - d}-${y - d + 1}`);
-    out.push(`${y - d - 1}-${y - d}`);
-  }
-  return Array.from(new Set(out));
-}
-
 async function lastEventsBase(teamId: string): Promise<any[]> {
   const j = await tsdb(`/eventslast.php?id=${teamId}`);
   return j?.results || [];
 }
 
-async function teamLeagues(teamId: string): Promise<string[]> {
-  const j = await tsdb(`/lookupteam.php?id=${teamId}`);
-  const t = j?.teams?.[0];
-  const ids = new Set<string>();
-  if (t?.idLeague) ids.add(String(t.idLeague));
-  for (let i = 2; i <= 7; i++) {
-    const v = t?.[`idLeague${i}`];
-    if (v) ids.add(String(v));
-  }
-  return Array.from(ids);
-}
-
-// Agrega TODAS as temporadas configuradas (não para na primeira que retorna algo).
-// A chave free do TSDB devolve no máximo 15 eventos por chamada — agregar é essencial
-// para fechar histórico de seleções que distribuem jogos em várias competições/anos.
-async function eventsFromSeason(teamId: string, leagueId: string, target: Map<string, any>, stopAtPlayed = 8): Promise<void> {
-  for (const s of currentSeasons()) {
-    const playedSoFar = Array.from(target.values()).filter(isPlayed).length;
-    if (playedSoFar >= stopAtPlayed) return;
-    const j = await tsdb(`/eventsseason.php?id=${leagueId}&s=${s}`);
-    const list: any[] = j?.events || [];
-    for (const e of list) {
-      if (!e?.idEvent) continue;
-      if (String(e.idHomeTeam) !== teamId && String(e.idAwayTeam) !== teamId) continue;
-      target.set(String(e.idEvent), e);
-    }
-  }
-}
-
+// NOTA TÉCNICA: TheSportsDB chave free ('123'/'3') retorna 429 em
+// /eventsseason.php e apenas 1 evento em /eventslast.php para seleções.
+// SportsRC free não expõe histórico por time (h2h/stats/team são PREMIUM).
+// Football-Data.org free não cobre amistosos/eliminatórias internacionais.
+// Resultado: para seleções nacionais conseguimos apenas o jogo mais recente.
+// Para clubes em ligas grandes, eventslast geralmente devolve até 5.
 async function lastEvents(teamId: string): Promise<any[]> {
   const cached = lastEventsCache.get(teamId);
   if (cached && Date.now() - cached.ts < TTL) return cached.data;
 
-  const merged = new Map<string, any>();
-  // 1) Base: últimos eventos diretos (free key devolve só 1, mas é o mais recente)
   const base = await lastEventsBase(teamId);
+  const merged = new Map<string, any>();
   for (const e of base) if (e?.idEvent) merged.set(String(e.idEvent), e);
-
-  // 2) Enriquecimento: agrega TODAS as ligas do time × TODAS as temporadas até
-  // termos pelo menos 5 jogos jogados (alvo 8 para sobrar margem).
-  try {
-    const leagues = await teamLeagues(teamId);
-    for (const lid of leagues) {
-      const played = Array.from(merged.values()).filter(isPlayed).length;
-      if (played >= 8) break;
-      await eventsFromSeason(teamId, lid, merged, 8);
-    }
-  } catch (e) {
-    console.warn("[team-form] season fallback error", String(e));
-  }
 
   const out = Array.from(merged.values());
   const playedFinal = out.filter(isPlayed).length;
-  console.log(`[team-form] team=${teamId} total=${out.length} played=${playedFinal}`);
+  console.log(`[team-form] team=${teamId} events=${out.length} played=${playedFinal}`);
   lastEventsCache.set(teamId, { ts: Date.now(), data: out });
   return out;
 }

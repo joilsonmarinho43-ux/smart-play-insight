@@ -219,10 +219,28 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
                 </span>
               ))}
             </div>
-            <div className="text-[11px] text-foreground/80">
-              Gols: {gf.join("-") || "—"} <span className="opacity-50">/</span>{" "}
-              Sofridos: {ga.join("-") || "—"}
-            </div>
+            {side?.recentResults?.length ? (
+              <ul className="space-y-0.5 mb-1.5">
+                {side.recentResults.slice(0, 5).map((r, i) => {
+                  const d = r.date ? new Date(r.date) : null;
+                  const dStr = d && !isNaN(d.getTime())
+                    ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })
+                    : "—";
+                  return (
+                    <li key={i} className="text-[10.5px] text-foreground/75 flex items-center gap-1.5">
+                      <span className="opacity-60 tabular-nums">{dStr}</span>
+                      <span className="truncate flex-1">vs {r.opp || "—"}</span>
+                      <span className="tabular-nums font-semibold">{r.gf}-{r.ga}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="text-[11px] text-foreground/80">
+                Gols: {gf.join("-") || "—"} <span className="opacity-50">/</span>{" "}
+                Sofridos: {ga.join("-") || "—"}
+              </div>
+            )}
             <div className="text-[11px] text-muted-foreground">
               Média: {(side?.goalsForAvg ?? 0).toFixed(1)} marcados ·{" "}
               {(side?.goalsAgainstAvg ?? 0).toFixed(1)} sofridos

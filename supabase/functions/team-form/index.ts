@@ -155,70 +155,28 @@ function isPlayed(e: any): boolean {
   return Number.isFinite(hs) && Number.isFinite(as);
 }
 
-function currentSeasons(): string[] {
-  const now = new Date();
-  const y = now.getFullYear();
-  // Cobre ligas calendário (2025, 2026) e europeu (2025-2026, 2024-2025)
-  return [`${y}-${y + 1}`, `${y - 1}-${y}`, String(y), String(y - 1)];
-}
-
 async function lastEventsBase(teamId: string): Promise<any[]> {
   const j = await tsdb(`/eventslast.php?id=${teamId}`);
   return j?.results || [];
 }
 
-async function teamLeagues(teamId: string): Promise<string[]> {
-  const j = await tsdb(`/lookupteam.php?id=${teamId}`);
-  const t = j?.teams?.[0];
-  const ids = new Set<string>();
-  if (t?.idLeague) ids.add(String(t.idLeague));
-  // ligas adicionais (copa nacional, internacional)
-  for (let i = 2; i <= 7; i++) {
-    const v = t?.[`idLeague${i}`];
-    if (v) ids.add(String(v));
-  }
-  return Array.from(ids);
-}
-
-async function eventsFromSeason(teamId: string, leagueId: string): Promise<any[]> {
-  for (const s of currentSeasons()) {
-    const j = await tsdb(`/eventsseason.php?id=${leagueId}&s=${s}`);
-    const list: any[] = j?.events || [];
-    const mine = list.filter((e) => String(e?.idHomeTeam) === teamId || String(e?.idAwayTeam) === teamId);
-    if (mine.length) return mine;
-  }
-  return [];
-}
-
+// NOTA TÉCNICA: TheSportsDB chave free ('123'/'3') retorna 429 em
+// /eventsseason.php e apenas 1 evento em /eventslast.php para seleções.
+// SportsRC free não expõe histórico por time (h2h/stats/team são PREMIUM).
+// Football-Data.org free não cobre amistosos/eliminatórias internacionais.
+// Resultado: para seleções nacionais conseguimos apenas o jogo mais recente.
+// Para clubes em ligas grandes, eventslast geralmente devolve até 5.
 async function lastEvents(teamId: string): Promise<any[]> {
   const cached = lastEventsCache.get(teamId);
   if (cached && Date.now() - cached.ts < TTL) return cached.data;
 
-  // 1) Base: últimos eventos diretos
   const base = await lastEventsBase(teamId);
   const merged = new Map<string, any>();
   for (const e of base) if (e?.idEvent) merged.set(String(e.idEvent), e);
 
-  let playedCount = Array.from(merged.values()).filter(isPlayed).length;
-
-  // 2) Fallback: se <5 jogados, busca temporada das ligas do time
-  if (playedCount < 5) {
-    try {
-      const leagues = await teamLeagues(teamId);
-      for (const lid of leagues) {
-        if (playedCount >= 5) break;
-        const evs = await eventsFromSeason(teamId, lid);
-        for (const e of evs) {
-          if (e?.idEvent) merged.set(String(e.idEvent), e);
-        }
-        playedCount = Array.from(merged.values()).filter(isPlayed).length;
-      }
-    } catch (e) {
-      console.warn("[team-form] season fallback error", String(e));
-    }
-  }
-
   const out = Array.from(merged.values());
+  const playedFinal = out.filter(isPlayed).length;
+  console.log(`[team-form] team=${teamId} events=${out.length} played=${playedFinal}`);
   lastEventsCache.set(teamId, { ts: Date.now(), data: out });
   return out;
 }

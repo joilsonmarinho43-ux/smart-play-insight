@@ -118,11 +118,11 @@ async function fdo(path: string, params?: Record<string, string>): Promise<any |
 
 // Constrói o índice usando /v4/teams paginado (500 por página). Sequencial
 // com throttle para respeitar o limite de 10 req/min do plano free.
-async function doBuildFdoIndex(): Promise<void> {
+async function fetchFdoIndexFromApi(): Promise<Map<string, number>> {
   const idx = new Map<string, number>();
   let offset = 0;
   const pageSize = 500;
-  const maxPages = 8; // até 4000 times
+  const maxPages = 8;
   for (let p = 0; p < maxPages; p++) {
     const r = await fdo('/teams', { limit: String(pageSize), offset: String(offset) });
     const teams: any[] = r?.teams || [];
@@ -138,13 +138,52 @@ async function doBuildFdoIndex(): Promise<void> {
     if (teams.length < pageSize) break;
     offset += pageSize;
   }
+  return idx;
+}
+
+async function loadFdoIndexFromKv(): Promise<{ idx: Map<string, number>; updatedAt: number } | null> {
+  if (!supa) return null;
+  try {
+    const { data, error } = await supa.from('team_form_kv').select('value, updated_at').eq('key', FDO_INDEX_KEY).maybeSingle();
+    if (error || !data) return null;
+    const entries: [string, number][] = (data.value as any)?.entries || [];
+    return { idx: new Map(entries), updatedAt: new Date(data.updated_at as any).getTime() };
+  } catch (e) { console.warn('[team-form] kv load failed', String(e)); return null; }
+}
+
+async function saveFdoIndexToKv(idx: Map<string, number>) {
+  if (!supa) return;
+  try {
+    const entries = Array.from(idx.entries());
+    const { error } = await supa.from('team_form_kv').upsert({
+      key: FDO_INDEX_KEY,
+      value: { entries, size: entries.length },
+      updated_at: new Date().toISOString(),
+    });
+    if (error) console.warn('[team-form] kv save error', error.message);
+    else console.log(`[team-form] kv saved (${entries.length} keys)`);
+  } catch (e) { console.warn('[team-form] kv save failed', String(e)); }
+}
+
+async function doBuildFdoIndex(): Promise<void> {
+  // 1) tenta KV
+  const fromKv = await loadFdoIndexFromKv();
+  if (fromKv && Date.now() - fromKv.updatedAt < FDO_INDEX_TTL_MS && fromKv.idx.size > 0) {
+    fdoTeamIndex = fromKv.idx;
+    fdoTeamIndexTs = fromKv.updatedAt;
+    console.log(`[team-form] FDO index loaded from KV: ${fromKv.idx.size} keys`);
+    return;
+  }
+  // 2) reconstroi da API e persiste
+  const idx = await fetchFdoIndexFromApi();
   fdoTeamIndex = idx;
   fdoTeamIndexTs = Date.now();
-  console.log(`[team-form] FDO index built: ${idx.size} keys`);
+  console.log(`[team-form] FDO index built from API: ${idx.size} keys`);
+  if (idx.size > 0) await saveFdoIndexToKv(idx);
 }
 
 function ensureFdoIndex(): Promise<void> {
-  if (fdoTeamIndex && Date.now() - fdoTeamIndexTs < 1000 * 60 * 60 * 24) return Promise.resolve();
+  if (fdoTeamIndex && Date.now() - fdoTeamIndexTs < FDO_INDEX_TTL_MS) return Promise.resolve();
   if (!fdoIndexBuilding) {
     fdoIndexBuilding = doBuildFdoIndex().catch((e) => {
       console.warn('[team-form] index build failed', String(e));

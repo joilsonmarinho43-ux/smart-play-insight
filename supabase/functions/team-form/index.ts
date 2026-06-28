@@ -108,15 +108,17 @@ async function fdo(path: string, params?: Record<string, string>): Promise<any |
   }
 }
 
-async function buildFdoIndex(): Promise<Map<string, number>> {
-  if (fdoTeamIndex && Date.now() - fdoTeamIndexTs < 1000 * 60 * 60 * 12) return fdoTeamIndex;
+// Constrói o índice usando /v4/teams paginado (500 por página). Sequencial
+// com throttle para respeitar o limite de 10 req/min do plano free.
+async function doBuildFdoIndex(): Promise<void> {
   const idx = new Map<string, number>();
-  // paraleliza
-  const results = await Promise.all(
-    FDO_COMPS.map((code) => fdo(`/competitions/${code}/teams`)),
-  );
-  for (const r of results) {
+  let offset = 0;
+  const pageSize = 500;
+  const maxPages = 8; // até 4000 times
+  for (let p = 0; p < maxPages; p++) {
+    const r = await fdo('/teams', { limit: String(pageSize), offset: String(offset) });
     const teams: any[] = r?.teams || [];
+    if (!teams.length) break;
     for (const t of teams) {
       const id = Number(t?.id);
       if (!id) continue;
@@ -125,11 +127,22 @@ async function buildFdoIndex(): Promise<Map<string, number>> {
         if (k && !idx.has(k)) idx.set(k, id);
       }
     }
+    if (teams.length < pageSize) break;
+    offset += pageSize;
   }
   fdoTeamIndex = idx;
   fdoTeamIndexTs = Date.now();
   console.log(`[team-form] FDO index built: ${idx.size} keys`);
-  return idx;
+}
+
+function ensureFdoIndex(): Promise<void> {
+  if (fdoTeamIndex && Date.now() - fdoTeamIndexTs < 1000 * 60 * 60 * 24) return Promise.resolve();
+  if (!fdoIndexBuilding) {
+    fdoIndexBuilding = doBuildFdoIndex().catch((e) => {
+      console.warn('[team-form] index build failed', String(e));
+    }).finally(() => { fdoIndexBuilding = null; });
+  }
+  return fdoIndexBuilding;
 }
 
 async function resolveFdoTeamId(name: string): Promise<number | null> {

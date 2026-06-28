@@ -13,10 +13,18 @@
 // Resp: { ok, home: SideForm, away: SideForm }
 
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const FDO_BASE = 'https://api.football-data.org/v4';
 const FDO_KEY = Deno.env.get('FOOTBALL_DATA_ORG_KEY') || '';
+
+const SUPA_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPA_SRV = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supa = SUPA_URL && SUPA_SRV ? createClient(SUPA_URL, SUPA_SRV) : null;
+
+const FDO_INDEX_KEY = 'fdo_team_index_v1';
+const FDO_INDEX_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 dias
 
 // === Caches em memória (instância warm) ===
 const tsdbTeamId = new Map<string, string>();

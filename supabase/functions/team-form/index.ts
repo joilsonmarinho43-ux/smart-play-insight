@@ -1,6 +1,16 @@
-// team-form: Últimos 5 jogos por time via TheSportsDB (free, key '123').
-// FDO foi desativado (conta bloqueada). TSDB cobre praticamente todas as ligas
-// e não exige chave paga.
+// team-form: Últimos 5 jogos por time.
+//
+// Estratégia auditada (sem APIs pagas), em ordem de prioridade:
+//   1) ESPN public API (site.web.api.espn.com)
+//      - common/v3/search?query=...  → resolve nome → { id, defaultLeagueSlug }
+//      - site/v2/sports/soccer/{slug}/teams/{id}/schedule?season=YYYY&seasontype=1
+//      - Retorna 30+ jogos por temporada para clubes e jogos jogados de seleções.
+//      - Sem auth, sem rate limit documentado. Cobertura global.
+//   2) TheSportsDB free (chave 123) — /eventslast.php devolve 1 jogo no tier
+//      free; serve apenas como complemento.
+//   3) Football-Data.org está desativada (conta retornando 403
+//      "Your account has been disabled."), mantida apenas como código morto e
+//      protegida por flag (FDO_ENABLED=false) para reativação futura.
 //
 // Body: { home: string; away: string }
 // Resp: { ok, home: SideForm, away: SideForm }
@@ -8,96 +18,182 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
+const ESPN_BASE = 'https://site.web.api.espn.com';
+const ESPN_UA = 'Mozilla/5.0 (compatible; Lovable/1.0)';
 
-const teamIdByName = new Map<string, string>();
-const lastEventsCache = new Map<string, { ts: number; data: any[] }>();
+// === Caches em memória (instância warm) ===
+const tsdbTeamId = new Map<string, string>();
+const tsdbEventsLast = new Map<string, { ts: number; data: any[] }>();
+const espnTeamCache = new Map<string, { id: string; slug: string } | null>();
+const espnScheduleCache = new Map<string, { ts: number; data: any[] }>();
 const TTL = 1000 * 60 * 60 * 6;
 
 function normalize(name: string): string {
   return String(name || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/\b(fc|cf|sc|ac|afc|cfc|club|clube|de|do|da)\b/g, ' ')
+    .replace(/\b(fc|cf|sc|ac|afc|cfc|club|clube|de|do|da|islands)\b/g, ' ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
 
+// PT → EN (mantido para seleções nacionais — ESPN aceita PT em vários
+// casos, mas EN melhora a relevância da busca)
 const TEAM_ALIASES: Record<string, string> = {
-  'argelia': 'Algeria',
-  'inglaterra': 'England',
-  'jordania': 'Jordan',
-  'colombia': 'Colombia',
-  'rd congo': 'DR Congo',
-  'republica democratica do congo': 'DR Congo',
-  'uzbequistao': 'Uzbekistan',
-  'gana': 'Ghana',
-  'panama': 'Panama',
-  'croacia': 'Croatia',
-  'alemanha': 'Germany',
-  'espanha': 'Spain',
-  'italia': 'Italy',
-  'franca': 'France',
-  'paises baixos': 'Netherlands',
-  'holanda': 'Netherlands',
-  'belgica': 'Belgium',
-  'suica': 'Switzerland',
-  'suecia': 'Sweden',
-  'dinamarca': 'Denmark',
-  'polonia': 'Poland',
-  'marrocos': 'Morocco',
-  'egito': 'Egypt',
-  'japao': 'Japan',
-  'coreia do sul': 'South Korea',
-  'estados unidos': 'United States',
-  'eua': 'United States',
-  'arabia saudita': 'Saudi Arabia',
-  'cabo verde': 'Cape Verde',
-  'costa do marfim': 'Ivory Coast',
-  'camaroes': 'Cameroon',
-  'senegal': 'Senegal',
-  'tunisia': 'Tunisia',
-  'nigeria': 'Nigeria',
-  'africa do sul': 'South Africa',
-  'austria': 'Austria',
-  'turquia': 'Turkey',
-  'russia': 'Russia',
-  'ucrania': 'Ukraine',
-  'servia': 'Serbia',
-  'romenia': 'Romania',
-  'grecia': 'Greece',
-  'irlanda': 'Republic of Ireland',
+  'argelia': 'Algeria', 'inglaterra': 'England', 'jordania': 'Jordan',
+  'colombia': 'Colombia', 'rd congo': 'DR Congo',
+  'republica democratica do congo': 'DR Congo', 'uzbequistao': 'Uzbekistan',
+  'gana': 'Ghana', 'panama': 'Panama', 'croacia': 'Croatia',
+  'arabia saudita': 'Saudi Arabia', 'cabo verde': 'Cape Verde',
+  'estados unidos': 'United States', 'eua': 'United States', 'usa': 'United States',
+  'paises baixos': 'Netherlands', 'holanda': 'Netherlands',
+  'alemanha': 'Germany', 'franca': 'France', 'espanha': 'Spain',
+  'italia': 'Italy', 'belgica': 'Belgium', 'suica': 'Switzerland',
+  'austria': 'Austria', 'polonia': 'Poland', 'portugal': 'Portugal',
+  'dinamarca': 'Denmark', 'noruega': 'Norway', 'suecia': 'Sweden',
+  'turquia': 'Turkey', 'russia': 'Russia', 'ucrania': 'Ukraine',
+  'republica tcheca': 'Czech Republic', 'tchequia': 'Czech Republic',
+  'eslovaquia': 'Slovakia', 'eslovenia': 'Slovenia',
+  'hungria': 'Hungary', 'romenia': 'Romania', 'bulgaria': 'Bulgaria',
+  'grecia': 'Greece', 'irlanda': 'Ireland', 'escocia': 'Scotland',
+  'pais de gales': 'Wales', 'gales': 'Wales',
   'irlanda do norte': 'Northern Ireland',
-  'pais de gales': 'Wales',
-  'escocia': 'Scotland',
-  'chequia': 'Czech Republic',
-  'republica tcheca': 'Czech Republic',
-  'eslovaquia': 'Slovakia',
-  'eslovenia': 'Slovenia',
-  'hungria': 'Hungary',
-  'noruega': 'Norway',
-  'finlandia': 'Finland',
-  'islandia': 'Iceland',
-  'mexico': 'Mexico',
-  'paraguai': 'Paraguay',
-  'uruguai': 'Uruguay',
-  'equador': 'Ecuador',
-  'venezuela': 'Venezuela',
-  'peru': 'Peru',
-  'chile': 'Chile',
-  'bolivia': 'Bolivia',
-  'australia': 'Australia',
+  'mexico': 'Mexico', 'canada': 'Canada', 'argentina': 'Argentina',
+  'brasil': 'Brazil', 'uruguai': 'Uruguay', 'paraguai': 'Paraguay',
+  'chile': 'Chile', 'peru': 'Peru', 'equador': 'Ecuador',
+  'venezuela': 'Venezuela', 'bolivia': 'Bolivia',
+  'coreia do sul': 'South Korea', 'coreia do norte': 'North Korea',
+  'japao': 'Japan', 'china': 'China', 'australia': 'Australia',
   'nova zelandia': 'New Zealand',
-  'ira': 'Iran',
-  'iraque': 'Iraq',
-  'catar': 'Qatar',
-  'emirados arabes': 'United Arab Emirates',
-  'china': 'China PR',
-  'coreia do norte': 'North Korea',
-  'estonia': 'Estonia',
-  'letonia': 'Latvia',
-  'lituania': 'Lithuania',
+  'ira': 'Iran', 'iraque': 'Iraq', 'siria': 'Syria',
+  'emirados arabes unidos': 'United Arab Emirates', 'emirados': 'United Arab Emirates',
+  'catar': 'Qatar', 'qatar': 'Qatar', 'kuwait': 'Kuwait',
+  'oma': 'Oman', 'libano': 'Lebanon', 'palestina': 'Palestine',
+  'egito': 'Egypt', 'marrocos': 'Morocco', 'tunisia': 'Tunisia',
+  'senegal': 'Senegal', 'nigeria': 'Nigeria', 'camaroes': 'Cameroon',
+  'costa do marfim': 'Ivory Coast', 'mali': 'Mali', 'burkina faso': 'Burkina Faso',
+  'africa do sul': 'South Africa', 'angola': 'Angola', 'mocambique': 'Mozambique',
 };
 
+function variants(name: string): string[] {
+  const out = new Set<string>();
+  const clean = String(name || '').trim();
+  if (!clean) return [];
+  out.add(clean);
+  const norm = normalize(clean);
+  if (TEAM_ALIASES[norm]) out.add(TEAM_ALIASES[norm]);
+  // remove sufixos comuns
+  const stripped = clean.replace(/\s+(FC|CF|SC|AC|AFC|CFC)$/i, '').trim();
+  if (stripped && stripped !== clean) out.add(stripped);
+  return Array.from(out);
+}
+
+// =====================================================
+// ESPN (primário)
+// =====================================================
+async function espn(path: string): Promise<any | null> {
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 10000);
+    const res = await fetch(ESPN_BASE + path, {
+      headers: { 'User-Agent': ESPN_UA, 'Accept': 'application/json' },
+      signal: ctrl.signal,
+    });
+    clearTimeout(to);
+    if (!res.ok) {
+      console.warn(`[team-form] ESPN ${path} -> ${res.status}`);
+      return null;
+    }
+    return await res.json().catch(() => null);
+  } catch (e) {
+    console.warn('[team-form] espn error', path, String(e));
+    return null;
+  }
+}
+
+async function resolveEspnTeam(name: string): Promise<{ id: string; slug: string } | null> {
+  const k = normalize(name);
+  if (!k) return null;
+  if (espnTeamCache.has(k)) return espnTeamCache.get(k)!;
+  for (const q of variants(name)) {
+    const j = await espn(`/apis/common/v3/search?query=${encodeURIComponent(q)}&limit=15`);
+    const items: any[] = j?.items || [];
+    const teams = items.filter((x) => x?.type === 'team' && x?.sport === 'soccer');
+    if (!teams.length) continue;
+    const target = normalize(q);
+    const exact = teams.find((t) => normalize(t?.displayName || '') === target) ||
+                  teams.find((t) => normalize(t?.name || '') === target) ||
+                  teams.find((t) => normalize(t?.displayName || '').includes(target)) ||
+                  teams[0];
+    if (exact?.id && exact?.defaultLeagueSlug) {
+      const out = { id: String(exact.id), slug: String(exact.defaultLeagueSlug) };
+      espnTeamCache.set(k, out);
+      return out;
+    }
+  }
+  espnTeamCache.set(k, null);
+  return null;
+}
+
+async function espnSchedule(slug: string, teamId: string): Promise<any[]> {
+  const cacheKey = `${slug}|${teamId}`;
+  const cached = espnScheduleCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < TTL) return cached.data;
+
+  const out: any[] = [];
+  const year = new Date().getUTCFullYear();
+  // Sem filtro de season = temporada atual (cobre seleções com seus últimos jogos).
+  // Em seguida, percorre os 2 anos anteriores para clubes que estejam fora de temporada.
+  const seasons: Array<string> = [
+    '', // current
+    `?season=${year}&seasontype=1`,
+    `?season=${year - 1}&seasontype=1`,
+    `?season=${year - 2}&seasontype=1`,
+  ];
+  const seen = new Set<string>();
+  for (const qs of seasons) {
+    if (out.filter(isCompleted).length >= 10) break;
+    const j = await espn(`/apis/site/v2/sports/soccer/${encodeURIComponent(slug)}/teams/${teamId}/schedule${qs}`);
+    const events: any[] = j?.events || [];
+    for (const e of events) {
+      const id = String(e?.id || '');
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      out.push(e);
+    }
+  }
+  espnScheduleCache.set(cacheKey, { ts: Date.now(), data: out });
+  return out;
+}
+
+function isCompleted(e: any): boolean {
+  const c = e?.competitions?.[0];
+  return !!c?.status?.type?.completed;
+}
+
+function espnToCommon(e: any, teamId: string) {
+  const comp = e?.competitions?.[0];
+  if (!comp || !comp?.status?.type?.completed) return null;
+  const competitors: any[] = comp?.competitors || [];
+  if (competitors.length < 2) return null;
+  const home = competitors.find((c) => c?.homeAway === 'home') || competitors[0];
+  const away = competitors.find((c) => c?.homeAway === 'away') || competitors[1];
+  const hs = Number(home?.score?.value ?? home?.score);
+  const as = Number(away?.score?.value ?? away?.score);
+  if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
+  const isHome = String(home?.team?.id || home?.id) === String(teamId);
+  return {
+    date: String(e?.date || '').slice(0, 10),
+    isHome,
+    homeName: String(home?.team?.displayName || home?.team?.name || ''),
+    awayName: String(away?.team?.displayName || away?.team?.name || ''),
+    hs, as,
+  };
+}
+
+// =====================================================
+// TSDB — fallback
+// =====================================================
 async function tsdb(path: string): Promise<any | null> {
   try {
     const ctrl = new AbortController();
@@ -115,99 +211,79 @@ async function tsdb(path: string): Promise<any | null> {
   }
 }
 
-async function resolveTeamId(name: string): Promise<string | null> {
+async function resolveTsdbId(name: string): Promise<string | null> {
   const k = normalize(name);
   if (!k) return null;
-  if (teamIdByName.has(k)) return teamIdByName.get(k)!;
-
-  // Tenta nome bruto, alias em inglês e normalizado
-  const alias = TEAM_ALIASES[k];
-  const variants = Array.from(new Set([alias, name.trim(), k].filter(Boolean)));
-  let fallbackPick: any = null;
-  for (const q of variants) {
+  if (tsdbTeamId.has(k)) return tsdbTeamId.get(k)!;
+  let fallback: any = null;
+  for (const q of variants(name)) {
     const j = await tsdb(`/searchteams.php?t=${encodeURIComponent(q)}`);
     const teams: any[] = j?.teams || [];
-    // Prefere times de futebol
     const soccer = teams.filter((t) => /soccer|football/i.test(t?.strSport || ''));
-    if (!fallbackPick && teams[0]) fallbackPick = teams[0];
-    const pool = soccer;
-    if (!pool.length) continue;
-
-    // Match exato normalizado
-    let pick = pool.find((t) => normalize(t?.strTeam || '') === k || (alias && normalize(t?.strTeam || '') === normalize(alias)))
-            || pool.find((t) => normalize(t?.strTeam || '').includes(k) || k.includes(normalize(t?.strTeam || '')))
-            || pool[0];
-    if (pick?.idTeam) {
-      teamIdByName.set(k, pick.idTeam);
-      return pick.idTeam;
-    }
+    if (!fallback && teams[0]) fallback = teams[0];
+    if (!soccer.length) continue;
+    const pick = soccer.find((t) => normalize(t?.strTeam || '') === normalize(q)) ||
+                 soccer.find((t) => normalize(t?.strTeam || '').includes(k)) ||
+                 soccer[0];
+    if (pick?.idTeam) { tsdbTeamId.set(k, pick.idTeam); return pick.idTeam; }
   }
-  if (fallbackPick?.idTeam) {
-    teamIdByName.set(k, fallbackPick.idTeam);
-    return fallbackPick.idTeam;
-  }
+  if (fallback?.idTeam) { tsdbTeamId.set(k, fallback.idTeam); return fallback.idTeam; }
   return null;
 }
 
-function isPlayed(e: any): boolean {
-  const hs = Number(e?.intHomeScore);
-  const as = Number(e?.intAwayScore);
-  return Number.isFinite(hs) && Number.isFinite(as);
-}
-
-async function lastEventsBase(teamId: string): Promise<any[]> {
-  const j = await tsdb(`/eventslast.php?id=${teamId}`);
-  return j?.results || [];
-}
-
-// NOTA TÉCNICA: TheSportsDB chave free ('123'/'3') retorna 429 em
-// /eventsseason.php e apenas 1 evento em /eventslast.php para seleções.
-// SportsRC free não expõe histórico por time (h2h/stats/team são PREMIUM).
-// Football-Data.org free não cobre amistosos/eliminatórias internacionais.
-// Resultado: para seleções nacionais conseguimos apenas o jogo mais recente.
-// Para clubes em ligas grandes, eventslast geralmente devolve até 5.
-async function lastEvents(teamId: string): Promise<any[]> {
-  const cached = lastEventsCache.get(teamId);
+async function tsdbLastEvents(teamId: string): Promise<any[]> {
+  const cached = tsdbEventsLast.get(teamId);
   if (cached && Date.now() - cached.ts < TTL) return cached.data;
-
-  const base = await lastEventsBase(teamId);
-  const merged = new Map<string, any>();
-  for (const e of base) if (e?.idEvent) merged.set(String(e.idEvent), e);
-
-  const out = Array.from(merged.values());
-  const playedFinal = out.filter(isPlayed).length;
-  console.log(`[team-form] team=${teamId} events=${out.length} played=${playedFinal}`);
-  lastEventsCache.set(teamId, { ts: Date.now(), data: out });
+  const j = await tsdb(`/eventslast.php?id=${teamId}`);
+  const out: any[] = j?.results || [];
+  tsdbEventsLast.set(teamId, { ts: Date.now(), data: out });
   return out;
 }
 
-function summarize(teamId: string, evts: any[]) {
-  const played = evts.filter(isPlayed).sort((a, b) => {
-    const da = new Date(a?.dateEvent || 0).getTime();
-    const db = new Date(b?.dateEvent || 0).getTime();
-    return db - da;
-  });
-  const last5 = played.slice(0, 5);
+function tsdbToCommon(e: any, teamId: string) {
+  const hs = Number(e?.intHomeScore);
+  const as = Number(e?.intAwayScore);
+  if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
+  const isHome = String(e?.idHomeTeam) === String(teamId);
+  return {
+    date: String(e?.dateEvent || ''),
+    isHome,
+    homeName: String(e?.strHomeTeam || ''),
+    awayName: String(e?.strAwayTeam || ''),
+    hs, as,
+  };
+}
+
+// =====================================================
+// Agregação
+// =====================================================
+type Common = { date: string; isHome: boolean; homeName: string; awayName: string; hs: number; as: number };
+
+function summarize(common: Common[]) {
+  // dedup por (data + adversário)
+  const map = new Map<string, Common>();
+  for (const c of common) {
+    const opp = c.isHome ? c.awayName : c.homeName;
+    const key = `${c.date}|${normalize(opp)}`;
+    if (!map.has(key)) map.set(key, c);
+  }
+  const sorted = Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+  const last5 = sorted.slice(0, 5);
   const gf: number[] = [];
   const ga: number[] = [];
-  const recentResults: Array<{ result: "W" | "D" | "L"; gf: number; ga: number; opp: string; date: string }> = [];
-  for (const e of last5) {
-    const hs = Number(e?.intHomeScore);
-    const as = Number(e?.intAwayScore);
-    const isHome = String(e?.idHomeTeam) === String(teamId);
-    const f = isHome ? hs : as;
-    const a = isHome ? as : hs;
-    gf.push(f);
-    ga.push(a);
+  const recentResults: Array<{ result: 'W' | 'D' | 'L'; gf: number; ga: number; opp: string; date: string }> = [];
+  for (const c of last5) {
+    const f = c.isHome ? c.hs : c.as;
+    const a = c.isHome ? c.as : c.hs;
+    gf.push(f); ga.push(a);
     recentResults.push({
-      result: f > a ? "W" : f < a ? "L" : "D",
-      gf: f,
-      ga: a,
-      opp: String((isHome ? e?.strAwayTeam : e?.strHomeTeam) || ""),
-      date: String(e?.dateEvent || ""),
+      result: f > a ? 'W' : f < a ? 'L' : 'D',
+      gf: f, ga: a,
+      opp: c.isHome ? c.awayName : c.homeName,
+      date: c.date,
     });
   }
-  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const avg = (arr: number[]) => arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : 0;
   return {
     games: gf.length,
     goalsForAvg: Number(avg(gf).toFixed(2)),
@@ -219,10 +295,34 @@ function summarize(teamId: string, evts: any[]) {
 }
 
 async function formFor(name: string) {
-  const id = await resolveTeamId(name);
-  if (!id) return { games: 0, goalsForAvg: 0, goalsAgainstAvg: 0, recentGoalsFor: [], recentGoalsAgainst: [], recentResults: [], teamId: null };
-  const evts = await lastEvents(id);
-  return { ...summarize(id, evts), teamId: id };
+  const collected: Common[] = [];
+  let sourceEspn = 0, sourceTsdb = 0;
+
+  // 1) ESPN (primário)
+  const t = await resolveEspnTeam(name);
+  if (t) {
+    const events = await espnSchedule(t.slug, t.id);
+    for (const e of events) {
+      const c = espnToCommon(e, t.id);
+      if (c) { collected.push(c); sourceEspn++; }
+    }
+  }
+
+  // 2) TSDB (complemento se ainda faltar)
+  if (collected.length < 5) {
+    const tid = await resolveTsdbId(name);
+    if (tid) {
+      const evts = await tsdbLastEvents(tid);
+      for (const e of evts) {
+        const c = tsdbToCommon(e, tid);
+        if (c) { collected.push(c); sourceTsdb++; }
+      }
+    }
+  }
+
+  console.log(`[team-form] "${name}" espn=${sourceEspn} tsdb=${sourceTsdb} total=${collected.length}`);
+  const s = summarize(collected);
+  return { ...s, sources: { espn: sourceEspn, tsdb: sourceTsdb } };
 }
 
 Deno.serve(async (req) => {

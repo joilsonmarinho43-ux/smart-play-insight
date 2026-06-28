@@ -717,6 +717,24 @@ export type Database = {
           },
         ]
       }
+      team_form_kv: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       telegram_alert_state: {
         Row: {
           alert_key: string

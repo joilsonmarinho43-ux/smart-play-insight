@@ -1,6 +1,13 @@
-// team-form: Últimos 5 jogos por time via TheSportsDB (free, key '123').
-// FDO foi desativado (conta bloqueada). TSDB cobre praticamente todas as ligas
-// e não exige chave paga.
+// team-form: Últimos 5 jogos por time.
+// Estratégia auditada (sem APIs pagas):
+//   1) Football-Data.org (TIER_ONE) — endpoint /v4/teams/{id}/matches devolve
+//      até dezenas de jogos com placar. Cobertura: PL, BSA, CL, EC, FL1, BL1,
+//      SA, DED, PPL, PD, WC, ELC. É a única fonte free que entrega 5 jogos
+//      reais e detalhados.
+//   2) TheSportsDB free (chave 123) — /eventslast.php devolve apenas 1 jogo
+//      no tier free, mas serve de complemento para ligas/seleções fora do
+//      escopo TIER_ONE da FDO.
+//   3) União ordenada (desc) e deduplicada por (data + adversário).
 //
 // Body: { home: string; away: string }
 // Resp: { ok, home: SideForm, away: SideForm }
@@ -8,96 +15,181 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
+const FDO_BASE = 'https://api.football-data.org/v4';
+const FDO_KEY = Deno.env.get('FOOTBALL_DATA_ORG_KEY') || '';
 
-const teamIdByName = new Map<string, string>();
-const lastEventsCache = new Map<string, { ts: number; data: any[] }>();
+// === Caches em memória (instância warm) ===
+const tsdbTeamId = new Map<string, string>();
+const tsdbEventsLast = new Map<string, { ts: number; data: any[] }>();
+const fdoTeamId = new Map<string, number | null>(); // null = já tentamos e não há
+const fdoMatchesCache = new Map<number, { ts: number; data: any[] }>();
 const TTL = 1000 * 60 * 60 * 6;
 
 function normalize(name: string): string {
   return String(name || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/\b(fc|cf|sc|ac|afc|cfc|club|clube|de|do|da)\b/g, ' ')
+    .replace(/\b(fc|cf|sc|ac|afc|cfc|club|clube|de|do|da|islands)\b/g, ' ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
 
+// PT → EN
 const TEAM_ALIASES: Record<string, string> = {
-  'argelia': 'Algeria',
-  'inglaterra': 'England',
-  'jordania': 'Jordan',
-  'colombia': 'Colombia',
-  'rd congo': 'DR Congo',
-  'republica democratica do congo': 'DR Congo',
-  'uzbequistao': 'Uzbekistan',
-  'gana': 'Ghana',
-  'panama': 'Panama',
-  'croacia': 'Croatia',
-  'alemanha': 'Germany',
-  'espanha': 'Spain',
-  'italia': 'Italy',
-  'franca': 'France',
-  'paises baixos': 'Netherlands',
-  'holanda': 'Netherlands',
-  'belgica': 'Belgium',
-  'suica': 'Switzerland',
-  'suecia': 'Sweden',
-  'dinamarca': 'Denmark',
-  'polonia': 'Poland',
-  'marrocos': 'Morocco',
-  'egito': 'Egypt',
-  'japao': 'Japan',
-  'coreia do sul': 'South Korea',
-  'estados unidos': 'United States',
-  'eua': 'United States',
-  'arabia saudita': 'Saudi Arabia',
-  'cabo verde': 'Cape Verde',
-  'costa do marfim': 'Ivory Coast',
-  'camaroes': 'Cameroon',
-  'senegal': 'Senegal',
-  'tunisia': 'Tunisia',
-  'nigeria': 'Nigeria',
-  'africa do sul': 'South Africa',
-  'austria': 'Austria',
-  'turquia': 'Turkey',
-  'russia': 'Russia',
-  'ucrania': 'Ukraine',
-  'servia': 'Serbia',
-  'romenia': 'Romania',
-  'grecia': 'Greece',
-  'irlanda': 'Republic of Ireland',
-  'irlanda do norte': 'Northern Ireland',
-  'pais de gales': 'Wales',
-  'escocia': 'Scotland',
-  'chequia': 'Czech Republic',
-  'republica tcheca': 'Czech Republic',
-  'eslovaquia': 'Slovakia',
-  'eslovenia': 'Slovenia',
-  'hungria': 'Hungary',
-  'noruega': 'Norway',
-  'finlandia': 'Finland',
-  'islandia': 'Iceland',
-  'mexico': 'Mexico',
-  'paraguai': 'Paraguay',
-  'uruguai': 'Uruguay',
-  'equador': 'Ecuador',
-  'venezuela': 'Venezuela',
-  'peru': 'Peru',
-  'chile': 'Chile',
-  'bolivia': 'Bolivia',
-  'australia': 'Australia',
-  'nova zelandia': 'New Zealand',
-  'ira': 'Iran',
-  'iraque': 'Iraq',
-  'catar': 'Qatar',
-  'emirados arabes': 'United Arab Emirates',
-  'china': 'China PR',
-  'coreia do norte': 'North Korea',
-  'estonia': 'Estonia',
-  'letonia': 'Latvia',
-  'lituania': 'Lithuania',
+  'argelia': 'Algeria', 'inglaterra': 'England', 'jordania': 'Jordan',
+  'colombia': 'Colombia', 'rd congo': 'DR Congo',
+  'republica democratica do congo': 'DR Congo', 'uzbequistao': 'Uzbekistan',
+  'gana': 'Ghana', 'panama': 'Panama', 'croacia': 'Croatia',
+  'alemanha': 'Germany', 'espanha': 'Spain', 'italia': 'Italy',
+  'franca': 'France', 'paises baixos': 'Netherlands', 'holanda': 'Netherlands',
+  'belgica': 'Belgium', 'suica': 'Switzerland', 'suecia': 'Sweden',
+  'dinamarca': 'Denmark', 'polonia': 'Poland', 'marrocos': 'Morocco',
+  'egito': 'Egypt', 'japao': 'Japan', 'coreia do sul': 'South Korea',
+  'estados unidos': 'United States', 'eua': 'United States',
+  'arabia saudita': 'Saudi Arabia', 'cabo verde': 'Cape Verde',
+  'costa do marfim': 'Ivory Coast', 'camaroes': 'Cameroon',
+  'senegal': 'Senegal', 'tunisia': 'Tunisia', 'nigeria': 'Nigeria',
+  'africa do sul': 'South Africa', 'austria': 'Austria', 'turquia': 'Turkey',
+  'russia': 'Russia', 'ucrania': 'Ukraine', 'servia': 'Serbia',
+  'romenia': 'Romania', 'grecia': 'Greece', 'irlanda': 'Republic of Ireland',
+  'irlanda do norte': 'Northern Ireland', 'pais de gales': 'Wales',
+  'escocia': 'Scotland', 'chequia': 'Czech Republic',
+  'republica tcheca': 'Czech Republic', 'eslovaquia': 'Slovakia',
+  'eslovenia': 'Slovenia', 'hungria': 'Hungary', 'noruega': 'Norway',
+  'finlandia': 'Finland', 'islandia': 'Iceland', 'mexico': 'Mexico',
+  'paraguai': 'Paraguay', 'uruguai': 'Uruguay', 'equador': 'Ecuador',
+  'venezuela': 'Venezuela', 'peru': 'Peru', 'chile': 'Chile',
+  'bolivia': 'Bolivia', 'australia': 'Australia', 'nova zelandia': 'New Zealand',
+  'ira': 'Iran', 'iraque': 'Iraq', 'catar': 'Qatar',
+  'emirados arabes': 'United Arab Emirates', 'china': 'China PR',
+  'coreia do norte': 'North Korea', 'estonia': 'Estonia',
+  'letonia': 'Latvia', 'lituania': 'Lithuania',
 };
 
+function variants(name: string): string[] {
+  const k = normalize(name);
+  const alias = TEAM_ALIASES[k];
+  return Array.from(new Set([name.trim(), alias, k].filter(Boolean) as string[]));
+}
+
+// =====================================================
+// FDO — Football-Data.org
+// =====================================================
+const FDO_COMPS = ['PL', 'BSA', 'BL1', 'SA', 'PD', 'FL1', 'DED', 'PPL', 'CL', 'EC', 'WC', 'ELC'];
+let fdoTeamIndex: Map<string, number> | null = null;
+let fdoTeamIndexTs = 0;
+
+async function fdo(path: string, params?: Record<string, string>): Promise<any | null> {
+  if (!FDO_KEY) return null;
+  const url = new URL(FDO_BASE + path);
+  if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(url.toString(), {
+      headers: { 'X-Auth-Token': FDO_KEY, 'Accept': 'application/json' },
+      signal: ctrl.signal,
+    });
+    clearTimeout(to);
+    if (!res.ok) {
+      console.warn(`[team-form] FDO ${path} -> ${res.status}`);
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    console.warn('[team-form] fdo error', path, String(e));
+    return null;
+  }
+}
+
+async function buildFdoIndex(): Promise<Map<string, number>> {
+  if (fdoTeamIndex && Date.now() - fdoTeamIndexTs < 1000 * 60 * 60 * 12) return fdoTeamIndex;
+  const idx = new Map<string, number>();
+  // paraleliza
+  const results = await Promise.all(
+    FDO_COMPS.map((code) => fdo(`/competitions/${code}/teams`)),
+  );
+  for (const r of results) {
+    const teams: any[] = r?.teams || [];
+    for (const t of teams) {
+      const id = Number(t?.id);
+      if (!id) continue;
+      for (const n of [t.name, t.shortName, t.tla].filter(Boolean)) {
+        const k = normalize(String(n));
+        if (k && !idx.has(k)) idx.set(k, id);
+      }
+    }
+  }
+  fdoTeamIndex = idx;
+  fdoTeamIndexTs = Date.now();
+  console.log(`[team-form] FDO index built: ${idx.size} keys`);
+  return idx;
+}
+
+async function resolveFdoTeamId(name: string): Promise<number | null> {
+  const k = normalize(name);
+  if (!k) return null;
+  if (fdoTeamId.has(k)) return fdoTeamId.get(k)!;
+  const idx = await buildFdoIndex();
+  for (const v of variants(name)) {
+    const nv = normalize(v);
+    if (idx.has(nv)) {
+      const id = idx.get(nv)!;
+      fdoTeamId.set(k, id);
+      return id;
+    }
+  }
+  // fuzzy includes
+  for (const v of variants(name)) {
+    const nv = normalize(v);
+    for (const [key, id] of idx) {
+      if (key.includes(nv) || nv.includes(key)) {
+        fdoTeamId.set(k, id);
+        return id;
+      }
+    }
+  }
+  fdoTeamId.set(k, null);
+  return null;
+}
+
+function isoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function fdoMatches(teamId: number): Promise<any[]> {
+  const cached = fdoMatchesCache.get(teamId);
+  if (cached && Date.now() - cached.ts < TTL) return cached.data;
+  const today = new Date().toISOString().slice(0, 10);
+  const r = await fdo(`/teams/${teamId}/matches`, {
+    dateFrom: isoDaysAgo(365),
+    dateTo: today,
+    status: 'FINISHED',
+  });
+  const matches: any[] = r?.matches || [];
+  fdoMatchesCache.set(teamId, { ts: Date.now(), data: matches });
+  return matches;
+}
+
+function fdoToCommon(m: any, teamId: number) {
+  const isHome = Number(m?.homeTeam?.id) === teamId;
+  const hs = Number(m?.score?.fullTime?.home);
+  const as = Number(m?.score?.fullTime?.away);
+  if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
+  return {
+    date: String(m?.utcDate || '').slice(0, 10),
+    isHome,
+    homeName: String(m?.homeTeam?.name || ''),
+    awayName: String(m?.awayTeam?.name || ''),
+    hs, as,
+  };
+}
+
+// =====================================================
+// TSDB — fallback
+// =====================================================
 async function tsdb(path: string): Promise<any | null> {
   try {
     const ctrl = new AbortController();
@@ -115,99 +207,77 @@ async function tsdb(path: string): Promise<any | null> {
   }
 }
 
-async function resolveTeamId(name: string): Promise<string | null> {
+async function resolveTsdbId(name: string): Promise<string | null> {
   const k = normalize(name);
   if (!k) return null;
-  if (teamIdByName.has(k)) return teamIdByName.get(k)!;
-
-  // Tenta nome bruto, alias em inglês e normalizado
-  const alias = TEAM_ALIASES[k];
-  const variants = Array.from(new Set([alias, name.trim(), k].filter(Boolean)));
-  let fallbackPick: any = null;
-  for (const q of variants) {
+  if (tsdbTeamId.has(k)) return tsdbTeamId.get(k)!;
+  let fallback: any = null;
+  for (const q of variants(name)) {
     const j = await tsdb(`/searchteams.php?t=${encodeURIComponent(q)}`);
     const teams: any[] = j?.teams || [];
-    // Prefere times de futebol
     const soccer = teams.filter((t) => /soccer|football/i.test(t?.strSport || ''));
-    if (!fallbackPick && teams[0]) fallbackPick = teams[0];
-    const pool = soccer;
-    if (!pool.length) continue;
-
-    // Match exato normalizado
-    let pick = pool.find((t) => normalize(t?.strTeam || '') === k || (alias && normalize(t?.strTeam || '') === normalize(alias)))
-            || pool.find((t) => normalize(t?.strTeam || '').includes(k) || k.includes(normalize(t?.strTeam || '')))
-            || pool[0];
-    if (pick?.idTeam) {
-      teamIdByName.set(k, pick.idTeam);
-      return pick.idTeam;
-    }
+    if (!fallback && teams[0]) fallback = teams[0];
+    if (!soccer.length) continue;
+    const pick = soccer.find((t) => normalize(t?.strTeam || '') === normalize(q)) ||
+                 soccer.find((t) => normalize(t?.strTeam || '').includes(k)) ||
+                 soccer[0];
+    if (pick?.idTeam) { tsdbTeamId.set(k, pick.idTeam); return pick.idTeam; }
   }
-  if (fallbackPick?.idTeam) {
-    teamIdByName.set(k, fallbackPick.idTeam);
-    return fallbackPick.idTeam;
-  }
+  if (fallback?.idTeam) { tsdbTeamId.set(k, fallback.idTeam); return fallback.idTeam; }
   return null;
 }
 
-function isPlayed(e: any): boolean {
-  const hs = Number(e?.intHomeScore);
-  const as = Number(e?.intAwayScore);
-  return Number.isFinite(hs) && Number.isFinite(as);
-}
-
-async function lastEventsBase(teamId: string): Promise<any[]> {
-  const j = await tsdb(`/eventslast.php?id=${teamId}`);
-  return j?.results || [];
-}
-
-// NOTA TÉCNICA: TheSportsDB chave free ('123'/'3') retorna 429 em
-// /eventsseason.php e apenas 1 evento em /eventslast.php para seleções.
-// SportsRC free não expõe histórico por time (h2h/stats/team são PREMIUM).
-// Football-Data.org free não cobre amistosos/eliminatórias internacionais.
-// Resultado: para seleções nacionais conseguimos apenas o jogo mais recente.
-// Para clubes em ligas grandes, eventslast geralmente devolve até 5.
-async function lastEvents(teamId: string): Promise<any[]> {
-  const cached = lastEventsCache.get(teamId);
+async function tsdbLastEvents(teamId: string): Promise<any[]> {
+  const cached = tsdbEventsLast.get(teamId);
   if (cached && Date.now() - cached.ts < TTL) return cached.data;
-
-  const base = await lastEventsBase(teamId);
-  const merged = new Map<string, any>();
-  for (const e of base) if (e?.idEvent) merged.set(String(e.idEvent), e);
-
-  const out = Array.from(merged.values());
-  const playedFinal = out.filter(isPlayed).length;
-  console.log(`[team-form] team=${teamId} events=${out.length} played=${playedFinal}`);
-  lastEventsCache.set(teamId, { ts: Date.now(), data: out });
+  const j = await tsdb(`/eventslast.php?id=${teamId}`);
+  const out: any[] = j?.results || [];
+  tsdbEventsLast.set(teamId, { ts: Date.now(), data: out });
   return out;
 }
 
-function summarize(teamId: string, evts: any[]) {
-  const played = evts.filter(isPlayed).sort((a, b) => {
-    const da = new Date(a?.dateEvent || 0).getTime();
-    const db = new Date(b?.dateEvent || 0).getTime();
-    return db - da;
-  });
-  const last5 = played.slice(0, 5);
+function tsdbToCommon(e: any, teamId: string) {
+  const hs = Number(e?.intHomeScore);
+  const as = Number(e?.intAwayScore);
+  if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
+  const isHome = String(e?.idHomeTeam) === String(teamId);
+  return {
+    date: String(e?.dateEvent || ''),
+    isHome,
+    homeName: String(e?.strHomeTeam || ''),
+    awayName: String(e?.strAwayTeam || ''),
+    hs, as,
+  };
+}
+
+// =====================================================
+// Agregação
+// =====================================================
+function summarize(common: Array<{ date: string; isHome: boolean; homeName: string; awayName: string; hs: number; as: number }>) {
+  // dedup por (data + adversário)
+  const map = new Map<string, typeof common[number]>();
+  for (const c of common) {
+    const opp = c.isHome ? c.awayName : c.homeName;
+    const key = `${c.date}|${normalize(opp)}`;
+    if (!map.has(key)) map.set(key, c);
+  }
+  const sorted = Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+  const last5 = sorted.slice(0, 5);
   const gf: number[] = [];
   const ga: number[] = [];
-  const recentResults: Array<{ result: "W" | "D" | "L"; gf: number; ga: number; opp: string; date: string }> = [];
-  for (const e of last5) {
-    const hs = Number(e?.intHomeScore);
-    const as = Number(e?.intAwayScore);
-    const isHome = String(e?.idHomeTeam) === String(teamId);
-    const f = isHome ? hs : as;
-    const a = isHome ? as : hs;
-    gf.push(f);
-    ga.push(a);
+  const recentResults: Array<{ result: 'W' | 'D' | 'L'; gf: number; ga: number; opp: string; date: string }> = [];
+  for (const c of last5) {
+    const f = c.isHome ? c.hs : c.as;
+    const a = c.isHome ? c.as : c.hs;
+    gf.push(f); ga.push(a);
     recentResults.push({
-      result: f > a ? "W" : f < a ? "L" : "D",
-      gf: f,
-      ga: a,
-      opp: String((isHome ? e?.strAwayTeam : e?.strHomeTeam) || ""),
-      date: String(e?.dateEvent || ""),
+      result: f > a ? 'W' : f < a ? 'L' : 'D',
+      gf: f, ga: a,
+      opp: c.isHome ? c.awayName : c.homeName,
+      date: c.date,
     });
   }
-  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const avg = (arr: number[]) => arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : 0;
   return {
     games: gf.length,
     goalsForAvg: Number(avg(gf).toFixed(2)),
@@ -219,10 +289,34 @@ function summarize(teamId: string, evts: any[]) {
 }
 
 async function formFor(name: string) {
-  const id = await resolveTeamId(name);
-  if (!id) return { games: 0, goalsForAvg: 0, goalsAgainstAvg: 0, recentGoalsFor: [], recentGoalsAgainst: [], recentResults: [], teamId: null };
-  const evts = await lastEvents(id);
-  return { ...summarize(id, evts), teamId: id };
+  const collected: Array<{ date: string; isHome: boolean; homeName: string; awayName: string; hs: number; as: number }> = [];
+  let sourceFdo = 0, sourceTsdb = 0;
+
+  // 1) FDO
+  const fdoId = await resolveFdoTeamId(name);
+  if (fdoId) {
+    const matches = await fdoMatches(fdoId);
+    for (const m of matches) {
+      const c = fdoToCommon(m, fdoId);
+      if (c) { collected.push(c); sourceFdo++; }
+    }
+  }
+
+  // 2) TSDB (complemento)
+  if (collected.length < 5) {
+    const tid = await resolveTsdbId(name);
+    if (tid) {
+      const evts = await tsdbLastEvents(tid);
+      for (const e of evts) {
+        const c = tsdbToCommon(e, tid);
+        if (c) { collected.push(c); sourceTsdb++; }
+      }
+    }
+  }
+
+  console.log(`[team-form] "${name}" fdoId=${fdoId} fdo=${sourceFdo} tsdb=${sourceTsdb} total=${collected.length}`);
+  const s = summarize(collected);
+  return { ...s, sources: { fdo: sourceFdo, tsdb: sourceTsdb } };
 }
 
 Deno.serve(async (req) => {

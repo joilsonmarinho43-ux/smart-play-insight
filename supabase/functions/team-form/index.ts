@@ -356,8 +356,8 @@ async function formFor(name: string) {
   const collected: Array<{ date: string; isHome: boolean; homeName: string; awayName: string; hs: number; as: number }> = [];
   let sourceFdo = 0, sourceTsdb = 0;
 
-  // 1) FDO
-  const fdoId = await resolveFdoTeamId(name);
+  // 1) FDO — espera até 5s pela carga do índice (KV é rápido, ~300ms)
+  const fdoId = await resolveFdoTeamId(name, 5000);
   if (fdoId) {
     const matches = await fdoMatches(fdoId);
     for (const m of matches) {

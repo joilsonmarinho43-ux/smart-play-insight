@@ -75,17 +75,23 @@ function variants(name: string): string[] {
 // =====================================================
 // FDO — Football-Data.org
 // =====================================================
-const FDO_COMPS = ['PL', 'BSA', 'BL1', 'SA', 'PD', 'FL1', 'DED', 'PPL', 'CL', 'EC', 'WC', 'ELC'];
 let fdoTeamIndex: Map<string, number> | null = null;
 let fdoTeamIndexTs = 0;
+let fdoIndexBuilding: Promise<void> | null = null;
 
+// FDO free: 10 req/min. Mantemos 7s entre chamadas para ficar abaixo do limite.
+const FDO_THROTTLE_MS = 7000;
+let fdoLastCall = 0;
 async function fdo(path: string, params?: Record<string, string>): Promise<any | null> {
   if (!FDO_KEY) return null;
+  const wait = Math.max(0, fdoLastCall + FDO_THROTTLE_MS - Date.now());
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  fdoLastCall = Date.now();
   const url = new URL(FDO_BASE + path);
   if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   try {
     const ctrl = new AbortController();
-    const to = setTimeout(() => ctrl.abort(), 8000);
+    const to = setTimeout(() => ctrl.abort(), 12000);
     const res = await fetch(url.toString(), {
       headers: { 'X-Auth-Token': FDO_KEY, 'Accept': 'application/json' },
       signal: ctrl.signal,

@@ -386,6 +386,19 @@ async function formFor(name: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    const url = new URL(req.url);
+    // Endpoint admin: força reconstrução completa do índice FDO via API.
+    // Uso: POST /functions/v1/team-form?build=1
+    if (url.searchParams.get('build') === '1') {
+      fdoTeamIndex = null; fdoTeamIndexTs = 0;
+      const idx = await fetchFdoIndexFromApi();
+      fdoTeamIndex = idx; fdoTeamIndexTs = Date.now();
+      if (idx.size > 0) await saveFdoIndexToKv(idx);
+      return new Response(JSON.stringify({ ok: true, built: true, size: idx.size }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const body = await req.json().catch(() => ({}));
     const home = String(body?.home || '').trim();
     const away = String(body?.away || '').trim();

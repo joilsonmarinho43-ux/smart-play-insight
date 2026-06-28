@@ -145,27 +145,25 @@ function ensureFdoIndex(): Promise<void> {
   return fdoIndexBuilding;
 }
 
-async function resolveFdoTeamId(name: string): Promise<number | null> {
+async function resolveFdoTeamId(name: string, waitMs = 0): Promise<number | null> {
   const k = normalize(name);
   if (!k) return null;
   if (fdoTeamId.has(k)) return fdoTeamId.get(k)!;
-  const idx = await buildFdoIndex();
+  // dispara build em background; aguarda no máximo `waitMs` se ainda não pronto
+  const buildP = ensureFdoIndex();
+  if (!fdoTeamIndex && waitMs > 0) {
+    await Promise.race([buildP, new Promise((r) => setTimeout(r, waitMs))]);
+  }
+  const idx = fdoTeamIndex;
+  if (!idx) return null;
   for (const v of variants(name)) {
     const nv = normalize(v);
-    if (idx.has(nv)) {
-      const id = idx.get(nv)!;
-      fdoTeamId.set(k, id);
-      return id;
-    }
+    if (idx.has(nv)) { const id = idx.get(nv)!; fdoTeamId.set(k, id); return id; }
   }
-  // fuzzy includes
   for (const v of variants(name)) {
     const nv = normalize(v);
     for (const [key, id] of idx) {
-      if (key.includes(nv) || nv.includes(key)) {
-        fdoTeamId.set(k, id);
-        return id;
-      }
+      if (key.includes(nv) || nv.includes(key)) { fdoTeamId.set(k, id); return id; }
     }
   }
   fdoTeamId.set(k, null);

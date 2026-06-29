@@ -927,7 +927,82 @@ export function buildMatchReadingV2(
     insightPool.push("A leitura sustenta entradas seletivas em mercados de dinâmica, e desaconselha exposição em linhas amplas.");
   const premiumInsight = pick(insightPool, seed + 7);
 
+  // ─── 12. MELHOR MERCADO (value-based, diversificado) ─────────
+  // Critério de "valor" não é só probabilidade: também olha edge vs odd real
+  // quando disponível, penaliza mercados rasos, e bonifica mercados específicos
+  // (cantos, cartões, dupla chance, handicap) quando atingem confiança suficiente,
+  // evitando que o "melhor pick" seja sempre a mesma linha de gols.
+  const oddByMarket = (name: string): number | null => {
+    if (!odds) return null;
+    if (name === "Vitória Casa") return odds.home ?? null;
+    if (name === "Vitória Fora") return odds.away ?? null;
+    if (name === "Empate") return odds.draw ?? null;
+    if (/Over 2\.5/i.test(name)) return odds.over25 ?? null;
+    if (/Under 2\.5/i.test(name)) return odds.under25 ?? null;
+    if (/Ambas Marcam/i.test(name)) return odds.bttsYes ?? null;
+    return null;
+  };
+  const categoryBonus: Record<string, number> = {
+    corners: 3,
+    cards: 3,
+    handicap: 4,
+    chance_dupla: 2,
+    btts: 1,
+    htft: 0,
+    result: 0,
+    goals: 0,
+  };
+  const riskOf = (conf: number): "baixo" | "medio" | "alto" =>
+    conf >= 78 ? "baixo" : conf >= 68 ? "medio" : "alto";
+
+  let bestPick: BestMarketPick | null = null;
+  if (opportunities.length > 0) {
+    const scored = opportunities.map((op) => {
+      const cat = op.category || "outro";
+      const fairOdd = op.confidence > 0 ? Number((100 / op.confidence).toFixed(2)) : null;
+      const marketOdd = oddByMarket(op.market);
+      let edgePct: number | null = null;
+      if (marketOdd && fairOdd) {
+        edgePct = Number((((marketOdd / fairOdd) - 1) * 100).toFixed(1));
+      }
+      // score base = confiança + bônus de categoria; soma edge real quando favorável.
+      let score = op.confidence + (categoryBonus[cat] ?? 0);
+      if (edgePct != null && edgePct > 0) score += Math.min(15, edgePct);
+      if (edgePct != null && edgePct < -5) score -= 8; // sem valor real
+      // penaliza Empate isolado e linhas muito sensíveis a contexto limitado
+      if (op.market === "Empate") score -= 6;
+      if (ctxReliab === "limitado") score -= 2;
+      return { op, score, fairOdd, marketOdd, edgePct, cat };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored[0];
+    const alternatives = scored
+      .slice(1, 4)
+      .map((s) => ({ market: s.op.market, confidence: s.op.confidence, category: s.cat }));
+    const edgeNote = top.edgePct != null
+      ? top.edgePct > 3
+        ? ` Odd de mercado em ${top.marketOdd?.toFixed(2)} contra justa ${top.fairOdd?.toFixed(2)} — valor de +${top.edgePct.toFixed(1)}%.`
+        : top.edgePct < -3
+          ? ` Odd de mercado (${top.marketOdd?.toFixed(2)}) abaixo da justa (${top.fairOdd?.toFixed(2)}) — entrada sem valor agregado, prefira live.`
+          : ` Odd alinhada ao valor justo (${top.marketOdd?.toFixed(2)} vs ${top.fairOdd?.toFixed(2)}).`
+      : top.fairOdd
+        ? ` Odd justa estimada ${top.fairOdd.toFixed(2)} (sem cotação capturada para comparar).`
+        : "";
+    bestPick = {
+      market: top.op.market,
+      category: top.cat,
+      confidence: top.op.confidence,
+      fairOdd: top.fairOdd,
+      marketOdd: top.marketOdd,
+      edgePct: top.edgePct,
+      risk: riskOf(top.op.confidence),
+      rationale: `${top.op.reasons[0] || "Cenário sustenta o mercado."}${edgeNote}`,
+      alternatives,
+    };
+  }
+
   return {
+
     projectedGoals: Number((hLs + aLs).toFixed(1)),
     goalLines,
     trendTags,

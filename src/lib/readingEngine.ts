@@ -618,8 +618,14 @@ export function buildMatchReadingV2(
       reasons.push(`projeção combinada sustenta probabilidade de ${m.probability}% neste mercado específico`);
     }
 
-    return { market: m.market, confidence: dampen(m.probability, m.market), reasons: reasons.slice(0, 3) };
+    return {
+      market: m.market,
+      confidence: dampen(m.probability, m.market),
+      reasons: reasons.slice(0, 3),
+      category: (m as any).category || "outro",
+    };
   });
+
 
   // Variação anti-template: garante que confianças não fiquem todas iguais
   const seenConf = new Set<number>();

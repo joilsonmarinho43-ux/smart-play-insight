@@ -1021,5 +1021,7 @@ export function buildMatchReadingV2(
     predictability: pred,
     verdict,
     contextQuality: ctxReliab,
+    bestPick,
   };
+
 }

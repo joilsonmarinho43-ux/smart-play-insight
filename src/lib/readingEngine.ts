@@ -933,15 +933,17 @@ export function buildMatchReadingV2(
   // (cantos, cartões, dupla chance, handicap) quando atingem confiança suficiente,
   // evitando que o "melhor pick" seja sempre a mesma linha de gols.
   const oddByMarket = (name: string): number | null => {
-    if (!odds) return null;
-    if (name === "Vitória Casa") return odds.home ?? null;
-    if (name === "Vitória Fora") return odds.away ?? null;
-    if (name === "Empate") return odds.draw ?? null;
-    if (/Over 2\.5/i.test(name)) return odds.over25 ?? null;
-    if (/Under 2\.5/i.test(name)) return odds.under25 ?? null;
-    if (/Ambas Marcam/i.test(name)) return odds.bttsYes ?? null;
+    const o = ctx?.odds;
+    if (!o) return null;
+    if (name === "Vitória Casa") return o.home ?? null;
+    if (name === "Vitória Fora") return o.away ?? null;
+    if (name === "Empate") return o.draw ?? null;
+    if (/Over 2\.5/i.test(name)) return o.over25 ?? null;
+    if (/Under 2\.5/i.test(name)) return o.under25 ?? null;
+    if (/Ambas Marcam/i.test(name)) return o.bttsYes ?? null;
     return null;
   };
+
   const categoryBonus: Record<string, number> = {
     corners: 3,
     cards: 3,

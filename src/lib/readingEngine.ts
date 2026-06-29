@@ -1003,6 +1003,23 @@ export function buildMatchReadingV2(
     };
   }
 
+  // Cola o melhor mercado no veredito — voz clara de analista, sem ficar preso a um único mercado.
+  if (bestPick) {
+    const valueTag =
+      bestPick.edgePct != null && bestPick.edgePct >= 4
+        ? ` com valor real de +${bestPick.edgePct.toFixed(1)}% sobre a odd publicada`
+        : bestPick.edgePct != null && bestPick.edgePct <= -4
+          ? ` (sem valor agregado contra a odd atual — observar live)`
+          : "";
+    const altTxt =
+      bestPick.alternatives.length > 0
+        ? ` Alternativas válidas: ${bestPick.alternatives.map((a) => `${a.market} ${a.confidence}%`).join(" · ")}.`
+        : "";
+    verdict += ` 🎯 Melhor entrada mapeada: ${bestPick.market} (${bestPick.confidence}%)${valueTag}.${altTxt}`;
+  }
+
+
+
   return {
 
     projectedGoals: Number((hLs + aLs).toFixed(1)),

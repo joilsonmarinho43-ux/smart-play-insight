@@ -52,6 +52,7 @@ export interface ReadingOpportunity {
   market: string;
   confidence: number;
   reasons: string[];
+  category?: string;
 }
 
 export interface GoalLineSuggestion {
@@ -60,6 +61,18 @@ export interface GoalLineSuggestion {
   probability: number;       // 0-100
   recommended: boolean;
   rationale: string;
+}
+
+export interface BestMarketPick {
+  market: string;
+  category: string;
+  confidence: number;
+  fairOdd: number | null;       // odd justa estimada (1/p)
+  marketOdd: number | null;     // odd real disponível, se houver
+  edgePct: number | null;       // valor em % vs odd real (positivo = valor)
+  risk: "baixo" | "medio" | "alto";
+  rationale: string;
+  alternatives: { market: string; confidence: number; category: string }[];
 }
 
 export interface MatchReadingV2 {
@@ -79,7 +92,9 @@ export interface MatchReadingV2 {
   trendTags: string[];
   premiumInsight: string;
   signature: string;
+  bestPick: BestMarketPick | null;
 }
+
 
 // ─── Math ─────────────────────────────────────────────────────
 const fact = (n: number) => { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };

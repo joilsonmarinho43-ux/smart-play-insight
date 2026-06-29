@@ -495,7 +495,10 @@ export function buildMatchReadingV2(
     .sort((a, b) => b.probability - a.probability);
 
   const finalMarkets: MarketAnalysis[] = [];
+  const catCount = new Map<string, number>();
   for (const m of ranked) {
+    const cat = (m as any).category || "outro";
+    if ((catCount.get(cat) || 0) >= 2) continue; // máx 2 por categoria
     if (m.market.includes("Handicap")) {
       if (banned.has("Handicap")) continue;
       banned.add("Handicap");
@@ -503,8 +506,10 @@ export function buildMatchReadingV2(
     if (m.market.includes("Over") && finalMarkets.some((x) => x.market.includes("Under"))) continue;
     if (m.market.includes("Under") && finalMarkets.some((x) => x.market.includes("Over"))) continue;
     finalMarkets.push(m);
-    if (finalMarkets.length >= 4) break;
+    catCount.set(cat, (catCount.get(cat) || 0) + 1);
+    if (finalMarkets.length >= 5) break;
   }
+
 
   // Amortecedor de confiança — evita percentuais exagerados em jogos sensíveis
   const dampen = (prob: number, marketName: string): number => {

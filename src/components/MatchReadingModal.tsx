@@ -723,6 +723,79 @@ export const MatchReadingModal = ({
               </span>
             </div>
 
+            {reading.bestPick && (
+              <div className="rounded-xl border-2 border-primary/60 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-4 shadow-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4 text-primary" />
+                  <h3 className="text-xs uppercase tracking-wider font-bold text-primary">
+                    Mercado Recomendado
+                  </h3>
+                  <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded ${riscoBadge[reading.bestPick.risk === "medio" ? "medio" : reading.bestPick.risk === "baixo" ? "baixo" : "alto"].color}`}>
+                    {riscoBadge[reading.bestPick.risk === "medio" ? "medio" : reading.bestPick.risk === "baixo" ? "baixo" : "alto"].label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-lg font-bold text-foreground">
+                    🎯 {reading.bestPick.market}
+                  </span>
+                  <span className="font-display text-base font-bold px-2.5 py-1 rounded-md bg-primary text-primary-foreground">
+                    {reading.bestPick.confidence}%
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-2 text-center">
+                  <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                    <div className="text-[10px] uppercase text-muted-foreground">Odd justa</div>
+                    <div className="font-display font-bold text-sm text-foreground">
+                      {reading.bestPick.fairOdd?.toFixed(2) ?? "—"}
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
+                    <div className="text-[10px] uppercase text-muted-foreground">Odd mercado</div>
+                    <div className="font-display font-bold text-sm text-foreground">
+                      {reading.bestPick.marketOdd?.toFixed(2) ?? "—"}
+                    </div>
+                  </div>
+                  <div className={`rounded-md border px-2 py-1.5 ${
+                    reading.bestPick.edgePct == null
+                      ? "bg-background/60 border-border"
+                      : reading.bestPick.edgePct >= 3
+                        ? "bg-emerald-500/15 border-emerald-500/40"
+                        : reading.bestPick.edgePct <= -3
+                          ? "bg-red-500/15 border-red-500/40"
+                          : "bg-background/60 border-border"
+                  }`}>
+                    <div className="text-[10px] uppercase text-muted-foreground">Valor (edge)</div>
+                    <div className="font-display font-bold text-sm text-foreground">
+                      {reading.bestPick.edgePct != null
+                        ? `${reading.bestPick.edgePct > 0 ? "+" : ""}${reading.bestPick.edgePct.toFixed(1)}%`
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-foreground/85 leading-relaxed">
+                  {reading.bestPick.rationale}
+                </p>
+                {reading.bestPick.alternatives.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-primary/20">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                      Alternativas válidas
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {reading.bestPick.alternatives.map((a, i) => (
+                        <span
+                          key={i}
+                          className="text-[11px] px-2 py-0.5 rounded-md bg-secondary/60 border border-border text-foreground/80"
+                        >
+                          {a.market} · <span className="font-bold text-primary">{a.confidence}%</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+
             <Section icon={LineChart} title="Resumo da Partida">
               <p>{reading.summary}</p>
             </Section>

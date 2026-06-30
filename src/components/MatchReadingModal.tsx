@@ -230,7 +230,7 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
                   return (
                     <li key={i} className="text-[10.5px] text-foreground/75 flex items-center gap-1.5">
                       <span className="opacity-60 tabular-nums">{dStr}</span>
-                      <span className="truncate flex-1">vs {r.opp || "—"}</span>
+                      <span className="truncate flex-1">vs {localizeTeamName(r.opp) || "—"}</span>
                       <span className="tabular-nums font-semibold">{r.gf}-{r.ga}</span>
                     </li>
                   );

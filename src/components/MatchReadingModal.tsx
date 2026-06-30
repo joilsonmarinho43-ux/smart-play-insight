@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
 import type { AnalystReading } from "@/hooks/useMatchReading";
 import { BookmakerFinder } from "@/components/BookmakerFinder";
+import { localizeTeamName } from "@/lib/teamI18n";
 
 interface Props {
   open: boolean;

@@ -240,6 +240,23 @@ async function tsdbLastEvents(teamId: string): Promise<any[]> {
   return out;
 }
 
+// searchevents.php por nome — útil para seleções nacionais (free tier devolve mais resultados aqui).
+async function tsdbSearchEventsByTeam(name: string): Promise<any[]> {
+  const out: any[] = [];
+  for (const q of variants(name)) {
+    const j = await tsdb(`/searchevents.php?e=${encodeURIComponent(q)}`);
+    const ev: any[] = j?.event || [];
+    for (const e of ev) {
+      // só eventos finalizados de futebol
+      if (!/soccer|football/i.test(e?.strSport || '')) continue;
+      if (e?.intHomeScore == null || e?.intAwayScore == null) continue;
+      out.push(e);
+    }
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
 function tsdbToCommon(e: any, teamId: string) {
   const hs = Number(e?.intHomeScore);
   const as = Number(e?.intAwayScore);

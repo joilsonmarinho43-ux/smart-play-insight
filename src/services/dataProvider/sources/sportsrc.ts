@@ -6,7 +6,9 @@ import { MatchData } from '@/types/match';
 import { supabase } from '@/integrations/supabase/client';
 
 const CACHE_PREFIX = 'sportsrc_cache_';
-const CACHE_TTL = 1000 * 60 * 60 * 6; // 6h para fixtures por data
+const STALE_PREFIX = 'sportsrc_stale_';
+const CACHE_TTL = 1000 * 60 * 60 * 12; // 12h fresh (proxy também cacheia 6h)
+const STALE_MAX = 1000 * 60 * 60 * 24 * 7; // 7d último recurso quando upstream falha
 
 const LIVE_STATUSES = new Set(['live', 'inprogress', 'in_progress', '1h', '2h', 'ht', 'halftime']);
 

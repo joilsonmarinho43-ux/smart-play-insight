@@ -6,7 +6,9 @@ import { MatchData } from '@/types/match';
 import { supabase } from '@/integrations/supabase/client';
 
 const CACHE_PREFIX = 'sportsrc_cache_';
-const CACHE_TTL = 1000 * 60 * 60 * 6; // 6h para fixtures por data
+const STALE_PREFIX = 'sportsrc_stale_';
+const CACHE_TTL = 1000 * 60 * 60 * 12; // 12h fresh (proxy também cacheia 6h)
+const STALE_MAX = 1000 * 60 * 60 * 24 * 7; // 7d último recurso quando upstream falha
 
 const LIVE_STATUSES = new Set(['live', 'inprogress', 'in_progress', '1h', '2h', 'ht', 'halftime']);
 
@@ -39,14 +41,25 @@ function mapMatch(m: any, leagueMeta: any): MatchData | null {
 }
 
 export async function fetchSportsRC(date: string): Promise<MatchData[]> {
-  // Cache local 6h
+  // 1) Cache fresco local (12h)
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + date);
     if (raw) {
       const { ts, data } = JSON.parse(raw);
-      if (Date.now() - ts < CACHE_TTL && Array.isArray(data)) return data;
+      if (Date.now() - ts < CACHE_TTL && Array.isArray(data) && data.length > 0) return data;
     }
   } catch { /* noop */ }
+
+  const returnStale = (reason: string): MatchData[] => {
+    try {
+      const raw = localStorage.getItem(STALE_PREFIX + date);
+      if (!raw) return [];
+      const { ts, data } = JSON.parse(raw);
+      if (!Array.isArray(data) || Date.now() - ts > STALE_MAX) return [];
+      console.warn(`[SportsRC] ${reason} → servindo stale (age=${Math.round((Date.now() - ts) / 60000)}min, n=${data.length})`);
+      return data;
+    } catch { return []; }
+  };
 
   try {
     const { data, error } = await supabase.functions.invoke('free-football-proxy', {
@@ -58,7 +71,7 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
     });
     if (error || !data?.ok) {
       console.warn('[SportsRC] proxy_error', { error, body: data });
-      return [];
+      return returnStale('proxy_error');
     }
     const payload = data.data;
     const groups: any[] = Array.isArray(payload?.data) ? payload.data : [];
@@ -71,13 +84,20 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
         if (mapped) matches.push(mapped);
       }
     }
+    if (matches.length === 0) {
+      // upstream pode ter devolvido vazio por limite — preserva snapshot anterior
+      console.info(`[SportsRC] date=${date} vazio (cache=${data.cache || 'miss'})`);
+      return returnStale('upstream_empty');
+    }
     try {
-      localStorage.setItem(CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: matches }));
+      const snap = JSON.stringify({ ts: Date.now(), data: matches });
+      localStorage.setItem(CACHE_PREFIX + date, snap);
+      localStorage.setItem(STALE_PREFIX + date, snap);
     } catch { /* noop */ }
-    console.info(`[SportsRC] date=${date} matches=${matches.length} latency=${data.latency_ms}ms`);
+    console.info(`[SportsRC] date=${date} matches=${matches.length} cache=${data.cache || 'miss'} latency=${data.latency_ms}ms${data.served_from_stale ? ' STALE' : ''}`);
     return matches;
   } catch (e) {
     console.warn('[SportsRC] fetch_exception', e);
-    return [];
+    return returnStale('fetch_exception');
   }
 }

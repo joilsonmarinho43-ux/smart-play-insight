@@ -384,7 +384,26 @@ const MatchCard = ({ match: rawMatch, isPremium }: Props) => {
   const { data: form } = useTeamForm(rawMatch);
   const matchWithForm = useMemo(() => mergeFormIntoMatch(rawMatch, form), [rawMatch, form]);
   const { data: aiStats } = useTeamStatsAI(matchWithForm);
-  const match = useMemo(() => mergeAIStatsIntoMatch(matchWithForm, aiStats), [matchWithForm, aiStats]);
+  const enriched = useMemo(() => mergeAIStatsIntoMatch(matchWithForm, aiStats), [matchWithForm, aiStats]);
+  // Recalcula previsões com dados atualizados (evita 35/35 quando só uma equipe tinha dados no fetch inicial)
+  const match = useMemo(() => {
+    const md: any = enriched.modelData || {};
+    const hGF = Number(md.homeGoalsAvg) || 0;
+    const aGF = Number(md.awayGoalsAvg) || 0;
+    const hGA = Number(md.homeGoalsAgainstAvg) || 0;
+    const aGA = Number(md.awayGoalsAgainstAvg) || 0;
+    if (hGF <= 0 && aGF <= 0) return enriched;
+    const leagueAvg = 1.3;
+    const homeL = hGF > 0 && aGA > 0 ? (hGF / leagueAvg) * (aGA / leagueAvg) * leagueAvg : (hGF || leagueAvg);
+    const awayL = aGF > 0 && hGA > 0 ? (aGF / leagueAvg) * (hGA / leagueAvg) * leagueAvg : (aGF || leagueAvg);
+    const total = homeL + awayL || 1;
+    const hs = homeL / total;
+    const as_ = awayL / total;
+    const homeWin = Math.round(hs * 70 + (hGF > 0 ? 5 : 0));
+    const awayWin = Math.round(as_ * 70 + (aGF > 0 ? 5 : 0));
+    const draw = Math.max(5, 100 - homeWin - awayWin);
+    return { ...enriched, predictions: { homeWin: String(homeWin), draw: String(draw), awayWin: String(awayWin) } };
+  }, [enriched]);
   const { reading, loading, context, analyst, analystLoading, analystError, fallback } = useMatchReading(match, readingOpen);
 
 

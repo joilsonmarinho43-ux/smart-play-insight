@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
 import type { AnalystReading } from "@/hooks/useMatchReading";
 import { BookmakerFinder } from "@/components/BookmakerFinder";
+import { localizeTeamName } from "@/lib/teamI18n";
 
 interface Props {
   open: boolean;
@@ -229,7 +230,7 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
                   return (
                     <li key={i} className="text-[10.5px] text-foreground/75 flex items-center gap-1.5">
                       <span className="opacity-60 tabular-nums">{dStr}</span>
-                      <span className="truncate flex-1">vs {r.opp || "—"}</span>
+                      <span className="truncate flex-1">vs {localizeTeamName(r.opp) || "—"}</span>
                       <span className="tabular-nums font-semibold">{r.gf}-{r.ga}</span>
                     </li>
                   );

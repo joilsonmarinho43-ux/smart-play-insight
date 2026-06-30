@@ -240,6 +240,23 @@ async function tsdbLastEvents(teamId: string): Promise<any[]> {
   return out;
 }
 
+// searchevents.php por nome — útil para seleções nacionais (free tier devolve mais resultados aqui).
+async function tsdbSearchEventsByTeam(name: string): Promise<any[]> {
+  const out: any[] = [];
+  for (const q of variants(name)) {
+    const j = await tsdb(`/searchevents.php?e=${encodeURIComponent(q)}`);
+    const ev: any[] = j?.event || [];
+    for (const e of ev) {
+      // só eventos finalizados de futebol
+      if (!/soccer|football/i.test(e?.strSport || '')) continue;
+      if (e?.intHomeScore == null || e?.intAwayScore == null) continue;
+      out.push(e);
+    }
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
 function tsdbToCommon(e: any, teamId: string) {
   const hs = Number(e?.intHomeScore);
   const as = Number(e?.intAwayScore);
@@ -309,6 +326,7 @@ async function formFor(name: string) {
   }
 
   // 2) TSDB (complemento se ainda faltar)
+  let sourceTsdbSearch = 0;
   if (collected.length < 5) {
     const tid = await resolveTsdbId(name);
     if (tid) {
@@ -320,9 +338,32 @@ async function formFor(name: string) {
     }
   }
 
-  console.log(`[team-form] "${name}" espn=${sourceEspn} tsdb=${sourceTsdb} total=${collected.length}`);
+  // 3) TSDB searchevents por nome — cobre seleções com poucos jogos no eventslast
+  if (collected.length < 5) {
+    const evts = await tsdbSearchEventsByTeam(name);
+    const target = normalize(variants(name)[1] || name);
+    for (const e of evts) {
+      const homeName = String(e?.strHomeTeam || '');
+      const awayName = String(e?.strAwayTeam || '');
+      const hn = normalize(homeName);
+      const an = normalize(awayName);
+      const isHome = hn.includes(target) || target.includes(hn);
+      const isAway = an.includes(target) || target.includes(an);
+      if (!isHome && !isAway) continue;
+      const hs = Number(e?.intHomeScore);
+      const as_ = Number(e?.intAwayScore);
+      if (!Number.isFinite(hs) || !Number.isFinite(as_)) continue;
+      collected.push({
+        date: String(e?.dateEvent || ''),
+        isHome, homeName, awayName, hs, as: as_,
+      });
+      sourceTsdbSearch++;
+    }
+  }
+
+  console.log(`[team-form] "${name}" espn=${sourceEspn} tsdb=${sourceTsdb} tsdbSearch=${sourceTsdbSearch} total=${collected.length}`);
   const s = summarize(collected);
-  return { ...s, sources: { espn: sourceEspn, tsdb: sourceTsdb } };
+  return { ...s, sources: { espn: sourceEspn, tsdb: sourceTsdb, tsdbSearch: sourceTsdbSearch } };
 }
 
 Deno.serve(async (req) => {

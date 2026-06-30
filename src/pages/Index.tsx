@@ -55,11 +55,12 @@ const Index = () => {
     return () => window.removeEventListener('football-offline-change', handler);
   }, []);
 
-  // Fetch 6 days (today + 5)
+  // Fetch 6 days (today + 5) — chave inclui data atual em UTC-3 para invalidar diariamente
+  const todayKey = getTodayInPara();
   const { data: rawMatches, isFetching, refetch } = useQuery({
-    queryKey: ['matches-multiday'],
+    queryKey: ['matches-multiday', todayKey],
     queryFn: () => fetchMultiDayMatches(6),
-    staleTime: 1000 * 60 * 60 * 24, // 24h — pré-jogo carrega 1x por dia
+    staleTime: 1000 * 60 * 60 * 6, // 6h
     gcTime: 1000 * 60 * 60 * 24,
     refetchOnMount: false,
     refetchOnWindowFocus: false,

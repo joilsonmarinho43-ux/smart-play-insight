@@ -9,6 +9,7 @@ import { MatchData } from '@/types/match';
 import { registerSource } from './index';
 import { fetchFootballDataOrg } from './sources/footballDataOrg';
 import { fetchSportsRC } from './sources/sportsrc';
+import { fetchWorldCupFallback } from './sources/worldCupFallback';
 
 // =====================================================================
 // FONTE 1 (PRIMÁRIA): SportsRC v2 — https://api.sportsrc.org/v2
@@ -101,6 +102,21 @@ registerSource({
 });
 
 // =====================================================================
+// FONTE 4 (COPA DO MUNDO — SEMPRE ATIVA): fallback dedicado para seleções
+// Consulta TSDB (ligas WC/Eliminatórias/Friendlies) + Football-Data.org
+// (competição 2000) e mescla no resultado geral. Roda em paralelo às
+// demais fontes: mesmo que SportsRC estoure o limite, os jogos da
+// Copa do Mundo permanecem disponíveis.
+// =====================================================================
+registerSource({
+  name: 'worldcup-fallback',
+  priority: 4,
+  fetchByDate: async (date: string): Promise<MatchData[]> => {
+    return await fetchWorldCupFallback(date);
+  },
+});
+
+
 // FONTE 99 (CACHE EXPIRADO — ATIVA): rede de segurança final.
 // =====================================================================
 registerSource({

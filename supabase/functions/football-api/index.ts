@@ -24,9 +24,9 @@ const SPORTSRC_BASE = "https://api.sportsrc.org/v2";
 const SPORTSRC_KEY = Deno.env.get("SPORTSRC_API_KEY") || "";
 
 const CACHE_TTL = {
-  LIVE: 60 * 1000,            // 60s
+  LIVE: 180 * 1000,           // 3 min (economiza cota SportsRC 1000/dia)
   PRE: 6 * 60 * 60 * 1000,    // 6h
-  STATS_LIVE: 90 * 1000,      // 90s
+  STATS_LIVE: 180 * 1000,     // 3 min
   STATS_FINAL: 7 * 24 * 60 * 60 * 1000, // 7d
 };
 

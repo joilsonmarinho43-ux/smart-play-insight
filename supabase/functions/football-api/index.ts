@@ -14,6 +14,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { fetchEspnMatches, normalizeTeam } from "../_shared/espnLive.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -274,10 +275,45 @@ serve(async (req) => {
       });
     }
 
-    // Modo live
+    // Modo live — ESPN (no-auth, com stats) + SportsRC (fill-in)
     if (body?.live === true) {
-      const matches = await fetchMatchesByDate("", true);
-      return new Response(JSON.stringify({ matches, provider: "sportsrc" }), {
+      const cacheKey = "live_multi_source";
+      const cached = await cacheGet(cacheKey, CACHE_TTL.LIVE);
+      if (cached) {
+        return new Response(JSON.stringify({ matches: cached, provider: "multi" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const [espn, src] = await Promise.all([
+        fetchEspnMatches({ liveOnly: true, enrichStats: true }).catch((e) => {
+          console.warn("[football-api] espn error", e instanceof Error ? e.message : e);
+          return [] as any[];
+        }),
+        fetchMatchesByDate("", true).catch(() => [] as any[]),
+      ]);
+      // Dedupe: prefer ESPN (has stats). Match SportsRC ↔ ESPN by normalized home+away.
+      const seen = new Set<string>();
+      const merged: any[] = [];
+      for (const m of espn) {
+        const key = `${normalizeTeam(m.homeTeam)}|${normalizeTeam(m.awayTeam)}`;
+        seen.add(key); merged.push(m);
+      }
+      for (const m of src) {
+        const key = `${normalizeTeam(m.homeTeam)}|${normalizeTeam(m.awayTeam)}`;
+        if (seen.has(key)) continue;
+        seen.add(key); merged.push(m);
+      }
+      console.log(`[football-api] LIVE merged espn=${espn.length} src=${src.length} → ${merged.length}`);
+      if (merged.length > 0) await cacheSet(cacheKey, merged, "LIVE");
+      else {
+        const stale = await cacheGetStale(cacheKey);
+        if (Array.isArray(stale) && stale.length > 0) {
+          return new Response(JSON.stringify({ matches: stale, provider: "multi-stale" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+      return new Response(JSON.stringify({ matches: merged, provider: "multi", counts: { espn: espn.length, sportsrc: src.length } }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

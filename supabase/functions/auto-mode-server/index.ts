@@ -170,7 +170,7 @@ function extractStats(match: any) {
   const homeTeam = match.teams?.home?.name || 'Casa';
   const awayTeam = match.teams?.away?.name || 'Fora';
   const matchId = String(match.id || match.fixture?.id);
-  const league = match.league || '';
+  const league = typeof match.league === 'string' ? match.league : (match.league?.name || '');
   const hasStats = !!(lH.shotsOnGoal || lA.shotsOnGoal || lH.dangerousAttacks || lA.dangerousAttacks || totalShots || corners);
 
   return {

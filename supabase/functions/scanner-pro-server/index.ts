@@ -150,7 +150,7 @@ function sniperScan(match: any): SniperSignal | null {
   const totalGoals = homeGoals + awayGoals;
   const homeTeam = match.teams?.home?.name || 'Casa';
   const awayTeam = match.teams?.away?.name || 'Fora';
-  const league = match.league || '';
+  const league = typeof match.league === 'string' ? match.league : (match.league?.name || '');
   const matchId = String(match.id || match.fixture?.id);
 
   const pressure = calculatePressure(lH, lA);

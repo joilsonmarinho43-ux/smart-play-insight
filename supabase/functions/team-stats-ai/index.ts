@@ -159,15 +159,16 @@ Forneça as médias dos últimos 5 jogos OFICIAIS de cada equipe (qualquer compe
       });
     }
 
-    if (resp.status === 429) {
-      return new Response(JSON.stringify({ error: 'rate_limited' }), {
-        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (resp.status === 402) {
-      return new Response(JSON.stringify({ error: 'credits_exhausted' }), {
-        status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (resp.status === 429 || resp.status === 402) {
+      // Degrada silenciosamente: devolve 200 com stats vazios para não quebrar a UI,
+      // e grava cache curto negativo (evita re-tentar imediatamente).
+      const empty = { home: EMPTY, away: EMPTY };
+      await cacheSet(key, empty);
+      return new Response(JSON.stringify({
+        ok: false,
+        source: resp.status === 429 ? 'rate_limited' : 'credits_exhausted',
+        ...empty,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     if (!resp.ok) {
       const txt = await resp.text();

@@ -790,13 +790,27 @@ export function buildMatchReadingV2(
     if (mOver) {
       const line = parseFloat(mOver[1]);
       const p = lineByKey.get(`over_${line}`);
-      if (p != null) op.confidence = dampen(p, op.market);
+      if (p != null) { op.confidence = dampen(p, op.market); op.modelProbability = p; }
     } else if (mUnder) {
       const line = parseFloat(mUnder[1]);
       const p = lineByKey.get(`under_${line}`);
-      if (p != null) op.confidence = dampen(p, op.market);
+      if (p != null) { op.confidence = dampen(p, op.market); op.modelProbability = p; }
     }
   });
+
+  // Anti-template + ordenação final: aplicado DEPOIS da sincronização das
+  // linhas de gols, para que a lista nunca apareça fora de ordem na tela
+  // (ex.: 72% → 70% → 71%) e nunca repita o mesmo percentual.
+  opportunities.sort((a, b) => b.confidence - a.confidence);
+  const seenConf = new Set<number>();
+  opportunities.forEach((op) => {
+    let c = op.confidence;
+    while (seenConf.has(c) && c > 58) c -= 1;
+    seenConf.add(c);
+    op.confidence = c;
+  });
+  opportunities.sort((a, b) => b.confidence - a.confidence);
+
 
   // ─── 8. TIMING (perfil tático real) ─────────────────────────
   const timing = {

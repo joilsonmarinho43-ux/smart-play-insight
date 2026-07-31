@@ -344,7 +344,13 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
 
     function buildReason(marketName: string, prob: number): string {
       const sample = `amostra ${homeN}+${awayN} jogos`;
+      // Sem histórico o modelo usa apenas a média da liga — dizer isso é mais
+      // honesto do que exibir "0.0 gols projetados".
+      if (!isLive && homeN === 0 && awayN === 0) {
+        return `Sem histórico recente disponível para estas equipes — projeção baseada apenas na média da liga (${prob}%). Confiabilidade reduzida.`;
+      }
       if (isLive) {
+
         const base = `Min ${minute ?? '?'} • ${totalSoG} chutes no alvo, pressão ${Math.round(pressure)}`;
         if (marketName.includes('Over') || marketName === 'Próximo Gol') {
           return `${base}. Ritmo ofensivo sustenta a linha (${prob}%).`;

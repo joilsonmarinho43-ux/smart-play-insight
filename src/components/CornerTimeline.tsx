@@ -1,11 +1,13 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import type { CornerPeriod } from '@/lib/eliteMetrics';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface Props {
   data: CornerPeriod[];
   currentMinute: number;
 }
+
+const CHART_H = 120;
 
 const CustomBar = React.forwardRef<SVGRectElement, any>((props, ref) => {
   const { x, y, width, height, fill } = props;
@@ -14,8 +16,28 @@ const CustomBar = React.forwardRef<SVGRectElement, any>((props, ref) => {
 });
 CustomBar.displayName = 'CustomBar';
 
+/** Mede a largura real do container; evita renderizar o gráfico com 0px (warning do recharts). */
+function useContainerWidth() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.floor(entries[0]?.contentRect.width ?? 0);
+      setWidth((prev) => (Math.abs(prev - w) > 1 ? w : prev));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return { ref, width };
+}
+
 const CornerTimeline = ({ data, currentMinute }: Props) => {
+  const { ref: wrapRef, width: chartWidth } = useContainerWidth();
+
   if (!data || data.length === 0) return null;
+
 
   const chartData = data.map((d, i) => ({
     period: d.period,

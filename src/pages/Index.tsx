@@ -41,6 +41,27 @@ function getMatchDateKey(match: any): string {
   return iso ? paraDateString(new Date(iso)) : (match?.date || '');
 }
 
+/** Status "já começou / terminou" — não deve aparecer no pré-jogo. */
+const STARTED_STATUSES = new Set([
+  '1H', '2H', 'HT', 'ET', 'BT', 'P', 'LIVE', 'FT', 'AET', 'PEN', 'AWD', 'WO', 'SUSP', 'INT',
+  'IN_PLAY', 'PAUSED', 'FINISHED', 'AWARDED',
+]);
+
+/** Só mantém partidas que ainda não começaram (tolerância de 10 min). */
+function isUpcoming(match: any): boolean {
+  const status = String(
+    match?.fixture?.status?.short ?? match?.status?.short ?? match?.status ?? ''
+  ).toUpperCase();
+  if (STARTED_STATUSES.has(status)) return false;
+  const iso = getMatchIso(match);
+  if (iso) {
+    const ts = new Date(iso).getTime();
+    if (!Number.isNaN(ts) && ts < Date.now() - 10 * 60 * 1000) return false;
+  }
+  return true;
+}
+
+
 const Index = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
@@ -86,6 +107,7 @@ const Index = () => {
 
   const safeMatches = useMemo(() =>
     (rawMatches || [])
+      .filter((m: any) => isUpcoming(m))
       .map((m: any) => {
       const sourceIso = getMatchIso(m);
       const dateKey = getMatchDateKey(m);

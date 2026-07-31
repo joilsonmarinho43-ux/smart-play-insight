@@ -1027,7 +1027,9 @@ export function buildMatchReadingV2(
         edgePct = Number((((marketOdd / fairOdd) - 1) * 100).toFixed(1));
       }
       // score = confiança + suporte de dados real; soma edge quando favorável.
-      let score = (op.modelProbability ?? op.confidence) + dataSupport(cat);
+      // score sobre a confiança CALIBRADA (já contém as penalidades de risco
+      // do confronto), mais o suporte real de dados da categoria.
+      let score = op.confidence + dataSupport(cat);
       if (edgePct != null && edgePct > 0) score += Math.min(15, edgePct);
       if (edgePct != null && edgePct < -5) score -= 8; // sem valor real
       // penaliza Empate isolado e amostra curta

@@ -1,11 +1,9 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Crosshair, Globe, Smartphone } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useFontScale } from "@/hooks/useFontScale";
-import { AUTO_BET_ENABLED } from "@/modules/auto-bet/config";
-import { SUPERBET_CONNECT_ENABLED } from "@/modules/superbet-connect/config";
 
 import {
   Sidebar,

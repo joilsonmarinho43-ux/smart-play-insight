@@ -86,7 +86,7 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
+        {/*<Sonner />*/}
         <BrowserRouter>
           <Routes>
             {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}

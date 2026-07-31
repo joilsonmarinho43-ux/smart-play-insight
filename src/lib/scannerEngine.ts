@@ -382,7 +382,8 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
       if (dataQuality === 'low') conf -= 15;
       if (!isLive) {
         const n = Math.min(homeN, awayN);
-        if (n < 3) conf -= 10;
+        if (n === 0) conf -= 22; // Sem dados reais (apenas média de liga) é fortemente penalizado
+        else if (n < 3) conf -= 10;
         else if (n < 5) conf -= 4;
       }
       // Dupla chance é inflada por natureza — desconto de realismo

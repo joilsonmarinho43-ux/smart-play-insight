@@ -47,18 +47,24 @@ const Scanner = () => {
       <div className="fixed inset-0 z-0 bg-black/50" />
 
       <main className="container max-w-3xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-4">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <Link to="/" className="p-2 bg-black/30 rounded-lg hover:bg-black/50">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <Crosshair className="w-6 h-6 text-orange-500" />
           <h1 className="text-xl font-black uppercase tracking-wider">Scanner PRO</h1>
+          {isEnriching && (
+            <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[11px] text-orange-300">
+              <Loader2 className="w-3 h-3 animate-spin text-orange-400" />
+              <span>Calibrando histórico real...</span>
+            </div>
+          )}
         </div>
 
         {isLoading ? (
           <p className="text-center text-muted-foreground py-8">Carregando jogos...</p>
         ) : (
-          <ScannerProPanel matches={safeMatches} />
+          <ScannerProPanel matches={enrichedMatches} />
         )}
       </main>
     </div>

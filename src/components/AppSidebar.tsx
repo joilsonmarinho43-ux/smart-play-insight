@@ -22,16 +22,13 @@ import {
 
 const navItems = [
   { title: "Pré-Jogo", url: "/", icon: Home },
-  { title: "Copa do Mundo", url: "/world-cup", icon: Globe },
   { title: "Live Trader", url: "/live", icon: Zap },
-  { title: "AutoPilot LIVE", url: "/autopilot", icon: Crosshair },
   { title: "Scanner PRO", url: "/scanner", icon: Radar },
   { title: "Elite", url: "/elite", icon: Shield },
 
   { title: "Bingo VIP PRO", url: "/bingo", icon: Trophy },
   { title: "Favoritos", url: "/favorites", icon: Star },
   { title: "Sugestões", url: "/suggestions", icon: Lightbulb },
-  ...(SUPERBET_CONNECT_ENABLED ? [{ title: "Superbet Connect", url: "/superbet-connect", icon: Smartphone }] : []),
 ];
 
 export function AppSidebar() {

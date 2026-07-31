@@ -98,7 +98,18 @@ const TopWinsSuggestion = ({ matches }: Props) => {
     return candidates.sort((a, b) => b.probability - a.probability).slice(0, 4);
   }, [matches]);
 
-  if (picks.length === 0) return null;
+  if (picks.length === 0) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-center">
+        <Crown className="w-8 h-8 text-orange-400/60 mx-auto mb-3" />
+        <h3 className="text-sm font-bold text-white mb-1">Nenhuma entrada aprovada hoje</h3>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Analisamos {matches?.length ?? 0} jogos, mas nenhum atingiu os critérios do Bingo VIP PRO
+          (favorito ≥ 45%, margem ≥ 12% e empate ≤ 35%, com histórico de pelo menos 4 jogos por equipe).
+        </p>
+      </div>
+    );
+  }
 
   const buildText = () => {
     const header = `👑 *TOP 4 — VITÓRIA DIRETA*\n*Trade Esportivo Profissional*\n${'─'.repeat(30)}\n\n`;

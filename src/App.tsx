@@ -85,8 +85,8 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        {/*<Sonner />*/}
+        {/*<Toaster />*/}
+        <Sonner />
         <BrowserRouter>
           <Routes>
             {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}

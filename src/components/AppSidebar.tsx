@@ -1,11 +1,9 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Crosshair, Globe, Smartphone } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useFontScale } from "@/hooks/useFontScale";
-import { AUTO_BET_ENABLED } from "@/modules/auto-bet/config";
-import { SUPERBET_CONNECT_ENABLED } from "@/modules/superbet-connect/config";
 
 import {
   Sidebar,
@@ -22,16 +20,13 @@ import {
 
 const navItems = [
   { title: "Pré-Jogo", url: "/", icon: Home },
-  { title: "Copa do Mundo", url: "/world-cup", icon: Globe },
   { title: "Live Trader", url: "/live", icon: Zap },
-  { title: "AutoPilot LIVE", url: "/autopilot", icon: Crosshair },
   { title: "Scanner PRO", url: "/scanner", icon: Radar },
   { title: "Elite", url: "/elite", icon: Shield },
 
   { title: "Bingo VIP PRO", url: "/bingo", icon: Trophy },
   { title: "Favoritos", url: "/favorites", icon: Star },
   { title: "Sugestões", url: "/suggestions", icon: Lightbulb },
-  ...(SUPERBET_CONNECT_ENABLED ? [{ title: "Superbet Connect", url: "/superbet-connect", icon: Smartphone }] : []),
 ];
 
 export function AppSidebar() {

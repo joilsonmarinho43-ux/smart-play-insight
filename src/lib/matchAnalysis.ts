@@ -387,12 +387,15 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
       }
     }
 
-    // Normaliza para soma 100 (corrige arredondamentos divergentes do 1X2)
+    // Normaliza para soma 100 (corrige arredondamentos divergentes do 1X2).
+    // `norm` já converte a fração Poisson (0..1) em porcentagem — multiplicar
+    // por 100 de novo estourava tudo para o teto (Casa 95 / Empate 60 / Fora 0).
     const rawSum = pHomeWin + pDraw + pAwayWin;
-    const norm = rawSum > 0 ? 100 / rawSum : 1;
-    const homeWinProb = Math.round(pHomeWin * 100 * norm);
-    const drawProb = Math.round(pDraw * 100 * norm);
+    const norm = rawSum > 0 ? 100 / rawSum : 0;
+    const homeWinProb = Math.round(pHomeWin * norm);
+    const drawProb = Math.round(pDraw * norm);
     const awayWinProb = Math.max(0, 100 - homeWinProb - drawProb);
+
 
     if (homeWinProb >= 35) {
       markets.push({ market: 'Vitória Casa', probability: Math.min(95, homeWinProb), risk: homeWinProb > 55 ? 'Médio' : 'Alto', category: 'result' });

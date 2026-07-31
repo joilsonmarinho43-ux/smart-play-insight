@@ -1,11 +1,14 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Crosshair } from 'lucide-react';
+import { ArrowLeft, Crosshair, Loader2 } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import { localizeTeamName } from '@/lib/teamI18n';
+import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
 import ScannerProPanel from '@/components/ScannerProPanel';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
+
 
 const Scanner = () => {
   const { data: matches = [], isLoading } = useQuery({
@@ -15,17 +18,24 @@ const Scanner = () => {
     gcTime: 1000 * 60 * 30,
   });
 
-  const safeMatches = (matches || []).filter((m: any) => !isWorldCupLeague(m.league)).map((m: any) => ({
-    ...m,
-    homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
-    awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
-    league: m.league?.name || m.league || '',
-    // Preserva a data/hora original (ISO) para o scanner exibir dia e horário
-    kickoff: m.fixture?.date || m.kickoff || m.date || m.utcDate || m.time || null,
-    time: m.fixture?.date
-      ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
-      : m.time || '',
-  }));
+  const safeMatches = useMemo(() => (matches || [])
+    .filter((m: any) => !isWorldCupLeague(m.league))
+    .map((m: any) => ({
+      ...m,
+      homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
+      awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
+      league: m.league?.name || m.league || '',
+      // Preserva a data/hora original (ISO) para o scanner exibir dia e horário
+      kickoff: m.fixture?.date || m.kickoff || m.date || m.utcDate || m.time || null,
+      time: m.fixture?.date
+        ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
+        : m.time || '',
+    })), [matches]);
+
+  // Busca os últimos jogos reais de cada equipe para o modelo não cair na
+  // média da liga (o que deixava todos os jogos com números idênticos).
+  const { matches: enrichedMatches, isEnriching, enrichedCount } = useScannerEnrichment(safeMatches);
+
 
 
   return (

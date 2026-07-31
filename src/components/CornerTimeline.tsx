@@ -1,11 +1,13 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import type { CornerPeriod } from '@/lib/eliteMetrics';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface Props {
   data: CornerPeriod[];
   currentMinute: number;
 }
+
+const CHART_H = 120;
 
 const CustomBar = React.forwardRef<SVGRectElement, any>((props, ref) => {
   const { x, y, width, height, fill } = props;
@@ -14,8 +16,28 @@ const CustomBar = React.forwardRef<SVGRectElement, any>((props, ref) => {
 });
 CustomBar.displayName = 'CustomBar';
 
+/** Mede a largura real do container; evita renderizar o gráfico com 0px (warning do recharts). */
+function useContainerWidth() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.floor(entries[0]?.contentRect.width ?? 0);
+      setWidth((prev) => (Math.abs(prev - w) > 1 ? w : prev));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return { ref, width };
+}
+
 const CornerTimeline = ({ data, currentMinute }: Props) => {
+  const { ref: wrapRef, width: chartWidth } = useContainerWidth();
+
   if (!data || data.length === 0) return null;
+
 
   const chartData = data.map((d, i) => ({
     period: d.period,
@@ -46,8 +68,9 @@ const CornerTimeline = ({ data, currentMinute }: Props) => {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={120}>
-        <BarChart data={chartData} barGap={2} barSize={10}>
+      <div ref={wrapRef} style={{ width: '100%', height: CHART_H }}>
+        {chartWidth > 0 && (
+        <BarChart width={chartWidth} height={CHART_H} data={chartData} barGap={2} barSize={10}>
           <XAxis
             dataKey="period"
             tick={{ fontSize: 9, fill: '#6b7280' }}
@@ -82,7 +105,9 @@ const CornerTimeline = ({ data, currentMinute }: Props) => {
             ))}
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+        )}
+      </div>
+
 
       <div className="flex justify-center gap-5 mt-2">
         <div className="flex items-center gap-1.5">

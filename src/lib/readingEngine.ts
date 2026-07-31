@@ -590,10 +590,13 @@ export function buildMatchReadingV2(
     if (fatigueOnFav) cap = Math.min(cap, 75);
     if (goalsVsTacticConflict && /Gols|Ambas/i.test(marketName)) cap = Math.min(cap, 68);
     if (/Handicap/i.test(marketName) && balanced) cap = Math.min(cap, 66);
-    if (prob <= cap) return Math.round(prob);
-    const excess = prob - cap;
-    const compressed = cap - 10 + Math.min(9.5, excess * 0.42);
-    return Math.round(Math.min(cap, compressed));
+    // Mapa monotônico e contínuo: abaixo do "joelho" a probabilidade é
+    // exibida como é; acima dela o excedente é comprimido a 25%, sem nunca
+    // ultrapassar o teto. Assim um mercado de 88% NUNCA aparece abaixo de um
+    // de 69% (o corte seco antigo criava exatamente essa inversão).
+    const knee = cap - 8;
+    if (prob <= knee) return Math.round(prob);
+    return Math.round(Math.min(cap, knee + (prob - knee) * 0.25));
   };
 
 
@@ -830,8 +833,8 @@ export function buildMatchReadingV2(
   // 69% só porque sofreu compressão maior).
   opportunities.sort(
     (a, b) =>
-      (b.modelProbability ?? b.confidence) - (a.modelProbability ?? a.confidence) ||
-      b.confidence - a.confidence,
+      b.confidence - a.confidence ||
+      (b.modelProbability ?? 0) - (a.modelProbability ?? 0),
   );
 
 

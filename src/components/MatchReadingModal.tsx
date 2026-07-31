@@ -738,7 +738,8 @@ export const MatchReadingModal = ({
 
         {!loading && reading && (
           <div className="space-y-3 mt-2">
-            <AnalystBlock analyst={analyst} loading={analystLoading} />
+            <AnalystBlock analyst={analyst} loading={analystLoading} reading={reading} />
+
 
             <ShareButton reading={reading} homeTeam={homeTeam} awayTeam={awayTeam} />
 

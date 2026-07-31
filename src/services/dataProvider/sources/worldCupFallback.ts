@@ -57,20 +57,19 @@ function tsdbToMatch(ev: any, leagueName: string): MatchData | null {
 }
 
 async function fetchTsdbLeague(leagueId: string, leagueName: string, date: string): Promise<MatchData[]> {
-  const endpoints = [
-    `https://www.thesportsdb.com/api/v1/json/123/eventsnextleague.php?id=${leagueId}`,
-    `https://www.thesportsdb.com/api/v1/json/123/eventspastleague.php?id=${leagueId}`,
+  // ⚠️ TheSportsDB não envia CORS: precisa passar pelo edge proxy.
+  const paths = [
+    `/eventsnextleague.php`,
+    `/eventspastleague.php`,
   ];
   const out: MatchData[] = [];
-  for (const url of endpoints) {
+  for (const path of paths) {
     try {
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 6000);
-      const res = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(to);
-      if (!res.ok) continue;
-      const json = await res.json().catch(() => null);
-      const events: any[] = Array.isArray(json?.events) ? json.events : [];
+      const { data, error } = await supabase.functions.invoke('free-football-proxy', {
+        body: { provider: 'thesportsdb', path, params: { id: leagueId } },
+      });
+      if (error || !data?.ok) continue;
+      const events: any[] = Array.isArray(data?.data?.events) ? data.data.events : [];
       for (const ev of events) {
         if (ev?.dateEvent !== date) continue;
         const m = tsdbToMatch(ev, leagueName);

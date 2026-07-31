@@ -27,7 +27,17 @@ const ElitePanel = ({ matches }: Props) => {
     return eliteMatches.filter(e => e.tags.includes(activeFilter));
   }, [eliteMatches, activeFilter]);
 
-  if (eliteMatches.length === 0) return null;
+  if (eliteMatches.length === 0) {
+    return (
+      <div className="rounded-2xl border border-amber-500/20 bg-black/40 backdrop-blur-sm p-8 text-center">
+        <Crown className="w-8 h-8 text-amber-400/60 mx-auto mb-3" />
+        <p className="text-sm font-bold text-amber-400">Nenhum jogo elite no momento</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Os jogos precisam atingir os critérios de performance (APM ≥ 0.8). Volte mais tarde.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/5 to-transparent overflow-hidden">

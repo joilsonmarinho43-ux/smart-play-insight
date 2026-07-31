@@ -77,7 +77,16 @@ const BingoSuggestion = ({ matches }: Props) => {
       .slice(0, 12);
   }, [matches, confMap]);
 
-  if (bingoData.length === 0) return null;
+  if (bingoData.length === 0) {
+    return (
+      <div className="rounded-2xl border border-orange-500/20 bg-black/40 backdrop-blur-sm p-8 text-center">
+        <p className="text-sm font-bold text-orange-400">Nenhum bilhete disponível agora</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Nenhum jogo atingiu a confiança mínima (≥ 72%) para entrar no Bingo VIP PRO hoje.
+        </p>
+      </div>
+    );
+  }
 
   // Count total markets across all matches
   const totalMarkets = bingoData.reduce((acc, bm) => acc + bm.selectedMarkets.length, 0);

@@ -824,10 +824,14 @@ export function buildMatchReadingV2(
   // Percentuais iguais são permitidos (o valor exibido é o valor real do
   // modelo); o desempate usa a probabilidade bruta, nunca um número
   // inventado para "parecer" diferente.
+  // A ordem segue a PROBABILIDADE REAL do modelo, não a confiança exibida.
+  // A confiança é apenas o número amortecido para leitura; ordenar por ela
+  // invertia o ranking (um mercado de 82% real podia aparecer abaixo de um de
+  // 69% só porque sofreu compressão maior).
   opportunities.sort(
     (a, b) =>
-      b.confidence - a.confidence ||
-      (b.modelProbability ?? 0) - (a.modelProbability ?? 0),
+      (b.modelProbability ?? b.confidence) - (a.modelProbability ?? a.confidence) ||
+      b.confidence - a.confidence,
   );
 
 
@@ -1020,7 +1024,7 @@ export function buildMatchReadingV2(
         edgePct = Number((((marketOdd / fairOdd) - 1) * 100).toFixed(1));
       }
       // score = confiança + suporte de dados real; soma edge quando favorável.
-      let score = op.confidence + dataSupport(cat);
+      let score = (op.modelProbability ?? op.confidence) + dataSupport(cat);
       if (edgePct != null && edgePct > 0) score += Math.min(15, edgePct);
       if (edgePct != null && edgePct < -5) score -= 8; // sem valor real
       // penaliza Empate isolado e amostra curta

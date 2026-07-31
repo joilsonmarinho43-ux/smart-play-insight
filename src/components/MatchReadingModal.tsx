@@ -525,6 +525,67 @@ function mergeFairOdds(
   return { odds: out, fromModel };
 }
 
+// Auditoria de coerência: confronta o que a IA escreveu com o que o modelo
+// estatístico calculou. Serve para expor "achismo" da IA em vez de escondê-lo.
+function coherenceCheck(
+  ai: AnalystReading,
+  reading?: MatchReadingV2 | null,
+): string[] {
+  if (!reading) return [];
+  const out: string[] = [];
+  const text = [
+    ai.veredito,
+    ai.mercados?.overUnderGols,
+    ai.mercados?.vitoria,
+    ai.mercados?.btts,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!text) return [];
+
+  // 1) Linha de gols 2.5
+  const line25 = reading.goalLines?.find((l) => l.line === 2.5);
+  if (line25) {
+    const overProb =
+      line25.side === "over" ? line25.probability : 100 - line25.probability;
+    const aiOver = /\bover\s*2[.,]5|mais de 2[.,]5/.test(text);
+    const aiUnder = /\bunder\s*2[.,]5|menos de 2[.,]5/.test(text);
+    if (aiOver && !aiUnder && overProb < 45) {
+      out.push(
+        `IA sugere Over 2.5, mas o modelo projeta apenas ${overProb}% (${reading.projectedGoals} gols esperados).`,
+      );
+    }
+    if (aiUnder && !aiOver && overProb > 60) {
+      out.push(
+        `IA sugere Under 2.5, mas o modelo projeta ${overProb}% de Over (${reading.projectedGoals} gols esperados).`,
+      );
+    }
+  }
+
+  // 2) BTTS
+  const btts = reading.opportunities?.find((o) => /Ambas Marcam/i.test(o.market));
+  const bttsProb = btts?.modelProbability ?? btts?.confidence ?? null;
+  if (bttsProb != null) {
+    if (/ambas marcam[^.]{0,25}(sim|provável)|btts sim/.test(text) && bttsProb < 45) {
+      out.push(`IA aponta Ambas Marcam Sim, mas o modelo dá ${Math.round(bttsProb)}%.`);
+    }
+  }
+
+  // 3) Amostra insuficiente citada como certeza
+  if (
+    reading.contextQuality === "limitado" &&
+    /(certeza|garantid|sem risco|aposta segura)/.test(text)
+  ) {
+    out.push(
+      `IA usa linguagem de certeza com contexto de dados limitado — trate como cenário, não como garantia.`,
+    );
+  }
+
+  return out;
+}
+
+
 const AnalystBlock = ({
   analyst,
   loading,
@@ -640,6 +701,33 @@ const AnalystBlock = ({
             </span>
             <p className="font-semibold text-foreground">{analyst.veredito}</p>
           </div>
+
+          {(() => {
+            const divs = coherenceCheck(analyst, reading);
+            if (divs.length === 0) {
+              return reading ? (
+                <p className="text-[11px] text-emerald-300/90">
+                  ✓ Análise da IA validada contra o modelo estatístico — sem divergências.
+                </p>
+              ) : null;
+            }
+            return (
+              <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-3">
+                <span className="text-xs uppercase tracking-wider font-bold text-red-300 block mb-1">
+                  Divergência IA × Modelo
+                </span>
+                <ul className="space-y-1 text-[13px] text-foreground/90">
+                  {divs.map((d, i) => (
+                    <li key={i}>• {d}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Em caso de conflito, prevalece o número do modelo (Poisson + amostra real).
+                </p>
+              </div>
+            );
+          })()}
+
         </div>
       )}
     </div>

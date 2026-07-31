@@ -163,25 +163,14 @@ export function buildMatchReadingV2(
   if (hGF == null || aGF == null || hGA == null || aGA == null) return null;
   if (homeN <= 0 && awayN <= 0) return null;
 
-  // λ ajustado (Bayes + força ofensiva × fragilidade adversária)
+  // λ base (Bayes + força ofensiva × fragilidade adversária)
   const adjHGF = bayes(hGF, leagueAvg, homeN);
   const adjAGA = bayes(aGA, leagueAvg, awayN);
   const adjAGF = bayes(aGF, leagueAvg, awayN);
   const adjHGA = bayes(hGA, leagueAvg, homeN);
-  const hL = (adjHGF / leagueAvg) * (adjAGA / leagueAvg) * leagueAvg;
-  const aL = (adjAGF / leagueAvg) * (adjHGA / leagueAvg) * leagueAvg;
-  const total = hL + aL;
-  const diff = hL - aL;
-  const balanced = Math.abs(diff) < 0.25;
-
-  let markets: MarketAnalysis[] = [];
-  try { markets = analyzeMarkets(match); } catch { markets = []; }
-  if (markets.length === 0) return null;
-
-  const o25Prob = markets.find((m) => m.market === "Over 2.5 Gols")?.probability ?? 0;
-  const bttsProb = markets.find((m) => m.market === "Ambas Marcam")?.probability ?? 0;
-  // Under 2.5 agora é exposto em analyzeMarkets como complemento direto de Over 2.5
-  const u25Prob = markets.find((m) => m.market === "Under 2.5 Gols")?.probability ?? Math.max(0, 100 - o25Prob);
+  const hL0 = (adjHGF / leagueAvg) * (adjAGA / leagueAvg) * leagueAvg;
+  const aL0 = (adjAGF / leagueAvg) * (adjHGA / leagueAvg) * leagueAvg;
+  const rawTotal = hL0 + aL0;
 
   // Contexto
   const homeImpact = ctx?.injuries?.home?.impact || "baixo";
@@ -200,22 +189,61 @@ export function buildMatchReadingV2(
   const oddA = ctx?.odds?.away ?? null;
   const oddO = ctx?.odds?.over25 ?? null;
 
-  // Perfis táticos
+  // Perfis táticos (medidos sobre a produção bruta das equipes)
   const homeAttacks = hGF >= 1.6;
   const awayAttacks = aGF >= 1.4;
   const homeLeaks = hGA >= 1.3;
   const awayLeaks = aGA >= 1.3;
   const homeSolid = hGA <= 1.0;
   const awaySolid = aGA <= 1.0;
-  const lowScoringProfile = total < 2.2 && !homeAttacks && !awayAttacks;
-  const openProfile = total >= 2.8 || (homeAttacks && awayAttacks);
+  const lowScoringProfile = rawTotal < 2.2 && !homeAttacks && !awayAttacks;
+  const openProfile = rawTotal >= 2.8 || (homeAttacks && awayAttacks);
   const physicalProfile =
     hCards != null && aCards != null && hCards + aCards >= 5;
 
-  // Favorito estatístico vs favorito de mercado
-  const statFav = balanced ? null : diff > 0 ? "home" : "away";
   let oddFav: "home" | "away" | null = null;
   if (oddH && oddA) oddFav = oddH < oddA ? "home" : oddA < oddH ? "away" : null;
+
+  // ─── λ AJUSTADO POR CONTEXTO REAL ───────────────────────────
+  // Um único λ ajustado alimenta TODA a leitura (narrativa, placares,
+  // linhas de gols e oportunidades). Antes existiam dois λ diferentes
+  // — texto usava o bruto e as linhas o ajustado — o que gerava
+  // percentuais divergentes na mesma tela.
+  let hLs = hL0;
+  let aLs = aL0;
+  if (homeImpact === "alto") { hLs *= 0.88; aLs *= 1.05; }
+  else if (homeImpact === "médio") { hLs *= 0.95; }
+  if (awayImpact === "alto") { aLs *= 0.85; hLs *= 1.06; }
+  else if (awayImpact === "médio") { aLs *= 0.94; }
+  const motTitle = (s: string | null) => !!s && /t[íi]tulo/i.test(s);
+  const motCont  = (s: string | null) => !!s && /classifica/i.test(s);
+  const motReleg = (s: string | null) => !!s && /rebaixamento/i.test(s);
+  const motMid   = (s: string | null) => !!s && /meio-tabela/i.test(s);
+  if (motTitle(homeMot) || motCont(homeMot)) hLs *= 1.05;
+  if (motTitle(awayMot) || motCont(awayMot)) aLs *= 1.05;
+  if (motReleg(homeMot)) hLs *= 0.96;
+  if (motReleg(awayMot)) aLs *= 0.94;
+  if (motMid(homeMot) && motMid(awayMot)) { hLs *= 0.95; aLs *= 0.95; }
+  if (homeLoad >= 3 || (homeRest != null && homeRest <= 2)) hLs *= 0.93;
+  if (awayLoad >= 3 || (awayRest != null && awayRest <= 2)) aLs *= 0.91;
+  if (oddH && oddA) {
+    if (oddFav === "home" && oddH <= 1.6) hLs *= 1.04;
+    if (oddFav === "away" && oddA <= 1.7) aLs *= 1.05;
+  }
+  if (lowScoringProfile) { hLs *= 0.92; aLs *= 0.92; }
+  if (openProfile) { hLs *= 1.04; aLs *= 1.04; }
+  hLs = Math.max(0.15, Math.min(hLs, 3.8));
+  aLs = Math.max(0.10, Math.min(aLs, 3.4));
+
+  // A partir daqui, hL/aL SÃO os λ ajustados usados em toda a leitura.
+  const hL = hLs;
+  const aL = aLs;
+  const total = hL + aL;
+  const diff = hL - aL;
+  const balanced = Math.abs(diff) < 0.25;
+
+  // Favorito estatístico vs favorito de mercado
+  const statFav = balanced ? null : diff > 0 ? "home" : "away";
   const marketDisagrees =
     statFav && oddFav && statFav !== oddFav;
 
@@ -228,7 +256,41 @@ export function buildMatchReadingV2(
     (statFav === "away" && awayImpact === "alto");
   const goalsVsTacticConflict = total >= 2.7 && lowScoringProfile === false && (homeSolid && awaySolid);
 
+  // ─── LINHAS DE GOLS (Poisson sobre o λ ajustado) ────────────
+  const probOver = (line: number): number => {
+    const threshold = Math.ceil(line); // 0.5→1, 1.5→2, 2.5→3, 3.5→4
+    let cum = 0;
+    for (let k = 0; k < threshold; k++) cum += poisson(total, k);
+    return Math.max(0, Math.min(1, 1 - cum));
+  };
+
+  let markets: MarketAnalysis[] = [];
+  try { markets = analyzeMarkets(match); } catch { markets = []; }
+  if (markets.length === 0) return null;
+
+  // Sincroniza as linhas Over/Under de gols com o λ ajustado ANTES de
+  // qualquer filtro de corte. Antes, o corte de 58% usava a probabilidade
+  // bruta e a exibição usava a ajustada — mercados de 45% reais apareciam
+  // como "oportunidade".
+  markets = markets.map((m) => {
+    const mOver = m.market.match(/Over\s+(\d\.\d)\s+Gols/i);
+    const mUnder = m.market.match(/Under\s+(\d\.\d)\s+Gols/i);
+    if (mOver) {
+      return { ...m, probability: Math.round(probOver(parseFloat(mOver[1])) * 100) };
+    }
+    if (mUnder) {
+      return { ...m, probability: Math.round((1 - probOver(parseFloat(mUnder[1]))) * 100) };
+    }
+    return m;
+  });
+
+  const o25Prob = markets.find((m) => m.market === "Over 2.5 Gols")?.probability ?? 0;
+  const bttsProb = markets.find((m) => m.market === "Ambas Marcam")?.probability ?? 0;
+  const u25Prob = markets.find((m) => m.market === "Under 2.5 Gols")?.probability ?? Math.max(0, 100 - o25Prob);
+
   const seed = Math.round(hL * 100 + aL * 50 + (homeN + awayN) * 7 + (oddH || 0) * 11);
+
+
 
   // ─── 1. SUMMARY (narrativo, variado) ────────────────────────
   let summary = "";
@@ -514,7 +576,11 @@ export function buildMatchReadingV2(
   }
 
 
-  // Amortecedor de confiança — evita percentuais exagerados em jogos sensíveis
+  // Amortecedor de confiança — evita percentuais exagerados em jogos sensíveis.
+  // Em vez de CORTAR tudo no teto (o que fazia 5 mercados diferentes exibirem
+  // exatamente 72%, escondendo qual era realmente o mais forte), a compressão é
+  // suave: acima do teto o excedente é comprimido de forma monotônica numa
+  // faixa de 5 pontos, preservando a ordem real do modelo.
   const dampen = (prob: number, marketName: string): number => {
     let cap = 85; // teto absoluto: nunca soar como certeza
     if (balanced) cap = Math.min(cap, 74);
@@ -524,8 +590,12 @@ export function buildMatchReadingV2(
     if (fatigueOnFav) cap = Math.min(cap, 75);
     if (goalsVsTacticConflict && /Gols|Ambas/i.test(marketName)) cap = Math.min(cap, 68);
     if (/Handicap/i.test(marketName) && balanced) cap = Math.min(cap, 66);
-    return Math.min(prob, cap);
+    if (prob <= cap) return Math.round(prob);
+    const excess = prob - cap;
+    const compressed = cap - 5 + 5 * (1 - Math.exp(-excess / 12));
+    return Math.round(Math.min(cap, compressed));
   };
+
 
   const opportunities: ReadingOpportunity[] = finalMarkets.map((m) => {
     const reasons: string[] = [];
@@ -634,6 +704,14 @@ export function buildMatchReadingV2(
       reasons.push(`modelo Poisson + forma recente projeta ${fmt(hL)} × ${fmt(aL)} e sustenta este mercado`);
     }
 
+    // Garante que nenhum mercado saia sem justificativa numérica real
+    // (ex.: cantos/cartões sem média capturada caíam em texto genérico).
+    if (reasons.length === 0) {
+      reasons.push(
+        `projeção Poisson ${fmt(hL)} × ${fmt(aL)} (${fmt(total)} gols) sobre ${homeN}+${awayN} jogos de amostra sustenta ${m.probability}% neste mercado`,
+      );
+    }
+
     return {
       market: m.market,
       confidence: dampen(m.probability, m.market),
@@ -642,6 +720,7 @@ export function buildMatchReadingV2(
       category: (m as any).category || "outro",
     };
   });
+
 
 
 
@@ -680,49 +759,13 @@ export function buildMatchReadingV2(
   if (alerts.length === 0)
     alerts.push(`Sem sinais de alerta relevantes — leitura limpa, dá para confiar no que os números mostram.`);
 
-  // ─── 7. PLACARES (λ ajustado por contexto real) ─────────────
-  let hLs = hL;
-  let aLs = aL;
-  // Lesões em peças ofensivas reduzem produção; defensivas fragilizam
-  if (homeImpact === "alto") { hLs *= 0.88; aLs *= 1.05; }
-  else if (homeImpact === "médio") { hLs *= 0.95; }
-  if (awayImpact === "alto") { aLs *= 0.85; hLs *= 1.06; }
-  else if (awayImpact === "médio") { aLs *= 0.94; }
-  // Motivação real (briga por título/classificação intensifica; meio-tabela esfria)
-  const motTitle = (s: string | null) => !!s && /t[íi]tulo/i.test(s);
-  const motCont  = (s: string | null) => !!s && /classifica/i.test(s);
-  const motReleg = (s: string | null) => !!s && /rebaixamento/i.test(s);
-  const motMid   = (s: string | null) => !!s && /meio-tabela/i.test(s);
-  if (motTitle(homeMot) || motCont(homeMot)) hLs *= 1.05;
-  if (motTitle(awayMot) || motCont(awayMot)) aLs *= 1.05;
-  if (motReleg(homeMot)) hLs *= 0.96;
-  if (motReleg(awayMot)) aLs *= 0.94;
-  if (motMid(homeMot) && motMid(awayMot)) { hLs *= 0.95; aLs *= 0.95; }
-  // Calendário pesado / pouco descanso derruba intensidade
-  if (homeLoad >= 3 || (homeRest != null && homeRest <= 2)) hLs *= 0.93;
-  if (awayLoad >= 3 || (awayRest != null && awayRest <= 2)) aLs *= 0.91;
-  // Drift de odds (mercado movendo para um lado é sinal real de força)
-  if (oddH && oddA) {
-    if (oddFav === "home" && oddH <= 1.6) hLs *= 1.04;
-    if (oddFav === "away" && oddA <= 1.7) aLs *= 1.05;
-  }
-  // Perfil tático ajusta dispersão
-  if (lowScoringProfile) { hLs *= 0.92; aLs *= 0.92; }
-  if (openProfile) { hLs *= 1.04; aLs *= 1.04; }
-  // Clamp para evitar extremos absurdos
-  hLs = Math.max(0.15, Math.min(hLs, 3.8));
-  aLs = Math.max(0.10, Math.min(aLs, 3.4));
-  const likelyScores = topScores(hLs, aLs, 3);
+  // ─── 7. PLACARES (sobre o λ já ajustado por contexto real) ──
+  const likelyScores = topScores(hL, aL, 3);
 
   // ─── 7b. LINHAS DE GOLS (Over/Under realista por Poisson) ───
-  const totalAdj = hLs + aLs;
-  const probOver = (line: number): number => {
-    // line é X.5 → Over = P(N >= ceil(line)) = P(N >= line+0.5)
-    const threshold = Math.ceil(line); // 0.5→1, 1.5→2, 2.5→3, 3.5→4
-    let cum = 0;
-    for (let k = 0; k < threshold; k++) cum += poisson(totalAdj, k);
-    return Math.max(0, Math.min(1, 1 - cum));
-  };
+  const totalAdj = total;
+
+
 
   const linesRaw = [0.5, 1.5, 2.5, 3.5].map((line) => {
     const pOver = probOver(line) * 100;
@@ -776,41 +819,18 @@ export function buildMatchReadingV2(
     rationale: rationaleFor(l),
   }));
 
-  // ─── UNIFICAÇÃO: sincroniza Over/Under X.5 Gols em "opportunities"
-  // com as mesmas probabilidades das "Linhas de Gols Realistas" (Poisson
-  // sobre o λ ajustado por contexto). Garante que as duas seções da
-  // leitura nunca exibam percentuais divergentes para a mesma linha.
-  const lineByKey = new Map<string, number>();
-  linesRaw.forEach((l) => {
-    lineByKey.set(`over_${l.line}`, Math.round(probOver(l.line) * 100));
-    lineByKey.set(`under_${l.line}`, Math.round((1 - probOver(l.line)) * 100));
-  });
-  opportunities.forEach((op) => {
-    const mOver = op.market.match(/Over\s+(\d\.\d)\s+Gols/i);
-    const mUnder = op.market.match(/Under\s+(\d\.\d)\s+Gols/i);
-    if (mOver) {
-      const line = parseFloat(mOver[1]);
-      const p = lineByKey.get(`over_${line}`);
-      if (p != null) { op.confidence = dampen(p, op.market); op.modelProbability = p; }
-    } else if (mUnder) {
-      const line = parseFloat(mUnder[1]);
-      const p = lineByKey.get(`under_${line}`);
-      if (p != null) { op.confidence = dampen(p, op.market); op.modelProbability = p; }
-    }
-  });
+  // Ordenação final: as linhas de gols já foram sincronizadas com o λ
+  // ajustado ANTES do corte de qualidade, então aqui só ordenamos.
+  // Percentuais iguais são permitidos (o valor exibido é o valor real do
+  // modelo); o desempate usa a probabilidade bruta, nunca um número
+  // inventado para "parecer" diferente.
+  opportunities.sort(
+    (a, b) =>
+      b.confidence - a.confidence ||
+      (b.modelProbability ?? 0) - (a.modelProbability ?? 0),
+  );
 
-  // Anti-template + ordenação final: aplicado DEPOIS da sincronização das
-  // linhas de gols, para que a lista nunca apareça fora de ordem na tela
-  // (ex.: 72% → 70% → 71%) e nunca repita o mesmo percentual.
-  opportunities.sort((a, b) => b.confidence - a.confidence);
-  const seenConf = new Set<number>();
-  opportunities.forEach((op) => {
-    let c = op.confidence;
-    while (seenConf.has(c) && c > 58) c -= 1;
-    seenConf.add(c);
-    op.confidence = c;
-  });
-  opportunities.sort((a, b) => b.confidence - a.confidence);
+
 
 
   // ─── 8. TIMING (perfil tático real) ─────────────────────────
@@ -967,15 +987,21 @@ export function buildMatchReadingV2(
     return null;
   };
 
-  const categoryBonus: Record<string, number> = {
-    corners: 3,
-    cards: 3,
-    handicap: 4,
-    chance_dupla: 2,
-    btts: 1,
-    htft: 0,
-    result: 0,
-    goals: 0,
+  // Suporte de dados por categoria: um mercado só ganha peso extra quando
+  // existe amostra REAL por trás dele. Antes havia bônus fixo (cantos +3,
+  // handicap +4...) mesmo sem média capturada — isso é achismo e podia
+  // eleger como "melhor entrada" um mercado sem base estatística.
+  const sampleTotal = homeN + awayN;
+  const cornerDataOk = hCorners != null && aCorners != null && hCorners + aCorners > 0 && sampleTotal >= 6;
+  const cardDataOk = hCards != null && aCards != null && hCards + aCards > 0 && sampleTotal >= 6;
+  const goalDataOk = sampleTotal >= 6;
+  const dataSupport = (cat: string): number => {
+    if (cat === "corners") return cornerDataOk ? 3 : -12;
+    if (cat === "cards") return cardDataOk ? 3 : -12;
+    if (cat === "handicap") return goalDataOk ? 2 : -8;
+    if (cat === "chance_dupla") return goalDataOk ? 1 : -4;
+    if (cat === "htft") return goalDataOk ? 0 : -6;
+    return goalDataOk ? 0 : -4;
   };
   const riskOf = (conf: number): "baixo" | "medio" | "alto" =>
     conf >= 78 ? "baixo" : conf >= 68 ? "medio" : "alto";
@@ -993,16 +1019,18 @@ export function buildMatchReadingV2(
       if (marketOdd && fairOdd) {
         edgePct = Number((((marketOdd / fairOdd) - 1) * 100).toFixed(1));
       }
-      // score base = confiança + bônus de categoria; soma edge real quando favorável.
-      let score = op.confidence + (categoryBonus[cat] ?? 0);
+      // score = confiança + suporte de dados real; soma edge quando favorável.
+      let score = op.confidence + dataSupport(cat);
       if (edgePct != null && edgePct > 0) score += Math.min(15, edgePct);
       if (edgePct != null && edgePct < -5) score -= 8; // sem valor real
-      // penaliza Empate isolado e linhas muito sensíveis a contexto limitado
+      // penaliza Empate isolado e amostra curta
       if (op.market === "Empate") score -= 6;
       if (ctxReliab === "limitado") score -= 2;
+      if (homeN < 3 || awayN < 3) score -= 6;
       return { op, score, fairOdd, marketOdd, edgePct, cat };
     });
     scored.sort((a, b) => b.score - a.score);
+
     const top = scored[0];
     // Alternativas: sem repetir a mesma categoria do pick principal nem entre si
     // (evita "Over 5.5 Cantos" + "Over 7.5 Cantos" ou 1X + DNB Casa lado a lado).

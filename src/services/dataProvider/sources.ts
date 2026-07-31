@@ -80,22 +80,19 @@ registerSource({
       }
     } catch { /* noop */ }
 
-    const url = `https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d=${encodeURIComponent(date)}&s=Soccer`;
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 8000);
+    // ⚠️ TheSportsDB não envia CORS: precisa passar pelo edge proxy.
     try {
-      const res = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(timeout);
-      if (!res.ok) return [];
-      const json = await res.json().catch(() => null);
-      const events: any[] = Array.isArray(json?.events) ? json.events : [];
+      const { data, error } = await supabase.functions.invoke('free-football-proxy', {
+        body: { provider: 'thesportsdb', path: '/eventsday.php', params: { d: date, s: 'Soccer' } },
+      });
+      if (error || !data?.ok) return [];
+      const events: any[] = Array.isArray(data?.data?.events) ? data.data.events : [];
       const matches = events.map(tsdbToMatch).filter(Boolean) as MatchData[];
       try {
         localStorage.setItem(TSDB_CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: matches }));
       } catch { /* noop */ }
       return matches;
     } catch {
-      clearTimeout(timeout);
       return [];
     }
   },

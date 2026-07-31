@@ -71,8 +71,6 @@ const CornerTimeline = ({ data, currentMinute }: Props) => {
       <div ref={wrapRef} style={{ width: '100%', height: CHART_H }}>
         {chartWidth > 0 && (
         <BarChart width={chartWidth} height={CHART_H} data={chartData} barGap={2} barSize={10}>
-
-        <BarChart data={chartData} barGap={2} barSize={10}>
           <XAxis
             dataKey="period"
             tick={{ fontSize: 9, fill: '#6b7280' }}

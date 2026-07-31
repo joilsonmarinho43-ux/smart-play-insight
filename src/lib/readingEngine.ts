@@ -592,7 +592,7 @@ export function buildMatchReadingV2(
     if (/Handicap/i.test(marketName) && balanced) cap = Math.min(cap, 66);
     if (prob <= cap) return Math.round(prob);
     const excess = prob - cap;
-    const compressed = cap - 5 + 5 * (1 - Math.exp(-excess / 12));
+    const compressed = cap - 10 + Math.min(9.5, excess * 0.42);
     return Math.round(Math.min(cap, compressed));
   };
 

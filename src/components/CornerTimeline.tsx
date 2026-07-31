@@ -105,7 +105,9 @@ const CornerTimeline = ({ data, currentMinute }: Props) => {
             ))}
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+        )}
+      </div>
+
 
       <div className="flex justify-center gap-5 mt-2">
         <div className="flex items-center gap-1.5">

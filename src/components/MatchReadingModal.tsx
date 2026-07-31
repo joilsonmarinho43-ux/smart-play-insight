@@ -500,14 +500,42 @@ const riscoBadge = {
   alto: { color: "bg-red-500/20 text-red-300 border-red-500/40", label: "Risco alto" },
 } as const;
 
+// Substitui as odds "redondas" que a IA costuma devolver (2.00 / 1.80 / 2.50)
+// pelas odds justas derivadas do modelo estatístico, quando disponíveis.
+function mergeFairOdds(
+  ai: AnalystReading["oddsReferencia"],
+  reading?: MatchReadingV2 | null,
+): { odds: AnalystReading["oddsReferencia"]; fromModel: boolean } {
+  if (!reading) return { odds: ai, fromModel: false };
+  const out = { ...(ai || {}) };
+  let fromModel = false;
+  const set = (k: keyof NonNullable<AnalystReading["oddsReferencia"]>, p?: number) => {
+    if (p == null || p <= 0 || p >= 100) return;
+    out[k] = (100 / p).toFixed(2);
+    fromModel = true;
+  };
+  const line25 = reading.goalLines?.find((l) => l.line === 2.5);
+  if (line25) {
+    const over = line25.side === "over" ? line25.probability : 100 - line25.probability;
+    set("over25", over);
+    set("under25", 100 - over);
+  }
+  const btts = reading.opportunities?.find((o) => /Ambas Marcam/i.test(o.market));
+  if (btts) set("bttsSim", btts.modelProbability ?? btts.confidence);
+  return { odds: out, fromModel };
+}
+
 const AnalystBlock = ({
   analyst,
   loading,
+  reading,
 }: {
   analyst?: AnalystReading | null;
   loading?: boolean;
+  reading?: MatchReadingV2 | null;
 }) => {
   if (!analyst && !loading) return null;
+  const merged = analyst ? mergeFairOdds(analyst.oddsReferencia, reading) : null;
   return (
     <div className="rounded-xl border border-primary/40 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -582,23 +610,29 @@ const AnalystBlock = ({
             </div>
           )}
 
-          {analyst.oddsReferencia && Object.values(analyst.oddsReferencia).some(Boolean) && (
+          {merged?.odds && Object.values(merged.odds).some(Boolean) && (
             <div className="rounded-lg border border-primary/40 bg-background/80 p-3">
-              <span className="text-xs uppercase tracking-wider font-bold text-primary block mb-2">
-                Odds Justas Estimadas
-              </span>
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <span className="text-xs uppercase tracking-wider font-bold text-primary">
+                  Odds Justas Estimadas
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {merged.fromModel ? "gols/BTTS pelo modelo" : "estimativa da IA"}
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[15px]">
-                {analyst.oddsReferencia.casa && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Casa:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.casa}</span></div>)}
-                {analyst.oddsReferencia.empate && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Empate:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.empate}</span></div>)}
-                {analyst.oddsReferencia.fora && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Fora:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.fora}</span></div>)}
-                {analyst.oddsReferencia.over25 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Over 2.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.over25}</span></div>)}
-                {analyst.oddsReferencia.under25 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Under 2.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.under25}</span></div>)}
-                {analyst.oddsReferencia.bttsSim && (<div className="flex justify-between gap-2"><span className="text-foreground/90">BTTS Sim:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.bttsSim}</span></div>)}
-                {analyst.oddsReferencia.escanteiosOver9 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Esc. +9.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.escanteiosOver9}</span></div>)}
-                {analyst.oddsReferencia.cartoesOver4 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Cart. +4.5:</span> <span className="font-display font-bold text-primary text-[17px]">{analyst.oddsReferencia.cartoesOver4}</span></div>)}
+                {merged.odds.casa && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Casa:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.casa}</span></div>)}
+                {merged.odds.empate && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Empate:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.empate}</span></div>)}
+                {merged.odds.fora && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Fora:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.fora}</span></div>)}
+                {merged.odds.over25 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Over 2.5:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.over25}</span></div>)}
+                {merged.odds.under25 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Under 2.5:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.under25}</span></div>)}
+                {merged.odds.bttsSim && (<div className="flex justify-between gap-2"><span className="text-foreground/90">BTTS Sim:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.bttsSim}</span></div>)}
+                {merged.odds.escanteiosOver9 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Esc. +9.5:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.escanteiosOver9}</span></div>)}
+                {merged.odds.cartoesOver4 && (<div className="flex justify-between gap-2"><span className="text-foreground/90">Cart. +4.5:</span> <span className="font-display font-bold text-primary text-[17px]">{merged.odds.cartoesOver4}</span></div>)}
               </div>
             </div>
           )}
+
 
           <div className="rounded-lg border border-amber-400/50 bg-amber-500/10 p-3">
             <span className="text-xs uppercase tracking-wider font-bold text-amber-300 block mb-1">
@@ -704,7 +738,8 @@ export const MatchReadingModal = ({
 
         {!loading && reading && (
           <div className="space-y-3 mt-2">
-            <AnalystBlock analyst={analyst} loading={analystLoading} />
+            <AnalystBlock analyst={analyst} loading={analystLoading} reading={reading} />
+
 
             <ShareButton reading={reading} homeTeam={homeTeam} awayTeam={awayTeam} />
 

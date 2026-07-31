@@ -53,6 +53,8 @@ export interface ReadingOpportunity {
   confidence: number;
   reasons: string[];
   category?: string;
+  /** Probabilidade bruta do modelo (antes do amortecedor de exibição). */
+  modelProbability?: number;
 }
 
 export interface GoalLineSuggestion {
@@ -614,27 +616,33 @@ export function buildMatchReadingV2(
       } else {
         reasons.push(`linha de handicap coerente com o cenário projetado`);
       }
+    } else if (/DNB|Empate Anula/i.test(m.market)) {
+      const side = /Fora|Visitante/i.test(m.market) ? away : home;
+      reasons.push(`${side} sustenta o lado sem risco de empate: derrota é o cenário menos provável da projeção`);
+      if (Math.abs(diff) >= 0.4)
+        reasons.push(`diferença de projeção de ${fmt(Math.abs(diff))} gol por jogo entre os dois lados`);
+    } else if (/1°\s*Tempo|1º\s*Tempo|HT/i.test(m.market)) {
+      reasons.push(`projeção de ${fmt(total * 0.42)} gols só no primeiro tempo pelo ritmo das duas equipes`);
+      if (physicalProfile) reasons.push(`início costuma ser estudado — linha curta é a leitura correta aqui`);
+    } else if (/2°\s*Tempo|2º\s*Tempo/i.test(m.market)) {
+      reasons.push(`projeção de ${fmt(total * 0.58)} gols na etapa final, onde o jogo historicamente se abre`);
+      if (!lowScoringProfile) reasons.push(`desgaste e mudanças de banco elevam o volume após os 60'`);
+    } else if (m.market === "Empate") {
+      reasons.push(`equilíbrio de projeção (${fmt(hL)} × ${fmt(aL)}) mantém o empate vivo até o fim`);
     } else {
-      reasons.push(`projeção combinada sustenta probabilidade de ${m.probability}% neste mercado específico`);
+      reasons.push(`modelo Poisson + forma recente projeta ${fmt(hL)} × ${fmt(aL)} e sustenta este mercado`);
     }
 
     return {
       market: m.market,
       confidence: dampen(m.probability, m.market),
+      modelProbability: m.probability,
       reasons: reasons.slice(0, 3),
       category: (m as any).category || "outro",
     };
   });
 
 
-  // Variação anti-template: garante que confianças não fiquem todas iguais
-  const seenConf = new Set<number>();
-  opportunities.forEach((op, idx) => {
-    let c = op.confidence;
-    while (seenConf.has(c)) c = Math.max(58, c - 1 - (idx % 2));
-    seenConf.add(c);
-    op.confidence = c;
-  });
 
   // ─── 6. ALERTAS (inteligentes, não genéricos) ───────────────
   const alerts: string[] = [];
@@ -782,13 +790,27 @@ export function buildMatchReadingV2(
     if (mOver) {
       const line = parseFloat(mOver[1]);
       const p = lineByKey.get(`over_${line}`);
-      if (p != null) op.confidence = dampen(p, op.market);
+      if (p != null) { op.confidence = dampen(p, op.market); op.modelProbability = p; }
     } else if (mUnder) {
       const line = parseFloat(mUnder[1]);
       const p = lineByKey.get(`under_${line}`);
-      if (p != null) op.confidence = dampen(p, op.market);
+      if (p != null) { op.confidence = dampen(p, op.market); op.modelProbability = p; }
     }
   });
+
+  // Anti-template + ordenação final: aplicado DEPOIS da sincronização das
+  // linhas de gols, para que a lista nunca apareça fora de ordem na tela
+  // (ex.: 72% → 70% → 71%) e nunca repita o mesmo percentual.
+  opportunities.sort((a, b) => b.confidence - a.confidence);
+  const seenConf = new Set<number>();
+  opportunities.forEach((op) => {
+    let c = op.confidence;
+    while (seenConf.has(c) && c > 58) c -= 1;
+    seenConf.add(c);
+    op.confidence = c;
+  });
+  opportunities.sort((a, b) => b.confidence - a.confidence);
+
 
   // ─── 8. TIMING (perfil tático real) ─────────────────────────
   const timing = {
@@ -961,7 +983,10 @@ export function buildMatchReadingV2(
   if (opportunities.length > 0) {
     const scored = opportunities.map((op) => {
       const cat = op.category || "outro";
-      const fairOdd = op.confidence > 0 ? Number((100 / op.confidence).toFixed(2)) : null;
+      // Odd justa vem da probabilidade REAL do modelo (não da confiança exibida,
+      // que é amortecida): usar a confiança inflava artificialmente o edge.
+      const p = op.modelProbability ?? op.confidence;
+      const fairOdd = p > 0 ? Number((100 / p).toFixed(2)) : null;
       const marketOdd = oddByMarket(op.market);
       let edgePct: number | null = null;
       if (marketOdd && fairOdd) {
@@ -978,9 +1003,19 @@ export function buildMatchReadingV2(
     });
     scored.sort((a, b) => b.score - a.score);
     const top = scored[0];
+    // Alternativas: sem repetir a mesma categoria do pick principal nem entre si
+    // (evita "Over 5.5 Cantos" + "Over 7.5 Cantos" ou 1X + DNB Casa lado a lado).
+    const usedCats = new Set<string>([top.cat]);
     const alternatives = scored
-      .slice(1, 4)
+      .slice(1)
+      .filter((s) => {
+        if (usedCats.has(s.cat)) return false;
+        usedCats.add(s.cat);
+        return true;
+      })
+      .slice(0, 3)
       .map((s) => ({ market: s.op.market, confidence: s.op.confidence, category: s.cat }));
+
     const edgeNote = top.edgePct != null
       ? top.edgePct > 3
         ? ` Odd de mercado em ${top.marketOdd?.toFixed(2)} contra justa ${top.fairOdd?.toFixed(2)} — valor de +${top.edgePct.toFixed(1)}%.`

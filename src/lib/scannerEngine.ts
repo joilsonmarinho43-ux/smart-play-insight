@@ -303,13 +303,26 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
 
     const matchOpportunities: ScannerOpportunity[] = [];
 
+    const DC_MARKETS = new Set(['1X (Casa ou Empate)', 'X2 (Empate ou Fora)']);
+    let dcCount = 0;
+
     for (const market of markets) {
       if (!targetMarkets.includes(market.market)) continue;
 
+      const isDC = DC_MARKETS.has(market.market);
+      // Dupla chance é naturalmente alta: exige mais e entra no máximo 1 por jogo
+      if (isDC) {
+        if (dcCount >= 1) continue;
+        if (market.probability < 72) continue;
+      }
+
       const ev = estimateEV(market.probability, market.market);
-      if (market.probability < 60 || ev <= 0) continue;
+      const minEV = isDC ? 0.04 : 0;
+      if (market.probability < 60 || ev <= minEV) continue;
+      if (isDC) dcCount++;
 
       const score = calculateOpportunityScore(market.probability, ev, pressure, isLive);
+
 
       matchOpportunities.push({
         matchId,

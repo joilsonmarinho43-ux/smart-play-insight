@@ -422,15 +422,19 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
       }
     }
 
-    const dc1X = Math.min(98, homeWinProb + drawProb);
-    const dcX2 = Math.min(98, awayWinProb + drawProb);
+    // Dupla chance: encolhe levemente em direção ao mercado e usa teto realista
+    // (antes travava em 98%, o que exagerava a confiança do modelo).
+    const shrinkDC = (v: number) => Math.min(90, Math.round(v * 0.94 + 3));
+    const dc1X = shrinkDC(homeWinProb + drawProb);
+    const dcX2 = shrinkDC(awayWinProb + drawProb);
 
-    if (dc1X >= 50) {
-      markets.push({ market: '1X (Casa ou Empate)', probability: dc1X, risk: dc1X > 75 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
+    if (dc1X >= 62) {
+      markets.push({ market: '1X (Casa ou Empate)', probability: dc1X, risk: dc1X > 78 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
     }
-    if (dcX2 >= 50) {
-      markets.push({ market: 'X2 (Empate ou Fora)', probability: dcX2, risk: dcX2 > 75 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
+    if (dcX2 >= 62) {
+      markets.push({ market: 'X2 (Empate ou Fora)', probability: dcX2, risk: dcX2 > 78 ? 'Baixo' : 'Médio', category: 'chance_dupla' });
     }
+
 
     // ─── Handicaps com filtro de coerência fav/azarão ─────────
     // -1 só faz sentido para o FAVORITO; +1 só faz sentido para o AZARÃO.

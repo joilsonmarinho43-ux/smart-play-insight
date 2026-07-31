@@ -66,29 +66,49 @@ function goalSignal(pressure: number, shotsOnGoal: number, minute: number | null
 }
 
 // ═══════════════════════════════════════
-// EV estimado (odd implícita com margem 8%)
+// EV estimado — compara a probabilidade do modelo com a
+// probabilidade implícita típica de mercado (baseline) + margem da casa.
+// Antes o cálculo derivava a odd da própria probabilidade, o que
+// resultava num EV constante (bug) para todos os jogos.
 // ═══════════════════════════════════════
+const MARKET_BASELINE: Record<string, number> = {
+  'Over 0.5 Gols': 0.93,
+  'Over 1.5 Gols': 0.76,
+  'Over 2.5 Gols': 0.52,
+  'Over 3.5 Gols': 0.28,
+  'Ambas Marcam': 0.52,
+  '1X (Casa ou Empate)': 0.70,
+  'X2 (Empate ou Fora)': 0.63,
+  'Vitória Casa': 0.45,
+  'Vitória Fora': 0.30,
+  'Próximo Gol': 0.50,
+};
+
+const BOOKMAKER_MARGIN = 0.06;
+
 function estimateEV(probability: number, market?: string): number {
-  if (probability <= 0) return -1;
-  const p = probability / 100;
-  const margins: Record<string, number> = {
-    'Over 0.5 Gols': 0.92, 'Over 1.5 Gols': 0.90, 'Over 2.5 Gols': 0.87,
-    'Over 3.5 Gols': 0.85, 'Ambas Marcam': 0.88,
-  };
-  const margin = margins[market || ''] || 0.88;
-  const marketOdd = Math.max(1 / (p * margin), 1.05);
-  return Math.round((p * marketOdd - 1) * 100) / 100;
+  if (!Number.isFinite(probability) || probability <= 0) return -1;
+  const p = Math.min(0.99, probability / 100);
+  const baseline = MARKET_BASELINE[market || ''] ?? 0.55;
+  // Odd praticada = odd justa do baseline reduzida pela margem da casa
+  const marketOdd = Math.max((1 / baseline) * (1 - BOOKMAKER_MARGIN), 1.01);
+  const ev = p * marketOdd - 1;
+  return Math.round(ev * 1000) / 1000;
 }
 
 // ═══════════════════════════════════════
-// Opportunity Score = prob*0.5 + ev*0.3 + pressure*0.2
+// Opportunity Score
+// LIVE:  prob*0.5 + ev*0.3 + pressão*0.2
+// PRÉ:   prob*0.65 + ev*0.35 (sem pressão ao vivo)
 // ═══════════════════════════════════════
-function calculateOpportunityScore(probability: number, ev: number, pressure: number): number {
-  const normProb = probability / 100;
-  const normEV = Math.max(0, Math.min(1, (ev + 0.1) / 0.2));
-  const normPressure = pressure / 100;
+function calculateOpportunityScore(probability: number, ev: number, pressure: number, isLive: boolean): number {
+  const normProb = Math.max(0, Math.min(1, probability / 100));
+  const normEV = Math.max(0, Math.min(1, (ev + 0.05) / 0.35));
+  if (!isLive) return normProb * 0.65 + normEV * 0.35;
+  const normPressure = Math.max(0, Math.min(1, pressure / 100));
   return normProb * 0.5 + normEV * 0.3 + normPressure * 0.2;
 }
+
 
 // ═══════════════════════════════════════
 // Filtro Inteligente LIVE

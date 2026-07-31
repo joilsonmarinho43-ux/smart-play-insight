@@ -179,7 +179,7 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
       <div className="px-4 py-2 bg-black/30 border-t border-white/5">
         <div className="flex items-center justify-between">
           <p className="text-[9px] text-gray-600">
-            Apenas oportunidades com probabilidade ≥60% e EV positivo • Atualiza automaticamente
+            1 melhor mercado por jogo • ranking por assertividade (prob. ajustada por qualidade dos dados)
           </p>
           <button
             onClick={() => setShowLogs(!showLogs)}

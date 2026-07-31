@@ -99,12 +99,17 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
                 {opp.minute != null && (
                   <span className="text-[10px] text-green-400 font-mono">{opp.minute}'</span>
                 )}
-                {!opp.isLive && opp.kickoff && (
+                {(opp.kickoff || opp.timeLabel) && (
                   <span className="flex items-center gap-1 text-[10px] text-orange-300/80 font-mono">
-                    <Clock className="w-3 h-3" /> {formatDateTimePara(opp.kickoff)}
+                    <Clock className="w-3 h-3" />
+                    {opp.kickoff ? formatDateTimePara(opp.kickoff) : opp.timeLabel}
                   </span>
                 )}
+                {!opp.isLive && !opp.kickoff && !opp.timeLabel && (
+                  <span className="text-[10px] text-gray-600 font-mono">Horário indisponível</span>
+                )}
               </div>
+
 
               {/* Row 3: Stats */}
                 <div className="flex items-center gap-3 mt-2 flex-wrap">

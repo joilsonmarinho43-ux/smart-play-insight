@@ -6,6 +6,7 @@
 //  99) stale-local-cache  (último recurso)
 
 import { MatchData } from '@/types/match';
+import { supabase } from '@/integrations/supabase/client';
 import { registerSource } from './index';
 import { fetchFootballDataOrg } from './sources/footballDataOrg';
 import { fetchSportsRC } from './sources/sportsrc';

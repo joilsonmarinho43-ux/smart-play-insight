@@ -79,8 +79,9 @@ const MARKET_BASELINE: Record<string, number> = {
   'Over 2.5 Gols': 0.52,
   'Over 3.5 Gols': 0.28,
   'Ambas Marcam': 0.52,
-  '1X (Casa ou Empate)': 0.70,
-  'X2 (Empate ou Fora)': 0.63,
+  '1X (Casa ou Empate)': 0.80,
+  'X2 (Empate ou Fora)': 0.74,
+
   'Vitória Casa': 0.45,
   'Vitória Fora': 0.30,
   'Próximo Gol': 0.50,
@@ -302,13 +303,26 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
 
     const matchOpportunities: ScannerOpportunity[] = [];
 
+    const DC_MARKETS = new Set(['1X (Casa ou Empate)', 'X2 (Empate ou Fora)']);
+    let dcCount = 0;
+
     for (const market of markets) {
       if (!targetMarkets.includes(market.market)) continue;
 
+      const isDC = DC_MARKETS.has(market.market);
+      // Dupla chance é naturalmente alta: exige mais e entra no máximo 1 por jogo
+      if (isDC) {
+        if (dcCount >= 1) continue;
+        if (market.probability < 72) continue;
+      }
+
       const ev = estimateEV(market.probability, market.market);
-      if (market.probability < 60 || ev <= 0) continue;
+      const minEV = isDC ? 0.04 : 0;
+      if (market.probability < 60 || ev <= minEV) continue;
+      if (isDC) dcCount++;
 
       const score = calculateOpportunityScore(market.probability, ev, pressure, isLive);
+
 
       matchOpportunities.push({
         matchId,
@@ -370,16 +384,25 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
   // Sort by score descending
   opportunities.sort((a, b) => b.score - a.score);
 
-  // Deduplicate same market+match, max 10
+  // Deduplicate same market+match, com diversidade:
+  // no máx. 2 entradas por jogo e no máx. 3 duplas chances no top 10
   const seen = new Set<string>();
+  const perMatch = new Map<string, number>();
+  const DC = new Set(['1X (Casa ou Empate)', 'X2 (Empate ou Fora)']);
+  let dcTotal = 0;
   const top: ScannerOpportunity[] = [];
   for (const opp of opportunities) {
     const key = `${opp.matchId}-${opp.opportunity}`;
     if (seen.has(key)) continue;
+    if ((perMatch.get(opp.matchId) || 0) >= 2) continue;
+    if (DC.has(opp.opportunity) && dcTotal >= 3) continue;
     seen.add(key);
+    perMatch.set(opp.matchId, (perMatch.get(opp.matchId) || 0) + 1);
+    if (DC.has(opp.opportunity)) dcTotal++;
     top.push(opp);
     if (top.length >= 10) break;
   }
+
 
   addLog('info', `Scanner finalizado: ${top.length} oportunidades encontradas de ${matches.length} jogos`);
   return top;

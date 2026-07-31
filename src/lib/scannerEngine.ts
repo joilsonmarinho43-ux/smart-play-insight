@@ -324,6 +324,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         isLive,
         dataQuality,
         kickoff: rawDate,
+        timeLabel,
       });
     }
 
@@ -345,6 +346,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         isLive: true,
         dataQuality,
         kickoff: rawDate,
+        timeLabel,
       });
     }
 

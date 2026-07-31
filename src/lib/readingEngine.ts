@@ -53,6 +53,8 @@ export interface ReadingOpportunity {
   confidence: number;
   reasons: string[];
   category?: string;
+  /** Probabilidade bruta do modelo (antes do amortecedor de exibição). */
+  modelProbability?: number;
 }
 
 export interface GoalLineSuggestion {
@@ -614,27 +616,33 @@ export function buildMatchReadingV2(
       } else {
         reasons.push(`linha de handicap coerente com o cenário projetado`);
       }
+    } else if (/DNB|Empate Anula/i.test(m.market)) {
+      const side = /Fora|Visitante/i.test(m.market) ? away : home;
+      reasons.push(`${side} sustenta o lado sem risco de empate: derrota é o cenário menos provável da projeção`);
+      if (Math.abs(diff) >= 0.4)
+        reasons.push(`diferença de projeção de ${fmt(Math.abs(diff))} gol por jogo entre os dois lados`);
+    } else if (/1°\s*Tempo|1º\s*Tempo|HT/i.test(m.market)) {
+      reasons.push(`projeção de ${fmt(total * 0.42)} gols só no primeiro tempo pelo ritmo das duas equipes`);
+      if (physicalProfile) reasons.push(`início costuma ser estudado — linha curta é a leitura correta aqui`);
+    } else if (/2°\s*Tempo|2º\s*Tempo/i.test(m.market)) {
+      reasons.push(`projeção de ${fmt(total * 0.58)} gols na etapa final, onde o jogo historicamente se abre`);
+      if (!lowScoringProfile) reasons.push(`desgaste e mudanças de banco elevam o volume após os 60'`);
+    } else if (m.market === "Empate") {
+      reasons.push(`equilíbrio de projeção (${fmt(hL)} × ${fmt(aL)}) mantém o empate vivo até o fim`);
     } else {
-      reasons.push(`projeção combinada sustenta probabilidade de ${m.probability}% neste mercado específico`);
+      reasons.push(`modelo Poisson + forma recente projeta ${fmt(hL)} × ${fmt(aL)} e sustenta este mercado`);
     }
 
     return {
       market: m.market,
       confidence: dampen(m.probability, m.market),
+      modelProbability: m.probability,
       reasons: reasons.slice(0, 3),
       category: (m as any).category || "outro",
     };
   });
 
 
-  // Variação anti-template: garante que confianças não fiquem todas iguais
-  const seenConf = new Set<number>();
-  opportunities.forEach((op, idx) => {
-    let c = op.confidence;
-    while (seenConf.has(c)) c = Math.max(58, c - 1 - (idx % 2));
-    seenConf.add(c);
-    op.confidence = c;
-  });
 
   // ─── 6. ALERTAS (inteligentes, não genéricos) ───────────────
   const alerts: string[] = [];

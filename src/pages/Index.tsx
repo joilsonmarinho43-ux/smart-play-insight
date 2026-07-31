@@ -107,6 +107,7 @@ const Index = () => {
 
   const safeMatches = useMemo(() =>
     (rawMatches || [])
+      .filter((m: any) => isUpcoming(m))
       .map((m: any) => {
       const sourceIso = getMatchIso(m);
       const dateKey = getMatchDateKey(m);

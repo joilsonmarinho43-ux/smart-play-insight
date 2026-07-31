@@ -197,6 +197,8 @@ function validateMarket(market: MarketAnalysis): boolean {
 // ═══════════════════════════════════════
 export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
   const opportunities: ScannerOpportunity[] = [];
+  // Reinicia os logs a cada varredura (antes acumulavam entre renders)
+  scannerLogs.length = 0;
   addLog('info', `Scanner iniciado: ${matches.length} jogos para análise`);
 
   const now = Date.now();
@@ -206,23 +208,30 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
   for (const match of matches) {
     const isLive = !!match.isLive;
 
+    const homeTeam = (match as any).teams?.home?.name || match.homeTeam || 'Casa';
+    const awayTeam = (match as any).teams?.away?.name || match.awayTeam || 'Fora';
+    // ID estável: evita colapsar jogos distintos sem id na deduplicação
+    const matchId = String(match.id ?? `${homeTeam}-${awayTeam}`);
+
     // Filtro de status: ignorar jogos finalizados, cancelados ou já iniciados (não-live)
     const statusShort: string = (match as any).fixture?.status?.short || (match as any).status?.short || '';
-    const fixtureDate = (match as any).fixture?.date ? new Date((match as any).fixture.date).getTime() : null;
+    const rawDate = (match as any).fixture?.date || (match as any).date || null;
+    const parsedDate = rawDate ? new Date(rawDate).getTime() : NaN;
+    const fixtureDate = Number.isFinite(parsedDate) ? parsedDate : null;
 
     if (FINISHED_STATUSES.has(statusShort)) {
-      addLog('info', `Jogo descartado (finalizado: ${statusShort})`, match.id);
+      addLog('info', `Jogo descartado (finalizado: ${statusShort})`, matchId);
       continue;
     }
 
     if (!isLive) {
       // Pré-jogo: deve estar agendado e ainda não ter começado
       if (statusShort && !PRE_STATUSES.has(statusShort)) {
-        addLog('info', `Jogo descartado (status não pré-jogo: ${statusShort})`, match.id);
+        addLog('info', `Jogo descartado (status não pré-jogo: ${statusShort})`, matchId);
         continue;
       }
       if (fixtureDate && fixtureDate <= now) {
-        addLog('info', `Jogo descartado (kickoff já passou)`, match.id);
+        addLog('info', `Jogo descartado (kickoff já passou)`, matchId);
         continue;
       }
     }
@@ -242,23 +251,24 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     try {
       markets = analyzeMarkets(match);
     } catch (e) {
-      addLog('error', `Falha ao analisar mercados: ${e}`, match.id);
+      addLog('error', `Falha ao analisar mercados: ${e}`, matchId);
       continue;
     }
 
     // Validar mercados
     markets = markets.filter(validateMarket);
     if (markets.length === 0) {
-      addLog('warn', 'Nenhum mercado válido encontrado', match.id);
+      addLog('warn', 'Nenhum mercado válido encontrado', matchId);
       continue;
     }
 
-    const pressure = isLive
-      ? calculatePressure(lH, lA)
-      : calculatePressure(hStats, aStats);
+    // Pressão só faz sentido ao vivo — em pré-jogo usar médias de temporada
+    // inflava o índice para 100 e distorcia o score.
+    const pressure = isLive ? calculatePressure(lH, lA) : 0;
 
     const totalSoG = (lH.shotsOnGoal || hStats.shotsOnGoal || 0) + (lA.shotsOnGoal || aStats.shotsOnGoal || 0);
-    const minute = match.minute || (match as any).fixture?.status?.elapsed || null;
+    const rawMinute = match.minute ?? (match as any).fixture?.status?.elapsed ?? null;
+    const minute = isLive && Number.isFinite(Number(rawMinute)) ? Number(rawMinute) : null;
     const hasGoalSignal = isLive && goalSignal(pressure, totalSoG, minute);
     const dataQuality = assessDataQuality(hStats, aStats, isLive);
 
@@ -270,70 +280,70 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
       'Vitória Casa', 'Vitória Fora',
     ];
 
+    const matchOpportunities: ScannerOpportunity[] = [];
+
     for (const market of markets) {
       if (!targetMarkets.includes(market.market)) continue;
 
       const ev = estimateEV(market.probability, market.market);
       if (market.probability < 60 || ev <= 0) continue;
 
-      const score = calculateOpportunityScore(market.probability, ev, pressure);
+      const score = calculateOpportunityScore(market.probability, ev, pressure, isLive);
 
-      const homeTeam = (match as any).teams?.home?.name || match.homeTeam || 'Casa';
-      const awayTeam = (match as any).teams?.away?.name || match.awayTeam || 'Fora';
-
-      opportunities.push({
-        matchId: match.id,
+      matchOpportunities.push({
+        matchId,
         match: `${homeTeam} vs ${awayTeam}`,
         minute,
         league: (match as any).league?.name || match.league || '',
         opportunity: market.market,
-        probability: market.probability,
+        probability: Math.round(market.probability),
         ev: Math.round(ev * 100) / 100,
         pressure: Math.round(pressure),
         score: Math.round(score * 100) / 100,
         signal: hasGoalSignal ? '🔥 GOL IMINENTE' : null,
         isLive,
         dataQuality,
-        kickoff: (match as any).fixture?.date || null,
+        kickoff: rawDate,
       });
     }
 
-    // ═══ RMA VALIDATION (parallel layer) ═══
-    if (isLive && minute && minute > 0) {
-      const rmaInput = buildRMAInput(lH, lA, minute, pressure);
-      const rmaResult = evaluateRMA(rmaInput);
-      // Attach RMA verdict to all opportunities from this match
-      for (const opp of opportunities) {
-        if (opp.matchId === match.id && opp.rmaVerdict === undefined) {
+    // Standalone imminent goal
+    if (hasGoalSignal && !matchOpportunities.some(o => o.opportunity === 'Próximo Gol')) {
+      const prob = Math.min(85, 60 + Math.round(pressure * 0.25));
+      const ev = estimateEV(prob, 'Próximo Gol');
+      matchOpportunities.push({
+        matchId,
+        match: `${homeTeam} vs ${awayTeam}`,
+        minute,
+        league: (match as any).league?.name || match.league || '',
+        opportunity: 'Próximo Gol',
+        probability: prob,
+        ev: Math.round(ev * 100) / 100,
+        pressure: Math.round(pressure),
+        score: Math.round(calculateOpportunityScore(prob, ev, pressure, true) * 100) / 100,
+        signal: '🔥 GOL IMINENTE',
+        isLive: true,
+        dataQuality,
+        kickoff: rawDate,
+      });
+    }
+
+    // ═══ RMA VALIDATION (parallel layer) — apenas nas oportunidades deste jogo ═══
+    if (isLive && minute && minute > 0 && matchOpportunities.length > 0) {
+      try {
+        const rmaResult = evaluateRMA(buildRMAInput(lH, lA, minute, pressure));
+        for (const opp of matchOpportunities) {
           opp.rmaVerdict = rmaResult.verdict;
           opp.rmaScore = rmaResult.score;
         }
+      } catch (e) {
+        addLog('warn', `RMA indisponível: ${e}`, matchId);
       }
     }
 
-    // Standalone imminent goal
-    if (hasGoalSignal) {
-      const existingGoalOpp = opportunities.find(o => o.matchId === match.id && o.signal);
-      if (!existingGoalOpp) {
-        const homeTeam = (match as any).teams?.home?.name || match.homeTeam || 'Casa';
-        const awayTeam = (match as any).teams?.away?.name || match.awayTeam || 'Fora';
-        opportunities.push({
-          matchId: match.id,
-          match: `${homeTeam} vs ${awayTeam}`,
-          minute,
-          league: (match as any).league?.name || match.league || '',
-          opportunity: 'Próximo Gol',
-          probability: Math.min(85, 60 + Math.round(pressure * 0.25)),
-          ev: 0.05,
-          pressure: Math.round(pressure),
-          score: 0.80,
-          signal: '🔥 GOL IMINENTE',
-          isLive: true,
-          dataQuality: 'high',
-        });
-      }
-    }
+    opportunities.push(...matchOpportunities);
   }
+
 
   // Sort by score descending
   opportunities.sort((a, b) => b.score - a.score);

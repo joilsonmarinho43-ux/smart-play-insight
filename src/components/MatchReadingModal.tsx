@@ -670,7 +670,7 @@ export const MatchReadingModal = ({
           : null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg w-[95vw] max-h-[88vh] overflow-y-auto bg-background border-primary/20 p-4 sm:p-5">
+      <DialogContent className="max-w-lg w-[95vw] max-h-[88vh] overflow-y-auto overflow-x-hidden bg-background border-primary/20 p-4 sm:p-5 [&_*]:min-w-0 break-words">
         <DialogHeader>
           <DialogTitle className="font-display text-xl tracking-wide">
             📖 Leitura do Jogo
@@ -780,11 +780,19 @@ export const MatchReadingModal = ({
                 </div>
                 <div className="grid grid-cols-3 gap-2 mb-2 text-center">
                   <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
-                    <div className="text-[10px] uppercase text-muted-foreground">Odd justa</div>
+                    <div className="text-[10px] uppercase text-muted-foreground leading-tight">
+                      Odd justa
+                      {reading.bestPick.modelProbability != null && (
+                        <span className="block normal-case text-[9px] opacity-70">
+                          modelo {Math.round(reading.bestPick.modelProbability)}%
+                        </span>
+                      )}
+                    </div>
                     <div className="font-display font-bold text-sm text-foreground">
                       {reading.bestPick.fairOdd?.toFixed(2) ?? "—"}
                     </div>
                   </div>
+
                   <div className="rounded-md bg-background/60 border border-border px-2 py-1.5">
                     <div className="text-[10px] uppercase text-muted-foreground">Odd mercado</div>
                     <div className="font-display font-bold text-sm text-foreground">

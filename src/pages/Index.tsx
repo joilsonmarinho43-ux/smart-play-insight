@@ -317,7 +317,7 @@ const Index = () => {
             }`}
           >
             <Crown className="w-3.5 h-3.5" fill="currentColor" />
-            🔥 Premium ({dayMatches.filter((m: any) => m.isPremium).length})
+            Premium ({dayMatches.filter((m: any) => m.isPremium).length})
           </button>
         </div>
 
@@ -370,12 +370,36 @@ const Index = () => {
             /scanner, /elite e /bingo — acessíveis pela barra lateral.
             A Home é dedicada exclusivamente às análises de Pré-Jogo. */}
 
+        {/* Empty state */}
+        {!isFetching && filteredMatches.length === 0 && (
+          <div className="mt-8 rounded-xl border border-border bg-black/40 backdrop-blur-sm p-6 text-center">
+            <div className="font-display text-lg tracking-wide text-foreground">
+              Nenhum jogo para {dayOptions[selectedDay]?.label?.toLowerCase() || 'esta data'}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {premiumFilter === 'premium'
+                ? 'Nenhuma partida de liga premium nesta data — toque em "Todas" para ver o restante.'
+                : selectedLeague !== 'all'
+                  ? 'Nenhuma partida desta liga nesta data — selecione "Ligas" para ver todas.'
+                  : 'Sem partidas futuras confirmadas nesta data. Toque em outro dia acima ou atualize a lista.'}
+            </p>
+            <button
+              onClick={() => { setPremiumFilter('all'); setSelectedLeague('all'); refetch(); }}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-bold"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Atualizar
+            </button>
+          </div>
+        )}
+
         {/* Match Cards */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredMatches.map((match: any) => (
             <MatchCard key={match.id} match={match} isPremium={match.isPremium} />
           ))}
         </div>
+
       </main>
     </div>
   );

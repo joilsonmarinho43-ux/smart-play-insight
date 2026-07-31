@@ -69,6 +69,7 @@ export interface BestMarketPick {
   market: string;
   category: string;
   confidence: number;
+  modelProbability?: number;    // probabilidade bruta do modelo (base da odd justa)
   fairOdd: number | null;       // odd justa estimada (1/p)
   marketOdd: number | null;     // odd real disponível, se houver
   edgePct: number | null;       // valor em % vs odd real (positivo = valor)
@@ -1029,6 +1030,7 @@ export function buildMatchReadingV2(
       market: top.op.market,
       category: top.cat,
       confidence: top.op.confidence,
+      modelProbability: top.op.modelProbability ?? top.op.confidence,
       fairOdd: top.fairOdd,
       marketOdd: top.marketOdd,
       edgePct: top.edgePct,

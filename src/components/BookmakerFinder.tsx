@@ -180,7 +180,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
   };
 
   return (
-    <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+    <div className="w-full max-w-full min-w-0 overflow-hidden rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Search className="w-4 h-4 text-primary" />
         <h3 className="text-xs uppercase tracking-wider font-bold text-foreground">
@@ -216,8 +216,8 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
 
       {/* Busca guiada */}
       <div className="rounded-lg bg-background/40 border border-primary/30 px-3 py-2 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Busca guiada
             </div>
@@ -232,6 +232,7 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
             <ChevronRight className="w-3 h-3" />
           </button>
         </div>
+
         <div className="text-[10px] text-muted-foreground">
           Se não achar, volte aqui e toque novamente para copiar outra variação.
         </div>
@@ -306,11 +307,12 @@ export const BookmakerFinder = ({ homeTeam, awayTeam }: Props) => {
       </div>
 
       {/* Confronto selecionado */}
-      <div className="rounded-lg bg-background/40 border border-border px-3 py-2 text-xs flex items-center justify-between gap-2">
-        <div className="min-w-0">
+      <div className="rounded-lg bg-background/40 border border-border px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
           <span className="text-muted-foreground">Confronto selecionado: </span>
-          <span className="font-bold text-foreground truncate">{query}</span>
+          <span className="font-bold text-foreground break-words">{query}</span>
         </div>
+
         <button
           onClick={() => handleOpenSearch(query)}
           className="shrink-0 flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary hover:opacity-80"

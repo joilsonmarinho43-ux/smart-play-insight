@@ -79,8 +79,9 @@ const MARKET_BASELINE: Record<string, number> = {
   'Over 2.5 Gols': 0.52,
   'Over 3.5 Gols': 0.28,
   'Ambas Marcam': 0.52,
-  '1X (Casa ou Empate)': 0.70,
-  'X2 (Empate ou Fora)': 0.63,
+  '1X (Casa ou Empate)': 0.80,
+  'X2 (Empate ou Fora)': 0.74,
+
   'Vitória Casa': 0.45,
   'Vitória Fora': 0.30,
   'Próximo Gol': 0.50,

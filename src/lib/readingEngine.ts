@@ -983,7 +983,10 @@ export function buildMatchReadingV2(
   if (opportunities.length > 0) {
     const scored = opportunities.map((op) => {
       const cat = op.category || "outro";
-      const fairOdd = op.confidence > 0 ? Number((100 / op.confidence).toFixed(2)) : null;
+      // Odd justa vem da probabilidade REAL do modelo (não da confiança exibida,
+      // que é amortecida): usar a confiança inflava artificialmente o edge.
+      const p = op.modelProbability ?? op.confidence;
+      const fairOdd = p > 0 ? Number((100 / p).toFixed(2)) : null;
       const marketOdd = oddByMarket(op.market);
       let edgePct: number | null = null;
       if (marketOdd && fairOdd) {
@@ -1000,9 +1003,19 @@ export function buildMatchReadingV2(
     });
     scored.sort((a, b) => b.score - a.score);
     const top = scored[0];
+    // Alternativas: sem repetir a mesma categoria do pick principal nem entre si
+    // (evita "Over 5.5 Cantos" + "Over 7.5 Cantos" ou 1X + DNB Casa lado a lado).
+    const usedCats = new Set<string>([top.cat]);
     const alternatives = scored
-      .slice(1, 4)
+      .slice(1)
+      .filter((s) => {
+        if (usedCats.has(s.cat)) return false;
+        usedCats.add(s.cat);
+        return true;
+      })
+      .slice(0, 3)
       .map((s) => ({ market: s.op.market, confidence: s.op.confidence, category: s.cat }));
+
     const edgeNote = top.edgePct != null
       ? top.edgePct > 3
         ? ` Odd de mercado em ${top.marketOdd?.toFixed(2)} contra justa ${top.fairOdd?.toFixed(2)} — valor de +${top.edgePct.toFixed(1)}%.`

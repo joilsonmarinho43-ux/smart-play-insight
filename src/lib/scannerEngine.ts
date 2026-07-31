@@ -16,6 +16,8 @@ export interface ScannerOpportunity {
   isLive: boolean;
   dataQuality: 'high' | 'medium' | 'low';
   kickoff?: string | null;
+  timeLabel?: string;
+
   rmaVerdict?: RMAVerdict;
   rmaScore?: number;
 }
@@ -215,9 +217,27 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
 
     // Filtro de status: ignorar jogos finalizados, cancelados ou já iniciados (não-live)
     const statusShort: string = (match as any).fixture?.status?.short || (match as any).status?.short || '';
-    const rawDate = (match as any).fixture?.date || (match as any).date || null;
-    const parsedDate = rawDate ? new Date(rawDate).getTime() : NaN;
-    const fixtureDate = Number.isFinite(parsedDate) ? parsedDate : null;
+    // Data/hora do jogo: as fontes usam campos diferentes (fixture.date, date,
+    // utcDate, kickoff ou o próprio `time` em ISO)
+    const dateCandidates = [
+      (match as any).fixture?.date,
+      (match as any).kickoff,
+      (match as any).date,
+      (match as any).utcDate,
+      (match as any).startTime,
+      match.time,
+    ];
+    let rawDate: string | null = null;
+    let fixtureDate: number | null = null;
+    for (const c of dateCandidates) {
+      if (!c) continue;
+      const t = new Date(c).getTime();
+      if (Number.isFinite(t)) { rawDate = new Date(t).toISOString(); fixtureDate = t; break; }
+    }
+    // Rótulo simples (ex.: "20:30") quando não há data completa
+    const timeLabel: string | undefined =
+      typeof match.time === 'string' && /^\d{1,2}:\d{2}$/.test(match.time.trim()) ? match.time.trim() : undefined;
+
 
     if (FINISHED_STATUSES.has(statusShort)) {
       addLog('info', `Jogo descartado (finalizado: ${statusShort})`, matchId);
@@ -304,6 +324,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         isLive,
         dataQuality,
         kickoff: rawDate,
+        timeLabel,
       });
     }
 
@@ -325,6 +346,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         isLive: true,
         dataQuality,
         kickoff: rawDate,
+        timeLabel,
       });
     }
 

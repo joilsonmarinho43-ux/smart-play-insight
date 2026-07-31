@@ -20,6 +20,17 @@ export interface ScannerOpportunity {
 
   rmaVerdict?: RMAVerdict;
   rmaScore?: number;
+
+  /** Justificativa com números reais do confronto */
+  reason?: string;
+  /** Índice de assertividade 0-100 (prob ajustada por qualidade de dados) */
+  confidence?: number;
+  /** Odd justa do modelo */
+  fairOdd?: number;
+  /** Odd típica praticada no mercado para a linha */
+  marketOdd?: number;
+  /** Alternativas analisadas e descartadas neste jogo */
+  alternatives?: { market: string; probability: number; ev: number }[];
 }
 
 export interface ScannerLog {

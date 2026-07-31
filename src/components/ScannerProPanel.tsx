@@ -111,8 +111,9 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
               </div>
 
 
-              {/* Row 3: Stats */}
+              {/* Row 3: Melhor mercado */}
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
+                <span className="text-[9px] uppercase font-black tracking-wider text-gray-500">Melhor mercado</span>
                 <Badge className="bg-orange-500/15 text-orange-300 border-orange-500/25 text-[11px] font-bold">
                   {opp.opportunity}
                 </Badge>
@@ -132,19 +133,43 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
                   <span className="text-xs font-bold text-emerald-400">{opp.probability}%</span>
                 </div>
 
+                {opp.confidence != null && (
+                  <span className="text-[11px] font-mono text-orange-300">
+                    Assertividade {opp.confidence}%
+                  </span>
+                )}
+
                 <span className={`text-[11px] font-mono ${opp.ev > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   EV {opp.ev > 0 ? '+' : ''}{opp.ev}
                 </span>
 
-                <div className="flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-yellow-400" />
-                  <span className="text-[11px] text-yellow-400">{opp.pressure}</span>
-                </div>
+                {opp.fairOdd != null && (
+                  <span className="text-[10px] font-mono text-gray-400">
+                    Odd justa {opp.fairOdd.toFixed(2)}
+                    {opp.marketOdd != null && ` • mercado ~${opp.marketOdd.toFixed(2)}`}
+                  </span>
+                )}
 
-                <span className="text-[10px] text-gray-500 ml-auto">
-                  Score: {opp.score}
-                </span>
+                {opp.isLive && (
+                  <div className="flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-yellow-400" />
+                    <span className="text-[11px] text-yellow-400">{opp.pressure}</span>
+                  </div>
+                )}
               </div>
+
+              {/* Row 4: Justificativa real */}
+              {opp.reason && (
+                <p className="mt-1.5 text-[10px] leading-relaxed text-gray-400">{opp.reason}</p>
+              )}
+
+              {/* Row 5: Alternativas descartadas */}
+              {opp.alternatives && opp.alternatives.length > 0 && (
+                <p className="mt-1 text-[9px] text-gray-600">
+                  Também analisados:{' '}
+                  {opp.alternatives.map(a => `${a.market} ${a.probability}%`).join(' • ')}
+                </p>
+              )}
             </div>
           );
         })}
@@ -154,7 +179,7 @@ export default function ScannerProPanel({ matches, cacheKey }: ScannerProPanelPr
       <div className="px-4 py-2 bg-black/30 border-t border-white/5">
         <div className="flex items-center justify-between">
           <p className="text-[9px] text-gray-600">
-            Apenas oportunidades com probabilidade ≥60% e EV positivo • Atualiza automaticamente
+            1 melhor mercado por jogo • ranking por assertividade (prob. ajustada por qualidade dos dados)
           </p>
           <button
             onClick={() => setShowLogs(!showLogs)}

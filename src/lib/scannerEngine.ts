@@ -20,6 +20,17 @@ export interface ScannerOpportunity {
 
   rmaVerdict?: RMAVerdict;
   rmaScore?: number;
+
+  /** Justificativa com números reais do confronto */
+  reason?: string;
+  /** Índice de assertividade 0-100 (prob ajustada por qualidade de dados) */
+  confidence?: number;
+  /** Odd justa do modelo */
+  fairOdd?: number;
+  /** Odd típica praticada no mercado para a linha */
+  marketOdd?: number;
+  /** Alternativas analisadas e descartadas neste jogo */
+  alternatives?: { market: string; probability: number; ev: number }[];
 }
 
 export interface ScannerLog {
@@ -85,17 +96,27 @@ const MARKET_BASELINE: Record<string, number> = {
   'Vitória Casa': 0.45,
   'Vitória Fora': 0.30,
   'Próximo Gol': 0.50,
+
+  'Under 2.5 Gols': 0.48,
+  'Gol no 1° Tempo': 0.57,
+  'Gol no 2° Tempo': 0.62,
+  'Over 5.5 Cantos': 0.80,
+  'Over 7.5 Cantos': 0.60,
+  'Over 9.5 Cantos': 0.38,
 };
 
 const BOOKMAKER_MARGIN = 0.06;
 
+function marketOddFor(market?: string): number {
+  const baseline = MARKET_BASELINE[market || ''] ?? 0.55;
+  return Math.max((1 / baseline) * (1 - BOOKMAKER_MARGIN), 1.01);
+}
+
 function estimateEV(probability: number, market?: string): number {
   if (!Number.isFinite(probability) || probability <= 0) return -1;
   const p = Math.min(0.99, probability / 100);
-  const baseline = MARKET_BASELINE[market || ''] ?? 0.55;
   // Odd praticada = odd justa do baseline reduzida pela margem da casa
-  const marketOdd = Math.max((1 / baseline) * (1 - BOOKMAKER_MARGIN), 1.01);
-  const ev = p * marketOdd - 1;
+  const ev = p * marketOddFor(market) - 1;
   return Math.round(ev * 1000) / 1000;
 }
 
@@ -293,10 +314,13 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     const hasGoalSignal = isLive && goalSignal(pressure, totalSoG, minute);
     const dataQuality = assessDataQuality(hStats, aStats, isLive);
 
-    // Filter valid markets
+    // Mercados elegíveis — inclui Under, HT e cantos para não travar em Over/DC
     const targetMarkets = [
       'Over 0.5 Gols', 'Over 1.5 Gols', 'Over 2.5 Gols', 'Over 3.5 Gols',
+      'Under 2.5 Gols',
       'Ambas Marcam',
+      'Gol no 1° Tempo', 'Gol no 2° Tempo',
+      'Over 5.5 Cantos', 'Over 7.5 Cantos', 'Over 9.5 Cantos',
       '1X (Casa ou Empate)', 'X2 (Empate ou Fora)',
       'Vitória Casa', 'Vitória Fora',
     ];
@@ -304,25 +328,86 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     const matchOpportunities: ScannerOpportunity[] = [];
 
     const DC_MARKETS = new Set(['1X (Casa ou Empate)', 'X2 (Empate ou Fora)']);
-    let dcCount = 0;
+
+    // Amostra e médias reais (usadas na justificativa e na assertividade)
+    const homeN = match.sampleSize?.homeGames ?? hStats.gamesCount ?? 0;
+    const awayN = match.sampleSize?.awayGames ?? aStats.gamesCount ?? 0;
+    const hGF = match.modelData?.homeGoalsAvg ?? hStats.goalsFor ?? 0;
+    const aGF = match.modelData?.awayGoalsAvg ?? aStats.goalsFor ?? 0;
+    const hGA = match.modelData?.homeGoalsAgainstAvg ?? hStats.goalsAgainst ?? 0;
+    const aGA = match.modelData?.awayGoalsAgainstAvg ?? aStats.goalsAgainst ?? 0;
+    const cornersAvg = (match.modelData?.homeCornersAvg ?? hStats.corners ?? 0) +
+      (match.modelData?.awayCornersAvg ?? aStats.corners ?? 0);
+    const expectedGoals = Math.round(((hGF + aGA) / 2 + (aGF + hGA) / 2) * 100) / 100;
+
+    const f1 = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : '0.0');
+
+    function buildReason(marketName: string, prob: number): string {
+      const sample = `amostra ${homeN}+${awayN} jogos`;
+      if (isLive) {
+        const base = `Min ${minute ?? '?'} • ${totalSoG} chutes no alvo, pressão ${Math.round(pressure)}`;
+        if (marketName.includes('Over') || marketName === 'Próximo Gol') {
+          return `${base}. Ritmo ofensivo sustenta a linha (${prob}%).`;
+        }
+        if (marketName === 'Ambas Marcam') {
+          return `${base}. As duas equipes já finalizam no alvo.`;
+        }
+        return `${base}. Cenário controlado favorece ${marketName}.`;
+      }
+      if (marketName.includes('Cantos')) {
+        return `Média combinada de ${f1(cornersAvg)} escanteios por jogo (${sample}) sustenta a linha.`;
+      }
+      if (marketName === 'Under 2.5 Gols') {
+        return `Projeção de ${f1(expectedGoals)} gols (${f1(hGF)} x ${f1(aGF)} marcados / ${f1(hGA)} x ${f1(aGA)} sofridos), ${sample} — jogo de placar baixo.`;
+      }
+      if (marketName.includes('Over')) {
+        return `Projeção de ${f1(expectedGoals)} gols: casa marca ${f1(hGF)} e sofre ${f1(hGA)}; fora marca ${f1(aGF)} e sofre ${f1(aGA)} (${sample}).`;
+      }
+      if (marketName === 'Ambas Marcam') {
+        return `Ambos os ataques produzem (${f1(hGF)} e ${f1(aGF)} gols/jogo) contra defesas que cedem ${f1(hGA)} e ${f1(aGA)} (${sample}).`;
+      }
+      if (marketName.includes('1° Tempo') || marketName.includes('2° Tempo')) {
+        return `Com ${f1(expectedGoals)} gols projetados, a fatia esperada do período sustenta ${prob}% (${sample}).`;
+      }
+      if (DC_MARKETS.has(marketName) || marketName.includes('Vitória')) {
+        return `Força relativa: casa ${f1(hGF)}/${f1(hGA)} vs fora ${f1(aGF)}/${f1(aGA)} gols marcados/sofridos (${sample}).`;
+      }
+      return `Modelo Poisson + xG com ${sample}.`;
+    }
+
+    // Assertividade: probabilidade ajustada pela confiabilidade dos dados
+    function assertiveness(prob: number, ev: number, marketName: string): number {
+      let conf = prob;
+      if (dataQuality === 'medium') conf -= 6;
+      if (dataQuality === 'low') conf -= 15;
+      if (!isLive) {
+        const n = Math.min(homeN, awayN);
+        if (n < 3) conf -= 10;
+        else if (n < 5) conf -= 4;
+      }
+      // Dupla chance é inflada por natureza — desconto de realismo
+      if (DC_MARKETS.has(marketName)) conf -= 8;
+      // EV alto agrega valor, mas não substitui acerto
+      conf += Math.max(-5, Math.min(8, ev * 20));
+      return Math.max(0, Math.min(97, Math.round(conf)));
+    }
 
     for (const market of markets) {
       if (!targetMarkets.includes(market.market)) continue;
 
       const isDC = DC_MARKETS.has(market.market);
-      // Dupla chance é naturalmente alta: exige mais e entra no máximo 1 por jogo
-      if (isDC) {
-        if (dcCount >= 1) continue;
-        if (market.probability < 72) continue;
-      }
+      if (isDC && market.probability < 72) continue;
 
       const ev = estimateEV(market.probability, market.market);
       const minEV = isDC ? 0.04 : 0;
       if (market.probability < 60 || ev <= minEV) continue;
-      if (isDC) dcCount++;
 
-      const score = calculateOpportunityScore(market.probability, ev, pressure, isLive);
-
+      const confidence = assertiveness(market.probability, ev, market.market);
+      // Score agora é a assertividade normalizada (0-1) com peso da pressão ao vivo
+      const base = confidence / 100;
+      const score = isLive
+        ? base * 0.85 + Math.max(0, Math.min(1, pressure / 100)) * 0.15
+        : base;
 
       matchOpportunities.push({
         matchId,
@@ -339,6 +424,10 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         dataQuality,
         kickoff: rawDate,
         timeLabel,
+        reason: buildReason(market.market, Math.round(market.probability)),
+        confidence,
+        fairOdd: Math.round((100 / Math.max(1, market.probability)) * 100) / 100,
+        marketOdd: Math.round(marketOddFor(market.market) * 100) / 100,
       });
     }
 
@@ -346,6 +435,7 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
     if (hasGoalSignal && !matchOpportunities.some(o => o.opportunity === 'Próximo Gol')) {
       const prob = Math.min(85, 60 + Math.round(pressure * 0.25));
       const ev = estimateEV(prob, 'Próximo Gol');
+      const confidence = assertiveness(prob, ev, 'Próximo Gol');
       matchOpportunities.push({
         matchId,
         match: `${homeTeam} vs ${awayTeam}`,
@@ -355,12 +445,16 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
         probability: prob,
         ev: Math.round(ev * 100) / 100,
         pressure: Math.round(pressure),
-        score: Math.round(calculateOpportunityScore(prob, ev, pressure, true) * 100) / 100,
+        score: Math.round((confidence / 100) * 100) / 100,
         signal: '🔥 GOL IMINENTE',
         isLive: true,
         dataQuality,
         kickoff: rawDate,
         timeLabel,
+        reason: buildReason('Próximo Gol', prob),
+        confidence,
+        fairOdd: Math.round((100 / prob) * 100) / 100,
+        marketOdd: Math.round(marketOddFor('Próximo Gol') * 100) / 100,
       });
     }
 
@@ -377,31 +471,32 @@ export function scanMatches(matches: MatchData[]): ScannerOpportunity[] {
       }
     }
 
-    opportunities.push(...matchOpportunities);
+    // ═══ MELHOR MERCADO DO JOGO ═══
+    // Uma única entrada por partida: a mais assertiva, com as alternativas
+    // analisadas anexadas para transparência.
+    if (matchOpportunities.length > 0) {
+      matchOpportunities.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0) || b.ev - a.ev);
+      const best = matchOpportunities[0];
+      best.alternatives = matchOpportunities.slice(1, 4).map(o => ({
+        market: o.opportunity,
+        probability: o.probability,
+        ev: o.ev,
+      }));
+      if (best.rmaVerdict === 'BLOQUEADO') {
+        addLog('warn', `Melhor mercado bloqueado pelo RMA: ${best.opportunity}`, matchId);
+      }
+      addLog('info', `Melhor mercado: ${best.opportunity} (${best.confidence}% assertividade)`, matchId);
+      opportunities.push(best);
+    } else {
+      addLog('info', 'Nenhum mercado atingiu o padrão mínimo', matchId);
+    }
   }
 
 
-  // Sort by score descending
-  opportunities.sort((a, b) => b.score - a.score);
+  // Ranking por assertividade
+  opportunities.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0) || b.ev - a.ev);
 
-  // Deduplicate same market+match, com diversidade:
-  // no máx. 2 entradas por jogo e no máx. 3 duplas chances no top 10
-  const seen = new Set<string>();
-  const perMatch = new Map<string, number>();
-  const DC = new Set(['1X (Casa ou Empate)', 'X2 (Empate ou Fora)']);
-  let dcTotal = 0;
-  const top: ScannerOpportunity[] = [];
-  for (const opp of opportunities) {
-    const key = `${opp.matchId}-${opp.opportunity}`;
-    if (seen.has(key)) continue;
-    if ((perMatch.get(opp.matchId) || 0) >= 2) continue;
-    if (DC.has(opp.opportunity) && dcTotal >= 3) continue;
-    seen.add(key);
-    perMatch.set(opp.matchId, (perMatch.get(opp.matchId) || 0) + 1);
-    if (DC.has(opp.opportunity)) dcTotal++;
-    top.push(opp);
-    if (top.length >= 10) break;
-  }
+  const top = opportunities.slice(0, 10);
 
 
   addLog('info', `Scanner finalizado: ${top.length} oportunidades encontradas de ${matches.length} jogos`);

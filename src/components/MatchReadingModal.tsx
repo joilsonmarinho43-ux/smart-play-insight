@@ -500,14 +500,42 @@ const riscoBadge = {
   alto: { color: "bg-red-500/20 text-red-300 border-red-500/40", label: "Risco alto" },
 } as const;
 
+// Substitui as odds "redondas" que a IA costuma devolver (2.00 / 1.80 / 2.50)
+// pelas odds justas derivadas do modelo estatístico, quando disponíveis.
+function mergeFairOdds(
+  ai: AnalystReading["oddsReferencia"],
+  reading?: MatchReadingV2 | null,
+): { odds: AnalystReading["oddsReferencia"]; fromModel: boolean } {
+  if (!reading) return { odds: ai, fromModel: false };
+  const out = { ...(ai || {}) };
+  let fromModel = false;
+  const set = (k: keyof NonNullable<AnalystReading["oddsReferencia"]>, p?: number) => {
+    if (p == null || p <= 0 || p >= 100) return;
+    out[k] = (100 / p).toFixed(2);
+    fromModel = true;
+  };
+  const line25 = reading.goalLines?.find((l) => l.line === 2.5);
+  if (line25) {
+    const over = line25.side === "over" ? line25.probability : 100 - line25.probability;
+    set("over25", over);
+    set("under25", 100 - over);
+  }
+  const btts = reading.opportunities?.find((o) => /Ambas Marcam/i.test(o.market));
+  if (btts) set("bttsSim", btts.modelProbability ?? btts.confidence);
+  return { odds: out, fromModel };
+}
+
 const AnalystBlock = ({
   analyst,
   loading,
+  reading,
 }: {
   analyst?: AnalystReading | null;
   loading?: boolean;
+  reading?: MatchReadingV2 | null;
 }) => {
   if (!analyst && !loading) return null;
+  const merged = analyst ? mergeFairOdds(analyst.oddsReferencia, reading) : null;
   return (
     <div className="rounded-xl border border-primary/40 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">

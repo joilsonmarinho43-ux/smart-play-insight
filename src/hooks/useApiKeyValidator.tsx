@@ -3,7 +3,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 const STORAGE_KEY = 'api_key_validated_at';
+const WARN_KEY = 'api_key_warned_at';
 const REVALIDATE_AFTER = 1000 * 60 * 60 * 6; // 6h
+const WARN_COOLDOWN = 1000 * 60 * 60 * 6; // não repetir aviso por 6h
 
 /**
  * Validação automática da chave SportsRC no boot do app.

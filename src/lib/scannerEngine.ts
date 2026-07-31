@@ -96,17 +96,27 @@ const MARKET_BASELINE: Record<string, number> = {
   'Vitória Casa': 0.45,
   'Vitória Fora': 0.30,
   'Próximo Gol': 0.50,
+
+  'Under 2.5 Gols': 0.48,
+  'Gol no 1° Tempo': 0.57,
+  'Gol no 2° Tempo': 0.62,
+  'Over 5.5 Cantos': 0.80,
+  'Over 7.5 Cantos': 0.60,
+  'Over 9.5 Cantos': 0.38,
 };
 
 const BOOKMAKER_MARGIN = 0.06;
 
+function marketOddFor(market?: string): number {
+  const baseline = MARKET_BASELINE[market || ''] ?? 0.55;
+  return Math.max((1 / baseline) * (1 - BOOKMAKER_MARGIN), 1.01);
+}
+
 function estimateEV(probability: number, market?: string): number {
   if (!Number.isFinite(probability) || probability <= 0) return -1;
   const p = Math.min(0.99, probability / 100);
-  const baseline = MARKET_BASELINE[market || ''] ?? 0.55;
   // Odd praticada = odd justa do baseline reduzida pela margem da casa
-  const marketOdd = Math.max((1 / baseline) * (1 - BOOKMAKER_MARGIN), 1.01);
-  const ev = p * marketOdd - 1;
+  const ev = p * marketOddFor(market) - 1;
   return Math.round(ev * 1000) / 1000;
 }
 

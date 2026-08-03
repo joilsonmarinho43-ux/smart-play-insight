@@ -25,8 +25,8 @@ Contabo, Vultr (São Paulo), Magalu Cloud, Hostinger VPS.
 Crie dois registros **A** apontando para o IP da VPS:
 
 ```
-analista.seudominio.com.br   →  IP
-api.seudominio.com.br        →  IP
+analista.funecob.com.br   →  IP
+api.funecob.com.br        →  IP
 ```
 
 Se usar Cloudflare, deixe o proxy **desligado** (nuvem cinza) no primeiro
@@ -66,8 +66,8 @@ O que o script faz:
 ## 4. Depois de subir
 
 ```
-App     https://analista.seudominio.com.br
-API     https://api.seudominio.com.br
+App     https://analista.funecob.com.br
+API     https://api.funecob.com.br
 Studio  http://IP_DA_VPS:8000     (usuário: supabase, senha impressa no install)
 ```
 
@@ -79,11 +79,11 @@ ufw allow 22,80,443/tcp && ufw enable
 
 ### Auth
 No Studio → Authentication → URL Configuration:
-- Site URL: `https://analista.seudominio.com.br`
+- Site URL: `https://analista.funecob.com.br`
 - Redirect URLs: a mesma + `/auth/callback`
 
 Para login Google, cadastre o provider com o client ID/secret do Google Cloud
-e redirect `https://api.seudominio.com.br/auth/v1/callback`.
+e redirect `https://api.funecob.com.br/auth/v1/callback`.
 
 ---
 

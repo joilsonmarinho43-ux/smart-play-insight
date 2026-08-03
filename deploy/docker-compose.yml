@@ -36,6 +36,9 @@ services:
       APP_DOMAIN: ${APP_DOMAIN}
       API_DOMAIN: ${API_DOMAIN}
     depends_on: [app]
+    # necessário no Linux para o Caddy alcançar o Kong do Supabase (porta 8000 do host)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks: [web]
 
 volumes:

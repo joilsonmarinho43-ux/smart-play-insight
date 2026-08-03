@@ -29,7 +29,8 @@ docs/                      # documentação técnica
 ```
 
 ## Deploy / migração de hospedagem
-Guia completo em **[DEPLOY.md](./DEPLOY.md)**.
+- **VPS própria (self-hosted 100%)**: **[SELF-HOST.md](./SELF-HOST.md)** — um script sobe app + Supabase + HTTPS.
+- Migração para outro provedor gerenciado: **[DEPLOY.md](./DEPLOY.md)**.
 
 ## Portabilidade
 100% do código, schema, cron e edge functions estão versionados neste repositório.

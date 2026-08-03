@@ -42,8 +42,9 @@ grep -l "eyJhbGciOi" supabase/migrations/*.sql
 # editar cada um manualmente trocando o token JWT antigo pelo novo anon key
 ```
 
-Arquivos afetados (cron): `20260423013404`, `20260424231235`, `20260504000255`,
-`20260516031802`, `20260516032254`, `20260412005743`.
+Arquivos afetados (cron) — verificado em 03/08/2026, apenas **2**:
+`supabase/migrations/20260423013404_f19816da-7ae2-4e8a-8a3f-b33b27eb6950.sql`
+e `supabase/migrations/20260424231235_db78c5b4-c19c-45b9-8067-f3462223272b.sql`.
 
 ## 4. Aplicar schema + policies + cron
 ```bash
@@ -54,16 +55,21 @@ extensões `pg_cron` + `pg_net` + `pgcrypto`, e agenda os jobs (auto-mode,
 scanner-pro, check-results, telegram-retry, ops-monitor, cache-cleanup).
 
 ## 5. Cadastrar secrets do backend
+Lista completa dos secrets realmente lidos pelas 26 edge functions:
 ```bash
 supabase secrets set \
   SPORTSRC_API_KEY=xxx \
   FOOTBALL_DATA_ORG_KEY=xxx \
   TELEGRAM_BOT_TOKEN=xxx \
   TELEGRAM_CHAT_ID=xxx \
+  TELEGRAM_API_KEY=xxx \
+  GEMINI_API_KEY=xxx \
+  GROQ_API_KEY=xxx \
   LOVABLE_API_KEY=xxx \
   APP_PUBLIC_URL=https://<sua-url>
-# Opcionais: GEMINI_API_KEY, GROQ_API_KEY, TELEGRAM_ADMIN_CHAT_ID
+# Opcional: TELEGRAM_ADMIN_CHAT_ID
 ```
+
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` são
 injetados automaticamente pelo runtime — não precisa cadastrar.
 

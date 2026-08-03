@@ -1,0 +1,14 @@
+# TLS automático (Let's Encrypt). Aponte os domínios (A record) para o IP da VPS.
+
+{$APP_DOMAIN} {
+	encode gzip
+	reverse_proxy app:80
+}
+
+# API do Supabase self-hosted (Kong do compose oficial, porta 8000 do host)
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy host.docker.internal:8000 {
+		header_up Host {host}
+	}
+}

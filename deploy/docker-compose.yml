@@ -1,0 +1,51 @@
+# =====================================================================
+# NEXUS 33 — stack do frontend + proxy TLS (Caddy)
+# O Supabase self-hosted sobe em ./supabase-docker (compose oficial),
+# instalado pelo script deploy/install-vps.sh.
+#
+# Uso:
+#   cd /opt/nexus33 && docker compose -f deploy/docker-compose.yml up -d --build
+# =====================================================================
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
+    image: nexus33-app:latest
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks: [web]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    depends_on: [app]
+    # necessário no Linux para o Caddy alcançar o Kong do Supabase (porta 8000 do host)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [web]
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  web:
+    name: nexus33_web
+    driver: bridge

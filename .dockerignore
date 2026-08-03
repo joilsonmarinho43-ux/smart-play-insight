@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+android
+ios
+.workspace
+.lovable
+*.log
+.env
+.env.*
+!.env.example
+supabase/.temp

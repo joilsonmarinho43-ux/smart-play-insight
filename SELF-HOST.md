@@ -45,12 +45,16 @@ cd /opt/nexus33
 cp deploy/.env.example deploy/.env
 nano deploy/.env        # preencha domínios e chaves das APIs
 
+bash deploy/preflight.sh   # verificação: DNS, RAM, disco, secrets, arquivos
 bash deploy/install-vps.sh
 ```
 
-Na **primeira execução** o script gera as chaves do Supabase e imprime a
-`ANON_KEY`. Cole-a em `VITE_SUPABASE_PUBLISHABLE_KEY` (em `deploy/.env`) e
-rode o script de novo — ele é idempotente.
+`preflight.sh` não altera nada — só valida a VPS e o `.env` e diz se algo
+está faltando antes de você instalar.
+
+Na **primeira execução** o `install-vps.sh` gera as chaves do Supabase e
+imprime a `ANON_KEY`. Cole-a em `VITE_SUPABASE_PUBLISHABLE_KEY` (em
+`deploy/.env`) e rode o script de novo — ele é idempotente.
 
 O que o script faz:
 1. Instala Docker (se faltar).
@@ -58,8 +62,21 @@ O que o script faz:
 3. Gera `JWT_SECRET`, senha do Postgres, `ANON_KEY` e `SERVICE_ROLE_KEY`.
 4. Aplica as **41 migrations** (schema, RLS, GRANTs, funções, pg_cron),
    trocando automaticamente a URL antiga e a anon key dentro dos jobs de cron.
-5. Copia as **26 edge functions** para o Edge Runtime e injeta os secrets.
+5. Sincroniza as **26 edge functions** via `deploy/sync-functions.sh`, que
+   preserva/cria o router `main` exigido pelo Edge Runtime self-hosted, e
+   injeta os secrets.
 6. Builda o frontend e sobe o Caddy com HTTPS automático.
+
+### Scripts do kit
+
+| Script | Para quê |
+|---|---|
+| `deploy/preflight.sh` | Checagem pré-instalação (não altera nada) |
+| `deploy/install-vps.sh` | Instalação completa |
+| `deploy/sync-functions.sh` | Reenvia só as edge functions |
+| `deploy/apply-migrations.sh` | Reaplica as migrations |
+| `deploy/update.sh` | `git pull` + rebuild + funções + migrations |
+| `deploy/backup.sh` | Dump diário do Postgres (14 dias de retenção) |
 
 ---
 

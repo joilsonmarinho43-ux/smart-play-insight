@@ -94,8 +94,7 @@ done
 
 # Edge functions do projeto
 say "Copiando edge functions..."
-mkdir -p supabase-docker/volumes/functions
-cp -r supabase/functions/* supabase-docker/volumes/functions/
+bash deploy/sync-functions.sh
 
 say "Subindo Supabase..."
 (cd supabase-docker && docker compose up -d)

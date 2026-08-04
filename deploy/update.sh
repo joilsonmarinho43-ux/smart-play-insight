@@ -9,8 +9,7 @@ git pull --ff-only
 
 # Edge functions
 if [ -d supabase-docker ]; then
-  rm -rf supabase-docker/volumes/functions/*
-  cp -r supabase/functions/* supabase-docker/volumes/functions/
+  bash deploy/sync-functions.sh
   (cd supabase-docker && docker compose restart functions)
 fi
 

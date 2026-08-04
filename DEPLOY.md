@@ -15,7 +15,7 @@ externas**. Nenhum recurso vive apenas na hospedagem atual.
 
 ## 1. Clone e build local
 ```bash
-git clone <repo> nexus33 && cd nexus33
+git clone https://github.com/joilsonmarinho43-ux/nexus33 nexus33 && cd nexus33
 bun install                  # ou: npm ci
 cp .env.example .env         # preencher com URL + publishable key do NOVO projeto
 bun run build                # gera dist/

@@ -9,12 +9,6 @@ git pull --ff-only
 
 # Edge functions
 if [ -d supabase-docker ]; then
-  # remove só as funções do projeto — o router "main" do edge-runtime fica
-  for d in supabase-docker/volumes/functions/*/; do
-    [ "$(basename "$d")" = "main" ] && continue
-    rm -rf "$d"
-  done
-  cp -r supabase/functions/* supabase-docker/volumes/functions/
   bash deploy/sync-functions.sh
   (cd supabase-docker && docker compose restart functions)
 fi

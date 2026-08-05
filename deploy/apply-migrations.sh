@@ -17,12 +17,15 @@ ANON="$(grep -E '^ANON_KEY=' supabase-docker/.env | cut -d= -f2-)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "Preparando migrations (substituindo host e anon key do cron)..."
+echo "Preparando migrations (host/anon key do cron + unschedule tolerante)..."
 for f in supabase/migrations/*.sql; do
   out="$TMP/$(basename "$f")"
-  sed -e "s|https://${OLD_REF}.supabase.co|https://${NEW_API}|g" \
+  sed -E \
+      -e "s|https://${OLD_REF}.supabase.co|https://${NEW_API}|g" \
       -e "s|${OLD_REF}|selfhosted|g" \
       -e "s|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_.-]*|${ANON}|g" \
+      -e "s|SELECT[[:space:]]+cron\.unschedule\(([0-9]+)\)[[:space:]]*;|SELECT cron.unschedule(jobid) FROM cron.job WHERE jobid = \1;|Ig" \
+      -e "s|SELECT[[:space:]]+cron\.unschedule\(('[^']*')\)[[:space:]]*;|SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = \1;|Ig" \
       "$f" > "$out"
 done
 

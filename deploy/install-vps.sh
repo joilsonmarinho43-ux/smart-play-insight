@@ -44,16 +44,29 @@ if ! grep -q "NEXUS33_CONFIGURED" supabase-docker/.env; then
   DASH_PASS="$(openssl rand -hex 12)"
 
   # anon + service_role assinados com o JWT_SECRET (HS256, 10 anos)
+  # Feito em python3 puro (hmac + base64url) — sem npm, sem dependências externas.
   gen_key() {
-    docker run --rm -e JWT_SECRET="$JWT_SECRET" -e ROLE="$1" node:20-alpine sh -c '
-      npm i -s jsonwebtoken@9 >/dev/null 2>&1
-      node -e "const j=require(\"jsonwebtoken\");
-        const iat=Math.floor(Date.now()/1000);
-        console.log(j.sign({role:process.env.ROLE,iss:\"supabase\",iat,exp:iat+60*60*24*3650},process.env.JWT_SECRET));"
-    '
+    JWT_SECRET="$JWT_SECRET" ROLE="$1" python3 - <<'PY'
+import base64, hashlib, hmac, json, os, time
+
+def b64(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+secret = os.environ["JWT_SECRET"].encode()
+iat = int(time.time())
+header = {"alg": "HS256", "typ": "JWT"}
+payload = {"role": os.environ["ROLE"], "iss": "supabase",
+           "iat": iat, "exp": iat + 60 * 60 * 24 * 3650}
+enc = lambda o: b64(json.dumps(o, separators=(",", ":")).encode())
+signing_input = f"{enc(header)}.{enc(payload)}".encode()
+sig = hmac.new(secret, signing_input, hashlib.sha256).digest()
+print(f"{signing_input.decode()}.{b64(sig)}")
+PY
   }
+  command -v python3 >/dev/null 2>&1 || { apt-get update -y && apt-get install -y python3; }
   ANON_KEY="$(gen_key anon)"
   SERVICE_KEY="$(gen_key service_role)"
+
 
   python3 - "$JWT_SECRET" "$PG_PASS" "$ANON_KEY" "$SERVICE_KEY" "$DASH_PASS" <<'PY'
 import re, sys

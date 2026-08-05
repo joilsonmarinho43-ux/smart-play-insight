@@ -29,17 +29,47 @@ for f in supabase/migrations/*.sql; do
       "$f" > "$out"
 done
 
-echo "Habilitando extensões..."
+echo "Habilitando extensões e ledger de migrations..."
 docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
+CREATE TABLE IF NOT EXISTS public.selfhost_migrations (
+  filename text PRIMARY KEY,
+  applied_at timestamptz NOT NULL DEFAULT now()
+);
 SQL
 
+psql_q() { docker exec -i supabase-db psql -U postgres -d postgres -tAq -c "$1"; }
+
+applied=0; skipped=0; assumed=0
 for f in $(ls "$TMP"/*.sql | sort); do
-  echo "→ $(basename "$f")"
-  docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$f"
+  name="$(basename "$f")"
+
+  # 1) Já registrado no ledger → pula
+  if [ "$(psql_q "SELECT 1 FROM public.selfhost_migrations WHERE filename = '${name}'")" = "1" ]; then
+    echo "· $name (já aplicada)"
+    skipped=$((skipped+1)); continue
+  fi
+
+  echo "→ $name"
+  log="$TMP/${name}.log"
+  if docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$f" > "$log" 2>&1; then
+    applied=$((applied+1))
+  elif grep -qiE 'already exists|duplicate key|já existe|duplicate object' "$log"; then
+    # 2) Instalação parcial anterior: objeto já existe → considera aplicada
+    echo "  ↳ objetos já existentes; marcando como aplicada"
+    assumed=$((assumed+1))
+  else
+    echo "----- ERRO em $name -----"; cat "$log"; exit 1
+  fi
+
+  psql_q "INSERT INTO public.selfhost_migrations (filename) VALUES ('${name}')
+          ON CONFLICT (filename) DO NOTHING" >/dev/null
 done
+
+echo "Migrations OK — novas: $applied | já aplicadas: $skipped | pré-existentes: $assumed"
+
 
 echo "Migrations aplicadas com sucesso."
 docker exec -i supabase-db psql -U postgres -d postgres \

@@ -39,7 +39,7 @@ deploy, para o Let's Encrypt validar.
 ```bash
 ssh root@SEU_IP
 apt update && apt install -y git
-git clone https://github.com/joilsonmarinho43-ux/nexus33 /opt/nexus33
+git clone https://github.com/joilsonmarinho43-ux/smart-play-insight /opt/nexus33
 cd /opt/nexus33
 
 cp deploy/.env.example deploy/.env

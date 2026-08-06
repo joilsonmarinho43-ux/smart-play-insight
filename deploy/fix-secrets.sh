@@ -80,29 +80,94 @@ PY
   fi
 done
 
-# 4. override declarando as variáveis no serviço functions
-OVR="$SB/docker-compose.override.yml"
-{
-  echo "# Gerado por deploy/fix-secrets.sh — não editar à mão"
-  echo "services:"
-  echo "  functions:"
-  echo "    environment:"
-  for K in "${KEYS[@]}"; do
-    echo "      ${K}: \${${K}:-}"
-  done
-} > "$OVR"
-echo "Override gravado em $OVR"
+# 4. arquivo de env dedicado ao edge-runtime (valores literais, chmod 600)
+FENV="$SB/functions.secrets.env"
+: > "$FENV"; chmod 600 "$FENV"
+for K in "${KEYS[@]}"; do
+  V="${!K:-}"
+  [ -z "$V" ] && continue
+  printf '%s=%s\n' "$K" "$V" >> "$FENV"
+done
+echo "Secrets literais gravados em $FENV ($(wc -l < "$FENV") vars)"
 
-# 5. reinicia o edge-runtime
-(cd "$SB" && docker compose up -d functions)
-sleep 3
+# 5. PATCH no docker-compose.yml do Supabase — o override era ignorado quando o
+#    serviço do edge-runtime não se chama "functions" ou quando o compose é
+#    invocado com -f explícito. Aqui injetamos env_file direto no serviço real.
+python3 - "$SB/docker-compose.yml" "functions.secrets.env" <<'PY'
+import re, shutil, sys
+path, envfile = sys.argv[1:3]
+src = open(path).read()
+if not path.endswith('.bak') and not __import__('os').path.exists(path + '.bak'):
+    shutil.copy(path, path + '.bak')
 
-# 6. relatório
+lines = src.splitlines()
+# localiza bloco "services:" e cada serviço de 1º nível (indent 2)
+svc_starts = []
+in_services = False
+for i, l in enumerate(lines):
+    if re.match(r'^services:\s*$', l):
+        in_services = True; continue
+    if in_services:
+        if re.match(r'^\S', l):  # saiu de services
+            break
+        m = re.match(r'^  ([A-Za-z0-9_.-]+):\s*$', l)
+        if m:
+            svc_starts.append((i, m.group(1)))
+
+def block(idx):
+    start = idx + 1
+    end = len(lines)
+    for j in range(start, len(lines)):
+        if re.match(r'^  \S', lines[j]) or re.match(r'^\S', lines[j]):
+            end = j; break
+    return start, end
+
+target = None
+for idx, name in svc_starts:
+    s, e = block(idx)
+    body = "\n".join(lines[s:e])
+    if 'edge-runtime' in body or 'supabase-edge-functions' in body or name in ('functions', 'edge-functions'):
+        target = (idx, name, s, e); break
+
+if not target:
+    print("  ✗ serviço do edge-runtime não encontrado no docker-compose.yml"); sys.exit(1)
+
+idx, name, s, e = target
+body_lines = lines[s:e]
+# remove env_file anterior nosso (bloco de lista) para regravar
+cleaned, skip = [], False
+for l in body_lines:
+    if re.match(r'^    env_file:\s*$', l):
+        skip = True; continue
+    if skip:
+        if re.match(r'^      - ', l):
+            if envfile in l:
+                continue
+            cleaned.append('    env_file:'); cleaned.append(l); skip = False; continue
+        skip = False
+    cleaned.append(l)
+cleaned = [f'    env_file:', f'      - ./{envfile}'] + cleaned
+lines[s:e] = cleaned
+open(path, 'w').write("\n".join(lines) + "\n")
+print(f"  ✓ env_file ./{envfile} injetado no serviço '{name}' (backup: {path}.bak)")
+PY
+
+# override antigo não é mais necessário (podia ser ignorado com -f explícito)
+rm -f "$SB/docker-compose.override.yml"
+
+# 6. recria o edge-runtime pegando o novo env_file
+SVC="$(cd "$SB" && docker compose config --services 2>/dev/null | grep -E '^(functions|edge-functions)$' | head -1)"
+SVC="${SVC:-functions}"
+(cd "$SB" && docker compose up -d --force-recreate "$SVC")
+sleep 5
+
+# 7. relatório
 echo
-echo "Variáveis dentro do container functions:"
+echo "Variáveis dentro do container do edge-runtime:"
 MISSING=0
 CT="$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-functions' | head -1)"
 CT="${CT:-supabase-edge-functions}"
+
 for K in "${KEYS[@]}"; do
   V="$(docker exec "$CT" printenv "$K" 2>/dev/null || true)"
   if [ -z "$V" ]; then

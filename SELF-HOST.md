@@ -73,12 +73,34 @@ O que o script faz:
 
 | Script | Para quê |
 |---|---|
-| `deploy/preflight.sh` | Checagem pré-instalação (não altera nada) |
-| `deploy/install-vps.sh` | Instalação completa |
+| `deploy/preflight.sh` | Checagem pré-instalação: arquivos, domínios, **todas as chaves**, DNS, RAM/disco (não altera nada) |
+| `deploy/install-vps.sh` | Instalação completa (idempotente) |
+| `deploy/fix-secrets.sh` | Injeta **todos** os secrets no edge-runtime e reinicia as functions |
+| `deploy/fix-cron.sh` | Reaponta os cron jobs para o `API_DOMAIN` e a ANON_KEY locais |
 | `deploy/sync-functions.sh` | Reenvia só as edge functions |
-| `deploy/apply-migrations.sh` | Reaplica as migrations |
-| `deploy/update.sh` | `git pull` + rebuild + funções + migrations |
+| `deploy/apply-migrations.sh` | Aplica migrations pendentes (ledger `public.selfhost_migrations`) |
+| `deploy/import-users.sh` | Importa e-mails/perfis de um CSV para `auth.users` (senha temporária) |
+| `deploy/update.sh` | `git pull` + funções + secrets + migrations + cron + rebuild |
 | `deploy/backup.sh` | Dump diário do Postgres (14 dias de retenção) |
+
+### Fluxo de atualização (o único que você precisa)
+
+```bash
+cd /opt/nexus33
+git pull
+bash deploy/preflight.sh
+bash deploy/fix-secrets.sh
+bash deploy/update.sh      # opcional: só se quiser rebuildar o frontend
+```
+
+`fix-secrets.sh` deriva sozinho `APP_PUBLIC_URL`, `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`,
+espelha `TELEGRAM_API_KEY`/`TELEGRAM_BOT_TOKEN` e
+`TELEGRAM_ADMIN_CHAT_ID`/`TELEGRAM_CHAT_ID`, e imprime ✓/✗ de cada chave
+dentro do container. Chaves obrigatórias para o app rodar igual ao ambiente
+gerenciado: `SPORTSRC_API_KEY`, `FOOTBALL_DATA_ORG_KEY`, `GEMINI_API_KEY`,
+`GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+
 
 ---
 
@@ -133,6 +155,19 @@ gunzip -c dump.sql.gz | docker exec -i supabase-db psql -U postgres -d postgres
 
 Faça isso **depois** das migrations. Usuários do `auth.users` vêm no mesmo
 dump; as senhas continuam válidas porque o hash é bcrypt.
+
+### Sem dump do `auth.users` (só a lista de e-mails)
+
+```bash
+bash deploy/import-users.sh deploy/profiles.csv 'SenhaTemp@2026'
+```
+
+O CSV é enviado pelo STDIN do `psql` (não precisa existir dentro do
+container), todos os campos de token do GoTrue são gravados como `''`
+(evita `converting NULL to string is unsupported`) e importações antigas com
+campos NULL são reparadas automaticamente. Cada usuário entra com a senha
+temporária informada e deve trocá-la depois.
+
 
 ---
 

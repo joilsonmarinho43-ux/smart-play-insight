@@ -116,19 +116,13 @@ PY
 set_env deploy/.env VITE_SUPABASE_URL "https://${API_DOMAIN}"
 set_env deploy/.env VITE_SUPABASE_PUBLISHABLE_KEY "$ANON_KEY"
 set_env deploy/.env VITE_SUPABASE_PROJECT_ID "${VITE_SUPABASE_PROJECT_ID:-selfhosted}"
+set_env deploy/.env APP_PUBLIC_URL "${APP_PUBLIC_URL:-https://${APP_DOMAIN}}"
+# o código aceita TELEGRAM_BOT_TOKEN ou TELEGRAM_API_KEY — espelha os dois
+[ -n "${TELEGRAM_BOT_TOKEN:-}" ] && set_env deploy/.env TELEGRAM_API_KEY "${TELEGRAM_API_KEY:-$TELEGRAM_BOT_TOKEN}"
+[ -n "${TELEGRAM_API_KEY:-}" ] && set_env deploy/.env TELEGRAM_BOT_TOKEN "${TELEGRAM_BOT_TOKEN:-$TELEGRAM_API_KEY}"
+[ -n "${TELEGRAM_CHAT_ID:-}" ] && set_env deploy/.env TELEGRAM_ADMIN_CHAT_ID "${TELEGRAM_ADMIN_CHAT_ID:-$TELEGRAM_CHAT_ID}"
 set -a; . deploy/.env; set +a
 
-# Secrets das edge functions
-say "Aplicando secrets das edge functions..."
-for K in SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID \
-         TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY GEMINI_API_KEY GROQ_API_KEY \
-         LOVABLE_API_KEY APP_PUBLIC_URL; do
-  V="${!K:-}"
-  [ -z "$V" ] && continue
-  grep -q "^${K}=" supabase-docker/.env \
-    && sed -i "s|^${K}=.*|${K}=${V}|" supabase-docker/.env \
-    || echo "${K}=${V}" >> supabase-docker/.env
-done
 
 
 # Edge functions do projeto

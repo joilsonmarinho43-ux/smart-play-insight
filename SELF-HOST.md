@@ -43,14 +43,28 @@ git clone https://github.com/joilsonmarinho43-ux/smart-play-insight /opt/nexus33
 cd /opt/nexus33
 
 cp deploy/.env.example deploy/.env
-nano deploy/.env        # preencha domínios e chaves das APIs
+nano deploy/.env        # preencha apenas APP_DOMAIN e API_DOMAIN
 
+bash deploy/set-secrets.sh # chaves reais (fica em /etc/nexus33/secrets.env, fora do git)
 bash deploy/preflight.sh   # verificação: DNS, RAM, disco, secrets, arquivos
 bash deploy/install-vps.sh
 ```
 
-`preflight.sh` não altera nada — só valida a VPS e o `.env` e diz se algo
-está faltando antes de você instalar.
+### Onde ficam as chaves reais
+
+As credenciais **nunca** vão para o repositório. `deploy/set-secrets.sh`
+grava-as em `/etc/nexus33/secrets.env` (chmod 600, fora do git), e
+`fix-secrets.sh` / `update.sh` / `preflight.sh` carregam esse cofre
+automaticamente a cada deploy. `deploy/.env` guarda só domínios e valores
+públicos e está no `.gitignore`.
+
+Chaves pedidas: `SPORTSRC_API_KEY`, `FOOTBALL_DATA_ORG_KEY`,
+`GEMINI_API_KEY`, `GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+(+ opcionais `TELEGRAM_ADMIN_CHAT_ID`, `TELEGRAM_API_KEY`, `LOVABLE_API_KEY`).
+Se já estiverem no ambiente do shell: `bash deploy/set-secrets.sh --from-env`.
+
+`preflight.sh` não altera nada — só valida a VPS, o `.env` e o cofre.
+
 
 Na **primeira execução** o `install-vps.sh` gera as chaves do Supabase e
 grava automaticamente `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
@@ -73,7 +87,9 @@ O que o script faz:
 
 | Script | Para quê |
 |---|---|
+| `deploy/set-secrets.sh` | Cadastra as chaves reais em `/etc/nexus33/secrets.env` (fora do git) |
 | `deploy/preflight.sh` | Checagem pré-instalação: arquivos, domínios, **todas as chaves**, DNS, RAM/disco (não altera nada) |
+
 | `deploy/install-vps.sh` | Instalação completa (idempotente) |
 | `deploy/fix-secrets.sh` | Injeta **todos** os secrets no edge-runtime e reinicia as functions |
 | `deploy/fix-cron.sh` | Reaponta os cron jobs para o `API_DOMAIN` e a ANON_KEY locais |

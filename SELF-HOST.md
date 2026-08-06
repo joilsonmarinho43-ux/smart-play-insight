@@ -156,6 +156,19 @@ gunzip -c dump.sql.gz | docker exec -i supabase-db psql -U postgres -d postgres
 Faça isso **depois** das migrations. Usuários do `auth.users` vêm no mesmo
 dump; as senhas continuam válidas porque o hash é bcrypt.
 
+### Sem dump do `auth.users` (só a lista de e-mails)
+
+```bash
+bash deploy/import-users.sh deploy/profiles.csv 'SenhaTemp@2026'
+```
+
+O CSV é enviado pelo STDIN do `psql` (não precisa existir dentro do
+container), todos os campos de token do GoTrue são gravados como `''`
+(evita `converting NULL to string is unsupported`) e importações antigas com
+campos NULL são reparadas automaticamente. Cada usuário entra com a senha
+temporária informada e deve trocá-la depois.
+
+
 ---
 
 ## 7. Diferenças do ambiente gerenciado

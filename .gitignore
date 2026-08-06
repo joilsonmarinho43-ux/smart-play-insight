@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# dados exportados de usuários (não versionar)
+deploy/profiles.csv

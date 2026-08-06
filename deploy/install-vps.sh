@@ -109,6 +109,10 @@ done
 say "Copiando edge functions..."
 bash deploy/sync-functions.sh
 
+# Declara os secrets no serviço "functions" (senão o container não os enxerga)
+say "Injetando secrets no edge-runtime..."
+bash deploy/fix-secrets.sh || true
+
 say "Subindo Supabase..."
 (cd supabase-docker && docker compose up -d)
 

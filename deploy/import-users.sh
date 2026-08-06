@@ -2,30 +2,44 @@
 # =====================================================================
 # NEXUS 33 — importa os usuários (e-mails) para o Supabase self-hosted
 #
-#   bash deploy/import-users.sh deploy/profiles.csv [SENHA_PADRAO]
+#   bash deploy/import-users.sh [CSV] [SENHA_PADRAO]
+#   bash deploy/import-users.sh deploy/profiles.csv 'SenhaTemp@2026'
 #
 # CSV esperado (cabeçalho obrigatório):
 #   id,email,is_admin,subscription_expiry_date,created_at
 #
-# IMPORTANTE:
-#  - As SENHAS antigas NÃO podem ser migradas. Cada usuário é criado com
-#    uma senha temporária e deve trocá-la depois.
-#  - O GoTrue atual (Go) faz Scan de colunas de token como string NOT NULL
-#    lógico: se ficarem NULL o login falha com
-#    'converting NULL to string is unsupported'.
-#    Por isso todos os campos de token são gravados como '' (string vazia)
-#    e o script também REPARA usuários já importados anteriormente.
+# NOTAS
+#  - O CSV é enviado pelo STDIN do psql (COPY ... FROM STDIN), portanto o
+#    caminho do host NÃO precisa existir dentro do container.
+#  - As SENHAS antigas não podem ser migradas (só existem hashes no
+#    provedor anterior). Cada usuário recebe uma senha temporária.
+#  - O GoTrue atual faz Scan de várias colunas de token como string NOT
+#    NULL lógico: se ficarem NULL o login falha com
+#    'converting NULL to string is unsupported'. Todos esses campos são
+#    gravados como '' e o script também REPARA importações anteriores.
 # =====================================================================
 set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
 CSV="${1:-deploy/profiles.csv}"
 DEFAULT_PASS="${2:-Nexus33@2026}"
 
 [ -f "$CSV" ] || { echo "CSV não encontrado: $CSV"; exit 1; }
+docker ps --format '{{.Names}}' | grep -q '^supabase-db$' \
+  || { echo "Container supabase-db não está rodando."; exit 1; }
+
+# senha entre aspas simples dentro do SQL
+ESC_PASS="${DEFAULT_PASS//\'/\'\'}"
 
 echo "Importando usuários de $CSV (senha temporária: $DEFAULT_PASS)"
 
-docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
+TMP="$(mktemp)"
+trap 'rm -f "$TMP"' EXIT
+
+cat > "$TMP" <<SQL
+\set ON_ERROR_STOP on
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TEMP TABLE _imp (
@@ -35,9 +49,19 @@ CREATE TEMP TABLE _imp (
   subscription_expiry_date timestamptz,
   created_at timestamptz
 );
-\copy _imp FROM '$(readlink -f "$CSV")' WITH CSV HEADER
 
--- 1) auth.users (todos os campos de token preenchidos com '')
+COPY _imp (id, email, is_admin, subscription_expiry_date, created_at)
+FROM STDIN WITH (FORMAT csv, HEADER true, NULL '');
+SQL
+
+# corpo do CSV (a própria linha de cabeçalho é consumida por HEADER true)
+cat "$CSV" >> "$TMP"
+# garante quebra de linha antes do terminador
+printf '\n\\.\n' >> "$TMP"
+
+cat >> "$TMP" <<SQL
+
+-- 1) auth.users — todos os campos de token preenchidos com ''
 INSERT INTO auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, invited_at,
@@ -54,7 +78,7 @@ INSERT INTO auth.users (
 SELECT
   '00000000-0000-0000-0000-000000000000',
   i.id, 'authenticated', 'authenticated',
-  lower(i.email), crypt('$DEFAULT_PASS', gen_salt('bf')),
+  lower(i.email), crypt('${ESC_PASS}', gen_salt('bf')),
   now(), NULL,
   '', NULL,
   '', NULL,
@@ -67,27 +91,29 @@ SELECT
   '', NULL,
   false, NULL, NULL
 FROM _imp i
+WHERE i.id IS NOT NULL AND i.email IS NOT NULL
 ON CONFLICT (id) DO NOTHING;
 
--- 1b) REPARO: usuários importados antes com campos NULL
+-- 1b) REPARO de importações anteriores com campos NULL
 UPDATE auth.users SET
-  confirmation_token         = COALESCE(confirmation_token, ''),
-  recovery_token             = COALESCE(recovery_token, ''),
-  email_change_token_new     = COALESCE(email_change_token_new, ''),
-  email_change               = COALESCE(email_change, ''),
-  email_change_token_current = COALESCE(email_change_token_current, ''),
-  email_change_confirm_status= COALESCE(email_change_confirm_status, 0),
-  phone_change               = COALESCE(phone_change, ''),
-  phone_change_token         = COALESCE(phone_change_token, ''),
-  reauthentication_token     = COALESCE(reauthentication_token, ''),
-  is_sso_user                = COALESCE(is_sso_user, false),
-  is_super_admin             = COALESCE(is_super_admin, false),
-  aud                        = COALESCE(NULLIF(aud, ''), 'authenticated'),
-  role                       = COALESCE(NULLIF(role, ''), 'authenticated'),
-  email_confirmed_at         = COALESCE(email_confirmed_at, now()),
-  raw_app_meta_data          = COALESCE(raw_app_meta_data, '{"provider":"email","providers":["email"]}'::jsonb),
-  raw_user_meta_data         = COALESCE(raw_user_meta_data, '{}'::jsonb),
-  updated_at                 = now()
+  confirmation_token          = COALESCE(confirmation_token, ''),
+  recovery_token              = COALESCE(recovery_token, ''),
+  email_change_token_new      = COALESCE(email_change_token_new, ''),
+  email_change                = COALESCE(email_change, ''),
+  email_change_token_current  = COALESCE(email_change_token_current, ''),
+  email_change_confirm_status = COALESCE(email_change_confirm_status, 0),
+  phone_change                = COALESCE(phone_change, ''),
+  phone_change_token          = COALESCE(phone_change_token, ''),
+  reauthentication_token      = COALESCE(reauthentication_token, ''),
+  is_sso_user                 = COALESCE(is_sso_user, false),
+  is_super_admin              = COALESCE(is_super_admin, false),
+  is_anonymous                = COALESCE(is_anonymous, false),
+  aud                         = COALESCE(NULLIF(aud, ''), 'authenticated'),
+  role                        = COALESCE(NULLIF(role, ''), 'authenticated'),
+  email_confirmed_at          = COALESCE(email_confirmed_at, now()),
+  raw_app_meta_data           = COALESCE(raw_app_meta_data, '{"provider":"email","providers":["email"]}'::jsonb),
+  raw_user_meta_data          = COALESCE(raw_user_meta_data, '{}'::jsonb),
+  updated_at                  = now()
 WHERE confirmation_token IS NULL
    OR recovery_token IS NULL
    OR email_change_token_new IS NULL
@@ -99,6 +125,7 @@ WHERE confirmation_token IS NULL
    OR reauthentication_token IS NULL
    OR is_sso_user IS NULL
    OR is_super_admin IS NULL
+   OR is_anonymous IS NULL
    OR aud IS NULL OR role IS NULL
    OR email_confirmed_at IS NULL
    OR raw_app_meta_data IS NULL
@@ -123,6 +150,7 @@ INSERT INTO public.profiles (id, email, is_admin, subscription_expiry_date, crea
 SELECT i.id, lower(i.email), COALESCE(i.is_admin,false), i.subscription_expiry_date,
        COALESCE(i.created_at, now())
 FROM _imp i
+WHERE i.id IS NOT NULL AND i.email IS NOT NULL
 ON CONFLICT (id) DO UPDATE
   SET email = EXCLUDED.email,
       is_admin = EXCLUDED.is_admin,
@@ -136,4 +164,16 @@ SELECT count(*) AS tokens_nulos FROM auth.users
     OR reauthentication_token IS NULL;
 SQL
 
-echo "Importação/reparo concluídos. Se 'tokens_nulos' = 0, o login por senha deve funcionar."
+# is_anonymous pode não existir em versões antigas do GoTrue — ignora se faltar
+if ! docker exec -i supabase-db psql -U postgres -d postgres -Atc \
+     "SELECT 1 FROM information_schema.columns
+       WHERE table_schema='auth' AND table_name='users' AND column_name='is_anonymous'" \
+     | grep -q 1; then
+  sed -i "/is_anonymous/d" "$TMP"
+fi
+
+docker exec -i supabase-db psql -U postgres -d postgres -q < "$TMP"
+
+echo
+echo "Importação/reparo concluídos. Se 'tokens_nulos' = 0, o login por senha funciona."
+echo "Senha temporária de todos os usuários importados: $DEFAULT_PASS"

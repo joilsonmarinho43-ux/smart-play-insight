@@ -23,11 +23,21 @@ cd "$ROOT"
 SB="supabase-docker"
 [ -d "$SB" ] || { echo "Pasta $SB não encontrada. Rode na raiz do projeto."; exit 1; }
 
-# 1. carrega deploy/.env (fonte das chaves)
+# 1. carrega deploy/.env (fonte das chaves) + cofre fora do git
 [ -f deploy/.env ] || { echo "deploy/.env não existe (copie de deploy/.env.example)."; exit 1; }
 set -a; . deploy/.env; set +a
 
+# /etc/nexus33/secrets.env tem prioridade: chaves reais da VPS, nunca versionadas.
+VAULT="${NEXUS33_VAULT:-/etc/nexus33/secrets.env}"
+if [ -f "$VAULT" ]; then
+  set -a; . "$VAULT"; set +a
+  echo "Cofre carregado: $VAULT"
+else
+  echo "ℹ Cofre $VAULT não existe — rode: bash deploy/set-secrets.sh"
+fi
+
 readenv() { grep -E "^$1=" "$SB/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'; }
+
 
 # 2. derivações automáticas — nada de configuração manual
 : "${APP_DOMAIN:?defina APP_DOMAIN em deploy/.env}"

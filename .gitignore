@@ -24,4 +24,3 @@ dist-ssr
 *.sw?
 
 # dados exportados de usuários (não versionar)
-deploy/profiles.csv

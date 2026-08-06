@@ -20,6 +20,7 @@ sec "1. Arquivos do kit"
 for f in Dockerfile deploy/nginx.conf deploy/Caddyfile deploy/docker-compose.yml \
          deploy/install-vps.sh deploy/apply-migrations.sh deploy/sync-functions.sh \
          deploy/fix-secrets.sh deploy/fix-cron.sh deploy/import-users.sh \
+         deploy/set-secrets.sh \
          deploy/update.sh deploy/backup.sh deploy/.env.example SELF-HOST.md; do
   [ -f "$f" ] && ok "$f" || bad "faltando: $f"
 done

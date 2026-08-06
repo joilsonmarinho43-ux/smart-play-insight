@@ -90,20 +90,46 @@ PY
   sed -i "s|^SUPABASE_PUBLIC_URL=.*|SUPABASE_PUBLIC_URL=https://${API_DOMAIN}|" supabase-docker/.env
 
   echo -e "\n\033[1;32mANON_KEY gerada:\033[0m\n$ANON_KEY\n"
-  echo "→ Copie para VITE_SUPABASE_PUBLISHABLE_KEY em deploy/.env"
   echo "→ Senha do Studio (user: supabase): $DASH_PASS"
 fi
+
+# --- 3b. Sincroniza as variáveis públicas do frontend ----------------
+# Sem isso o bundle é compilado com o placeholder do .env.example e o app
+# sobe totalmente quebrado (client Supabase com URL/chave inválidas).
+say "Sincronizando VITE_* do frontend com o Supabase local..."
+ANON_KEY="$(grep -E '^ANON_KEY=' supabase-docker/.env | cut -d= -f2- | tr -d '"')"
+[ -n "$ANON_KEY" ] || { echo "ANON_KEY não encontrada em supabase-docker/.env"; exit 1; }
+
+set_env() { # arquivo chave valor
+  if grep -q "^${2}=" "$1"; then
+    python3 - "$1" "$2" "$3" <<'PY'
+import sys
+path, key, val = sys.argv[1:4]
+lines = open(path).read().splitlines()
+out = [f"{key}={val}" if l.startswith(f"{key}=") else l for l in lines]
+open(path, "w").write("\n".join(out) + "\n")
+PY
+  else
+    echo "${2}=${3}" >> "$1"
+  fi
+}
+set_env deploy/.env VITE_SUPABASE_URL "https://${API_DOMAIN}"
+set_env deploy/.env VITE_SUPABASE_PUBLISHABLE_KEY "$ANON_KEY"
+set_env deploy/.env VITE_SUPABASE_PROJECT_ID "${VITE_SUPABASE_PROJECT_ID:-selfhosted}"
+set -a; . deploy/.env; set +a
 
 # Secrets das edge functions
 say "Aplicando secrets das edge functions..."
 for K in SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID \
-         TELEGRAM_API_KEY GEMINI_API_KEY GROQ_API_KEY LOVABLE_API_KEY APP_PUBLIC_URL; do
+         TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY GEMINI_API_KEY GROQ_API_KEY \
+         LOVABLE_API_KEY APP_PUBLIC_URL; do
   V="${!K:-}"
   [ -z "$V" ] && continue
   grep -q "^${K}=" supabase-docker/.env \
     && sed -i "s|^${K}=.*|${K}=${V}|" supabase-docker/.env \
     || echo "${K}=${V}" >> supabase-docker/.env
 done
+
 
 # Edge functions do projeto
 say "Copiando edge functions..."

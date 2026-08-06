@@ -152,7 +152,11 @@ bash deploy/apply-migrations.sh
 
 # --- 5. Frontend + Caddy --------------------------------------------
 say "Build do frontend e proxy HTTPS..."
+case "${VITE_SUPABASE_PUBLISHABLE_KEY:-}" in
+  ""|*"<"*) echo "VITE_SUPABASE_PUBLISHABLE_KEY inválida em deploy/.env"; exit 1 ;;
+esac
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
+
 
 say "Pronto!"
 echo "App:    https://${APP_DOMAIN}"

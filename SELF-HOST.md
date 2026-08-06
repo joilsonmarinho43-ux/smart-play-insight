@@ -53,8 +53,10 @@ bash deploy/install-vps.sh
 está faltando antes de você instalar.
 
 Na **primeira execução** o `install-vps.sh` gera as chaves do Supabase e
-imprime a `ANON_KEY`. Cole-a em `VITE_SUPABASE_PUBLISHABLE_KEY` (em
-`deploy/.env`) e rode o script de novo — ele é idempotente.
+grava automaticamente `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
+em `deploy/.env` antes de buildar o frontend — não é preciso copiar nada à
+mão. O script é idempotente e pode ser executado quantas vezes quiser.
+
 
 O que o script faz:
 1. Instala Docker (se faltar).

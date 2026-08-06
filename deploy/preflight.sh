@@ -54,7 +54,14 @@ else
 fi
 
 sec "4. Secrets das Edge Functions"
-if [ -f deploy/.env ]; then
+VAULT="${NEXUS33_VAULT:-/etc/nexus33/secrets.env}"
+if [ -f "$VAULT" ]; then
+  ok "cofre $VAULT presente (fora do git)"
+  set -a; . "$VAULT"; set +a
+else
+  warn "cofre $VAULT ausente — rode: bash deploy/set-secrets.sh"
+fi
+if [ -f deploy/.env ] || [ -f "$VAULT" ]; then
   # obrigatórias: sem elas o app não funciona como no Lovable
   declare -A WHY=(
     [SPORTSRC_API_KEY]="jogos ao vivo e pré-jogo"
@@ -67,12 +74,13 @@ if [ -f deploy/.env ]; then
   for K in SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY GEMINI_API_KEY GROQ_API_KEY \
            TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID; do
     if [ -n "${!K:-}" ]; then ok "$K (${WHY[$K]})"
-    else bad "$K vazio — ${WHY[$K]} não vai funcionar"; fi
+    else bad "$K vazio — ${WHY[$K]} não vai funcionar (bash deploy/set-secrets.sh)"; fi
   done
   for K in TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY LOVABLE_API_KEY; do
     [ -n "${!K:-}" ] && ok "$K (opcional)" || warn "$K vazio (opcional)"
   done
 fi
+
 
 sec "5. Ambiente da VPS"
 command -v docker >/dev/null 2>&1 && ok "docker $(docker --version | awk '{print $3}' | tr -d ,)" \

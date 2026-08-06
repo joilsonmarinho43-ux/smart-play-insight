@@ -87,7 +87,9 @@ O que o script faz:
 
 | Script | Para quê |
 |---|---|
+| `deploy/set-secrets.sh` | Cadastra as chaves reais em `/etc/nexus33/secrets.env` (fora do git) |
 | `deploy/preflight.sh` | Checagem pré-instalação: arquivos, domínios, **todas as chaves**, DNS, RAM/disco (não altera nada) |
+
 | `deploy/install-vps.sh` | Instalação completa (idempotente) |
 | `deploy/fix-secrets.sh` | Injeta **todos** os secrets no edge-runtime e reinicia as functions |
 | `deploy/fix-cron.sh` | Reaponta os cron jobs para o `API_DOMAIN` e a ANON_KEY locais |

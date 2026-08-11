@@ -392,12 +392,17 @@ Deno.serve(async (req) => {
     console.log(`[TIMEZONE] scanner day_brt=${brtDay} startIso=${todayStartIso}`);
     const { data: existingSignals } = await supabase
       .from('telegram_signals')
-      .select('match_id, market')
+      .select('match_id, match_name, market')
       .gte('created_at', todayStartIso)
       .eq('success', true);
 
-    const signaledKeys = new Set((existingSignals || []).map((s: any) => `${s.match_id}-${s.market}`));
-    let newSignals = sniperSignals.filter(s => !signaledKeys.has(`${s.matchId}-${s.market}`));
+    // 1 sinal por JOGO/dia (ignora mercado) — evita repetição entre funções
+    const signaledMatchIds = new Set((existingSignals || []).map((s: any) => String(s.match_id || '')).filter(Boolean));
+    const signaledNames = new Set((existingSignals || []).map((s: any) => String(s.match_name || '').trim().toLowerCase()).filter(Boolean));
+    let newSignals = sniperSignals.filter(s =>
+      !signaledMatchIds.has(String(s.matchId)) && !signaledNames.has(String(s.match || '').trim().toLowerCase())
+    );
+
 
     // ─── CONFIDENCE POLICY GATE ────────────────────────────────────
     // Resolve confidence_score por jogo (paralelo) e aplica política:

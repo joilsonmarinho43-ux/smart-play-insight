@@ -27,10 +27,13 @@ export function useTeamForm(match: MatchData | null | undefined) {
   const away = match?.awayTeam || '';
   const enabled = Boolean(home && away);
 
-  // Só busca se a partida ainda não tem modelData populado
+  // Só pula a busca se a partida já tem médias E amostra de jogos conhecida
+  const sample = match?.sampleSize;
+  const hasSample = Number(sample?.homeGames || 0) > 0 && Number(sample?.awayGames || 0) > 0;
   const alreadyHas = Boolean(
     Number(match?.modelData?.homeGoalsAvg || 0) > 0 &&
-    Number(match?.modelData?.awayGoalsAvg || 0) > 0
+    Number(match?.modelData?.awayGoalsAvg || 0) > 0 &&
+    hasSample
   );
 
   return useQuery<TeamFormResponse>({

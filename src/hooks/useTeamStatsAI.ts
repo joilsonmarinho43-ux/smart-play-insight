@@ -60,12 +60,22 @@ export function mergeAIStatsIntoMatch(match: MatchData, ai?: AIStatsResponse | n
   if (!ai?.ok) return match;
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
+  const sample = (match as any).sampleSize || {};
   const pick = (cur: any, incoming: number) => {
     const c = Number(cur || 0);
     return c > 0 ? c : incoming;
   };
+  const hasAiHome = Number(ai.home?.totalShots || 0) > 0 || Number(ai.home?.possession || 0) > 0;
+  const hasAiAway = Number(ai.away?.totalShots || 0) > 0 || Number(ai.away?.possession || 0) > 0;
   return {
     ...match,
+    sampleSize: {
+      ...sample,
+      homeGames: Number(sample.homeGames || 0) > 0 ? sample.homeGames : (hasAiHome ? 5 : 0),
+      awayGames: Number(sample.awayGames || 0) > 0 ? sample.awayGames : (hasAiAway ? 5 : 0),
+      homeWithStats: Number(sample.homeWithStats || 0) > 0 ? sample.homeWithStats : (hasAiHome ? 5 : 0),
+      awayWithStats: Number(sample.awayWithStats || 0) > 0 ? sample.awayWithStats : (hasAiAway ? 5 : 0),
+    },
     homeStats: {
       ...hs,
       possession: pick(hs.possession, ai.home.possession),

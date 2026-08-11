@@ -463,8 +463,13 @@ Deno.serve(async (req) => {
 
     // 4. Send each approved signal as individual sniper message
     let sentCount = 0;
+    const sentThisRun = new Set<string>();
     for (const signal of approved) {
+      const runKey = String(signal.matchId || signal.match).trim().toLowerCase();
+      if (sentThisRun.has(runKey)) continue; // 1 sinal por jogo por execução
+      sentThisRun.add(runKey);
       const text = buildSniperMessage(signal);
+
 
       const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, {
         botToken: TELEGRAM_BOT_TOKEN,

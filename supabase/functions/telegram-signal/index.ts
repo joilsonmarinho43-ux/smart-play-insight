@@ -69,8 +69,37 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
+    // ═══ ANTI-REPETIÇÃO GLOBAL: 1 sinal por jogo/dia (BRT) ═══
+    // Cobre qualquer emissor (auto-mode, scanner-pro, sniper) e qualquer
+    // variação de mercado/minuto — evita 2 sinais do mesmo jogo (ex.: 9' e 17').
+    {
+      const brtDay = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date());
+      const dayStartIso = `${brtDay}T03:00:00.000Z`;
+      const normName = (payload.match || '').trim().toLowerCase();
+
+      const { data: sameDay } = await sb
+        .from('telegram_signals')
+        .select('match_id, match_name, minute, market')
+        .gte('created_at', dayStartIso)
+        .eq('success', true)
+        .limit(500);
+
+      const already = (sameDay || []).some((r: any) =>
+        (payload.matchId && r.match_id === payload.matchId) ||
+        (normName && String(r.match_name || '').trim().toLowerCase() === normName)
+      );
+
+      if (already) {
+        console.log(`[TELEGRAM-SIGNAL] ⏭️ Repetido no dia bloqueado: ${payload.match} • ${payload.market} • ${payload.minute}'`);
+        return jsonResp({ success: true, deduped: true, reason: 'already_signaled_today' });
+      }
+    }
+
     // ═══ IDEMPOTÊNCIA ATÔMICA ═══
     let claimedSignalId: string | null = null;
+
     if (payload.matchId) {
       const { data: claimed, error: claimErr } = await sb.rpc('try_claim_telegram_slot', {
         _match_id: payload.matchId,

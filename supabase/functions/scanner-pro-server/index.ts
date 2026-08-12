@@ -270,7 +270,7 @@ function sniperScan(match: any): SniperSignal | null {
       pressure >= 40 &&
       totalDA >= 5 &&
       totalLambda >= 2.0 &&
-      oddFT >= 1.25 && oddFT <= 1.60 &&
+      oddFT >= 1.40 && oddFT <= 1.90 &&
       evFT > 0 &&
       rma.verdict !== 'BLOQUEADO';
 

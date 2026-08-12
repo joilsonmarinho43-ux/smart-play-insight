@@ -243,7 +243,9 @@ function sniperScan(match: any): SniperSignal | null {
   // ═══════════════════════════════════════
   // OVER 1.5 FT — PRIORIDADE 1
   // ═══════════════════════════════════════
-  if (totalGoals < 2) {
+  // 🔒 VALOR DE ODD: só entra em Over 1.5 com 0x0 e até o minuto 35.
+  // Com gol já marcado (ou tarde demais) a odd cai para ~1.15-1.25 → entrada sem valor.
+  if (totalGoals === 0 && minute <= 35) {
     const remainingNeeded = 2 - totalGoals;
     const remainingMin = Math.max(1, 90 - minute);
     const remainingLambda = totalLambda * (remainingMin / 90);
@@ -268,7 +270,7 @@ function sniperScan(match: any): SniperSignal | null {
       pressure >= 40 &&
       totalDA >= 5 &&
       totalLambda >= 2.0 &&
-      oddFT >= 1.25 && oddFT <= 1.60 &&
+      oddFT >= 1.40 && oddFT <= 1.90 &&
       evFT > 0 &&
       rma.verdict !== 'BLOQUEADO';
 

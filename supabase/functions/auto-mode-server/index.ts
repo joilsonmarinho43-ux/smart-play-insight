@@ -241,10 +241,10 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
   // Histórico: min ≥ 38 = 56% acerto, min 45 = 67%, min ≥ 50 = 38%. Zona dourada: 8-35.
   // 🔒 Anti-falso-positivo: SEMI só aceita DA REAL do feed.
   // Calibração 27/05: 3/3 losses do dia eram SEMI com DA estimado (≈) em ligas SA travadas.
+  // 🔒 VALOR DE ODD: Over 1.5 só tem odd paga com placar 0x0.
+  // Com 1 gol já marcado o mercado vira "falta 1 gol" (odd ~1.15-1.25) → sem valor.
   const totalGoals = s.homeGoals + s.awayGoals;
-  const semiWindowOk =
-    (totalGoals === 0 && s.minute >= 8 && s.minute <= 35) ||
-    (totalGoals === 1 && s.minute >= 8 && s.minute <= 35);
+  const semiWindowOk = totalGoals === 0 && s.minute >= 8 && s.minute <= 35;
   const isSemi = !isSuperSniper && !isSniper && semiWindowOk &&
     !s.daEstimated &&
     s.sog >= 2 && s.dominantPoss >= 52 && s.da >= 5 && s.corners >= 1 && s.pressure >= 35;

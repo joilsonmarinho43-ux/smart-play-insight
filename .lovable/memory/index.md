@@ -3,6 +3,8 @@ Updated: now
 
 # Project Memory
 
+- [Execução de Apostas](mem://constraints/betting-execution) — Sem API oficial Layback/Bolsa de Aposta; só modo simulação, arquitetura BettingProvider
+
 ## Core
 - **Stack**: React, Tailwind, Supabase Edge Functions. No Lovable references. Brand: 'Analista Joilson'.
 - **Design**: Sporty dark, orange/gold on navy/black. Bebas Neue (titles), Inter/Roboto. Numbers `.toFixed(1)`.

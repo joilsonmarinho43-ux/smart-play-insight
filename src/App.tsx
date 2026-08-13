@@ -29,6 +29,7 @@ import NotFound from "./pages/NotFound";
 import AutoPilot from "./pages/AutoPilot";
 import WorldCup from "./pages/WorldCup";
 import SuperbetConnect from "./pages/SuperbetConnect";
+import BettingExecution from "./pages/BettingExecution";
 import { AppLayout } from "./components/AppLayout";
 
 import { Loader2 } from "lucide-react";
@@ -109,6 +110,7 @@ const App = () => {
             <Route path="/quality" element={<AdminRoute><AppLayout><Quality /></AppLayout></AdminRoute>} />
             <Route path="/diagnostics" element={<AdminRoute><AppLayout><Diagnostics /></AppLayout></AdminRoute>} />
             <Route path="/context" element={<AdminRoute><AppLayout><Context /></AppLayout></AdminRoute>} />
+            <Route path="/betting-execution" element={<AdminRoute><AppLayout><BettingExecution /></AppLayout></AdminRoute>} />
             
             {/* Rotas de Fluxo de Usuário */}
             <Route path="/expired" element={<Paywall />} />

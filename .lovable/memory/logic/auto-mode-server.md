@@ -9,10 +9,16 @@ Edge function `auto-mode-server` envia sinais Over 1.5 FT ao Telegram.
 ## Tiers (prioridade SUPER > SNIPER > SEMI)
 - **SUPER_SNIPER 💀**: 0x0, min 12-28, SoG≥4, DA≥12, corners≥3, posse≥58%, pressão≥75, RMA≥28. Sensitivity: `premium`.
 - **SNIPER 🔥**: 0x0, min **8-28**, SoG≥3, posse≥55, DA≥8, corners≥2, pressão≥60. Sensitivity: `agressivo`.
-- **SEMI ⚡**: **somente 0x0** (1x0/0x1 bloqueado — odd sem valor após o 1º gol), min **8-35** (não aceita HT/2ºT), SoG≥**2**, posse≥**52**, DA≥**5** **REAL** (não estimado), corners≥1, pressão≥**35**. Sensitivity: `moderado`. 🔒 Bloqueia DA estimado + 🔒 **Filtro de posse estéril**: se min≥20 e posse≥60% sem penetração (SIB≥2 OR BS≥2 OR SoG≥2) OU DA/Attacks<0.35 → bloqueia. Bypass quando SoG≥3 ou pressão≥70 (preserva sensibilidade em jogos intensos).
+- **SEMI ⚡**: **somente 0x0**, min **8-25** (após 25' não há tempo para 2 gols), SoG≥**3**, posse≥**55**, DA≥**8** **REAL** (não estimado), corners≥**2**, pressão≥**50**. Sensitivity: `moderado`. 🔒 Bloqueia DA estimado + filtro de posse estéril.
+
+## Gate Poisson (0x0 → precisa de 2 gols)
+`_shared/goalProjection.ts` calcula xG/min por eventos reais (SoG 0.09, chute fora 0.025, DA 0.012, escanteio 0.022) × fator de pressão, projeta λ até o min 90 e exige P(≥2 gols):
+- auto-mode: SUPER ≥55%, SNIPER ≥58%, SEMI ≥62%
+- scanner-pro (Over 1.5 FT): ≥60%, além de min ≤25, SoG≥3, DA≥8, pressão≥50, λ≥2.2
 
 ## Regra global de valor (Over 1.5)
-Nenhum sinal Over 1.5 é enviado com gol já marcado nem após o min 35 — vale para `auto-mode-server` e `scanner-pro-server` (este último exige odd estimada entre **1.40 e 1.90**).
+Nenhum sinal Over 1.5 é enviado com gol já marcado nem após o min 25 — vale para `auto-mode-server` e `scanner-pro-server` (este último exige odd estimada entre **1.40 e 1.90**).
+
 
 ## RMA + Hard Blocks
 `score = pressão×0.30 + ap_norm×0.35 + f_norm×0.15 + sot_norm×0.20 + leagueWeight + momentumDelta`

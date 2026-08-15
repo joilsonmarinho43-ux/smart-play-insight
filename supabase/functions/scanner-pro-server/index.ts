@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynamicConfidence.ts';
 import { classifyConfidence, resolveMatchConfidence, logConfidenceDecision } from '../_shared/confidencePolicy.ts';
+import { projectGoals } from '../_shared/goalProjection.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -245,7 +246,7 @@ function sniperScan(match: any): SniperSignal | null {
   // ═══════════════════════════════════════
   // 🔒 VALOR DE ODD: só entra em Over 1.5 com 0x0 e até o minuto 35.
   // Com gol já marcado (ou tarde demais) a odd cai para ~1.15-1.25 → entrada sem valor.
-  if (totalGoals === 0 && minute <= 35) {
+  if (totalGoals === 0 && minute <= 25) {
     const remainingNeeded = 2 - totalGoals;
     const remainingMin = Math.max(1, 90 - minute);
     const remainingLambda = totalLambda * (remainingMin / 90);
@@ -264,15 +265,25 @@ function sniperScan(match: any): SniperSignal | null {
 
     const { odd: oddFT, ev: evFT } = estimateOddAndEV(probFT, 'Over 1.5 Gols');
 
+    // 🔒 GATE POISSON por eventos reais — 0x0 precisa de 2 gols
+    const totalCornersLive = (lH.corners || 0) + (lA.corners || 0);
+    const proj = projectGoals({ minute, sog: totalSoG, totalShots, da: totalDA, corners: totalCornersLive, pressure });
+    if (proj.probAtLeast2 < 0.60) {
+      console.log(`[SNIPER] 🔴 Poisson bloqueou FT: ${baseInfo.match} min ${minute} • P(≥2)=${(proj.probAtLeast2 * 100).toFixed(0)}% (λ=${proj.lambdaRemaining})`);
+    }
+
     // FT rules — padrão alto
     const ftValid =
+      proj.probAtLeast2 >= 0.60 &&
       probFT >= 80 &&
-      pressure >= 40 &&
-      totalDA >= 5 &&
-      totalLambda >= 2.0 &&
+      pressure >= 50 &&
+      totalSoG >= 3 &&
+      totalDA >= 8 &&
+      totalLambda >= 2.2 &&
       oddFT >= 1.40 && oddFT <= 1.90 &&
       evFT > 0 &&
       rma.verdict !== 'BLOQUEADO';
+
 
     if (ftValid) {
       const score = oppScore(probFT, evFT, pressure);

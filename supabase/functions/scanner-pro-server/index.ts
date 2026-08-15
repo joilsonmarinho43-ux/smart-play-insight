@@ -266,7 +266,8 @@ function sniperScan(match: any): SniperSignal | null {
     const { odd: oddFT, ev: evFT } = estimateOddAndEV(probFT, 'Over 1.5 Gols');
 
     // 🔒 GATE POISSON por eventos reais — 0x0 precisa de 2 gols
-    const proj = projectGoals({ minute, sog: totalSoG, totalShots, da: totalDA, corners: totalCorners, pressure });
+    const totalCornersLive = (lH.corners || 0) + (lA.corners || 0);
+    const proj = projectGoals({ minute, sog: totalSoG, totalShots, da: totalDA, corners: totalCornersLive, pressure });
     if (proj.probAtLeast2 < 0.60) {
       console.log(`[SNIPER] 🔴 Poisson bloqueou FT: ${baseInfo.match} min ${minute} • P(≥2)=${(proj.probAtLeast2 * 100).toFixed(0)}% (λ=${proj.lambdaRemaining})`);
     }

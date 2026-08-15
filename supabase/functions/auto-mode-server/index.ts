@@ -237,17 +237,16 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
     s.homeGoals === 0 && s.awayGoals === 0 &&
     s.sog >= 3 && s.dominantPoss >= 55 && s.da >= 8 && s.corners >= 2 && s.pressure >= 60;
 
-  // SEMI — janela endurecida: 8-35 (não aceita HT min 38-45 nem 2º tempo)
-  // Histórico: min ≥ 38 = 56% acerto, min 45 = 67%, min ≥ 50 = 38%. Zona dourada: 8-35.
+  // SEMI — janela endurecida: 8-25 (0x0 em Over 1.5 exige DOIS gols; após 25' o tempo
+  // restante não sustenta a probabilidade). Histórico pós-atualização: excesso de loss
+  // vinha de SEMI fraco entre 26' e 35'.
   // 🔒 Anti-falso-positivo: SEMI só aceita DA REAL do feed.
-  // Calibração 27/05: 3/3 losses do dia eram SEMI com DA estimado (≈) em ligas SA travadas.
   // 🔒 VALOR DE ODD: Over 1.5 só tem odd paga com placar 0x0.
-  // Com 1 gol já marcado o mercado vira "falta 1 gol" (odd ~1.15-1.25) → sem valor.
   const totalGoals = s.homeGoals + s.awayGoals;
-  const semiWindowOk = totalGoals === 0 && s.minute >= 8 && s.minute <= 35;
+  const semiWindowOk = totalGoals === 0 && s.minute >= 8 && s.minute <= 25;
   const isSemi = !isSuperSniper && !isSniper && semiWindowOk &&
     !s.daEstimated &&
-    s.sog >= 2 && s.dominantPoss >= 52 && s.da >= 5 && s.corners >= 1 && s.pressure >= 35;
+    s.sog >= 3 && s.dominantPoss >= 55 && s.da >= 8 && s.corners >= 2 && s.pressure >= 50;
 
   if (!isSuperSniper && !isSniper && !isSemi) return null;
 
@@ -259,6 +258,21 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
       return null;
     }
   }
+
+  // 🔒 GATE POISSON — jogo 0x0 precisa de 2 gols para pagar Over 1.5.
+  // Exige probabilidade real de ≥2 gols no tempo restante.
+  if (totalGoals === 0) {
+    const proj = projectGoals({
+      minute: s.minute, sog: s.sog, totalShots: s.totalShots,
+      da: s.da, corners: s.corners, pressure: s.pressure,
+    });
+    const minP2 = isSuperSniper ? 0.55 : isSniper ? 0.58 : 0.62;
+    if (proj.probAtLeast2 < minP2) {
+      console.log(`[AUTO-MODE-SERVER] 🔴 Poisson bloqueou: ${s.homeTeam} vs ${s.awayTeam} min ${s.minute} • P(≥2)=${(proj.probAtLeast2 * 100).toFixed(0)}% < ${(minP2 * 100).toFixed(0)}% (λ=${proj.lambdaRemaining})`);
+      return null;
+    }
+  }
+
 
   const tier: HybridTier = isSuperSniper ? 'SUPER_SNIPER' : isSniper ? 'SNIPER' : 'SEMI';
   const market = 'Over 1.5';

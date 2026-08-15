@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynamicConfidence.ts';
 import { isWorldCupLeague } from '../_shared/worldCup.ts';
 import { classifyConfidence, resolveMatchConfidence, logConfidenceDecision } from '../_shared/confidencePolicy.ts';
+import { projectGoals } from '../_shared/goalProjection.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

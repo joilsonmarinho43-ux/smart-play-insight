@@ -50,8 +50,8 @@ const Auth = () => {
         }
         navigate('/');
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim().toLowerCase(),
           password,
           options: { emailRedirectTo: window.location.origin },
         });
@@ -59,22 +59,38 @@ const Auth = () => {
           console.error('[AUTH] signUp error:', error);
           throw error;
         }
-        navigate('/');
+        if (data.session) {
+          navigate('/');
+        } else {
+          setMessage('Conta criada! Confirme seu e-mail para acessar (verifique também o spam).');
+        }
       }
     } catch (err: any) {
-      let msg = err.message || 'Erro inesperado';
-      if (err.message === 'Invalid login credentials') {
+      const raw = err?.message || 'Erro inesperado';
+      let msg = raw;
+      if (raw === 'Invalid login credentials') {
         msg = 'E-mail ou senha incorretos.';
-      } else if (err.message?.includes('User already registered')) {
-        msg = 'E-mail já cadastrado. Faça login.';
-      } else if (err.message?.includes('Password should be')) {
+      } else if (/already registered|already been registered/i.test(raw)) {
+        msg = 'E-mail já cadastrado. Faça login ou use "Esqueci minha senha".';
+      } else if (/Password should be|at least 6/i.test(raw)) {
         msg = 'Senha muito curta (mínimo 6 caracteres).';
+      } else if (/invalid.*email|email address.*invalid/i.test(raw)) {
+        msg = 'E-mail inválido. Confira se digitou corretamente.';
+      } else if (/Database error saving new user/i.test(raw)) {
+        msg = 'Falha ao criar o perfil. Tente novamente em instantes ou fale com o suporte.';
+      } else if (/rate limit|too many|429/i.test(raw)) {
+        msg = 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
+      } else if (/Signups not allowed|signup.*disabled/i.test(raw)) {
+        msg = 'Cadastros temporariamente desativados. Fale com o suporte no WhatsApp.';
+      } else if (/sending confirmation|confirmation email/i.test(raw)) {
+        msg = 'Não foi possível enviar o e-mail de confirmação. Fale com o suporte no WhatsApp.';
       }
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">

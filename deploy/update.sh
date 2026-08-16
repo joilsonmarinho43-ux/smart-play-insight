@@ -14,6 +14,29 @@ if [ ! -f "$VAULT" ]; then
 fi
 
 if [ -d supabase-docker ]; then
+  # Mantém o cadastro habilitado também em instalações já existentes.
+  # Alterar somente o .env não basta: o container de Auth precisa ser recriado
+  # para receber ENABLE_EMAIL_SIGNUP/AUTOCONFIRM atualizados.
+  python3 - <<'PY'
+import re
+
+path = "supabase-docker/.env"
+text = open(path).read()
+values = {
+    "ENABLE_EMAIL_SIGNUP": "true",
+    "ENABLE_EMAIL_AUTOCONFIRM": "true",
+    "DISABLE_SIGNUP": "false",
+}
+for key, value in values.items():
+    pattern = rf"(?m)^{re.escape(key)}=.*$"
+    if re.search(pattern, text):
+        text = re.sub(pattern, f"{key}={value}", text)
+    else:
+        text += f"\n{key}={value}"
+open(path, "w").write(text.rstrip() + "\n")
+PY
+
+  (cd supabase-docker && docker compose up -d --force-recreate auth)
   # Edge functions
   bash deploy/sync-functions.sh
   # re-declara TODOS os secrets (deploy/.env + cofre) e reinicia o edge-runtime

@@ -117,6 +117,11 @@ set_env deploy/.env VITE_SUPABASE_URL "https://${API_DOMAIN}"
 set_env deploy/.env VITE_SUPABASE_PUBLISHABLE_KEY "$ANON_KEY"
 set_env deploy/.env VITE_SUPABASE_PROJECT_ID "${VITE_SUPABASE_PROJECT_ID:-selfhosted}"
 set_env deploy/.env APP_PUBLIC_URL "${APP_PUBLIC_URL:-https://${APP_DOMAIN}}"
+# Cadastro de novos usuários: sem SMTP configurado o GoTrue falha ao enviar o
+# e-mail de confirmação e o signup quebra. Auto-confirma por padrão.
+set_env supabase-docker/.env ENABLE_EMAIL_SIGNUP true
+set_env supabase-docker/.env ENABLE_EMAIL_AUTOCONFIRM "${ENABLE_EMAIL_AUTOCONFIRM:-true}"
+set_env supabase-docker/.env DISABLE_SIGNUP false
 # o código aceita TELEGRAM_BOT_TOKEN ou TELEGRAM_API_KEY — espelha os dois
 if [ -n "${TELEGRAM_BOT_TOKEN:-}${TELEGRAM_API_KEY:-}" ]; then
   set_env deploy/.env TELEGRAM_BOT_TOKEN "${TELEGRAM_BOT_TOKEN:-${TELEGRAM_API_KEY:-}}"

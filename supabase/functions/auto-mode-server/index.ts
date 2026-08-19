@@ -309,6 +309,7 @@ function classifyServer(match: any, rmaScorePreview: number): HybridSignal | nul
       daTotal: s.da,
       pressure: s.pressure,
       pressureRecent: s.pressure,
+      requiredGoals: 2,
     });
     console.log(`[DYN-CONF ${tier}] ${s.homeTeam} vs ${s.awayTeam} min ${s.minute}: ${confidence}% → ${dyn.confidence}% • ${dyn.reason}`);
     confidence = dyn.confidence;

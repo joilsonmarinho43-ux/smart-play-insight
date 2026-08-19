@@ -52,6 +52,10 @@ function safeDangerousAttacks(stats: any): number {
   return ((stats.totalShots || stats.shotsOnGoal || 0) * 1.5) + ((stats.corners || 0) * 2);
 }
 
+function hasRealDangerousAttacks(stats: any): boolean {
+  return Number(stats?.dangerousAttacks || 0) > 0;
+}
+
 function calculatePressure(h: any, a: any): number {
   const hDA = safeDangerousAttacks(h || {});
   const aDA = safeDangerousAttacks(a || {});
@@ -156,8 +160,10 @@ function sniperScan(match: any): SniperSignal | null {
 
   const pressure = calculatePressure(lH, lA);
   const totalDA = safeDangerousAttacks(lH) + safeDangerousAttacks(lA);
+  const daEstimated = !hasRealDangerousAttacks(lH) || !hasRealDangerousAttacks(lA);
   const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
   const totalSoG = (lH.shotsOnGoal || 0) + (lA.shotsOnGoal || 0);
+  const totalCorners = (lH.corners || 0) + (lA.corners || 0);
 
   // ─── Lambdas
   const hSoG = lH.shotsOnGoal || 0;
@@ -209,6 +215,7 @@ function sniperScan(match: any): SniperSignal | null {
         minute, homeGoals, awayGoals,
         sotTotal: totalSoG, shotsTotal: totalShots, daTotal: totalDA,
         pressure, pressureRecent: pressure,
+        requiredGoals: 1,
       });
       console.log(`[DYN-CONF HT] ${baseInfo.match} min ${minute}: ${probHT}% → ${dyn.confidence}% • ${dyn.reason}`);
       probHT = dyn.confidence;
@@ -222,8 +229,7 @@ function sniperScan(match: any): SniperSignal | null {
       pressure >= 55 &&       // pressão MUITO alta
       totalDA >= 8 &&         // ataques perigosos consistentes
       ritmo !== 'Lento 🐌' &&  // jogo não pode ser lento
-      oddHT >= 1.30 &&
-      evHT > 0 &&
+      (totalSoG >= 3 || (totalSoG >= 2 && totalCorners >= 2)) &&
       rma.verdict !== 'BLOQUEADO';
 
     if (htValid) {
@@ -258,6 +264,7 @@ function sniperScan(match: any): SniperSignal | null {
         minute, homeGoals, awayGoals,
         sotTotal: totalSoG, shotsTotal: totalShots, daTotal: totalDA,
         pressure, pressureRecent: pressure,
+        requiredGoals: 2,
       });
       console.log(`[DYN-CONF FT] ${baseInfo.match} min ${minute}: ${probFT}% → ${dyn.confidence}% • ${dyn.reason}`);
       probFT = dyn.confidence;
@@ -266,8 +273,7 @@ function sniperScan(match: any): SniperSignal | null {
     const { odd: oddFT, ev: evFT } = estimateOddAndEV(probFT, 'Over 1.5 Gols');
 
     // 🔒 GATE POISSON por eventos reais — 0x0 precisa de 2 gols
-    const totalCornersLive = (lH.corners || 0) + (lA.corners || 0);
-    const proj = projectGoals({ minute, sog: totalSoG, totalShots, da: totalDA, corners: totalCornersLive, pressure });
+    const proj = projectGoals({ minute, sog: totalSoG, totalShots, da: totalDA, corners: totalCorners, pressure });
     if (proj.probAtLeast2 < 0.60) {
       console.log(`[SNIPER] 🔴 Poisson bloqueou FT: ${baseInfo.match} min ${minute} • P(≥2)=${(proj.probAtLeast2 * 100).toFixed(0)}% (λ=${proj.lambdaRemaining})`);
     }
@@ -279,9 +285,7 @@ function sniperScan(match: any): SniperSignal | null {
       pressure >= 50 &&
       totalSoG >= 3 &&
       totalDA >= 8 &&
-      totalLambda >= 2.2 &&
-      oddFT >= 1.40 && oddFT <= 1.90 &&
-      evFT > 0 &&
+      (!daEstimated || (totalSoG >= 4 && totalShots >= 7 && totalCorners >= 2)) &&
       rma.verdict !== 'BLOQUEADO';
 
 
@@ -301,10 +305,14 @@ function sniperScan(match: any): SniperSignal | null {
   }
 
   // ═══════════════════════════════════════
-  // PRIORIDADE: HT timing perfeito (10-25 + pressão alta) → HT, senão → FT
+  // ROTEAMENTO DE MERCADO: mantém o volume, mas escolhe o mercado cuja
+  // exigência combina melhor com o estado observado. HT pede explosão imediata;
+  // FT pede sustentação suficiente para dois gols.
   // ═══════════════════════════════════════
   if (htSignal && ftSignal) {
-    if (minute >= 10 && minute <= 25 && pressure >= 55) {
+    const htUrgency = htSignal.probability + Math.min(8, totalSoG * 2 + totalCorners);
+    const ftStrength = ftSignal.probability + Math.min(8, totalShots / 2 + totalSoG);
+    if (minute >= 14 && htUrgency >= ftStrength + 2) {
       console.log(`[SNIPER] ⚡ HT priorizado sobre FT: ${baseInfo.match} min ${minute}`);
       return htSignal;
     }
@@ -502,7 +510,7 @@ Deno.serve(async (req) => {
         minute: signal.minute,
         score: `${signal.homeGoals}-${signal.awayGoals}`,
         odd_min: String(signal.odd),
-        reason: `Sniper Dual Mode • EV ${signal.ev > 0 ? '+' : ''}${signal.ev} • Odd ${signal.odd} • Pressão ${signal.pressure}% • ${signal.ritmo} • RMA ${signal.rmaVerdict}`,
+        reason: `Sniper Dual Mode • Odd de referência ${signal.odd} • Pressão ${signal.pressure}% • ${signal.ritmo} • RMA ${signal.rmaVerdict}`,
         success: tgRes.ok,
         error_message: tgRes.ok ? null : JSON.stringify(tgData),
         telegram_message_id: telegramMessageId,

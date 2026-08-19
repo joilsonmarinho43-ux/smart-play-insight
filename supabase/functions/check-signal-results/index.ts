@@ -11,6 +11,15 @@ function checkMarketResult(market: string, homeGoals: number, awayGoals: number,
   const totalGoals = homeGoals + awayGoals;
   const marketLower = market.toLowerCase();
 
+  // Mercados por período precisam ser tratados ANTES do regex genérico.
+  // Caso contrário "Over 0.5 HT" vira Over 0.5 FT e um gol no segundo tempo
+  // é registrado incorretamente como GREEN.
+  if (marketLower.includes('over 0.5 ht') || marketLower.includes('over 0.5 1t')) {
+    if (totalGoals > 0) return 'green';
+    if (matchFinished) return 'loss';
+    return 'pendente';
+  }
+
   const overMatch = marketLower.match(/over\s*(\d+\.?\d*)\s*(?:gols|goals)?/);
   if (overMatch) {
     const threshold = parseFloat(overMatch[1]);
@@ -45,13 +54,6 @@ function checkMarketResult(market: string, homeGoals: number, awayGoals: number,
     if (matchFinished) {
       return totalGoals > 0 ? 'green' : 'loss';
     }
-    return 'pendente';
-  }
-
-  // Over 0.5 HT — special handling
-  if (marketLower.includes('over 0.5 ht') || marketLower.includes('over 0.5 1t')) {
-    if (totalGoals > 0) return 'green';
-    if (matchFinished) return 'loss';
     return 'pendente';
   }
 
@@ -150,10 +152,16 @@ Deno.serve(async (req) => {
             const cornerStat = (team.statistics || []).find((s: any) => s.type === 'Corner Kicks');
             corners += (cornerStat?.value ?? 0);
           }
-          // If we have cached stats, the match is likely finished
-          matchData[mId] = {
-            homeGoals: 0, awayGoals: 0, corners, finished: true, status: 'FT',
-          };
+          // Estatísticas sem placar não podem resolver a aposta. Marcar 0x0
+          // aqui transformava partidas ausentes em LOSS falso.
+          const fixture = cached.dados_json.fixture || resArr[0]?.fixture;
+          const goals = cached.dados_json.goals || resArr[0]?.goals;
+          if (goals && Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away))) {
+            matchData[mId] = {
+              homeGoals: Number(goals.home), awayGoals: Number(goals.away), corners,
+              finished: ['FT', 'AET', 'PEN'].includes(String(fixture?.status?.short || '')), status: fixture?.status?.short || '',
+            };
+          }
         }
       }
 
@@ -167,14 +175,20 @@ Deno.serve(async (req) => {
             body: JSON.stringify({ fixture: id }),
           });
           const json = await resp.json();
-          const teams = json?.response || [];
+           const teams = json?.response || [];
           const corners = teams.reduce((sum: number, t: any) => {
             const cs = (t.statistics || []).find((s: any) => s.type === 'Corner Kicks');
             return sum + Number(cs?.value ?? 0);
           }, 0);
-          matchData[String(id)] = {
-            homeGoals: 0, awayGoals: 0, corners, finished: true, status: 'FT',
-          };
+           const resolvedMatch = json?.matches?.[0] || json?.match || json?.fixture;
+           const goals = resolvedMatch?.goals;
+           const status = resolvedMatch?.fixture?.status?.short || resolvedMatch?.status?.short || '';
+           if (goals && Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away))) {
+             matchData[String(id)] = {
+               homeGoals: Number(goals.home), awayGoals: Number(goals.away), corners,
+               finished: ['FT', 'AET', 'PEN'].includes(status), status,
+             };
+           }
         } catch (e) {
           console.error(`SportsRC stats fetch failed for ${id}:`, e);
         }

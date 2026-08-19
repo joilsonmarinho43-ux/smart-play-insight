@@ -21,6 +21,7 @@ export interface LiveSnapshot {
   isHomeFavorite?: boolean;        // p/ DI; default false
   ratingFavMinusUnd?: number;      // diff rating/odds, p/ deficit
   xgEstimateTotal?: number;        // xG acumulado (opcional)
+  requiredGoals?: 1 | 2;           // gols necessários para liquidar o mercado
 }
 
 export interface DynamicConfResult {
@@ -70,8 +71,13 @@ export function dynamicConfidence(
   const ratePerMin = Math.max(0.003, xgResid / Math.max(t, 1));
   const lambdaDyn = ratePerMin * minutesLeft;
 
-  // 5) Confiança dinâmica (chance de pelo menos +1 gol até o fim)
-  const dynProb = (1 - Math.exp(-lambdaDyn)) * 100;
+  // 5) Confiança dinâmica específica do mercado. Over 1.5 em 0x0 precisa
+  // de DOIS gols; usar P(>=1) aqui inflava artificialmente essa entrada.
+  const requiredGoals = snap.requiredGoals ?? 1;
+  const p0 = Math.exp(-lambdaDyn);
+  const dynProb = (requiredGoals === 2
+    ? 1 - p0 - lambdaDyn * p0
+    : 1 - p0) * 100;
 
   // 6) Combina raw com dinâmica:
   //   - peso pré-jogo decai com o tempo
@@ -82,7 +88,7 @@ export function dynamicConfidence(
 
   const confidence = Math.max(0, Math.min(CONFIDENCE_CAP, Math.round(blended * di)));
 
-  const reason = `decay=${decayWeight.toFixed(2)} dyn=${dynProb.toFixed(0)}% λ=${lambdaDyn.toFixed(2)} DI=${di.toFixed(2)}${triggered ? ' [TRIGGER]' : ' [no-trigger]'}`;
+  const reason = `decay=${decayWeight.toFixed(2)} dyn=P(≥${requiredGoals})${dynProb.toFixed(0)}% λ=${lambdaDyn.toFixed(2)} DI=${di.toFixed(2)}${triggered ? ' [TRIGGER]' : ' [no-trigger]'}`;
 
   return { confidence, lambdaDyn, di, triggered, decayWeight, reason };
 }

@@ -34,10 +34,16 @@ export function projectGoals(i: GoalProjectionInput): GoalProjection {
     (i.da || 0) * 0.012 +
     (i.corners || 0) * 0.022;
 
-  let ratePerMin = xgSoFar / min;
+  // Regressão Bayesiana para não extrapolar 8-12 minutos como se o ritmo
+  // inicial fosse durar a partida inteira. O peso da amostra cresce com o
+  // relógio; antes disso, mistura com baseline neutro de 2.55 gols/90.
+  const observedRate = xgSoFar / min;
+  const priorRate = 2.55 / 90;
+  const evidenceWeight = Math.min(0.82, Math.max(0.30, min / (min + 18)));
+  let ratePerMin = observedRate * evidenceWeight + priorRate * (1 - evidenceWeight);
 
   // Ajuste leve por pressão atual (jogo esquentando ou esfriando)
-  const pressureFactor = 0.85 + Math.min(0.35, (i.pressure || 0) / 200);
+  const pressureFactor = 0.90 + Math.min(0.20, (i.pressure || 0) / 350);
   ratePerMin *= pressureFactor;
 
   const remaining = Math.max(0, 90 - i.minute);

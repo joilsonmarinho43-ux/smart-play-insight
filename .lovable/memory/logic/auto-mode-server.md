@@ -17,7 +17,7 @@ Edge function `auto-mode-server` envia sinais Over 1.5 FT ao Telegram.
 - scanner-pro (Over 1.5 FT): ≥60%, além de min ≤25, SoG≥3, DA≥8, pressão≥50, λ≥2.2
 
 ## Regra global de valor (Over 1.5)
-Nenhum sinal Over 1.5 é enviado com gol já marcado nem após o min 25 — vale para `auto-mode-server` e `scanner-pro-server` (este último exige odd estimada entre **1.40 e 1.90**).
+Nenhum sinal Over 1.5 é enviado com gol já marcado nem após o min 25 — vale para `auto-mode-server` e `scanner-pro-server`. Odds derivadas da própria probabilidade são apenas referência e **não podem bloquear entradas** como se fossem cotações reais da casa.
 
 ## Diretriz de refinamento (ago/2026)
 - O objetivo é **manter volume com melhor seleção de mercado**, não reduzir sinais por endurecimento indiscriminado.

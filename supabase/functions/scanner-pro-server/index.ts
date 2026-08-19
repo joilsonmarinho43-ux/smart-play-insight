@@ -229,7 +229,6 @@ function sniperScan(match: any): SniperSignal | null {
       pressure >= 55 &&       // pressão MUITO alta
       totalDA >= 8 &&         // ataques perigosos consistentes
       ritmo !== 'Lento 🐌' &&  // jogo não pode ser lento
-      oddHT >= 1.30 &&
       (totalSoG >= 3 || (totalSoG >= 2 && totalCorners >= 2)) &&
       rma.verdict !== 'BLOQUEADO';
 
@@ -287,8 +286,6 @@ function sniperScan(match: any): SniperSignal | null {
       totalSoG >= 3 &&
       totalDA >= 8 &&
       (!daEstimated || (totalSoG >= 4 && totalShots >= 7 && totalCorners >= 2)) &&
-      totalLambda >= 2.2 &&
-      oddFT >= 1.40 && oddFT <= 1.90 &&
       rma.verdict !== 'BLOQUEADO';
 
 

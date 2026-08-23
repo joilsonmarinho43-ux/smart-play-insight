@@ -107,7 +107,7 @@ const TopWinsSuggestion = ({ matches }: Props) => {
         <Crown className="w-8 h-8 text-orange-400/60 mx-auto mb-3" />
         <h3 className="text-sm font-bold text-white mb-1">Nenhuma entrada aprovada hoje</h3>
         <p className="text-xs text-gray-500 leading-relaxed">
-          Analisamos {matches?.length ?? 0} jogos, mas nenhum atingiu os critérios do Bingo VIP PRO
+          Analisamos {matches?.length ?? 0} jogos. Só entram ligas com mercado nas casas de aposta
           (favorito ≥ 45%, margem ≥ 12% e empate ≤ 35%, com histórico de pelo menos 4 jogos por equipe).
         </p>
       </div>

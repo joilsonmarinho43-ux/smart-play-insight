@@ -148,7 +148,7 @@ function evaluateIntensity(match: MatchData): number {
 function hasEnoughData(match: MatchData): boolean {
   const hGames = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount || 0;
   const aGames = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount || 0;
-  return hGames >= 3 && aGames >= 3;
+  return hGames >= 4 && aGames >= 4;
 }
 
 function hasGoalsData(match: MatchData): boolean {

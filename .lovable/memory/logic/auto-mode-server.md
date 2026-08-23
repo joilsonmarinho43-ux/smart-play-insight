@@ -25,6 +25,8 @@ Nenhum sinal Over 1.5 é enviado com gol já marcado nem após o min 25 — vale
 - O ritmo inicial passa por regressão Bayesiana antes da projeção até 90', evitando extrapolação excessiva de amostras curtas.
 - Quando HT e FT qualificarem juntos, escolher pelo perfil do jogo: explosão imediata → HT; pressão sustentada → FT.
 - DA estimado só sustenta FT quando confirmado por SoG, chutes e escanteios reais.
+- Auto Mode e Scanner usam o mesmo RMA compartilhado e enviam pelo mesmo `telegram-signal`; nenhum emissor deve gravar/enviar diretamente por fora do claim central.
+- Resultado sem placar real permanece pendente; idade do sinal ou ausência no feed não pode ser convertida em LOSS.
 
 
 ## RMA + Hard Blocks

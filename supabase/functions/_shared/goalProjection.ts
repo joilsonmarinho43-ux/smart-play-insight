@@ -42,9 +42,8 @@ export function projectGoals(i: GoalProjectionInput): GoalProjection {
   const evidenceWeight = Math.min(0.82, Math.max(0.30, min / (min + 18)));
   let ratePerMin = observedRate * evidenceWeight + priorRate * (1 - evidenceWeight);
 
-  // Ajuste leve por pressão atual (jogo esquentando ou esfriando)
-  const pressureFactor = 0.90 + Math.min(0.20, (i.pressure || 0) / 350);
-  ratePerMin *= pressureFactor;
+  // Não multiplicar pela pressão instantânea: ela já deriva de SoG, chutes,
+  // DA e cantos, que estão em xgSoFar. Reutilizá-la contaria os eventos duas vezes.
 
   const remaining = Math.max(0, 90 - i.minute);
   const lambda = ratePerMin * remaining;

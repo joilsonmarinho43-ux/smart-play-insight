@@ -4,6 +4,8 @@ import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import { localizeTeamName } from '@/lib/teamI18n';
 import TopWinsSuggestion from '@/components/TopWinsSuggestion';
+import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
+import { isPremiumLeague } from '@/lib/premiumLeagues';
 
 const Bingo = () => {
   const { data: matches = [], isLoading } = useQuery({
@@ -22,7 +24,11 @@ const Bingo = () => {
     time: m.fixture?.date
       ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
       : m.time || '',
-  }));
+  }))
+  .sort((a: any, b: any) => (isPremiumLeague(a.league) ? 0 : 1) - (isPremiumLeague(b.league) ? 0 : 1));
+
+  // Sem histórico real (>= 3 jogos por equipe) o Bingo descarta tudo — enriquece antes
+  const { matches: bingoReady, isEnriching } = useScannerEnrichment(safeMatches as any);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -39,7 +45,7 @@ const Bingo = () => {
           </div>
         </header>
 
-        {isLoading ? (
+        {isLoading || isEnriching ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
           </div>
@@ -49,7 +55,7 @@ const Bingo = () => {
           </div>
         ) : (
           <>
-            <TopWinsSuggestion matches={safeMatches} />
+            <TopWinsSuggestion matches={bingoReady as any} />
           </>
         )}
       </div>

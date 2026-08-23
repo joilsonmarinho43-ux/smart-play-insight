@@ -5,6 +5,8 @@ import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import { localizeTeamName } from '@/lib/teamI18n';
 import ElitePanel from '@/components/ElitePanel';
+import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
+import { isPremiumLeague } from '@/lib/premiumLeagues';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
 const Elite = () => {
@@ -25,7 +27,12 @@ const Elite = () => {
     time: m.fixture?.date
       ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
       : m.time || '',
-  }));
+  }))
+  // Ligas de elite primeiro: garantem histórico real dentro do limite de enriquecimento
+  .sort((a: any, b: any) => (isPremiumLeague(a.league) ? 0 : 1) - (isPremiumLeague(b.league) ? 0 : 1));
+
+  // Enriquece com o histórico real (últimos jogos) — sem isso nenhum jogo passa nos critérios
+  const { matches: eliteReady, isEnriching } = useScannerEnrichment(safeMatches as any);
 
   return (
     <div className="min-h-screen text-white pb-8 font-sans relative">
@@ -44,10 +51,10 @@ const Elite = () => {
           <h1 className="text-xl font-black uppercase tracking-wider">Elite Performance</h1>
         </div>
 
-        {isLoading ? (
-          <p className="text-center text-muted-foreground py-8">Carregando jogos...</p>
+        {isLoading || isEnriching ? (
+          <p className="text-center text-muted-foreground py-8">Carregando histórico real das equipes...</p>
         ) : (
-          <ElitePanel matches={safeMatches} />
+          <ElitePanel matches={eliteReady as any} />
         )}
       </main>
     </div>

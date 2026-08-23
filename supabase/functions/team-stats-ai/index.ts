@@ -46,6 +46,11 @@ function cacheKey(home: string, away: string) {
   return `team-stats-ai:${home.toLowerCase()}::${away.toLowerCase()}`;
 }
 
+function isEmptyStats(v: any): boolean {
+  const sum = (s: any) => Object.values(s || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0);
+  return sum(v?.home) <= 0 && sum(v?.away) <= 0;
+}
+
 async function cacheGet(key: string): Promise<any | null> {
   try {
     const { data } = await sb().from('cache_api')
@@ -54,17 +59,45 @@ async function cacheGet(key: string): Promise<any | null> {
     if (!data) return null;
     const ageH = (Date.now() - new Date(data.ultima_atualizacao).getTime()) / 3.6e6;
     if (ageH > 24) return null;
+    // NUNCA servir cache vazio (envenenado por rate-limit anterior)
+    if (isEmptyStats(data.dados_json)) return null;
     return data.dados_json;
   } catch { return null; }
 }
 
 async function cacheSet(key: string, value: any) {
+  if (isEmptyStats(value)) return; // não envenena o cache
   try {
     await sb().from('cache_api').upsert({
       cache_key: key, dados_json: value, ultima_atualizacao: new Date().toISOString(),
     }, { onConflict: 'cache_key' });
   } catch {}
 }
+
+/**
+ * Fallback determinístico: deriva médias de finalizações/escanteios/posse a
+ * partir das médias reais de gols (últimos 5 jogos) usando conversões
+ * padrão do futebol profissional. Marcado como `derived` na resposta.
+ */
+function derive(gf: number, ga: number, strongerSide: boolean): SideStats {
+  const g = Math.max(0.3, Number(gf) || 0);
+  const conc = Math.max(0.3, Number(ga) || 0);
+  const sot = g / 0.31;                    // ~31% de conversão de chutes no gol
+  const shots = sot / 0.36;                // ~36% dos chutes vão ao gol
+  return {
+    possession: Math.round((strongerSide ? 53 : 47) + (g - conc) * 3),
+    totalShots: Number(shots.toFixed(1)),
+    shotsOnGoal: Number(sot.toFixed(1)),
+    bigChances: Number((g * 1.35).toFixed(1)),
+    corners: Number((shots * 0.42).toFixed(1)),
+    offsides: Number((shots * 0.13).toFixed(1)),
+    fouls: Number((12 - (g - conc)).toFixed(1)),
+    yellowCards: Number((1.9 + (conc - g) * 0.2).toFixed(1)),
+    goalsFor: Number(g.toFixed(2)),
+    goalsAgainst: Number(conc.toFixed(2)),
+  };
+}
+
 
 function clean(s: any): SideStats {
   const n = (v: any, min = 0, max = 100) => {
@@ -94,11 +127,21 @@ Deno.serve(async (req) => {
     const home = String(body?.home || '').trim();
     const away = String(body?.away || '').trim();
     const league = String(body?.league || '').trim();
+    const hGF = Number(body?.homeGoalsAvg || 0);
+    const aGF = Number(body?.awayGoalsAvg || 0);
+    const hGA = Number(body?.homeGoalsAgainstAvg || 0);
+    const aGA = Number(body?.awayGoalsAgainstAvg || 0);
+    const canDerive = hGF > 0 && aGF > 0;
+    const derived = () => ({
+      home: derive(hGF, hGA || aGF, hGF >= aGF),
+      away: derive(aGF, aGA || hGF, aGF > hGF),
+    });
     if (!home || !away) {
       return new Response(JSON.stringify({ error: 'missing_teams' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     const key = cacheKey(home, away);
     const cached = await cacheGet(key);
@@ -174,14 +217,18 @@ Forneça as médias dos últimos 5 jogos OFICIAIS de cada equipe (qualquer compe
     }
 
     if (!resp) {
-      // Degrada silenciosamente: 200 com stats vazios para não quebrar a UI
-      const empty = { home: EMPTY, away: EMPTY };
-      await cacheSet(key, empty);
-      return new Response(JSON.stringify({
-        ok: false,
-        source: lastStatus === 429 ? 'rate_limited' : lastStatus === 402 ? 'credits_exhausted' : 'ai_unavailable',
-        ...empty,
-      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      // IA indisponível → deriva a partir das médias reais de gols (se houver)
+      const reason = lastStatus === 429 ? 'rate_limited' : lastStatus === 402 ? 'credits_exhausted' : 'ai_unavailable';
+      if (canDerive) {
+        const out = { home: clean(derived().home), away: clean(derived().away) };
+        await cacheSet(key, out);
+        return new Response(JSON.stringify({ ok: true, source: `derived:${reason}`, ...out }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ ok: false, source: reason, home: EMPTY, away: EMPTY }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const data = await resp.json();
@@ -193,10 +240,18 @@ Forneça as médias dos últimos 5 jogos OFICIAIS de cada equipe (qualquer compe
     }
     if (!parsed) {
       console.warn('team-stats-ai parse fail', String(raw).slice(0, 300));
+      if (canDerive) {
+        const out = { home: clean(derived().home), away: clean(derived().away) };
+        await cacheSet(key, out);
+        return new Response(JSON.stringify({ ok: true, source: 'derived:parse_fail', ...out }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(JSON.stringify({ ok: false, error: 'parse_fail', home: EMPTY, away: EMPTY }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     const out = { home: clean(parsed.home), away: clean(parsed.away) };
     await cacheSet(key, out);

@@ -83,8 +83,15 @@ const CorrectScore = () => {
         const d = m.__iso ? paraDateString(new Date(m.__iso)) : m.date || '';
         const league = m.league?.name || m.league || '';
         return (!selectedDate || d === selectedDate) && (!onlyPremium || isPremiumLeague(league));
+      })
+      // Ligas de elite primeiro: garantem histórico real dentro do limite de enriquecimento
+      .sort((a: any, b: any) => {
+        const pa = isPremiumLeague(a.league?.name || a.league || '') ? 0 : 1;
+        const pb = isPremiumLeague(b.league?.name || b.league || '') ? 0 : 1;
+        return pa - pb;
       });
   }, [rawMatches, dayOptions, selectedDay, onlyPremium]);
+
 
   // 2) Enriquece com os últimos jogos reais (mesma fonte do Scanner PRO)
   const { matches: enriched, isEnriching } = useScannerEnrichment(dayMatches as any);
@@ -181,11 +188,22 @@ const CorrectScore = () => {
 
         {!isFetching && !isEnriching && rows.length === 0 && (
           <div className="rounded-xl border border-white/10 bg-black/40 p-8 text-center text-sm text-gray-400">
-            {onlyReal
-              ? 'Nenhum jogo com histórico real confirmado para esta data. Desative "Só com dados reais" para ver as leituras indicativas.'
-              : 'Nenhum jogo disponível para esta data.'}
+            {onlyReal ? (
+              <>
+                <p>Nenhum jogo com histórico real confirmado para esta data.</p>
+                <button
+                  onClick={() => setOnlyReal(false)}
+                  className="mt-3 px-4 py-2 rounded-lg text-xs font-bold border border-orange-500/50 bg-orange-500/15 text-orange-400"
+                >
+                  Mostrar leituras indicativas
+                </button>
+              </>
+            ) : (
+              'Nenhum jogo disponível para esta data.'
+            )}
           </div>
         )}
+
 
 
 

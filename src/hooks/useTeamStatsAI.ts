@@ -30,6 +30,12 @@ export function useTeamStatsAI(match: MatchData | null | undefined, enabled = tr
   const away = match?.awayTeam || '';
   const league = match?.league || '';
 
+  const md = (match as any)?.modelData || {};
+  const homeGoalsAvg = Number(md.homeGoalsAvg || 0);
+  const awayGoalsAvg = Number(md.awayGoalsAvg || 0);
+  const homeGoalsAgainstAvg = Number(md.homeGoalsAgainstAvg || 0);
+  const awayGoalsAgainstAvg = Number(md.awayGoalsAgainstAvg || 0);
+
   // Já tem stats reais? não precisa de IA.
   const hs = (match as any)?.homeStats || {};
   const as_ = (match as any)?.awayStats || {};
@@ -39,14 +45,14 @@ export function useTeamStatsAI(match: MatchData | null | undefined, enabled = tr
     || Number(as_.totalShots || 0) > 0;
 
   return useQuery<AIStatsResponse>({
-    queryKey: ['team-stats-ai', home, away],
+    queryKey: ['team-stats-ai', home, away, homeGoalsAvg, awayGoalsAvg],
     enabled: enabled && Boolean(home && away) && !hasRealStats,
     staleTime: 1000 * 60 * 60 * 24,
     gcTime: 1000 * 60 * 60 * 24,
     retry: 0,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('team-stats-ai', {
-        body: { home, away, league },
+        body: { home, away, league, homeGoalsAvg, awayGoalsAvg, homeGoalsAgainstAvg, awayGoalsAgainstAvg },
       });
       if (error || !data?.ok) {
         return { ok: false, home: {} as AISideStats, away: {} as AISideStats };
@@ -55,6 +61,7 @@ export function useTeamStatsAI(match: MatchData | null | undefined, enabled = tr
     },
   });
 }
+
 
 export function mergeAIStatsIntoMatch(match: MatchData, ai?: AIStatsResponse | null): MatchData {
   if (!ai?.ok) return match;

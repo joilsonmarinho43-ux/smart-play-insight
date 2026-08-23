@@ -200,8 +200,14 @@ function StatsTab({ match }: { match: MatchData }) {
       <div className="flex items-center justify-between px-2 pb-1 mb-1 border-b border-border/30">
         <span className="text-[10px] font-bold text-[hsl(170,55%,42%)] uppercase tracking-wider">{match.homeTeam}</span>
         <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">
-          {(match as any).statsSource?.startsWith('ai') ? 'Estimativa IA · 5 jogos' : 'Média 5 jogos'}
+          {(() => {
+            const src = String((match as any).statsSource || '');
+            if (src.startsWith('derived')) return 'Modelo · médias reais';
+            if (src.startsWith('ai')) return 'Estimativa IA · 5 jogos';
+            return 'Média 5 jogos';
+          })()}
         </span>
+
         <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{match.awayTeam}</span>
       </div>
 

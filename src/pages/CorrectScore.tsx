@@ -44,6 +44,7 @@ const labelColor: Record<CorrectScoreRead['label'], string> = {
 const CorrectScore = () => {
   const [selectedDay, setSelectedDay] = useState(0);
   const [onlyPremium, setOnlyPremium] = useState(false);
+  const [onlyReal, setOnlyReal] = useState(true);
 
   const todayKey = getTodayInPara();
   const { data: rawMatches, isFetching } = useQuery({

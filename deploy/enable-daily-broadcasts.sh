@@ -50,8 +50,25 @@ SQL
 schedule 'daily-correct-score-broadcast' 'daily-correct-score-broadcast' "$HORA_PLACAR"
 schedule 'daily-bet-analyzer-broadcast'  'daily-bet-analyzer-broadcast'  "$HORA_ANALYZER"
 
+# Conferência automática do bilhete (WIN/LOSS) — a cada 30 minutos
+echo "→ daily-ticket-settle: a cada 30 min"
+docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
+SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = 'daily-ticket-settle';
+SELECT cron.schedule(
+  'daily-ticket-settle',
+  '*/30 * * * *',
+  \$\$
+  SELECT net.http_post(
+    url := 'https://${API}/functions/v1/daily-ticket-settle',
+    headers := '{"Content-Type":"application/json","apikey":"${ANON}","Authorization":"Bearer ${ANON}"}'::jsonb,
+    body := '{"source":"cron"}'::jsonb
+  );
+  \$\$
+);
+SQL
+
 docker exec -i supabase-db psql -U postgres -d postgres -c \
-  "SELECT jobname, schedule, active FROM cron.job WHERE jobname LIKE 'daily-%broadcast';"
+  "SELECT jobname, schedule, active FROM cron.job WHERE jobname LIKE 'daily-%';"
 
 echo
 echo "✅ Agendado. Teste manual:"

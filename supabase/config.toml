@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.daily-bet-analyzer-broadcast]
 verify_jwt = false
+
+[functions.daily-ticket-settle]
+verify_jwt = false

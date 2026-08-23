@@ -315,7 +315,9 @@ Deno.serve(async (req) => {
 
     try {
       const png = await svgToPng(buildSvg(top, dateLabel));
-      const r = await sendTelegramPhoto(botToken, TELEGRAM_CHAT_ID, png, caption, { tag: 'CS-PHOTO', filename: 'placar-exato.png' });
+      // Somente a foto — sem legenda (texto só entra se a imagem falhar)
+      const r = await sendTelegramPhoto(botToken, TELEGRAM_CHAT_ID, png, '', { tag: 'CS-PHOTO', filename: 'placar-exato.png' });
+
       if (r.ok) {
         sentAsPhoto = true;
         messageId = r.data?.result?.message_id ?? null;

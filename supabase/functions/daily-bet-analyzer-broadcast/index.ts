@@ -52,6 +52,8 @@ function buildSvg(cards: ScenarioCard[], dateLabel: string): string {
     <text x="980" y="${y + 48}" font-family="${F}" font-size="15" fill="#94a3b8" text-anchor="end">SCORE NEXUS</text>
     <text x="980" y="${y + 88}" font-family="${F}" font-size="38" font-weight="700" fill="${scoreColor}" text-anchor="end">${c.score}</text>
     <text x="980" y="${y + 114}" font-family="${F}" font-size="15" fill="#64748b" text-anchor="end">${svgEscape(c.rating)} • ${svgEscape(c.quality)}</text>
+    <text x="980" y="${y + 146}" font-family="${F}" font-size="15" fill="#94a3b8" text-anchor="end">${svgEscape(truncate(c.indicator.label, 26))}</text>
+    <text x="980" y="${y + 172}" font-family="${F}" font-size="24" font-weight="700" fill="${indColor}" text-anchor="end">${c.indicator.value}/100 ${svgEscape(c.indicator.level)}</text>
   </g>`;
   }).join('');
 

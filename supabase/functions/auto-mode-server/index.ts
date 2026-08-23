@@ -3,6 +3,7 @@ import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynami
 import { isWorldCupLeague } from '../_shared/worldCup.ts';
 import { classifyConfidence, resolveMatchConfidence, logConfidenceDecision } from '../_shared/confidencePolicy.ts';
 import { projectGoals } from '../_shared/goalProjection.ts';
+import { evaluateRMA } from '../_shared/rmaEngine.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,42 +13,6 @@ const corsHeaders = {
 // ═══════════════════════════════════════
 // RMA ENGINE (inline) — pesos rebalanceados + league_weight + momentum
 // ═══════════════════════════════════════
-function evaluateRMAServer(
-  minute: number,
-  pressure: number,
-  da: number,
-  shots: number,
-  sot: number,
-  leagueWeight = 0,
-  momentumDelta = 0,
-  daEstimated = false,
-): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number; blockReason?: string } {
-  const safeMin = Math.max(minute, 1);
-  const ap_norm = (da / safeMin) * 10;
-  const f_norm = (shots / safeMin) * 10;
-  const sot_norm = (sot / safeMin) * 10;
-  // Pesos: pressão 0.30, ap 0.35, f 0.15, sot 0.20
-  let rma_score = (pressure * 0.30) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.20);
-  rma_score += leagueWeight + momentumDelta;
-
-  // ── HARD BLOCK 1: pressão fake premium (endurecido) ──
-  // pressão alta + DA estimado + SoG fraco = ilusão estatística
-  if (pressure > 70 && sot <= 2 && daEstimated) {
-    return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake premium (prs>70, SoG≤2, DA estimado)' };
-  }
-
-  // ── HARD BLOCK 2: SoG por minuto muito baixo (sem finalização real) ──
-  if (sot_norm < 0.6) {
-    return { verdict: 'BLOQUEADO', score: rma_score, blockReason: `sot_norm baixo (${sot_norm.toFixed(2)})` };
-  }
-
-  if (ap_norm < 1.5) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'ap_norm < 1.5' };
-  if (pressure > 60 && da === 0) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão alta sem DA' };
-  if (sot_norm === 0) return { verdict: 'NEUTRO', score: rma_score };
-  const verdict = rma_score > 40 ? 'CONFIRMADO' as const : rma_score >= 20 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
-  return { verdict, score: Math.round(rma_score * 100) / 100 };
-}
-
 // ═══════════════════════════════════════
 // LEAGUE WEIGHT — qualidade estatística da liga
 // ═══════════════════════════════════════
@@ -424,7 +389,11 @@ Deno.serve(async (req) => {
       const leagueWeight = getLeagueWeight(s.league);
 
       // RMA com ajustes (usado também como preview para SUPER SNIPER)
-      const rma = evaluateRMAServer(s.minute, s.pressure, s.da, s.totalShots, s.sog, leagueWeight, momentumDelta, s.daEstimated);
+      const rma = evaluateRMA({
+        minute: s.minute, pressure: s.pressure, dangerousAttacks: s.da,
+        totalShots: s.totalShots, shotsOnGoal: s.sog, leagueWeight,
+        momentumDelta, daEstimated: s.daEstimated,
+      });
 
       const signal = classifyServer(match, rma.score);
       if (!signal) continue;

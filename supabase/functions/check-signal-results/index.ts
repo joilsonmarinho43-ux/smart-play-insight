@@ -218,15 +218,12 @@ Deno.serve(async (req) => {
 
       let newStatus = signal.status;
       if (signal.status === 'pendente') {
-        const signalAge = Date.now() - new Date(signal.created_at).getTime();
-        const timedOut = signalAge > 3 * 60 * 60 * 1000;
-
         newStatus = checkMarketResult(
           signal.market,
           data.homeGoals,
           data.awayGoals,
           data.corners,
-          data.finished || timedOut,
+          data.finished,
           data.halfTimeGoals,
         );
 

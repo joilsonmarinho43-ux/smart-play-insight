@@ -3,6 +3,7 @@ import { sendTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts
 import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynamicConfidence.ts';
 import { classifyConfidence, resolveMatchConfidence, logConfidenceDecision } from '../_shared/confidencePolicy.ts';
 import { projectGoals } from '../_shared/goalProjection.ts';
+import { evaluateRMA } from '../_shared/rmaEngine.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,20 +34,6 @@ function poissonOver(lambda: number, k: number): number {
 // ═══════════════════════════════════════
 // RMA ENGINE (inline for edge function)
 // ═══════════════════════════════════════
-function evaluateRMAServer(minute: number, pressure: number, da: number, shots: number, sot: number): { verdict: 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO'; score: number; blockReason: string | null } {
-  const safeMin = Math.max(minute, 1);
-  const ap_norm = (da / safeMin) * 10;
-  const f_norm = (shots / safeMin) * 10;
-  const sot_norm = (sot / safeMin) * 10;
-
-  let rma_score = (pressure * 0.4) + (ap_norm * 0.35) + (f_norm * 0.15) + (sot_norm * 0.10);
-
-  if (pressure > 60 && da === 0 && sot === 0) return { verdict: 'BLOQUEADO', score: rma_score, blockReason: 'Pressão fake: pressão alta sem atividade' };
-
-  const verdict = rma_score > 15 ? 'CONFIRMADO' as const : rma_score >= 8 ? 'NEUTRO' as const : 'BLOQUEADO' as const;
-  return { verdict, score: Math.round(rma_score * 100) / 100, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 8` : null };
-}
-
 function safeDangerousAttacks(stats: any): number {
   if (stats.dangerousAttacks && stats.dangerousAttacks > 0) return stats.dangerousAttacks;
   return ((stats.totalShots || stats.shotsOnGoal || 0) * 1.5) + ((stats.corners || 0) * 2);
@@ -178,7 +165,10 @@ function sniperScan(match: any): SniperSignal | null {
   const ritmo = activityPerMin > 3 ? 'Acelerado 🔥' : activityPerMin > 1.5 ? 'Moderado ⚡' : 'Lento 🐌';
 
   // ─── RMA
-  const rma = evaluateRMAServer(minute, pressure, totalDA, totalShots, totalSoG);
+  const rma = evaluateRMA({
+    minute, pressure, dangerousAttacks: totalDA, totalShots,
+    shotsOnGoal: totalSoG, daEstimated,
+  });
 
   const baseInfo = {
     matchId,

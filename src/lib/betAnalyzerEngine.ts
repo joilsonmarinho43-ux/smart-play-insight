@@ -41,6 +41,15 @@ export interface AnalyzedMatch {
   read: CorrectScoreRead;
 }
 
+/** Indicador dedicado do mercado (0-100) com os componentes que o sustentam. */
+export interface CardIndicator {
+  label: string;                 // ex.: "Índice de Zebra"
+  value: number;                 // 0-100
+  level: 'FORTE' | 'MÉDIO' | 'FRACO';
+  caption: string;               // leitura curta do indicador
+  components: { label: string; value: number }[]; // 0-100 cada
+}
+
 export interface ScenarioCard {
   scenario: ScenarioMeta;
   match: AnalyzedMatch;
@@ -48,6 +57,7 @@ export interface ScenarioCard {
   score: number;                // Score Nexus 0-100
   rating: string;               // classificação textual
   quality: 'ALTA' | 'MÉDIA' | 'BAIXA';
+  indicator: CardIndicator;     // indicador específico do mercado
   stats: { label: string; value: string }[];
   pros: string[];
   cons: string[];

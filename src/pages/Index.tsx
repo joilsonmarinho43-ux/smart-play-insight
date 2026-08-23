@@ -8,7 +8,8 @@ import { localizeTeamName } from '@/lib/teamI18n';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, RefreshCw, Trash2, WifiOff, Send, Crown } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, WifiOff, Send, Crown, DownloadCloud } from 'lucide-react';
+import { forceAppUpdate } from '@/lib/forceUpdate';
 import bannerImg from "@/assets/banner-hero.jpg";
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from "@/lib/timezone";

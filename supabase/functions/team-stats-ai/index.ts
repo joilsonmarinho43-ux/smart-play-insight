@@ -126,56 +126,62 @@ Devolva APENAS JSON válido (sem comentários, sem markdown) no formato:
     const user = `Partida: ${home} vs ${away}${league ? ` (${league})` : ''}.
 Forneça as médias dos últimos 5 jogos OFICIAIS de cada equipe (qualquer competição).`;
 
-    let resp: Response;
-    let usedSource = 'ai';
+    const messages = [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ];
 
-    if (groqKey) {
-      usedSource = 'groq';
-      resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const callGroq = (model: string) =>
+      fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          response_format: { type: 'json_object' },
-          temperature: 0.3,
-        }),
+        body: JSON.stringify({ model, messages, response_format: { type: 'json_object' }, temperature: 0.3 }),
       });
-    } else {
-      resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+
+    const callLovable = () =>
+      fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${lovableKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          response_format: { type: 'json_object' },
-        }),
+        body: JSON.stringify({ model: 'google/gemini-2.5-flash', messages, response_format: { type: 'json_object' } }),
       });
+
+    // Modelos Groq atuais (o antigo llama-3.3-70b-versatile pode estar indisponível na chave)
+    const GROQ_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-20b'];
+
+    let resp: Response | null = null;
+    let usedSource = 'ai';
+    let lastStatus = 0;
+
+    if (groqKey) {
+      for (const model of GROQ_MODELS) {
+        const r = await callGroq(model);
+        if (r.ok) { resp = r; usedSource = `groq:${model}`; break; }
+        lastStatus = r.status;
+        const txt = await r.text();
+        console.error('team-stats-ai groq error', model, r.status, txt.slice(0, 200));
+        // 404/400 = modelo inválido → tenta o próximo; 429/402 → para e degrada
+        if (r.status === 429 || r.status === 402) break;
+      }
     }
 
-    if (resp.status === 429 || resp.status === 402) {
-      // Degrada silenciosamente: devolve 200 com stats vazios para não quebrar a UI,
-      // e grava cache curto negativo (evita re-tentar imediatamente).
+    if (!resp && lovableKey && lastStatus !== 429 && lastStatus !== 402) {
+      const r = await callLovable();
+      if (r.ok) { resp = r; usedSource = 'lovable'; }
+      else {
+        lastStatus = r.status;
+        console.error('team-stats-ai gateway error', r.status, (await r.text()).slice(0, 200));
+      }
+    }
+
+    if (!resp) {
+      // Degrada silenciosamente: 200 com stats vazios para não quebrar a UI
       const empty = { home: EMPTY, away: EMPTY };
       await cacheSet(key, empty);
       return new Response(JSON.stringify({
         ok: false,
-        source: resp.status === 429 ? 'rate_limited' : 'credits_exhausted',
+        source: lastStatus === 429 ? 'rate_limited' : lastStatus === 402 ? 'credits_exhausted' : 'ai_unavailable',
         ...empty,
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    if (!resp.ok) {
-      const txt = await resp.text();
-      console.error('team-stats-ai gateway error', resp.status, txt);
-      return new Response(JSON.stringify({ error: 'ai_error', status: resp.status }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
     }
 
     const data = await resp.json();

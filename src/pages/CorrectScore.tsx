@@ -83,8 +83,15 @@ const CorrectScore = () => {
         const d = m.__iso ? paraDateString(new Date(m.__iso)) : m.date || '';
         const league = m.league?.name || m.league || '';
         return (!selectedDate || d === selectedDate) && (!onlyPremium || isPremiumLeague(league));
+      })
+      // Ligas de elite primeiro: garantem histórico real dentro do limite de enriquecimento
+      .sort((a: any, b: any) => {
+        const pa = isPremiumLeague(a.league?.name || a.league || '') ? 0 : 1;
+        const pb = isPremiumLeague(b.league?.name || b.league || '') ? 0 : 1;
+        return pa - pb;
       });
   }, [rawMatches, dayOptions, selectedDay, onlyPremium]);
+
 
   // 2) Enriquece com os últimos jogos reais (mesma fonte do Scanner PRO)
   const { matches: enriched, isEnriching } = useScannerEnrichment(dayMatches as any);

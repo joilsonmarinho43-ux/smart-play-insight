@@ -258,10 +258,26 @@ const CorrectScore = () => {
                   ))}
                 </div>
 
+                {!cs.hasRealData && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-amber-200">
+                      Sem histórico real confirmado destas equipes — leitura apenas indicativa, não recomendada para entrada.
+                    </p>
+                  </div>
+                )}
+
+                <ul className="mt-2 space-y-0.5">
+                  {cs.reasons.map((t) => (
+                    <li key={t} className="text-[10px] text-gray-400 leading-snug">• {t}</li>
+                  ))}
+                </ul>
+
                 <p className="mt-2 text-[10px] text-gray-500">
                   λ {cs.homeLambda.toFixed(2)} x {cs.awayLambda.toFixed(2)} • amostra{' '}
-                  {cs.sample.home}+{cs.sample.away} jogos • BTTS {pct(cs.btts)}
+                  {cs.sample.home}+{cs.sample.away} jogos • BTTS {pct(cs.btts)} • Under 2.5 {pct(cs.under25)}
                 </p>
+
               </article>
             );
           })}

@@ -15,42 +15,29 @@ const isPreview =
 if ("serviceWorker" in navigator && !isInIframe && !isPreview) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js").then((reg) => {
-      // Quando houver nova versão, ativa só quando a aba estiver oculta
-      // (evita "recarrega sozinho" no meio do uso)
+      // Procura nova versão assim que abre e a cada 60s
+      reg.update().catch(() => {});
+      setInterval(() => reg.update().catch(() => {}), 60_000);
+
       reg.addEventListener("updatefound", () => {
         const newWorker = reg.installing;
         if (!newWorker) return;
         newWorker.addEventListener("statechange", () => {
           if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-            const activateWhenHidden = () => {
-              if (document.visibilityState === "hidden") {
-                newWorker.postMessage({ type: "SKIP_WAITING" });
-                document.removeEventListener("visibilitychange", activateWhenHidden);
-              }
-            };
-            if (document.visibilityState === "hidden") {
-              newWorker.postMessage({ type: "SKIP_WAITING" });
-            } else {
-              document.addEventListener("visibilitychange", activateWhenHidden);
-            }
+            newWorker.postMessage({ type: "SKIP_WAITING" });
           }
         });
       });
     }).catch(() => {});
 
-    // Só recarrega quando o usuário não está olhando a tela
+    // Recarrega uma única vez quando o novo SW assume
     let reloaded = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (reloaded) return;
-      const tryReload = () => {
-        if (document.visibilityState === "hidden") {
-          reloaded = true;
-          window.location.reload();
-        }
-      };
-      tryReload();
-      document.addEventListener("visibilitychange", tryReload);
+      reloaded = true;
+      window.location.reload();
     });
+
   });
 } else if (isInIframe || isPreview) {
 

@@ -87,6 +87,32 @@ function weighted(parts: { w: number; v: number | null }[]): number {
   return sw > 0 ? s / sw : 0;
 }
 
+const clamp01 = (v: number | null): number | null =>
+  v === null || !Number.isFinite(v) ? null : Math.max(0, Math.min(1, v));
+
+/**
+ * Monta o indicador dedicado do mercado. Cada componente é uma métrica real
+ * normalizada 0-1; componentes sem dado são descartados (peso redistribuído).
+ */
+function mkIndicator(
+  label: string,
+  parts: { label: string; w: number; v: number | null }[],
+  caption: (v: number) => string,
+): CardIndicator {
+  const usable = parts.map((p) => ({ ...p, v: clamp01(p.v) }));
+  const value = Math.round(100 * weighted(usable));
+  return {
+    label,
+    value,
+    level: value >= 70 ? 'FORTE' : value >= 50 ? 'MÉDIO' : 'FRACO',
+    caption: caption(value),
+    components: usable
+      .filter((p) => p.v !== null)
+      .map((p) => ({ label: p.label, value: Math.round(100 * (p.v as number)) })),
+  };
+}
+
+
 export function ratingOf(score: number): string {
   if (score >= 90) return 'EXCELENTE CONSISTÊNCIA';
   if (score >= 80) return 'MUITO FORTE';

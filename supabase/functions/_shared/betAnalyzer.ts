@@ -230,7 +230,7 @@ function buildBttsCard(m: AnalyzedMatch): ScenarioCard | null {
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
     stats: [
       { label: 'Modelo (BTTS sim)', value: pctTxt(m.read.btts) },
-      { label: 'Prob. 0x0', value: pctTxt(m.read.matrix.find((c) => c.home === 0 && c.away === 0)?.prob ?? 0) },
+      { label: 'Prob. 0x0', value: pctTxt((m.read as any).matrix?.find((c: any) => c.home === 0 && c.away === 0)?.prob ?? 0) },
       { label: 'Marcou (casa/fora)', value: `${scoredHome !== null ? pctTxt(scoredHome) : '—'} / ${scoredAway !== null ? pctTxt(scoredAway) : '—'}` },
       { label: 'Clean sheets', value: `${csHome !== null ? pctTxt(csHome) : '—'} / ${csAway !== null ? pctTxt(csAway) : '—'}` },
     ],

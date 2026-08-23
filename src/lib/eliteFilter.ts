@@ -99,6 +99,11 @@ function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
   if (totalSoG >= 10) score += 20;
   else if (totalSoG >= 5) score += 10;
 
+  // Sem finalizações disponíveis (pré-jogo), refina o score pela média real de gols
+  if (totalShots === 0 && totalSoG === 0) {
+    score += Math.min(30, Math.max(0, totalGoalsAvg - 2.0) * 20);
+  }
+
   return Math.min(100, score);
 }
 

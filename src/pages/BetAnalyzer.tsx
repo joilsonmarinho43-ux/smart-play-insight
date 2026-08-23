@@ -57,6 +57,18 @@ function scoreColor(score: number): string {
   return 'text-gray-400';
 }
 
+function indicatorColor(v: number): string {
+  if (v >= 70) return 'text-emerald-400';
+  if (v >= 50) return 'text-amber-400';
+  return 'text-gray-400';
+}
+
+function indicatorBar(v: number): string {
+  if (v >= 70) return 'bg-emerald-400';
+  if (v >= 50) return 'bg-amber-400';
+  return 'bg-gray-500';
+}
+
 const BetAnalyzer = () => {
   const queryClient = useQueryClient();
   const [selectedDay, setSelectedDay] = useState(0);

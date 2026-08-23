@@ -12,9 +12,10 @@ import { MatchData } from '@/types/match';
 import { mergeFormIntoMatch } from '@/hooks/useTeamForm';
 
 /** Máximo de partidas enriquecidas por varredura (protege a cota da API). */
-const MAX_ENRICH = 24;
+const MAX_ENRICH = 36;
 /** Requisições simultâneas à edge function. */
-const CONCURRENCY = 4;
+const CONCURRENCY = 6;
+
 
 function hasRealData(m: any): boolean {
   const md = m?.modelData || {};

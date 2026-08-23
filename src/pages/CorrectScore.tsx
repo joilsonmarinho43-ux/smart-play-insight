@@ -5,7 +5,8 @@ import { localizeTeamName } from '@/lib/teamI18n';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from '@/lib/timezone';
 import { buildCorrectScore, pct, type CorrectScoreRead } from '@/lib/correctScoreEngine';
-import { Loader2, Target, Crown, TrendingUp } from 'lucide-react';
+import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
+import { Loader2, Target, Crown, TrendingUp, ShieldCheck, AlertTriangle } from 'lucide-react';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
 function paraDateString(d: Date): string {
@@ -43,6 +44,7 @@ const labelColor: Record<CorrectScoreRead['label'], string> = {
 const CorrectScore = () => {
   const [selectedDay, setSelectedDay] = useState(0);
   const [onlyPremium, setOnlyPremium] = useState(false);
+  const [onlyReal, setOnlyReal] = useState(true);
 
   const todayKey = getTodayInPara();
   const { data: rawMatches, isFetching } = useQuery({
@@ -66,12 +68,31 @@ const CorrectScore = () => {
     });
   }, []);
 
-  const rows = useMemo(() => {
+  // 1) Filtra por dia ANTES de enriquecer (economiza chamadas à API)
+  const dayMatches = useMemo(() => {
     const selectedDate = dayOptions[selectedDay]?.date;
     return (rawMatches || [])
       .filter(isUpcoming)
+      .map((m: any) => ({
+        ...m,
+        homeTeam: m.homeTeam || m.teams?.home?.name || '',
+        awayTeam: m.awayTeam || m.teams?.away?.name || '',
+        __iso: getMatchIso(m),
+      }))
+      .filter((m: any) => {
+        const d = m.__iso ? paraDateString(new Date(m.__iso)) : m.date || '';
+        const league = m.league?.name || m.league || '';
+        return (!selectedDate || d === selectedDate) && (!onlyPremium || isPremiumLeague(league));
+      });
+  }, [rawMatches, dayOptions, selectedDay, onlyPremium]);
+
+  // 2) Enriquece com os últimos jogos reais (mesma fonte do Scanner PRO)
+  const { matches: enriched, isEnriching } = useScannerEnrichment(dayMatches as any);
+
+  const rows = useMemo(() => {
+    return (enriched || [])
       .map((m: any) => {
-        const iso = getMatchIso(m);
+        const iso = m.__iso || getMatchIso(m);
         const league = m.league?.name || m.league || '';
         return {
           id: String(m.id ?? m.fixture?.id ?? `${m.homeTeam}-${m.awayTeam}`),
@@ -79,14 +100,15 @@ const CorrectScore = () => {
           time: iso ? formatTimePara(iso) : m.time || '',
           league,
           premium: isPremiumLeague(league),
-          homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
-          awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
+          homeTeam: localizeTeamName(m.homeTeam) || 'Casa',
+          awayTeam: localizeTeamName(m.awayTeam) || 'Fora',
           read: buildCorrectScore(m),
         };
       })
-      .filter((r) => (!selectedDate || r.date === selectedDate) && (!onlyPremium || r.premium))
+      .filter((r) => (!onlyReal || r.read.hasRealData))
       .sort((a, b) => b.read.confidence - a.read.confidence || (a.time || '').localeCompare(b.time || ''));
-  }, [rawMatches, dayOptions, selectedDay, onlyPremium]);
+  }, [enriched, onlyReal]);
+
 
   return (
     <div className="min-h-screen text-white pb-10 font-sans relative">
@@ -129,8 +151,18 @@ const CorrectScore = () => {
             </button>
           ))}
           <button
-            onClick={() => setOnlyPremium((v) => !v)}
+            onClick={() => setOnlyReal((v) => !v)}
             className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-colors ${
+              onlyReal
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400'
+                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+            }`}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" /> Só com dados reais
+          </button>
+          <button
+            onClick={() => setOnlyPremium((v) => !v)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-colors ${
               onlyPremium
                 ? 'bg-amber-500/15 border-amber-500/50 text-amber-400'
                 : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
@@ -140,17 +172,22 @@ const CorrectScore = () => {
           </button>
         </div>
 
-        {isFetching && rows.length === 0 && (
-          <div className="flex items-center justify-center py-20">
+        {(isFetching || isEnriching) && rows.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 gap-2">
             <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
+            <p className="text-xs text-gray-400">Carregando histórico real das equipes…</p>
           </div>
         )}
 
-        {!isFetching && rows.length === 0 && (
+        {!isFetching && !isEnriching && rows.length === 0 && (
           <div className="rounded-xl border border-white/10 bg-black/40 p-8 text-center text-sm text-gray-400">
-            Nenhum jogo disponível para esta data.
+            {onlyReal
+              ? 'Nenhum jogo com histórico real confirmado para esta data. Desative "Só com dados reais" para ver as leituras indicativas.'
+              : 'Nenhum jogo disponível para esta data.'}
           </div>
         )}
+
+
 
         <div className="grid gap-3 lg:grid-cols-2">
           {rows.map((r) => {
@@ -221,10 +258,26 @@ const CorrectScore = () => {
                   ))}
                 </div>
 
+                {!cs.hasRealData && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-amber-200">
+                      Sem histórico real confirmado destas equipes — leitura apenas indicativa, não recomendada para entrada.
+                    </p>
+                  </div>
+                )}
+
+                <ul className="mt-2 space-y-0.5">
+                  {cs.reasons.map((t) => (
+                    <li key={t} className="text-[10px] text-gray-400 leading-snug">• {t}</li>
+                  ))}
+                </ul>
+
                 <p className="mt-2 text-[10px] text-gray-500">
                   λ {cs.homeLambda.toFixed(2)} x {cs.awayLambda.toFixed(2)} • amostra{' '}
-                  {cs.sample.home}+{cs.sample.away} jogos • BTTS {pct(cs.btts)}
+                  {cs.sample.home}+{cs.sample.away} jogos • BTTS {pct(cs.btts)} • Under 2.5 {pct(cs.under25)}
                 </p>
+
               </article>
             );
           })}

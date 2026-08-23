@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynamicConfidence.ts';
 import { classifyConfidence, resolveMatchConfidence, logConfidenceDecision } from '../_shared/confidencePolicy.ts';
 import { projectGoals } from '../_shared/goalProjection.ts';
@@ -314,35 +313,6 @@ function sniperScan(match: any): SniperSignal | null {
 }
 
 // ═══════════════════════════════════════
-// SNIPER TELEGRAM MESSAGE FORMAT
-// ═══════════════════════════════════════
-function buildSniperMessage(s: SniperSignal): string {
-  const rmaIcon = s.rmaVerdict === 'CONFIRMADO' ? '🟢' : '🟡';
-  return [
-    `🚨 <b>SINAL APROVADO — MODO SNIPER</b> ${rmaIcon}`,
-    ``,
-    `🏆 <b>${s.match}</b>`,
-    `⏱️ Minuto: ${s.minute}'`,
-    ``,
-    `🎯 Mercado: <b>${s.market}</b>`,
-    `📊 Confiança: <b>${s.probability}%</b>`,
-    `💰 Odd: <b>${s.odd}</b>`,
-    ``,
-    `🧠 <i>${s.leitura}</i>`,
-    ``,
-    `🔥 <b>Contexto:</b>`,
-    `  • Pressão: ${s.pressure}%`,
-    `  • Ataques perigosos: ${s.dangerousAttacks}`,
-    `  • Ritmo: ${s.ritmo}`,
-    ``,
-    `✅ Status: <b>ENTRADA APROVADA</b>`,
-    `📌 Stake: ${s.stake}% da banca`,
-    ``,
-    `🤖 <i>Nexus 33 | Sniper Dual Mode</i>`,
-  ].join('\n');
-}
-
-// ═══════════════════════════════════════
 // MAIN HANDLER
 // ═══════════════════════════════════════
 
@@ -352,7 +322,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const TELEGRAM_BOT_TOKEN = getTelegramBotToken();
     const TELEGRAM_CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -479,35 +448,31 @@ Deno.serve(async (req) => {
       const runKey = String(signal.matchId || signal.match).trim().toLowerCase();
       if (sentThisRun.has(runKey)) continue; // 1 sinal por jogo por execução
       sentThisRun.add(runKey);
-      const text = buildSniperMessage(signal);
-
-
-      const tgRes = await sendTelegramMessage(TELEGRAM_CHAT_ID, text, {
-        botToken: TELEGRAM_BOT_TOKEN,
-        tag: 'SNIPER-DUAL',
+      // Centraliza envio, claim atômico, dedupe e auditoria no telegram-signal.
+      const tgRes = await fetch(`${supabaseUrl}/functions/v1/telegram-signal`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          match: signal.match,
+          matchId: signal.matchId,
+          market: signal.market,
+          confidence: signal.probability,
+          filtersValidated: `Sniper Dual • Score ${signal.score}`,
+          sensitivity: 'sniper-dual',
+          minute: signal.minute,
+          score: `${signal.homeGoals} x ${signal.awayGoals}`,
+          oddMin: String(signal.odd),
+          reason: `Sniper Dual • Odd ref. ${signal.odd} • Pressão ${signal.pressure}% • ${signal.ritmo} • RMA ${signal.rmaVerdict}`,
+          pressure: signal.pressure,
+          dangerousAttacks: signal.dangerousAttacks,
+          totalShots: signal.totalShots,
+          shotsOnGoal: signal.shotsOnGoal,
+        }),
       });
-      const tgData = tgRes.data ?? {};
-      const telegramMessageId = tgData.result?.message_id ?? null;
-
-      // Log to DB
-      await supabase.from('telegram_signals').insert({
-        match_name: signal.match,
-        match_id: signal.matchId,
-        market: signal.market,
-        confidence: signal.probability,
-        filters_validated: `Sniper Dual • Score ${signal.score}`,
-        sensitivity: 'sniper-dual',
-        minute: signal.minute,
-        score: `${signal.homeGoals}-${signal.awayGoals}`,
-        odd_min: String(signal.odd),
-        reason: `Sniper Dual Mode • Odd de referência ${signal.odd} • Pressão ${signal.pressure}% • ${signal.ritmo} • RMA ${signal.rmaVerdict}`,
-        success: tgRes.ok,
-        error_message: tgRes.ok ? null : JSON.stringify(tgData),
-        telegram_message_id: telegramMessageId,
-        status: 'pendente',
-        rma_verdict: signal.rmaVerdict || null,
-        rma_score: signal.rmaScore || null,
-      });
+      const tgData = await tgRes.json().catch(() => ({}));
 
       if (signal.rmaVerdict) {
         await supabase.from('rma_shadow_logs').insert({
@@ -517,7 +482,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (tgRes.ok) sentCount++;
+      if (tgRes.ok && tgData.success && !tgData.deduped) sentCount++;
     }
 
     console.log(`[SNIPER-DUAL] ✅ ${sentCount} enviados, ${blocked.length} bloqueados`);

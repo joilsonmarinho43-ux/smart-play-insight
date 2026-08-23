@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { MatchData } from '@/types/match';
 import { Trophy, Copy, MessageCircle, Crown } from 'lucide-react';
 import { toast } from 'sonner';
+import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
 
 function fact(n: number): number { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
 function pois(l: number, k: number): number { return (Math.exp(-l) * Math.pow(l, k)) / fact(k); }
@@ -56,7 +57,9 @@ const UNSTABLE = [
 
 function isStable(m: MatchData): boolean {
   const l = (m.league || '').toLowerCase();
-  return !UNSTABLE.some(t => l.includes(t));
+  if (UNSTABLE.some(t => l.includes(t))) return false;
+  // Só sugere jogos que existem nas casas de aposta
+  return isBookmakerLeague(m.league || '');
 }
 
 function hasReliable(m: MatchData): boolean {

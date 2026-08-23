@@ -18,8 +18,8 @@ set -a; . deploy/.env; set +a
 API="${API_DOMAIN:?defina API_DOMAIN em deploy/.env}"
 ANON="$(grep -E '^ANON_KEY=' supabase-docker/.env | cut -d= -f2-)"
 
-HORA_PLACAR="${HORA_PLACAR:-10}"
-HORA_ANALYZER="${HORA_ANALYZER:-11}"
+HORA_PLACAR="${HORA_PLACAR:-08}"
+HORA_ANALYZER="${HORA_ANALYZER:-09}"
 
 utc() { echo $(( (10#$1 + 3) % 24 )); }
 

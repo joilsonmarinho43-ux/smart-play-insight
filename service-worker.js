@@ -1,12 +1,11 @@
-const CACHE_NAME = "nexus-33-v3";
+const CACHE_NAME = "nexus-33-v4";
 const PRECACHE_URLS = ["/", "/index.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
   );
-  // NÃO chamar skipWaiting aqui — só ativa quando o cliente mandar a mensagem
-  // (evita reload automático no meio do uso)
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -16,8 +15,7 @@ self.addEventListener("activate", (event) => {
       await Promise.all(
         keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
       );
-      // NÃO chamar clients.claim() — deixa a aba atual seguir com o SW antigo
-      // até ela ser fechada/recarregada naturalmente
+      await self.clients.claim();
     })()
   );
 });

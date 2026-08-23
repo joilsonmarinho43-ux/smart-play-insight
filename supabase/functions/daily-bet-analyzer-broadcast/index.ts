@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendTelegramMessage, enqueueTelegramOutbox, escapeHtml, getTelegramBotToken } from '../_shared/telegram.ts';
-import { brTodayDate, brTime, brDate, APP_TZ } from '../_shared/timezone.ts';
+import { brTime, brDate, APP_TZ } from '../_shared/timezone.ts';
 import { loadMatchPool } from '../_shared/matchPool.ts';
 import { toAnalyzed, runBetAnalyzer, type ScenarioCard } from '../_shared/betAnalyzer.ts';
 import { svgToPng, svgEscape, truncate, sendTelegramPhoto, CARD_FONT } from '../_shared/renderCard.ts';

@@ -33,6 +33,7 @@ function buildSvg(cards: ScenarioCard[], dateLabel: string): string {
     const y = TOP + i * ROW;
     const m = c.match;
     const scoreColor = c.score >= 80 ? '#22c55e' : c.score >= 70 ? '#fbbf24' : '#f97316';
+    const indColor = c.indicator.value >= 70 ? '#22c55e' : c.indicator.value >= 50 ? '#fbbf24' : '#94a3b8';
     const stats = c.stats.slice(0, 3);
     const statCells = stats.map((s, k) => {
       const x = 126 + k * 300;

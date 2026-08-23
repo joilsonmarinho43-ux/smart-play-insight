@@ -4,8 +4,12 @@
 import { initWasm, Resvg } from 'npm:@resvg/resvg-wasm@2.6.2';
 
 const WASM_URL = 'https://unpkg.com/@resvg/resvg-wasm@2.6.2/index_bg.wasm';
-const FONT_REGULAR = 'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Regular.ttf';
-const FONT_BOLD = 'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Bold.ttf';
+// Fontes TTF estáveis (jsdelivr/npm). URLs do repositório google/fonts retornam
+// 404 e faziam o card sair em branco (sem glifos).
+const FONT_REGULAR = 'https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans.ttf';
+const FONT_BOLD = 'https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf/DejaVuSans-Bold.ttf';
+/** Família disponível nos buffers acima — use-a nos templates SVG. */
+export const CARD_FONT = 'DejaVu Sans';
 
 let wasmReady: Promise<void> | null = null;
 let fontsCache: Uint8Array[] | null = null;
@@ -20,13 +24,18 @@ async function ensureWasm(): Promise<void> {
   return wasmReady;
 }
 
+async function fetchFont(url: string): Promise<Uint8Array> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`fonte indisponível [${r.status}]: ${url}`);
+  const buf = new Uint8Array(await r.arrayBuffer());
+  // Um HTML de erro tem poucos KB; fontes reais passam de 50KB.
+  if (buf.byteLength < 50_000) throw new Error(`fonte inválida (${buf.byteLength}B): ${url}`);
+  return buf;
+}
+
 async function loadFonts(): Promise<Uint8Array[]> {
   if (fontsCache) return fontsCache;
-  const [reg, bold] = await Promise.all([
-    fetch(FONT_REGULAR).then((r) => r.arrayBuffer()),
-    fetch(FONT_BOLD).then((r) => r.arrayBuffer()),
-  ]);
-  fontsCache = [new Uint8Array(reg), new Uint8Array(bold)];
+  fontsCache = await Promise.all([fetchFont(FONT_REGULAR), fetchFont(FONT_BOLD)]);
   return fontsCache;
 }
 
@@ -36,10 +45,18 @@ export async function svgToPng(svg: string, width = 1080): Promise<Uint8Array> {
   const fontBuffers = await loadFonts();
   const resvg = new Resvg(svg, {
     fitTo: { mode: 'width', value: width },
-    font: { fontBuffers, defaultFontFamily: 'Roboto', loadSystemFonts: false },
+    font: {
+      fontBuffers,
+      defaultFontFamily: CARD_FONT,
+      sansSerifFamily: CARD_FONT,
+      serifFamily: CARD_FONT,
+      monospaceFamily: CARD_FONT,
+      loadSystemFonts: false,
+    },
   });
   return resvg.render().asPng();
 }
+
 
 /** Escape para conteúdo textual de SVG. */
 export function svgEscape(input: unknown): string {
@@ -60,14 +77,16 @@ export async function sendTelegramPhoto(
   botToken: string,
   chatId: string | number,
   png: Uint8Array,
-  caption: string,
+  caption?: string,
   opts?: { filename?: string; tag?: string },
 ): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
   const tag = opts?.tag ?? 'TG-PHOTO';
   const form = new FormData();
   form.append('chat_id', String(chatId));
-  form.append('caption', caption.slice(0, 1024));
-  form.append('parse_mode', 'HTML');
+  if (caption && caption.trim()) {
+    form.append('caption', caption.slice(0, 1024));
+    form.append('parse_mode', 'HTML');
+  }
   form.append(
     'photo',
     new Blob([png as unknown as BlobPart], { type: 'image/png' }),

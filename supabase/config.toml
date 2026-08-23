@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.daily-correct-score-broadcast]
 verify_jwt = false
+
+[functions.daily-bet-analyzer-broadcast]
+verify_jwt = false

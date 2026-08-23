@@ -6,6 +6,7 @@ export interface ScoreCell { home: number; away: number; prob: number; fairOdd: 
 export interface CorrectScoreRead {
   homeLambda: number;
   awayLambda: number;
+  matrix: ScoreCell[];
   top: ScoreCell[];
   combo: ScoreCell[];
   comboProb: number;
@@ -151,7 +152,7 @@ export function buildCorrectScore(match: any): CorrectScoreRead {
   }
 
   return {
-    homeLambda, awayLambda, top, combo, comboProb, comboFairOdd,
+    homeLambda, awayLambda, matrix, top, combo, comboProb, comboFairOdd,
     outcome: { home, draw, away }, over25, under25: 1 - over25, btts,
     confidence, sample, label, hasRealData, reasons,
   };

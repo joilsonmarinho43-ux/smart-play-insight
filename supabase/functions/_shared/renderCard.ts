@@ -77,14 +77,16 @@ export async function sendTelegramPhoto(
   botToken: string,
   chatId: string | number,
   png: Uint8Array,
-  caption: string,
+  caption?: string,
   opts?: { filename?: string; tag?: string },
 ): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
   const tag = opts?.tag ?? 'TG-PHOTO';
   const form = new FormData();
   form.append('chat_id', String(chatId));
-  form.append('caption', caption.slice(0, 1024));
-  form.append('parse_mode', 'HTML');
+  if (caption && caption.trim()) {
+    form.append('caption', caption.slice(0, 1024));
+    form.append('parse_mode', 'HTML');
+  }
   form.append(
     'photo',
     new Blob([png as unknown as BlobPart], { type: 'image/png' }),

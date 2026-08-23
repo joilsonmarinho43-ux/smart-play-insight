@@ -86,6 +86,7 @@ function buildFallbackText(cards: ScenarioCard[], dateLabel: string): string {
   cards.forEach((c, i) => {
     lines.push(`${i + 1}. <b>${escapeHtml(c.scenario.title)}</b> — ${escapeHtml(c.match.homeTeam)} x ${escapeHtml(c.match.awayTeam)} (${escapeHtml(c.match.time)})`);
     lines.push(`   ${escapeHtml(c.headline)} • Score ${c.score} (${escapeHtml(c.rating)})`);
+    lines.push(`   ${escapeHtml(c.indicator.label)}: ${c.indicator.value}/100 (${escapeHtml(c.indicator.level)})`);
   });
   lines.push('');
   lines.push('⚠️ Gestão de banca: máx. 1% por entrada.');

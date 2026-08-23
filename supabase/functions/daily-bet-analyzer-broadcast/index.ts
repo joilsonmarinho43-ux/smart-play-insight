@@ -33,6 +33,7 @@ function buildSvg(cards: ScenarioCard[], dateLabel: string): string {
     const y = TOP + i * ROW;
     const m = c.match;
     const scoreColor = c.score >= 80 ? '#22c55e' : c.score >= 70 ? '#fbbf24' : '#f97316';
+    const indColor = c.indicator.value >= 70 ? '#22c55e' : c.indicator.value >= 50 ? '#fbbf24' : '#94a3b8';
     const stats = c.stats.slice(0, 3);
     const statCells = stats.map((s, k) => {
       const x = 126 + k * 300;
@@ -52,6 +53,8 @@ function buildSvg(cards: ScenarioCard[], dateLabel: string): string {
     <text x="980" y="${y + 48}" font-family="${F}" font-size="15" fill="#94a3b8" text-anchor="end">SCORE NEXUS</text>
     <text x="980" y="${y + 88}" font-family="${F}" font-size="38" font-weight="700" fill="${scoreColor}" text-anchor="end">${c.score}</text>
     <text x="980" y="${y + 114}" font-family="${F}" font-size="15" fill="#64748b" text-anchor="end">${svgEscape(c.rating)} • ${svgEscape(c.quality)}</text>
+    <text x="980" y="${y + 146}" font-family="${F}" font-size="15" fill="#94a3b8" text-anchor="end">${svgEscape(truncate(c.indicator.label, 26))}</text>
+    <text x="980" y="${y + 172}" font-family="${F}" font-size="24" font-weight="700" fill="${indColor}" text-anchor="end">${c.indicator.value}/100 ${svgEscape(c.indicator.level)}</text>
   </g>`;
   }).join('');
 
@@ -83,6 +86,7 @@ function buildFallbackText(cards: ScenarioCard[], dateLabel: string): string {
   cards.forEach((c, i) => {
     lines.push(`${i + 1}. <b>${escapeHtml(c.scenario.title)}</b> — ${escapeHtml(c.match.homeTeam)} x ${escapeHtml(c.match.awayTeam)} (${escapeHtml(c.match.time)})`);
     lines.push(`   ${escapeHtml(c.headline)} • Score ${c.score} (${escapeHtml(c.rating)})`);
+    lines.push(`   ${escapeHtml(c.indicator.label)}: ${c.indicator.value}/100 (${escapeHtml(c.indicator.level)})`);
   });
   lines.push('');
   lines.push('⚠️ Gestão de banca: máx. 1% por entrada.');

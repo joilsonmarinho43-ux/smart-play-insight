@@ -41,6 +41,15 @@ export interface AnalyzedMatch {
   read: CorrectScoreRead;
 }
 
+/** Indicador dedicado do mercado (0-100) com os componentes que o sustentam. */
+export interface CardIndicator {
+  label: string;                 // ex.: "Índice de Zebra"
+  value: number;                 // 0-100
+  level: 'FORTE' | 'MÉDIO' | 'FRACO';
+  caption: string;               // leitura curta do indicador
+  components: { label: string; value: number }[]; // 0-100 cada
+}
+
 export interface ScenarioCard {
   scenario: ScenarioMeta;
   match: AnalyzedMatch;
@@ -48,6 +57,7 @@ export interface ScenarioCard {
   score: number;                // Score Nexus 0-100
   rating: string;               // classificação textual
   quality: 'ALTA' | 'MÉDIA' | 'BAIXA';
+  indicator: CardIndicator;     // indicador específico do mercado
   stats: { label: string; value: string }[];
   pros: string[];
   cons: string[];
@@ -76,6 +86,32 @@ function weighted(parts: { w: number; v: number | null }[]): number {
   }
   return sw > 0 ? s / sw : 0;
 }
+
+const clamp01 = (v: number | null): number | null =>
+  v === null || !Number.isFinite(v) ? null : Math.max(0, Math.min(1, v));
+
+/**
+ * Monta o indicador dedicado do mercado. Cada componente é uma métrica real
+ * normalizada 0-1; componentes sem dado são descartados (peso redistribuído).
+ */
+function mkIndicator(
+  label: string,
+  parts: { label: string; w: number; v: number | null }[],
+  caption: (v: number) => string,
+): CardIndicator {
+  const usable = parts.map((p) => ({ ...p, v: clamp01(p.v) }));
+  const value = Math.round(100 * weighted(usable));
+  return {
+    label,
+    value,
+    level: value >= 70 ? 'FORTE' : value >= 50 ? 'MÉDIO' : 'FRACO',
+    caption: caption(value),
+    components: usable
+      .filter((p) => p.v !== null)
+      .map((p) => ({ label: p.label, value: Math.round(100 * (p.v as number)) })),
+  };
+}
+
 
 export function ratingOf(score: number): string {
   if (score >= 90) return 'EXCELENTE CONSISTÊNCIA';
@@ -176,11 +212,26 @@ function buildCorrectScoreCard(m: AnalyzedMatch): ScenarioCard | null {
   if (r.homeLambda + r.awayLambda >= 3.2) consList.push('Jogo aberto reduz a precisão do placar exato.');
   if (Math.min(m.sample.home, m.sample.away) < 5) consList.push('Amostra abaixo de 5 jogos por equipe.');
   if (best.prob < 0.12) consList.push('Nenhum placar domina claramente a distribuição.');
+  const indicator = mkIndicator(
+    'Índice de Previsibilidade',
+    [
+      { label: 'Concentração top-3', w: 30, v: r.comboProb / 0.45 },
+      { label: 'Domínio do placar líder', w: 25, v: best.prob / 0.16 },
+      { label: 'Jogo fechado (poucos gols)', w: 25, v: 1 - (r.homeLambda + r.awayLambda - 1.8) / 2.0 },
+      { label: 'Estabilidade ofensiva', w: 20, v: cons || null },
+    ],
+    (v) => v >= 70
+      ? `Distribuição muito concentrada — ${best.home}x${best.away} é o placar natural do confronto.`
+      : v >= 50
+        ? 'Placar provável identificado, mas com alternativas próximas.'
+        : 'Distribuição espalhada — placar exato de baixa previsibilidade.',
+  );
   return {
     scenario: SCENARIOS[0],
     match: m,
     headline: `${m.homeTeam} ${best.home} x ${best.away} ${m.awayTeam}`,
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Prob. do placar', value: pctTxt(best.prob) },
       { label: 'Odd justa', value: best.fairOdd.toFixed(2) },
@@ -224,10 +275,41 @@ function buildBttsCard(m: AnalyzedMatch): ScenarioCard | null {
   if (yes && csAway !== null && csAway >= 0.4) consList.push(`${m.awayTeam} tem ${pctTxt(csAway)} de jogos sem sofrer gol.`);
   if (!yes && scoredHome !== null && scoredAway !== null && Math.min(scoredHome, scoredAway) > 0.8)
     consList.push('Ambas marcaram na maioria dos jogos recentes.');
+  const indicator = yes
+    ? mkIndicator(
+        'Índice de Troca de Gols',
+        [
+          { label: 'Modelo BTTS sim', w: 30, v: (model - 0.4) / 0.35 },
+          { label: 'BTTS no histórico (casa)', w: 20, v: bttsHome },
+          { label: 'BTTS no histórico (fora)', w: 20, v: bttsAway },
+          { label: 'Frequência de marcar', w: 15, v: weighted([{ w: 1, v: scoredHome }, { w: 1, v: scoredAway }]) || null },
+          { label: 'Defesas vazadas', w: 15, v: weighted([{ w: 1, v: csHome === null ? null : 1 - csHome }, { w: 1, v: csAway === null ? null : 1 - csAway }]) || null },
+        ],
+        (v) => v >= 70
+          ? 'As duas equipes marcam e sofrem com regularidade — cenário natural para BTTS sim.'
+          : v >= 50
+            ? 'Tendência de gols dos dois lados, mas com jogos secos no histórico.'
+            : 'Troca de gols pouco sustentada pelos números reais.',
+      )
+    : mkIndicator(
+        'Índice de Solidez Defensiva',
+        [
+          { label: 'Modelo BTTS não', w: 30, v: (1 - model - 0.4) / 0.35 },
+          { label: 'Jogos sem BTTS (casa)', w: 20, v: bttsHome === null ? null : 1 - bttsHome },
+          { label: 'Jogos sem BTTS (fora)', w: 20, v: bttsAway === null ? null : 1 - bttsAway },
+          { label: 'Clean sheets', w: 30, v: weighted([{ w: 1, v: csHome }, { w: 1, v: csAway }]) || null },
+        ],
+        (v) => v >= 70
+          ? 'Pelo menos uma defesa costuma zerar o jogo — cenário forte para BTTS não.'
+          : v >= 50
+            ? 'Solidez defensiva presente, mas não dominante.'
+            : 'Poucos indícios reais de jogo com uma equipe zerada.',
+      );
   return {
     scenario: SCENARIOS[1], match: m,
     headline: yes ? 'AMBAS MARCAM — SIM' : 'AMBAS MARCAM — NÃO',
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Modelo (BTTS sim)', value: pctTxt(m.read.btts) },
       { label: 'Prob. 0x0', value: pctTxt(m.read.matrix.find((c) => c.home === 0 && c.away === 0)?.prob ?? 0) },
@@ -265,10 +347,48 @@ function buildGoals25Card(m: AnalyzedMatch): ScenarioCard | null {
   const consList: string[] = [];
   if (support < 0.6) consList.push('Margem estatística estreita entre Over e Under.');
   if (Math.min(m.sample.home, m.sample.away) < 5) consList.push('Amostra abaixo de 5 jogos por equipe.');
+  const bothScoringRate = weighted([
+    { w: 1, v: freq(homeGames.map((g) => g.gf + g.ga >= 2)) },
+    { w: 1, v: freq(awayGames.map((g) => g.gf + g.ga >= 2)) },
+  ]);
+  const dryRate = weighted([
+    { w: 1, v: freq(homeGames.map((g) => g.gf + g.ga <= 1)) },
+    { w: 1, v: freq(awayGames.map((g) => g.gf + g.ga <= 1)) },
+  ]);
+  const indicator = over
+    ? mkIndicator(
+        'Índice de Volume Ofensivo',
+        [
+          { label: 'Gols projetados', w: 30, v: (avgGoals - 1.8) / 1.4 },
+          { label: 'Over 2.5 no histórico (casa)', w: 20, v: overHome },
+          { label: 'Over 2.5 no histórico (fora)', w: 20, v: overAway },
+          { label: 'Jogos com 2+ gols', w: 30, v: bothScoringRate || null },
+        ],
+        (v) => v >= 70
+          ? 'Ritmo de gols alto e recorrente nos dois lados — mercado de linha alta bem sustentado.'
+          : v >= 50
+            ? 'Volume ofensivo acima da média, com oscilações no histórico.'
+            : 'Volume ofensivo insuficiente para linha alta.',
+      )
+    : mkIndicator(
+        'Índice de Jogo Travado',
+        [
+          { label: 'Gols projetados baixos', w: 30, v: (3.0 - avgGoals) / 1.2 },
+          { label: 'Under 2.5 no histórico (casa)', w: 20, v: overHome === null ? null : 1 - overHome },
+          { label: 'Under 2.5 no histórico (fora)', w: 20, v: overAway === null ? null : 1 - overAway },
+          { label: 'Jogos com até 1 gol', w: 30, v: dryRate || null },
+        ],
+        (v) => v >= 70
+          ? 'Padrão claro de jogos travados nas duas equipes — linha baixa com respaldo real.'
+          : v >= 50
+            ? 'Tendência de poucos gols, mas com jogos abertos no histórico.'
+            : 'Pouca evidência real de jogo travado.',
+      );
   return {
     scenario: SCENARIOS[2], match: m,
     headline: over ? 'OVER 2.5' : 'UNDER 2.5',
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Over 2.5 (modelo)', value: pctTxt(m.read.over25) },
       { label: 'Under 2.5 (modelo)', value: pctTxt(m.read.under25) },
@@ -303,10 +423,48 @@ function buildResultCard(m: AnalyzedMatch): ScenarioCard | null {
   const consList: string[] = [];
   if (prob - entries[1][1] < 0.08) consList.push('Diferença pequena para o segundo cenário — jogo equilibrado.');
   if (pick === 'EMPATE') consList.push('Empate é o cenário de maior variância.');
+  const pickGames = pick === 'FORA' ? awayGames : homeGames;
+  const pickDiff = pickGames.length
+    ? pickGames.reduce((a, g) => a + (g.gf - g.ga), 0) / pickGames.length
+    : null;
+  const drawRate = weighted([
+    { w: 1, v: freq(homeGames.map((g) => g.gf === g.ga)) },
+    { w: 1, v: freq(awayGames.map((g) => g.gf === g.ga)) },
+  ]);
+  const indicator = pick === 'EMPATE'
+    ? mkIndicator(
+        'Índice de Equilíbrio',
+        [
+          { label: 'Probabilidade de empate', w: 30, v: (o.draw - 0.24) / 0.16 },
+          { label: 'Empates no histórico', w: 30, v: drawRate || null },
+          { label: 'Forças equivalentes', w: 25, v: 1 - Math.abs(o.home - o.away) / 0.3 },
+          { label: 'Jogo de poucos gols', w: 15, v: (3.0 - (m.read.homeLambda + m.read.awayLambda)) / 1.2 },
+        ],
+        (v) => v >= 70
+          ? 'Forças muito próximas e histórico de empates — equilíbrio real, não estatístico apenas.'
+          : v >= 50
+            ? 'Partida equilibrada, mas sem histórico forte de empates.'
+            : 'Equilíbrio frágil — há margem para um lado se impor.',
+      )
+    : mkIndicator(
+        'Índice de Domínio',
+        [
+          { label: 'Probabilidade do lado', w: 30, v: (prob - 0.34) / 0.3 },
+          { label: 'Vantagem sobre o 2º cenário', w: 25, v: (prob - entries[1][1]) / 0.25 },
+          { label: 'Vitórias recentes', w: 25, v: formSupport },
+          { label: 'Saldo de gols recente', w: 20, v: pickDiff === null ? null : (pickDiff + 0.5) / 2.0 },
+        ],
+        (v) => v >= 70
+          ? `Superioridade consistente do lado ${pick} — domínio confirmado pelo histórico.`
+          : v >= 50
+            ? `Favoritismo do lado ${pick}, mas sem folga confortável.`
+            : 'Favoritismo apertado — resultado seco é arriscado.',
+      );
   return {
     scenario: SCENARIOS[3], match: m,
     headline: pick,
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Casa', value: pctTxt(o.home) },
       { label: 'Empate', value: pctTxt(o.draw) },
@@ -358,10 +516,25 @@ function buildUpsetCard(m: AnalyzedMatch): ScenarioCard | null {
     `Modelo ainda favorece ${fav} (${pctTxt(favProb)} contra ${pctTxt(undProb)}).`,
   ];
   if (Math.min(m.sample.home, m.sample.away) < 5) consList.push('Amostra abaixo de 5 jogos por equipe.');
+  const indicator = mkIndicator(
+    'Índice de Zebra',
+    [
+      { label: 'Vulnerabilidade do favorito', w: 30, v: vulnerability },
+      { label: 'Força do azarão', w: 25, v: strength },
+      { label: 'Probabilidade da zebra', w: 20, v: undProb / 0.35 },
+      { label: 'Gols sofridos pelo favorito', w: 25, v: favConceded / 1.8 },
+    ],
+    (v) => v >= 70
+      ? `${fav} está claramente vulnerável e ${und} chega competitivo — zebra de alto potencial.`
+      : v >= 50
+        ? `Existem brechas em ${fav}, mas o favoritismo ainda pesa.`
+        : 'Sinais de zebra fracos neste confronto.',
+  );
   return {
     scenario: SCENARIOS[4], match: m,
     headline: `Indicador de surpresa: ${und}`,
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Favorito', value: fav },
       { label: 'Prob. favorito', value: pctTxt(favProb) },

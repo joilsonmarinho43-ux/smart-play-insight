@@ -280,10 +280,15 @@ Deno.serve(async (req) => {
         .then((r) => r.json()).catch(() => ({ matches: [] }))
     ));
     const matches: any[] = results.flatMap((r: any) => Array.isArray(r?.matches) ? r.matches : []);
-    console.log(`[CS] jogos=${matches.length}`);
+    const eligible = matches.filter(isEligible);
+    console.log(`[CS] jogos=${matches.length} elegíveis=${eligible.length}`);
+
+    // Enriquece com histórico real (últimos jogos) antes de calcular o modelo
+    const enriched = await enrich(eligible, supabaseUrl, supabaseKey);
 
     const picks: Pick[] = [];
-    for (const m of matches) {
+    for (const m of enriched) {
+
       try {
         const p = buildPick(m);
         if (p) picks.push(p);

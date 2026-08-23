@@ -275,10 +275,41 @@ function buildBttsCard(m: AnalyzedMatch): ScenarioCard | null {
   if (yes && csAway !== null && csAway >= 0.4) consList.push(`${m.awayTeam} tem ${pctTxt(csAway)} de jogos sem sofrer gol.`);
   if (!yes && scoredHome !== null && scoredAway !== null && Math.min(scoredHome, scoredAway) > 0.8)
     consList.push('Ambas marcaram na maioria dos jogos recentes.');
+  const indicator = yes
+    ? mkIndicator(
+        'Índice de Troca de Gols',
+        [
+          { label: 'Modelo BTTS sim', w: 30, v: (model - 0.4) / 0.35 },
+          { label: 'BTTS no histórico (casa)', w: 20, v: bttsHome },
+          { label: 'BTTS no histórico (fora)', w: 20, v: bttsAway },
+          { label: 'Frequência de marcar', w: 15, v: weighted([{ w: 1, v: scoredHome }, { w: 1, v: scoredAway }]) || null },
+          { label: 'Defesas vazadas', w: 15, v: weighted([{ w: 1, v: csHome === null ? null : 1 - csHome }, { w: 1, v: csAway === null ? null : 1 - csAway }]) || null },
+        ],
+        (v) => v >= 70
+          ? 'As duas equipes marcam e sofrem com regularidade — cenário natural para BTTS sim.'
+          : v >= 50
+            ? 'Tendência de gols dos dois lados, mas com jogos secos no histórico.'
+            : 'Troca de gols pouco sustentada pelos números reais.',
+      )
+    : mkIndicator(
+        'Índice de Solidez Defensiva',
+        [
+          { label: 'Modelo BTTS não', w: 30, v: (1 - model - 0.4) / 0.35 },
+          { label: 'Jogos sem BTTS (casa)', w: 20, v: bttsHome === null ? null : 1 - bttsHome },
+          { label: 'Jogos sem BTTS (fora)', w: 20, v: bttsAway === null ? null : 1 - bttsAway },
+          { label: 'Clean sheets', w: 30, v: weighted([{ w: 1, v: csHome }, { w: 1, v: csAway }]) || null },
+        ],
+        (v) => v >= 70
+          ? 'Pelo menos uma defesa costuma zerar o jogo — cenário forte para BTTS não.'
+          : v >= 50
+            ? 'Solidez defensiva presente, mas não dominante.'
+            : 'Poucos indícios reais de jogo com uma equipe zerada.',
+      );
   return {
     scenario: SCENARIOS[1], match: m,
     headline: yes ? 'AMBAS MARCAM — SIM' : 'AMBAS MARCAM — NÃO',
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Modelo (BTTS sim)', value: pctTxt(m.read.btts) },
       { label: 'Prob. 0x0', value: pctTxt(m.read.matrix.find((c) => c.home === 0 && c.away === 0)?.prob ?? 0) },

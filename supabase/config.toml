@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.match-analyst]
 verify_jwt = false
+
+[functions.daily-correct-score-broadcast]
+verify_jwt = false

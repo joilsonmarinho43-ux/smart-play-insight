@@ -516,10 +516,25 @@ function buildUpsetCard(m: AnalyzedMatch): ScenarioCard | null {
     `Modelo ainda favorece ${fav} (${pctTxt(favProb)} contra ${pctTxt(undProb)}).`,
   ];
   if (Math.min(m.sample.home, m.sample.away) < 5) consList.push('Amostra abaixo de 5 jogos por equipe.');
+  const indicator = mkIndicator(
+    'Índice de Zebra',
+    [
+      { label: 'Vulnerabilidade do favorito', w: 30, v: vulnerability },
+      { label: 'Força do azarão', w: 25, v: strength },
+      { label: 'Probabilidade da zebra', w: 20, v: undProb / 0.35 },
+      { label: 'Gols sofridos pelo favorito', w: 25, v: favConceded / 1.8 },
+    ],
+    (v) => v >= 70
+      ? `${fav} está claramente vulnerável e ${und} chega competitivo — zebra de alto potencial.`
+      : v >= 50
+        ? `Existem brechas em ${fav}, mas o favoritismo ainda pesa.`
+        : 'Sinais de zebra fracos neste confronto.',
+  );
   return {
     scenario: SCENARIOS[4], match: m,
     headline: `Indicador de surpresa: ${und}`,
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Favorito', value: fav },
       { label: 'Prob. favorito', value: pctTxt(favProb) },

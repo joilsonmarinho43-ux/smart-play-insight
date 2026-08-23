@@ -423,10 +423,48 @@ function buildResultCard(m: AnalyzedMatch): ScenarioCard | null {
   const consList: string[] = [];
   if (prob - entries[1][1] < 0.08) consList.push('Diferença pequena para o segundo cenário — jogo equilibrado.');
   if (pick === 'EMPATE') consList.push('Empate é o cenário de maior variância.');
+  const pickGames = pick === 'FORA' ? awayGames : homeGames;
+  const pickDiff = pickGames.length
+    ? pickGames.reduce((a, g) => a + (g.gf - g.ga), 0) / pickGames.length
+    : null;
+  const drawRate = weighted([
+    { w: 1, v: freq(homeGames.map((g) => g.gf === g.ga)) },
+    { w: 1, v: freq(awayGames.map((g) => g.gf === g.ga)) },
+  ]);
+  const indicator = pick === 'EMPATE'
+    ? mkIndicator(
+        'Índice de Equilíbrio',
+        [
+          { label: 'Probabilidade de empate', w: 30, v: (o.draw - 0.24) / 0.16 },
+          { label: 'Empates no histórico', w: 30, v: drawRate || null },
+          { label: 'Forças equivalentes', w: 25, v: 1 - Math.abs(o.home - o.away) / 0.3 },
+          { label: 'Jogo de poucos gols', w: 15, v: (3.0 - (m.read.homeLambda + m.read.awayLambda)) / 1.2 },
+        ],
+        (v) => v >= 70
+          ? 'Forças muito próximas e histórico de empates — equilíbrio real, não estatístico apenas.'
+          : v >= 50
+            ? 'Partida equilibrada, mas sem histórico forte de empates.'
+            : 'Equilíbrio frágil — há margem para um lado se impor.',
+      )
+    : mkIndicator(
+        'Índice de Domínio',
+        [
+          { label: 'Probabilidade do lado', w: 30, v: (prob - 0.34) / 0.3 },
+          { label: 'Vantagem sobre o 2º cenário', w: 25, v: (prob - entries[1][1]) / 0.25 },
+          { label: 'Vitórias recentes', w: 25, v: formSupport },
+          { label: 'Saldo de gols recente', w: 20, v: pickDiff === null ? null : (pickDiff + 0.5) / 2.0 },
+        ],
+        (v) => v >= 70
+          ? `Superioridade consistente do lado ${pick} — domínio confirmado pelo histórico.`
+          : v >= 50
+            ? `Favoritismo do lado ${pick}, mas sem folga confortável.`
+            : 'Favoritismo apertado — resultado seco é arriscado.',
+      );
   return {
     scenario: SCENARIOS[3], match: m,
     headline: pick,
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Casa', value: pctTxt(o.home) },
       { label: 'Empate', value: pctTxt(o.draw) },

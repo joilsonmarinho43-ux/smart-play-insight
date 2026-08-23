@@ -33,7 +33,8 @@ const ElitePanel = ({ matches }: Props) => {
         <Crown className="w-8 h-8 text-amber-400/60 mx-auto mb-3" />
         <p className="text-sm font-bold text-amber-400">Nenhum jogo elite no momento</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Os jogos precisam atingir os critérios de performance (APM ≥ 0.8). Volte mais tarde.
+          Só entram ligas com mercado nas casas de aposta, com no mínimo 4 jogos de histórico
+          por equipe e score ≥ 55. Volte mais tarde.
         </p>
       </div>
     );

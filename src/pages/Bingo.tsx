@@ -14,6 +14,15 @@ const Bingo = () => {
     staleTime: 1000 * 60 * 10,
   });
 
+  const fmt = (v: any) => {
+    const d = v ? new Date(v) : null;
+    if (!d || isNaN(d.getTime())) return typeof v === 'string' ? v : '';
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Belem', day: '2-digit', month: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(d);
+  };
+
   const safeMatches = (matches || []).filter((m: any) => !isWorldCupLeague(m.league)).map((m: any) => ({
     ...m,
     homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
@@ -21,9 +30,7 @@ const Bingo = () => {
     homeLogo: m.teams?.home?.logo,
     awayLogo: m.teams?.away?.logo,
     league: m.league?.name || m.league || '',
-    time: m.fixture?.date
-      ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
-      : m.time || '',
+    time: fmt(m.fixture?.date || m.time),
   }))
   .sort((a: any, b: any) => (isPremiumLeague(a.league) ? 0 : 1) - (isPremiumLeague(b.league) ? 0 : 1));
 

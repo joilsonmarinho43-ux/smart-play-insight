@@ -1,5 +1,6 @@
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
+import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
 
 /**
  * Elite Performance Filter v2 — APM ≥ 1.2, weighted stats, variance filter
@@ -147,7 +148,7 @@ function evaluateIntensity(match: MatchData): number {
 function hasEnoughData(match: MatchData): boolean {
   const hGames = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount || 0;
   const aGames = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount || 0;
-  return hGames >= 3 && aGames >= 3;
+  return hGames >= 4 && aGames >= 4;
 }
 
 function hasGoalsData(match: MatchData): boolean {
@@ -166,10 +167,22 @@ function hasIntensityData(match: MatchData): boolean {
 
 // ─── Engine principal ───
 
+/** Menor amostra entre as duas equipes */
+function minSample(match: MatchData): number {
+  const h = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount || 0;
+  const a = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount || 0;
+  return Math.min(h, a);
+}
+
+/** Máximo de jogos exibidos no painel Elite */
+const MAX_ELITE = 12;
+
 export function filterEliteMatches(matches: MatchData[]): EliteMatch[] {
   return matches
     .filter(m => !m.isLive)
     .filter(isHighQualityLeague)
+    // Só jogos que o usuário realmente encontra nas casas de aposta
+    .filter(m => isBookmakerLeague(m.league || ''))
     .filter(hasEnoughData)
     .map(match => {
       const markets = analyzeMarkets(match);
@@ -195,12 +208,20 @@ export function filterEliteMatches(matches: MatchData[]): EliteMatch[] {
       ].filter(d => d.available);
 
       const totalWeight = dims.reduce((s2, d) => s2 + d.weight, 0);
-      const eliteScore = totalWeight > 0
-        ? Math.round(dims.reduce((s2, d) => s2 + d.score * d.weight, 0) / totalWeight)
+      const raw = totalWeight > 0
+        ? dims.reduce((s2, d) => s2 + d.score * d.weight, 0) / totalWeight
         : 0;
+
+      // Penalização de confiança: poucas dimensões com dado real ou amostra curta
+      // não podem competir com jogos totalmente cobertos.
+      const sample = minSample(match);
+      const coverage = Math.min(1, totalWeight / 0.6);   // 0.6 = gols + cantos
+      const samplePenalty = sample >= 6 ? 1 : sample >= 5 ? 0.96 : sample >= 4 ? 0.92 : 0.85;
+      const eliteScore = Math.round(raw * (0.8 + 0.2 * coverage) * samplePenalty);
 
       return { match, tags, cornersScore, goalsScore, cardsScore, intensityScore, eliteScore };
     })
-    .filter(e => e.tags.length >= 1 && e.eliteScore >= 50) // Threshold elevado de 45→50
-    .sort((a, b) => b.eliteScore - a.eliteScore);
+    .filter(e => e.tags.length >= 1 && e.eliteScore >= 55)
+    .sort((a, b) => b.eliteScore - a.eliteScore)
+    .slice(0, MAX_ELITE);
 }

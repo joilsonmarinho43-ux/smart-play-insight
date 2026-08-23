@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { MatchData } from '@/types/match';
 import { Trophy, Copy, MessageCircle, Crown } from 'lucide-react';
 import { toast } from 'sonner';
+import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
 
 function fact(n: number): number { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
 function pois(l: number, k: number): number { return (Math.exp(-l) * Math.pow(l, k)) / fact(k); }
@@ -56,7 +57,9 @@ const UNSTABLE = [
 
 function isStable(m: MatchData): boolean {
   const l = (m.league || '').toLowerCase();
-  return !UNSTABLE.some(t => l.includes(t));
+  if (UNSTABLE.some(t => l.includes(t))) return false;
+  // Só sugere jogos que existem nas casas de aposta
+  return isBookmakerLeague(m.league || '');
 }
 
 function hasReliable(m: MatchData): boolean {
@@ -104,7 +107,7 @@ const TopWinsSuggestion = ({ matches }: Props) => {
         <Crown className="w-8 h-8 text-orange-400/60 mx-auto mb-3" />
         <h3 className="text-sm font-bold text-white mb-1">Nenhuma entrada aprovada hoje</h3>
         <p className="text-xs text-gray-500 leading-relaxed">
-          Analisamos {matches?.length ?? 0} jogos, mas nenhum atingiu os critérios do Bingo VIP PRO
+          Analisamos {matches?.length ?? 0} jogos. Só entram ligas com mercado nas casas de aposta
           (favorito ≥ 45%, margem ≥ 12% e empate ≤ 35%, com histórico de pelo menos 4 jogos por equipe).
         </p>
       </div>

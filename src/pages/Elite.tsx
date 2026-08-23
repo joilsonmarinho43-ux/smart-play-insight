@@ -17,6 +17,16 @@ const Elite = () => {
     gcTime: 1000 * 60 * 30,
   });
 
+  const fmt = (v: any, withDate = false) => {
+    const d = v ? new Date(v) : null;
+    if (!d || isNaN(d.getTime())) return typeof v === 'string' ? v : '';
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Belem',
+      ...(withDate ? { day: '2-digit' as const, month: '2-digit' as const } : {}),
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(d);
+  };
+
   const safeMatches = (matches || []).filter((m: any) => !isWorldCupLeague(m.league)).map((m: any) => ({
     ...m,
     homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
@@ -24,9 +34,7 @@ const Elite = () => {
     homeLogo: m.teams?.home?.logo,
     awayLogo: m.teams?.away?.logo,
     league: m.league?.name || m.league || '',
-    time: m.fixture?.date
-      ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
-      : m.time || '',
+    time: fmt(m.fixture?.date || m.time),
   }))
   // Ligas de elite primeiro: garantem histórico real dentro do limite de enriquecimento
   .sort((a: any, b: any) => (isPremiumLeague(a.league) ? 0 : 1) - (isPremiumLeague(b.league) ? 0 : 1));

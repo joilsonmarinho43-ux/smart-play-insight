@@ -5,7 +5,8 @@ import { localizeTeamName } from '@/lib/teamI18n';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from '@/lib/timezone';
 import { buildCorrectScore, pct, type CorrectScoreRead } from '@/lib/correctScoreEngine';
-import { Loader2, Target, Crown, TrendingUp } from 'lucide-react';
+import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
+import { Loader2, Target, Crown, TrendingUp, ShieldCheck, AlertTriangle } from 'lucide-react';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
 function paraDateString(d: Date): string {

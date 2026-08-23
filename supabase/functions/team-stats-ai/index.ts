@@ -217,14 +217,18 @@ Forneça as médias dos últimos 5 jogos OFICIAIS de cada equipe (qualquer compe
     }
 
     if (!resp) {
-      // Degrada silenciosamente: 200 com stats vazios para não quebrar a UI
-      const empty = { home: EMPTY, away: EMPTY };
-      await cacheSet(key, empty);
-      return new Response(JSON.stringify({
-        ok: false,
-        source: lastStatus === 429 ? 'rate_limited' : lastStatus === 402 ? 'credits_exhausted' : 'ai_unavailable',
-        ...empty,
-      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      // IA indisponível → deriva a partir das médias reais de gols (se houver)
+      const reason = lastStatus === 429 ? 'rate_limited' : lastStatus === 402 ? 'credits_exhausted' : 'ai_unavailable';
+      if (canDerive) {
+        const out = { home: clean(derived().home), away: clean(derived().away) };
+        await cacheSet(key, out);
+        return new Response(JSON.stringify({ ok: true, source: `derived:${reason}`, ...out }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ ok: false, source: reason, home: EMPTY, away: EMPTY }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const data = await resp.json();
@@ -236,10 +240,18 @@ Forneça as médias dos últimos 5 jogos OFICIAIS de cada equipe (qualquer compe
     }
     if (!parsed) {
       console.warn('team-stats-ai parse fail', String(raw).slice(0, 300));
+      if (canDerive) {
+        const out = { home: clean(derived().home), away: clean(derived().away) };
+        await cacheSet(key, out);
+        return new Response(JSON.stringify({ ok: true, source: 'derived:parse_fail', ...out }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(JSON.stringify({ ok: false, error: 'parse_fail', home: EMPTY, away: EMPTY }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     const out = { home: clean(parsed.home), away: clean(parsed.away) };
     await cacheSet(key, out);

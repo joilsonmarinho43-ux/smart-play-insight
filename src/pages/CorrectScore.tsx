@@ -151,8 +151,18 @@ const CorrectScore = () => {
             </button>
           ))}
           <button
-            onClick={() => setOnlyPremium((v) => !v)}
+            onClick={() => setOnlyReal((v) => !v)}
             className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-colors ${
+              onlyReal
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400'
+                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+            }`}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" /> Só com dados reais
+          </button>
+          <button
+            onClick={() => setOnlyPremium((v) => !v)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-colors ${
               onlyPremium
                 ? 'bg-amber-500/15 border-amber-500/50 text-amber-400'
                 : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
@@ -162,17 +172,22 @@ const CorrectScore = () => {
           </button>
         </div>
 
-        {isFetching && rows.length === 0 && (
-          <div className="flex items-center justify-center py-20">
+        {(isFetching || isEnriching) && rows.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 gap-2">
             <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
+            <p className="text-xs text-gray-400">Carregando histórico real das equipes…</p>
           </div>
         )}
 
-        {!isFetching && rows.length === 0 && (
+        {!isFetching && !isEnriching && rows.length === 0 && (
           <div className="rounded-xl border border-white/10 bg-black/40 p-8 text-center text-sm text-gray-400">
-            Nenhum jogo disponível para esta data.
+            {onlyReal
+              ? 'Nenhum jogo com histórico real confirmado para esta data. Desative "Só com dados reais" para ver as leituras indicativas.'
+              : 'Nenhum jogo disponível para esta data.'}
           </div>
         )}
+
+
 
         <div className="grid gap-3 lg:grid-cols-2">
           {rows.map((r) => {

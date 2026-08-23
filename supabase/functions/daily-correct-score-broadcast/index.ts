@@ -45,7 +45,85 @@ interface Pick {
   sample: string;
 }
 
+/** Jogo elegível: liga estável e ainda não começou. */
+function isEligible(m: any): boolean {
+  const league = (m.league?.name || m.league || '').toString();
+  if (!league) return false;
+  if (UNSTABLE.some((t) => league.toLowerCase().includes(t))) return false;
+  const kickoff = m.fixture?.date ? new Date(m.fixture.date).getTime() : NaN;
+  return Number.isFinite(kickoff) && kickoff > Date.now();
+}
+
+function num(v: any, d = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : d;
+}
+
+function hasRealStats(m: any): boolean {
+  const hs = m?.homeStats || {};
+  const as_ = m?.awayStats || {};
+  return num(hs.gamesCount) >= 3 && num(as_.gamesCount) >= 3 && num(hs.goalsFor) > 0 && num(as_.goalsFor) > 0;
+}
+
+/** Mescla a resposta do team-form no objeto de partida (espelha mergeFormIntoMatch do app). */
+function mergeForm(m: any, form: any): any {
+  if (!form?.ok) return m;
+  const h = form.home || {}, a = form.away || {};
+  const hs = m.homeStats || {}, as_ = m.awayStats || {};
+  const pick = (cur: any, inc: number) => (num(inc) > 0 && num(cur) <= 0 ? inc : cur ?? inc);
+  return {
+    ...m,
+    homeStats: {
+      ...hs,
+      goalsFor: pick(hs.goalsFor, h.goalsForAvg),
+      goalsAgainst: pick(hs.goalsAgainst, h.goalsAgainstAvg),
+      gamesCount: Math.max(num(hs.gamesCount), num(h.games)),
+      recentGoalsFor: hs.recentGoalsFor?.length ? hs.recentGoalsFor : h.recentGoalsFor,
+      recentGoalsAgainst: hs.recentGoalsAgainst?.length ? hs.recentGoalsAgainst : h.recentGoalsAgainst,
+    },
+    awayStats: {
+      ...as_,
+      goalsFor: pick(as_.goalsFor, a.goalsForAvg),
+      goalsAgainst: pick(as_.goalsAgainst, a.goalsAgainstAvg),
+      gamesCount: Math.max(num(as_.gamesCount), num(a.games)),
+      recentGoalsFor: as_.recentGoalsFor?.length ? as_.recentGoalsFor : a.recentGoalsFor,
+      recentGoalsAgainst: as_.recentGoalsAgainst?.length ? as_.recentGoalsAgainst : a.recentGoalsAgainst,
+    },
+  };
+}
+
+/** Busca histórico real (últimos jogos) para as partidas sem estatística. */
+async function enrich(matches: any[], supabaseUrl: string, key: string, limit = 40): Promise<any[]> {
+  const pending = matches.filter((m) => !hasRealStats(m)).slice(0, limit);
+  const headers = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', apikey: key };
+  const map = new Map<string, any>();
+  const CONC = 6;
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(CONC, pending.length) }, async () => {
+    while (cursor < pending.length) {
+      const m = pending[cursor++];
+      const home = m.teams?.home?.name || m.homeTeam;
+      const away = m.teams?.away?.name || m.awayTeam;
+      if (!home || !away) continue;
+      try {
+        const r = await fetch(`${supabaseUrl}/functions/v1/team-form`, {
+          method: 'POST', headers, body: JSON.stringify({ home, away }),
+        });
+        const data = await r.json().catch(() => null);
+        if (data?.ok) map.set(`${home}|${away}`, data);
+      } catch { /* ignora falha pontual */ }
+    }
+  }));
+  console.log(`[CS] enriquecidos=${map.size}/${pending.length}`);
+  return matches.map((m) => {
+    const k = `${m.teams?.home?.name || m.homeTeam}|${m.teams?.away?.name || m.awayTeam}`;
+    const f = map.get(k);
+    return f ? mergeForm(m, f) : m;
+  });
+}
+
 function buildPick(m: any): Pick | null {
+
   const league = (m.league?.name || m.league || '').toString();
   if (!league) return null;
   if (UNSTABLE.some((t) => league.toLowerCase().includes(t))) return null;

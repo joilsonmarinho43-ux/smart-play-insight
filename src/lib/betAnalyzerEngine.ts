@@ -85,7 +85,7 @@ export function ratingOf(score: number): string {
   return 'BAIXA';
 }
 
-function qualityOf(sample: { home: number; away: number }, hist: AnalyzedMatch['history']): AnalyzedMatch extends never ? never : 'ALTA' | 'MÉDIA' | 'BAIXA' {
+function qualityOf(sample: { home: number; away: number }, hist: AnalyzedMatch['history']): 'ALTA' | 'MÉDIA' | 'BAIXA' {
   const games = Math.min(sample.home, sample.away);
   const listed = Math.min(hist.homeGF.length, hist.awayGF.length);
   if (games >= 5 && listed >= 5) return 'ALTA';

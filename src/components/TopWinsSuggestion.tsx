@@ -3,6 +3,7 @@ import { MatchData } from '@/types/match';
 import { Trophy, Copy, MessageCircle, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
+import { isUpcomingMatch } from '@/lib/matchTiming';
 
 function fact(n: number): number { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
 function pois(l: number, k: number): number { return (Math.exp(-l) * Math.pow(l, k)) / fact(k); }
@@ -58,6 +59,8 @@ const UNSTABLE = [
 function isStable(m: MatchData): boolean {
   const l = (m.league || '').toLowerCase();
   if (UNSTABLE.some(t => l.includes(t))) return false;
+  // Jogo já iniciado/encerrado não existe mais na casa de aposta
+  if (!isUpcomingMatch(m)) return false;
   // Só sugere jogos que existem nas casas de aposta
   return isBookmakerLeague(m.league || '');
 }
@@ -108,7 +111,7 @@ const TopWinsSuggestion = ({ matches }: Props) => {
         <h3 className="text-sm font-bold text-white mb-1">Nenhuma entrada aprovada hoje</h3>
         <p className="text-xs text-gray-500 leading-relaxed">
           Analisamos {matches?.length ?? 0} jogos. Só entram ligas com mercado nas casas de aposta
-          (favorito ≥ 45%, margem ≥ 12% e empate ≤ 35%, com histórico de pelo menos 4 jogos por equipe).
+          (favorito ≥ 45%, margem ≥ 12% e empate ≤ 35%, com histórico de pelo menos 4 jogos por equipe) e apenas partidas que ainda não começaram.
         </p>
       </div>
     );

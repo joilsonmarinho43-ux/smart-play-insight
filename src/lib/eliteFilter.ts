@@ -1,6 +1,7 @@
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
 import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
+import { isUpcomingMatch } from '@/lib/matchTiming';
 
 /**
  * Elite Performance Filter v2 — APM ≥ 1.2, weighted stats, variance filter

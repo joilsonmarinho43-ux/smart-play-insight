@@ -145,6 +145,20 @@ function hasEnoughData(match: MatchData): boolean {
   return hGames >= 3 && aGames >= 3;
 }
 
+function hasGoalsData(match: MatchData): boolean {
+  const md = (match as any).modelData || {};
+  const hs = (match as any).homeStats || {};
+  const as_ = (match as any).awayStats || {};
+  return (md.homeGoalsAvg || hs.goalsFor || 0) > 0 && (md.awayGoalsAvg || as_.goalsFor || 0) > 0;
+}
+
+function hasIntensityData(match: MatchData): boolean {
+  const hs = (match as any).homeStats || {};
+  const as_ = (match as any).awayStats || {};
+  return ((hs.totalShots || 0) + (as_.totalShots || 0) + (hs.shotsOnGoal || 0) +
+    (as_.shotsOnGoal || 0) + (hs.dangerousAttacks || 0) + (as_.dangerousAttacks || 0)) > 0;
+}
+
 // ─── Engine principal ───
 
 export function filterEliteMatches(matches: MatchData[]): EliteMatch[] {
@@ -165,9 +179,20 @@ export function filterEliteMatches(matches: MatchData[]): EliteMatch[] {
       if (cardsScore >= 50) tags.push('cards');
       if (intensityScore >= 50) tags.push('intense');
 
-      const eliteScore = Math.round(
-        cornersScore * 0.25 + goalsScore * 0.35 + cardsScore * 0.2 + intensityScore * 0.2
-      );
+      // Pré-jogo raramente traz escanteios/cartões/finalizações. Em vez de zerar
+      // o score (o que esvaziava o painel), o peso é renormalizado apenas sobre
+      // as dimensões que realmente têm dado — sem inventar números.
+      const dims: { score: number; weight: number; available: boolean }[] = [
+        { score: goalsScore, weight: 0.35, available: hasGoalsData(match) },
+        { score: cornersScore, weight: 0.25, available: cornersScore > 0 },
+        { score: cardsScore, weight: 0.2, available: cardsScore > 0 },
+        { score: intensityScore, weight: 0.2, available: hasIntensityData(match) },
+      ].filter(d => d.available);
+
+      const totalWeight = dims.reduce((s2, d) => s2 + d.weight, 0);
+      const eliteScore = totalWeight > 0
+        ? Math.round(dims.reduce((s2, d) => s2 + d.score * d.weight, 0) / totalWeight)
+        : 0;
 
       return { match, tags, cornersScore, goalsScore, cardsScore, intensityScore, eliteScore };
     })

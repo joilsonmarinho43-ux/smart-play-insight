@@ -66,12 +66,31 @@ const CorrectScore = () => {
     });
   }, []);
 
-  const rows = useMemo(() => {
+  // 1) Filtra por dia ANTES de enriquecer (economiza chamadas à API)
+  const dayMatches = useMemo(() => {
     const selectedDate = dayOptions[selectedDay]?.date;
     return (rawMatches || [])
       .filter(isUpcoming)
+      .map((m: any) => ({
+        ...m,
+        homeTeam: m.homeTeam || m.teams?.home?.name || '',
+        awayTeam: m.awayTeam || m.teams?.away?.name || '',
+        __iso: getMatchIso(m),
+      }))
+      .filter((m: any) => {
+        const d = m.__iso ? paraDateString(new Date(m.__iso)) : m.date || '';
+        const league = m.league?.name || m.league || '';
+        return (!selectedDate || d === selectedDate) && (!onlyPremium || isPremiumLeague(league));
+      });
+  }, [rawMatches, dayOptions, selectedDay, onlyPremium]);
+
+  // 2) Enriquece com os últimos jogos reais (mesma fonte do Scanner PRO)
+  const { matches: enriched, isEnriching } = useScannerEnrichment(dayMatches as any);
+
+  const rows = useMemo(() => {
+    return (enriched || [])
       .map((m: any) => {
-        const iso = getMatchIso(m);
+        const iso = m.__iso || getMatchIso(m);
         const league = m.league?.name || m.league || '';
         return {
           id: String(m.id ?? m.fixture?.id ?? `${m.homeTeam}-${m.awayTeam}`),
@@ -79,14 +98,15 @@ const CorrectScore = () => {
           time: iso ? formatTimePara(iso) : m.time || '',
           league,
           premium: isPremiumLeague(league),
-          homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
-          awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
+          homeTeam: localizeTeamName(m.homeTeam) || 'Casa',
+          awayTeam: localizeTeamName(m.awayTeam) || 'Fora',
           read: buildCorrectScore(m),
         };
       })
-      .filter((r) => (!selectedDate || r.date === selectedDate) && (!onlyPremium || r.premium))
+      .filter((r) => (!onlyReal || r.read.hasRealData))
       .sort((a, b) => b.read.confidence - a.read.confidence || (a.time || '').localeCompare(b.time || ''));
-  }, [rawMatches, dayOptions, selectedDay, onlyPremium]);
+  }, [enriched, onlyReal]);
+
 
   return (
     <div className="min-h-screen text-white pb-10 font-sans relative">

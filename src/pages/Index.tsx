@@ -8,7 +8,8 @@ import { localizeTeamName } from '@/lib/teamI18n';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2, RefreshCw, Trash2, WifiOff, Send, Crown } from 'lucide-react';
+import { Loader2, RefreshCw, Trash2, WifiOff, Send, Crown, DownloadCloud } from 'lucide-react';
+import { forceAppUpdate } from '@/lib/forceUpdate';
 import bannerImg from "@/assets/banner-hero.jpg";
 import bgPattern from "@/assets/bg-circuit-pattern.jpg";
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from "@/lib/timezone";
@@ -69,6 +70,8 @@ const Index = () => {
   const [selectedDay, setSelectedDay] = useState<number>(0);
   const [premiumFilter, setPremiumFilter] = useState<'all' | 'premium'>('all');
   const [offline, setOffline] = useState<boolean>(isOfflineMode());
+  const [updating, setUpdating] = useState(false);
+
 
   useEffect(() => {
     const handler = () => setOffline(isOfflineMode());
@@ -233,10 +236,22 @@ const Index = () => {
             <button onClick={() => refetch()} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar">
               <RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} />
             </button>
+            <button
+              onClick={async () => { setUpdating(true); await forceAppUpdate(); }}
+              disabled={updating}
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-primary/15 border border-primary/40 backdrop-blur-sm rounded-lg hover:bg-primary/25 transition-colors disabled:opacity-60"
+              title="Forçar atualização do aplicativo (nova versão)"
+            >
+              <DownloadCloud className={`w-5 h-5 text-primary ${updating ? 'animate-pulse' : ''}`} />
+              <span className="text-xs font-bold text-primary uppercase tracking-wide">
+                {updating ? 'Atualizando…' : 'Atualizar app'}
+              </span>
+            </button>
             <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache">
               <Trash2 className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
+
 
         </div>
 

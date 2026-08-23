@@ -3,6 +3,11 @@ import App from "./App.tsx";
 import "./index.css";
 // Registra as fontes do Data Provider Unificado (Pré-Jogo)
 import "./services/dataProvider/sources";
+import { installChunkReloadGuard } from "./lib/chunkReloadGuard";
+
+// Recarrega uma única vez quando o navegador está com um bundle antigo (pós-deploy)
+installChunkReloadGuard();
+
 
 // PWA cleanup: service workers antigos serviam HTML/assets desatualizados (tela branca).
 // Agora nenhum SW é registrado; qualquer registro remanescente é removido.

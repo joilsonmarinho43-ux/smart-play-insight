@@ -188,11 +188,22 @@ const CorrectScore = () => {
 
         {!isFetching && !isEnriching && rows.length === 0 && (
           <div className="rounded-xl border border-white/10 bg-black/40 p-8 text-center text-sm text-gray-400">
-            {onlyReal
-              ? 'Nenhum jogo com histórico real confirmado para esta data. Desative "Só com dados reais" para ver as leituras indicativas.'
-              : 'Nenhum jogo disponível para esta data.'}
+            {onlyReal ? (
+              <>
+                <p>Nenhum jogo com histórico real confirmado para esta data.</p>
+                <button
+                  onClick={() => setOnlyReal(false)}
+                  className="mt-3 px-4 py-2 rounded-lg text-xs font-bold border border-orange-500/50 bg-orange-500/15 text-orange-400"
+                >
+                  Mostrar leituras indicativas
+                </button>
+              </>
+            ) : (
+              'Nenhum jogo disponível para esta data.'
+            )}
           </div>
         )}
+
 
 
 

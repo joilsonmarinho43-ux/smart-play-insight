@@ -70,6 +70,8 @@ const Index = () => {
   const [selectedDay, setSelectedDay] = useState<number>(0);
   const [premiumFilter, setPremiumFilter] = useState<'all' | 'premium'>('all');
   const [offline, setOffline] = useState<boolean>(isOfflineMode());
+  const [updating, setUpdating] = useState(false);
+
 
   useEffect(() => {
     const handler = () => setOffline(isOfflineMode());

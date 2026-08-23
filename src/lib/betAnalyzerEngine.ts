@@ -212,11 +212,26 @@ function buildCorrectScoreCard(m: AnalyzedMatch): ScenarioCard | null {
   if (r.homeLambda + r.awayLambda >= 3.2) consList.push('Jogo aberto reduz a precisão do placar exato.');
   if (Math.min(m.sample.home, m.sample.away) < 5) consList.push('Amostra abaixo de 5 jogos por equipe.');
   if (best.prob < 0.12) consList.push('Nenhum placar domina claramente a distribuição.');
+  const indicator = mkIndicator(
+    'Índice de Previsibilidade',
+    [
+      { label: 'Concentração top-3', w: 30, v: r.comboProb / 0.45 },
+      { label: 'Domínio do placar líder', w: 25, v: best.prob / 0.16 },
+      { label: 'Jogo fechado (poucos gols)', w: 25, v: 1 - (r.homeLambda + r.awayLambda - 1.8) / 2.0 },
+      { label: 'Estabilidade ofensiva', w: 20, v: cons || null },
+    ],
+    (v) => v >= 70
+      ? `Distribuição muito concentrada — ${best.home}x${best.away} é o placar natural do confronto.`
+      : v >= 50
+        ? 'Placar provável identificado, mas com alternativas próximas.'
+        : 'Distribuição espalhada — placar exato de baixa previsibilidade.',
+  );
   return {
     scenario: SCENARIOS[0],
     match: m,
     headline: `${m.homeTeam} ${best.home} x ${best.away} ${m.awayTeam}`,
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Prob. do placar', value: pctTxt(best.prob) },
       { label: 'Odd justa', value: best.fairOdd.toFixed(2) },

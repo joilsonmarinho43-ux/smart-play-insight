@@ -347,10 +347,48 @@ function buildGoals25Card(m: AnalyzedMatch): ScenarioCard | null {
   const consList: string[] = [];
   if (support < 0.6) consList.push('Margem estatística estreita entre Over e Under.');
   if (Math.min(m.sample.home, m.sample.away) < 5) consList.push('Amostra abaixo de 5 jogos por equipe.');
+  const bothScoringRate = weighted([
+    { w: 1, v: freq(homeGames.map((g) => g.gf + g.ga >= 2)) },
+    { w: 1, v: freq(awayGames.map((g) => g.gf + g.ga >= 2)) },
+  ]);
+  const dryRate = weighted([
+    { w: 1, v: freq(homeGames.map((g) => g.gf + g.ga <= 1)) },
+    { w: 1, v: freq(awayGames.map((g) => g.gf + g.ga <= 1)) },
+  ]);
+  const indicator = over
+    ? mkIndicator(
+        'Índice de Volume Ofensivo',
+        [
+          { label: 'Gols projetados', w: 30, v: (avgGoals - 1.8) / 1.4 },
+          { label: 'Over 2.5 no histórico (casa)', w: 20, v: overHome },
+          { label: 'Over 2.5 no histórico (fora)', w: 20, v: overAway },
+          { label: 'Jogos com 2+ gols', w: 30, v: bothScoringRate || null },
+        ],
+        (v) => v >= 70
+          ? 'Ritmo de gols alto e recorrente nos dois lados — mercado de linha alta bem sustentado.'
+          : v >= 50
+            ? 'Volume ofensivo acima da média, com oscilações no histórico.'
+            : 'Volume ofensivo insuficiente para linha alta.',
+      )
+    : mkIndicator(
+        'Índice de Jogo Travado',
+        [
+          { label: 'Gols projetados baixos', w: 30, v: (3.0 - avgGoals) / 1.2 },
+          { label: 'Under 2.5 no histórico (casa)', w: 20, v: overHome === null ? null : 1 - overHome },
+          { label: 'Under 2.5 no histórico (fora)', w: 20, v: overAway === null ? null : 1 - overAway },
+          { label: 'Jogos com até 1 gol', w: 30, v: dryRate || null },
+        ],
+        (v) => v >= 70
+          ? 'Padrão claro de jogos travados nas duas equipes — linha baixa com respaldo real.'
+          : v >= 50
+            ? 'Tendência de poucos gols, mas com jogos abertos no histórico.'
+            : 'Pouca evidência real de jogo travado.',
+      );
   return {
     scenario: SCENARIOS[2], match: m,
     headline: over ? 'OVER 2.5' : 'UNDER 2.5',
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
+    indicator,
     stats: [
       { label: 'Over 2.5 (modelo)', value: pctTxt(m.read.over25) },
       { label: 'Under 2.5 (modelo)', value: pctTxt(m.read.under25) },

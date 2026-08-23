@@ -127,11 +127,21 @@ Deno.serve(async (req) => {
     const home = String(body?.home || '').trim();
     const away = String(body?.away || '').trim();
     const league = String(body?.league || '').trim();
+    const hGF = Number(body?.homeGoalsAvg || 0);
+    const aGF = Number(body?.awayGoalsAvg || 0);
+    const hGA = Number(body?.homeGoalsAgainstAvg || 0);
+    const aGA = Number(body?.awayGoalsAgainstAvg || 0);
+    const canDerive = hGF > 0 && aGF > 0;
+    const derived = () => ({
+      home: derive(hGF, hGA || aGF, hGF >= aGF),
+      away: derive(aGF, aGA || hGF, aGF > hGF),
+    });
     if (!home || !away) {
       return new Response(JSON.stringify({ error: 'missing_teams' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     const key = cacheKey(home, away);
     const cached = await cacheGet(key);

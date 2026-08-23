@@ -352,6 +352,40 @@ const BetAnalyzer = () => {
                     </div>
                   </div>
 
+                  {/* Indicador dedicado do mercado */}
+                  <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] uppercase tracking-widest text-gray-400 truncate">
+                        {card.indicator.label}
+                      </span>
+                      <span className={`text-xs font-bold ${indicatorColor(card.indicator.value)}`}>
+                        {card.indicator.value}/100 · {card.indicator.level}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${indicatorBar(card.indicator.value)}`}
+                        style={{ width: `${Math.max(4, Math.min(100, card.indicator.value))}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-gray-300">{card.indicator.caption}</p>
+                    <div className="mt-2 grid gap-1">
+                      {card.indicator.components.map((c) => (
+                        <div key={c.label} className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-500 w-[52%] truncate">{c.label}</span>
+                          <div className="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${indicatorBar(c.value)}`}
+                              style={{ width: `${Math.max(3, Math.min(100, c.value))}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-400 w-8 text-right">{c.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+
                   <div className="grid grid-cols-2 gap-2">
                     {card.stats.map((s) => (
                       <div key={s.label} className="rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5">

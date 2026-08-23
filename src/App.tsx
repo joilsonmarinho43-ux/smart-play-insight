@@ -20,6 +20,7 @@ import MatchDetails from "./pages/MatchDetails";
 
 import Favorites from "./pages/Favorites";
 import Scanner from "./pages/Scanner";
+import CorrectScore from "./pages/CorrectScore";
 import Elite from "./pages/Elite";
 import Bingo from "./pages/Bingo";
 import Suggestions from "./pages/Suggestions";
@@ -97,6 +98,7 @@ const App = () => {
             
             <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
             <Route path="/elite" element={<ProtectedRoute><AppLayout><Elite /></AppLayout></ProtectedRoute>} />
+            <Route path="/placar-exato" element={<ProtectedRoute><AppLayout><CorrectScore /></AppLayout></ProtectedRoute>} />
             <Route path="/bingo" element={<ProtectedRoute><AppLayout><Bingo /></AppLayout></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
             <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />

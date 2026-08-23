@@ -1,6 +1,7 @@
 import { MatchData, MarketAnalysis } from '@/types/match';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
 import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
+import { isUpcomingMatch } from '@/lib/matchTiming';
 
 /**
  * Elite Performance Filter v2 — APM ≥ 1.2, weighted stats, variance filter
@@ -183,6 +184,8 @@ export function filterEliteMatches(matches: MatchData[]): EliteMatch[] {
     .filter(isHighQualityLeague)
     // Só jogos que o usuário realmente encontra nas casas de aposta
     .filter(m => isBookmakerLeague(m.league || ''))
+    // Só jogos que ainda não começaram (nada de partidas já encerradas)
+    .filter(m => isUpcomingMatch(m))
     .filter(hasEnoughData)
     .map(match => {
       const markets = analyzeMarkets(match);

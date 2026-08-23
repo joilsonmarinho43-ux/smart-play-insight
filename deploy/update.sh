@@ -45,6 +45,9 @@ PY
   bash deploy/apply-migrations.sh || echo "⚠ revise as migrations manualmente"
   # cron jobs apontando para o domínio local
   bash deploy/fix-cron.sh || echo "⚠ revise os cron jobs manualmente"
+  # placar exato diário (imagem no Telegram)
+  bash deploy/enable-correct-score-cron.sh || echo "⚠ revise o cron do placar exato"
+
 fi
 
 

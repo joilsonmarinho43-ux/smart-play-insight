@@ -4,18 +4,15 @@
 // Placar Exato, Ambas Marcam, Total 2.5, Resultado e Zebra.
 // Projetado para rodar via pg_cron na VPS (self-hosted).
 // ═══════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, enqueueTelegramOutbox, escapeHtml, getTelegramBotToken } from '../_shared/telegram.ts';
 import { brTime, brDate, APP_TZ } from '../_shared/timezone.ts';
 import { loadMatchPool } from '../_shared/matchPool.ts';
 import { toAnalyzed, runBetAnalyzer, type ScenarioCard } from '../_shared/betAnalyzer.ts';
 import { svgToPng, svgEscape, truncate, sendTelegramPhoto, CARD_FONT } from '../_shared/renderCard.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
+import { corsHeaders } from '../_shared/cors.ts';
 const REASON = 'daily-bet-analyzer';
 const F = CARD_FONT;
 

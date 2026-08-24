@@ -4,17 +4,14 @@
 // do dia, calculados com Poisson bivariado + Dixon-Coles.
 // Projetado para rodar via pg_cron na VPS (self-hosted).
 // ═══════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, enqueueTelegramOutbox, escapeHtml, getTelegramBotToken } from '../_shared/telegram.ts';
 import { brTodayDate, brTime, brDate, APP_TZ } from '../_shared/timezone.ts';
 import { buildCorrectScore } from '../_shared/correctScore.ts';
 import { svgToPng, svgEscape, truncate, sendTelegramPhoto } from '../_shared/renderCard.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
+import { corsHeaders } from '../_shared/cors.ts';
 const UNSTABLE = [
   'friendly', 'friendlies', 'amistos', 'amistoso',
   'u15', 'u16', 'u17', 'u18', 'u19', 'u20', 'u21', 'u23',

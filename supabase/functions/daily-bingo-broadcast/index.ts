@@ -3,16 +3,13 @@
 // Poisson + xG, ranking por premiumScore, EV+, aprendizado por histórico,
 // dedup 24h, filtros de qualidade reais e logs profissionais.
 // ═══════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, escapeHtml, enqueueTelegramOutbox } from '../_shared/telegram.ts';
 import { brTodayDate, brTime, brDate, brHour, APP_TZ } from '../_shared/timezone.ts';
 import { isWorldCupLeague } from '../_shared/worldCup.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
+import { corsHeaders } from '../_shared/cors.ts';
 const APP_URL = Deno.env.get('APP_PUBLIC_URL') || 'https://analista.funecob.com.br';
 const SEP = '━━━━━━━━━━━━━━━━━━━';
 

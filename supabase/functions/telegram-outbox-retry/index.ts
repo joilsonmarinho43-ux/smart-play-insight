@@ -3,14 +3,11 @@
 // Cron worker: processa telegram_outbox (DLQ) com retry exponencial.
 // Marca como 'delivered' ou 'dead' após max_attempts.
 // ═══════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage } from '../_shared/telegram.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
+import { corsHeaders } from '../_shared/cors.ts';
 const BATCH_SIZE = 25;
 
 Deno.serve(async (req) => {

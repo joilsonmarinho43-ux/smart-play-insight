@@ -1,10 +1,7 @@
+import { corsHeaders } from '../_shared/cors.ts';
 // AI Signal Analyst — Groq (Llama 3.3 70B) primary, Gemini 2.5 Flash fallback
 // Generates short tactical reading for Telegram signals and Live Trader PRO
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 interface AnalystPayload {
   mode: 'telegram' | 'live';

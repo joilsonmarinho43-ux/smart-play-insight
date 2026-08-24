@@ -1,7 +1,7 @@
 // 🖼️ Renderiza SVG → PNG dentro do edge runtime (resvg-wasm) e envia como foto
 // no Telegram (sendPhoto multipart). Usado pelo broadcast diário de Placar Exato.
 
-import { initWasm, Resvg } from 'npm:@resvg/resvg-wasm@2.6.2';
+import { initWasm, Resvg } from 'https://esm.sh/@resvg/resvg-wasm@2.6.2';
 
 const WASM_URL = 'https://unpkg.com/@resvg/resvg-wasm@2.6.2/index_bg.wasm';
 // Fontes TTF estáveis (jsdelivr/npm). URLs do repositório google/fonts retornam

@@ -5,14 +5,11 @@
 // por mercado + placar final e o resumo do bilhete.
 // Roda via pg_cron (a cada 30 min) na VPS.
 // ═══════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { telegramRequest, getTelegramBotToken, escapeHtml } from '../_shared/telegram.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
+import { corsHeaders } from '../_shared/cors.ts';
 const REASONS = ['daily-bet-analyzer', 'daily-correct-score'];
 /** Após esse tempo sem dado do jogo, o palpite vira VOID (não trava o bilhete). */
 const STALE_HOURS = 20;

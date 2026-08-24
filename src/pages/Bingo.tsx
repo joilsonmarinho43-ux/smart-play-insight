@@ -30,12 +30,20 @@ const Bingo = () => {
     homeLogo: m.teams?.home?.logo,
     awayLogo: m.teams?.away?.logo,
     league: m.league?.name || m.league || '',
+    kickoff: m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : undefined),
     time: fmt(m.fixture?.date || m.time),
   }))
   .sort((a: any, b: any) => (isPremiumLeague(a.league) ? 0 : 1) - (isPremiumLeague(b.league) ? 0 : 1));
 
-  // Sem histórico real (>= 3 jogos por equipe) o Bingo descarta tudo — enriquece antes
-  const { matches: bingoReady, isEnriching } = useScannerEnrichment(safeMatches as any);
+  // Só enriquece o que pode virar entrada: liga com mercado nas casas + jogo que ainda não começou.
+  // Sem esse recorte o orçamento de enriquecimento se perde em jogos descartados depois.
+  const candidates = safeMatches.filter(
+    (m: any) => isUpcomingMatch(m) && isBookmakerLeague(m.league),
+  );
+
+  // Sem histórico real (>= 4 jogos por equipe) o Bingo descarta tudo — enriquece antes
+  const { matches: bingoReady, isEnriching } = useScannerEnrichment(candidates as any);
+
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">

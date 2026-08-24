@@ -3,6 +3,8 @@
 // (SportsRC costuma listar poucos jogos além de hoje/amanhã).
 
 import { MatchData } from '@/types/match';
+import { supabase } from '@/integrations/supabase/client';
+
 
 const CACHE_PREFIX = 'espn_fix_';
 const CACHE_TTL = 1000 * 60 * 60 * 3; // 3h

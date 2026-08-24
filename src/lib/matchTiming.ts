@@ -6,11 +6,13 @@ const TZ_OFFSET_MIN = -180; // UTC-3 (America/Belem / Sao Paulo sem horário de 
 /** Extrai a data/hora de início do jogo a partir dos formatos usados no app. */
 export function getKickoffDate(m: any): Date | null {
   const raw =
-    m?.fixture?.date ?? m?.date ?? m?.kickoff ?? m?.startTime ?? m?.utcDate ?? null;
+    m?.fixture?.date ?? m?.date ?? m?.kickoff ?? m?.startTime ?? m?.utcDate ??
+    (typeof m?.time === 'string' && m.time.includes('T') ? m.time : null);
   if (raw) {
     const d = new Date(raw);
     if (!isNaN(d.getTime())) return d;
   }
+
 
   // Fallback: string já formatada "dd/MM, HH:mm" ou "HH:mm" (UTC-3)
   const t: string = typeof m?.time === 'string' ? m.time : '';

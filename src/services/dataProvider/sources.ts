@@ -10,7 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { registerSource } from './index';
 import { fetchFootballDataOrg } from './sources/footballDataOrg';
 import { fetchSportsRC } from './sources/sportsrc';
+import { fetchEspnFixtures } from './sources/espnFixtures';
 import { fetchWorldCupFallback } from './sources/worldCupFallback';
+
 
 // =====================================================================
 // FONTE 1 (PRIMÁRIA): SportsRC v2 — https://api.sportsrc.org/v2

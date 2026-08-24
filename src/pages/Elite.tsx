@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Crown } from 'lucide-react';
+import { ArrowLeft, Crown, RefreshCw } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import { localizeTeamName } from '@/lib/teamI18n';
@@ -8,16 +8,25 @@ import ElitePanel from '@/components/ElitePanel';
 import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
 import { isUpcomingMatch } from '@/lib/matchTiming';
+import { clearMatchCaches } from '@/lib/refreshMatches';
 
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
 const Elite = () => {
-  const { data: matches = [], isLoading } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: matches = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ['matches-multiday'],
     queryFn: () => fetchMultiDayMatches(6),
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
   });
+
+  const handleRefresh = async () => {
+    clearMatchCaches();
+    await queryClient.invalidateQueries({ queryKey: ['matches-multiday'] });
+    refetch();
+  };
+
 
   const isoOf = (m: any): string | null => {
     const raw = m?.fixture?.date || (typeof m?.time === 'string' && m.time.includes('T') ? m.time : null);

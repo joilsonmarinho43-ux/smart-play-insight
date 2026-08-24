@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Crown } from 'lucide-react';
+import { ArrowLeft, Crown, RefreshCw } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import { localizeTeamName } from '@/lib/teamI18n';
@@ -8,16 +8,25 @@ import ElitePanel from '@/components/ElitePanel';
 import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
 import { isUpcomingMatch } from '@/lib/matchTiming';
+import { clearMatchCaches } from '@/lib/refreshMatches';
 
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
 const Elite = () => {
-  const { data: matches = [], isLoading } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: matches = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ['matches-multiday'],
     queryFn: () => fetchMultiDayMatches(6),
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
   });
+
+  const handleRefresh = async () => {
+    clearMatchCaches();
+    await queryClient.invalidateQueries({ queryKey: ['matches-multiday'] });
+    refetch();
+  };
+
 
   const isoOf = (m: any): string | null => {
     const raw = m?.fixture?.date || (typeof m?.time === 'string' && m.time.includes('T') ? m.time : null);
@@ -80,7 +89,15 @@ const Elite = () => {
           </Link>
           <Crown className="w-6 h-6 text-amber-400" />
           <h1 className="text-xl font-black uppercase tracking-wider">Elite Performance</h1>
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold border bg-white/5 border-white/10 text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar jogos
+          </button>
         </div>
+
 
         {isLoading || isEnriching ? (
           <p className="text-center text-muted-foreground py-8">Carregando histórico real das equipes...</p>

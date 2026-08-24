@@ -6,6 +6,8 @@ import { localizeTeamName } from '@/lib/teamI18n';
 import TopWinsSuggestion from '@/components/TopWinsSuggestion';
 import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
+import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
+import { isUpcomingMatch } from '@/lib/matchTiming';
 
 const Bingo = () => {
   const { data: matches = [], isLoading } = useQuery({
@@ -64,7 +66,7 @@ const Bingo = () => {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
           </div>
-        ) : matches.length === 0 ? (
+        ) : candidates.length === 0 ? (
           <div className="text-center py-20 text-gray-500 text-sm">
             Nenhum jogo elegível encontrado.
           </div>

@@ -154,8 +154,8 @@ const CorrectScore = () => {
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar jogos
             </button>
-            <div className="hidden">
-            </div>
+
+
           </div>
         </header>
 

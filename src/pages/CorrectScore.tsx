@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMultiDayMatches } from '@/services/footballApi';
+import { clearMatchCaches } from '@/lib/refreshMatches';
 import { localizeTeamName } from '@/lib/teamI18n';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from '@/lib/timezone';
 import { buildCorrectScore, pct, type CorrectScoreRead } from '@/lib/correctScoreEngine';
 import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
-import { Loader2, Target, Crown, TrendingUp, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Loader2, RefreshCw, Target, Crown, TrendingUp, ShieldCheck, AlertTriangle } from 'lucide-react';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
 function paraDateString(d: Date): string {
@@ -47,12 +48,19 @@ const CorrectScore = () => {
   const [onlyReal, setOnlyReal] = useState(true);
 
   const todayKey = getTodayInPara();
-  const { data: rawMatches, isFetching } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: rawMatches, isFetching, refetch } = useQuery({
     queryKey: ['matches-multiday', todayKey],
     queryFn: () => fetchMultiDayMatches(6),
     staleTime: 1000 * 60 * 60 * 6,
     gcTime: 1000 * 60 * 60 * 24,
   });
+
+  const handleRefresh = async () => {
+    clearMatchCaches();
+    await queryClient.invalidateQueries({ queryKey: ['matches-multiday', todayKey] });
+    refetch();
+  };
 
   const dayOptions = useMemo(() => {
     const base = new Date(`${getTodayInPara()}T12:00:00-03:00`);
@@ -131,13 +139,22 @@ const CorrectScore = () => {
             <div className="h-11 w-11 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
               <Target className="h-6 w-6 text-orange-500" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <h1 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-orange-400">
                 Placar Exato
               </h1>
               <p className="text-xs text-gray-400">
                 Poisson bivariado + ajuste Dixon-Coles sobre médias reais das equipes
               </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isFetching}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border bg-white/5 border-white/10 text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar jogos
+            </button>
+            <div className="hidden">
             </div>
           </div>
         </header>

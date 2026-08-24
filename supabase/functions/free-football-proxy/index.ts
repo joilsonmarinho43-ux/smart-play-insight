@@ -9,8 +9,8 @@
 // 3) Cache compartilhado entre TODOS os usuários — uma única chamada
 //    por dia abastece o app inteiro.
 
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const FD_KEY = Deno.env.get('FOOTBALL_DATA_ORG_KEY') || '';
 const SPORTSRC_KEY = Deno.env.get('SPORTSRC_API_KEY') || '';

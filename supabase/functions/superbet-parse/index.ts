@@ -10,8 +10,8 @@
 //  - fallbacks_used: ordem das camadas acionadas
 //  - vision_used / sportsrc_used / sportsrc_matched
 
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { parseSuperbetPayload, PARSER_VERSION } from "../_shared/superbetParser.ts";
 import { enrichFromSportsRC } from "../_shared/superbetSportsrc.ts";
 

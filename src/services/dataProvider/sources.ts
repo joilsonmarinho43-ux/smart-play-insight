@@ -10,7 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { registerSource } from './index';
 import { fetchFootballDataOrg } from './sources/footballDataOrg';
 import { fetchSportsRC } from './sources/sportsrc';
+import { fetchEspnFixtures } from './sources/espnFixtures';
 import { fetchWorldCupFallback } from './sources/worldCupFallback';
+
 
 // =====================================================================
 // FONTE 1 (PRIMÁRIA): SportsRC v2 — https://api.sportsrc.org/v2
@@ -26,15 +28,28 @@ registerSource({
 });
 
 // =====================================================================
-// FONTE 2: Football-Data.org (free, ligas principais)
+// FONTE 2: ESPN Scoreboard (público, sem chave) — cobertura forte de
+// jogos FUTUROS (amanhã, depois, etc.), onde a SportsRC lista pouco.
+// =====================================================================
+registerSource({
+  name: 'espn-fixtures',
+  priority: 2,
+  fetchByDate: async (date: string): Promise<MatchData[]> => {
+    return await fetchEspnFixtures(date);
+  },
+});
+
+// =====================================================================
+// FONTE 3: Football-Data.org (free, ligas principais)
 // =====================================================================
 registerSource({
   name: 'football-data-org',
-  priority: 2,
+  priority: 3,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchFootballDataOrg(date);
   },
 });
+
 
 // =====================================================================
 // FONTE 2 (SECUNDÁRIA — ATIVA): TheSportsDB (público, sem chave obrigatória)
@@ -70,7 +85,7 @@ function tsdbToMatch(ev: any): MatchData | null {
 
 registerSource({
   name: 'thesportsdb-public',
-  priority: 3,
+  priority: 4,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     // cache curto (6h) para evitar bater no endpoint repetidamente
     try {
@@ -108,7 +123,7 @@ registerSource({
 // =====================================================================
 registerSource({
   name: 'worldcup-fallback',
-  priority: 4,
+  priority: 5,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchWorldCupFallback(date);
   },

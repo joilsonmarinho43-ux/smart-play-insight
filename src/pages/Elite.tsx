@@ -37,9 +37,15 @@ const Elite = () => {
         homeLogo: m.teams?.home?.logo,
         awayLogo: m.teams?.away?.logo,
         league: m.league?.name || m.league || '',
-        // Mantém o ISO real: o filtro de "jogo futuro" depende dele.
-        time: iso || m.time,
+        // Exibe dd/MM HH:mm (UTC-3) mantendo o ISO em `kickoff` para o filtro de jogo futuro.
+        time: iso
+          ? new Intl.DateTimeFormat('pt-BR', {
+              timeZone: 'America/Belem', day: '2-digit', month: '2-digit',
+              hour: '2-digit', minute: '2-digit',
+            }).format(new Date(iso))
+          : m.time,
         kickoff: iso,
+
       };
     })
     // Só jogos que ainda vão acontecer (hoje, amanhã, depois...)

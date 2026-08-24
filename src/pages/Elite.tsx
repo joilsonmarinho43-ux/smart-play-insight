@@ -89,7 +89,15 @@ const Elite = () => {
           </Link>
           <Crown className="w-6 h-6 text-amber-400" />
           <h1 className="text-xl font-black uppercase tracking-wider">Elite Performance</h1>
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold border bg-white/5 border-white/10 text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar jogos
+          </button>
         </div>
+
 
         {isLoading || isEnriching ? (
           <p className="text-center text-muted-foreground py-8">Carregando histórico real das equipes...</p>

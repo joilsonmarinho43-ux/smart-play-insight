@@ -96,15 +96,41 @@ export async function fetchEspnFixtures(date: string): Promise<MatchData[]> {
         params: { dates: espnDate(date), limit: '500' },
       },
     });
-    if (error || !data?.ok) return [];
-    const events: any[] = Array.isArray(data?.data?.events) ? data.data.events : [];
-    const matches = events.map(mapEvent).filter(Boolean) as MatchData[];
-    console.info(`[ESPN-Fixtures] date=${date} matches=${matches.length} (proxy)`);
-    return store(matches);
+    if (!error && data?.ok) {
+      const events: any[] = Array.isArray(data?.data?.events) ? data.data.events : [];
+      const matches = events.map(mapEvent).filter(Boolean) as MatchData[];
+      if (matches.length > 0) {
+        console.info(`[ESPN-Fixtures] date=${date} matches=${matches.length} (proxy)`);
+        return store(matches);
+      }
+    }
   } catch (e) {
-    console.warn('[ESPN-Fixtures] fetch_exception', e);
-    return [];
+    console.warn('[ESPN-Fixtures] proxy_exception', e);
   }
+
+  // 3) Último recurso: espelhos públicos com CORS liberado (self-host / edge fora do ar).
+  const target = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${espnDate(date)}&limit=500`;
+  const mirrors = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
+    `https://corsproxy.io/?${encodeURIComponent(target)}`,
+  ];
+  for (const url of mirrors) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const events: any[] = Array.isArray(json?.events) ? json.events : [];
+      const matches = events.map(mapEvent).filter(Boolean) as MatchData[];
+      if (matches.length > 0) {
+        console.info(`[ESPN-Fixtures] date=${date} matches=${matches.length} (mirror)`);
+        return store(matches);
+      }
+    } catch { /* tenta o próximo espelho */ }
+  }
+
+  console.warn(`[ESPN-Fixtures] date=${date} sem dados em todas as rotas`);
+  return [];
 }
+
 
 

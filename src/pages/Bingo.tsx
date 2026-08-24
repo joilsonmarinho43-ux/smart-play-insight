@@ -6,6 +6,8 @@ import { localizeTeamName } from '@/lib/teamI18n';
 import TopWinsSuggestion from '@/components/TopWinsSuggestion';
 import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
+import { isBookmakerLeague } from '@/lib/bookmakerLeagues';
+import { isUpcomingMatch } from '@/lib/matchTiming';
 
 const Bingo = () => {
   const { data: matches = [], isLoading } = useQuery({
@@ -30,12 +32,20 @@ const Bingo = () => {
     homeLogo: m.teams?.home?.logo,
     awayLogo: m.teams?.away?.logo,
     league: m.league?.name || m.league || '',
+    kickoff: m.fixture?.date || (typeof m.time === 'string' && m.time.includes('T') ? m.time : undefined),
     time: fmt(m.fixture?.date || m.time),
   }))
   .sort((a: any, b: any) => (isPremiumLeague(a.league) ? 0 : 1) - (isPremiumLeague(b.league) ? 0 : 1));
 
-  // Sem histórico real (>= 3 jogos por equipe) o Bingo descarta tudo — enriquece antes
-  const { matches: bingoReady, isEnriching } = useScannerEnrichment(safeMatches as any);
+  // Só enriquece o que pode virar entrada: liga com mercado nas casas + jogo que ainda não começou.
+  // Sem esse recorte o orçamento de enriquecimento se perde em jogos descartados depois.
+  const candidates = safeMatches.filter(
+    (m: any) => isUpcomingMatch(m) && isBookmakerLeague(m.league),
+  );
+
+  // Sem histórico real (>= 4 jogos por equipe) o Bingo descarta tudo — enriquece antes
+  const { matches: bingoReady, isEnriching } = useScannerEnrichment(candidates as any);
+
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -56,7 +66,7 @@ const Bingo = () => {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
           </div>
-        ) : matches.length === 0 ? (
+        ) : candidates.length === 0 ? (
           <div className="text-center py-20 text-gray-500 text-sm">
             Nenhum jogo elegível encontrado.
           </div>

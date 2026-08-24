@@ -28,15 +28,28 @@ registerSource({
 });
 
 // =====================================================================
-// FONTE 2: Football-Data.org (free, ligas principais)
+// FONTE 2: ESPN Scoreboard (público, sem chave) — cobertura forte de
+// jogos FUTUROS (amanhã, depois, etc.), onde a SportsRC lista pouco.
+// =====================================================================
+registerSource({
+  name: 'espn-fixtures',
+  priority: 2,
+  fetchByDate: async (date: string): Promise<MatchData[]> => {
+    return await fetchEspnFixtures(date);
+  },
+});
+
+// =====================================================================
+// FONTE 3: Football-Data.org (free, ligas principais)
 // =====================================================================
 registerSource({
   name: 'football-data-org',
-  priority: 2,
+  priority: 3,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchFootballDataOrg(date);
   },
 });
+
 
 // =====================================================================
 // FONTE 2 (SECUNDÁRIA — ATIVA): TheSportsDB (público, sem chave obrigatória)

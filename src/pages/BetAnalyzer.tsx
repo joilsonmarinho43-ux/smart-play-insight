@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMultiDayMatches } from '@/services/footballApi';
+import { clearMatchCaches } from '@/lib/refreshMatches';
 import { localizeTeamName } from '@/lib/teamI18n';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
 import { APP_TIMEZONE, formatTimePara, getTodayInPara } from '@/lib/timezone';
@@ -224,7 +225,7 @@ const BetAnalyzer = () => {
             onClick={handleRefresh}
             className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white/5 border-white/10 text-gray-300 hover:text-white flex items-center gap-1.5 transition-colors"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar Dados
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar jogos
           </button>
           <button
             onClick={() => setOnlyPremium((v) => !v)}
@@ -280,7 +281,7 @@ const BetAnalyzer = () => {
         {isError && (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300 flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            Não foi possível carregar os jogos agora. Tente "Atualizar Dados" em alguns instantes.
+            Não foi possível carregar os jogos agora. Tente "Atualizar jogos" em alguns instantes.
           </div>
         )}
 

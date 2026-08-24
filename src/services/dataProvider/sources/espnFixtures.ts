@@ -62,21 +62,27 @@ export async function fetchEspnFixtures(date: string): Promise<MatchData[]> {
   } catch { /* noop */ }
 
   try {
-    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${espnDate(date)}&limit=500`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const json = await res.json();
-    const events: any[] = Array.isArray(json?.events) ? json.events : [];
+    // Via edge proxy: evita bloqueios de rede/CORS e reaproveita o cache do servidor.
+    const { data, error } = await supabase.functions.invoke('free-football-proxy', {
+      body: {
+        provider: 'espn',
+        path: '/apis/site/v2/sports/soccer/all/scoreboard',
+        params: { dates: espnDate(date), limit: '500' },
+      },
+    });
+    if (error || !data?.ok) return [];
+    const events: any[] = Array.isArray(data?.data?.events) ? data.data.events : [];
     const matches = events.map(mapEvent).filter(Boolean) as MatchData[];
     if (matches.length > 0) {
       try {
         localStorage.setItem(CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: matches }));
       } catch { /* noop */ }
     }
-    console.info(`[ESPN-Fixtures] date=${date} matches=${matches.length}`);
+    console.info(`[ESPN-Fixtures] date=${date} matches=${matches.length} cache=${data.cache || 'miss'}`);
     return matches;
   } catch (e) {
     console.warn('[ESPN-Fixtures] fetch_exception', e);
     return [];
   }
 }
+

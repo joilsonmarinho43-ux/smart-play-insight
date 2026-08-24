@@ -85,7 +85,7 @@ function tsdbToMatch(ev: any): MatchData | null {
 
 registerSource({
   name: 'thesportsdb-public',
-  priority: 3,
+  priority: 4,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     // cache curto (6h) para evitar bater no endpoint repetidamente
     try {
@@ -123,7 +123,7 @@ registerSource({
 // =====================================================================
 registerSource({
   name: 'worldcup-fallback',
-  priority: 4,
+  priority: 5,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchWorldCupFallback(date);
   },

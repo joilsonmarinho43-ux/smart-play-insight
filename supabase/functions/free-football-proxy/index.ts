@@ -126,6 +126,12 @@ Deno.serve(async (req) => {
         });
       }
       headers['X-API-KEY'] = SPORTSRC_KEY;
+    } else if (body.provider === 'espn') {
+      // ESPN bloqueia requisições sem cara de navegador (403 Access Denied).
+      headers['User-Agent'] =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+      headers['Accept-Language'] = 'en-US,en;q=0.9';
+      headers['Referer'] = 'https://www.espn.com/';
     }
 
     let upstreamOk = false;

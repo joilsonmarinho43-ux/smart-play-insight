@@ -25,7 +25,7 @@ const FRESH_TTL_MS = 1000 * 60 * 60 * 6; // 6h fresh
 const STALE_MAX_MS = 1000 * 60 * 60 * 24 * 7; // 7d stale absoluto
 
 interface ProxyBody {
-  provider: 'football-data-org' | 'thesportsdb' | 'sportsrc';
+  provider: 'football-data-org' | 'thesportsdb' | 'sportsrc' | 'espn';
   path: string;
   params?: Record<string, string>;
 }
@@ -35,6 +35,7 @@ function buildUrl(provider: string, path: string, params?: Record<string, string
   if (provider === 'football-data-org') base = 'https://api.football-data.org';
   else if (provider === 'thesportsdb') base = 'https://www.thesportsdb.com/api/v1/json/123';
   else if (provider === 'sportsrc') base = 'https://api.sportsrc.org/v2';
+  else if (provider === 'espn') base = 'https://site.api.espn.com';
   else throw new Error('unknown_provider');
   const url = new URL(base + (path || '/'));
   if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
@@ -48,6 +49,9 @@ function cacheKeyFor(body: ProxyBody): string | null {
   }
   if (body.provider === 'football-data-org' && body.params?.dateFrom && body.params?.dateTo) {
     return `fdo:matches:${body.params.dateFrom}:${body.params.dateTo}`;
+  }
+  if (body.provider === 'espn' && body.params?.dates) {
+    return `espn:scoreboard:${body.params.dates}`;
   }
   if (body.provider === 'thesportsdb' && (body.path || '').includes('eventsday.php') && body.params?.d) {
     return `tsdb:eventsday:${body.params.d}`;

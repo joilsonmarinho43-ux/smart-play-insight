@@ -7,6 +7,8 @@ import { localizeTeamName } from '@/lib/teamI18n';
 import ElitePanel from '@/components/ElitePanel';
 import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
 import { isPremiumLeague } from '@/lib/premiumLeagues';
+import { isUpcomingMatch } from '@/lib/matchTiming';
+
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
 const Elite = () => {

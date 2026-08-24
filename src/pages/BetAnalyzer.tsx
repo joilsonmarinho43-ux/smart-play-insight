@@ -172,10 +172,12 @@ const BetAnalyzer = () => {
   const loading = (isFetching || isEnriching) && analyzed.length === 0;
   const lastUpdate = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('pt-BR', { timeZone: APP_TIMEZONE, hour: '2-digit', minute: '2-digit' }) : '—';
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['matches-multiday', todayKey] });
+  const handleRefresh = async () => {
+    clearMatchCaches();
+    await queryClient.invalidateQueries({ queryKey: ['matches-multiday', todayKey] });
     refetch();
   };
+
 
   return (
     <div className="min-h-screen text-white pb-10 font-sans relative">

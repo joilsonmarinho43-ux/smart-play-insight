@@ -3,13 +3,14 @@
 
 const CACHE_PREFIXES = [
   'football_cache_pre',      // footballApi (pré-jogo por data)
-  'sportsrc_',               // SportsRC
+  'sportsrc_cache_',         // SportsRC
   'sportsrc_stale_',
   'espn_fix_',               // ESPN Fixtures
-  'tsdb_day_',               // TheSportsDB
-  'fdo_',                    // Football-Data.org
+  'tsdb_cache_',             // TheSportsDB
+  'fdo_cache_',              // Football-Data.org
   'wc_fallback_',            // Copa do Mundo
 ];
+
 
 export function clearMatchCaches(): number {
   let removed = 0;

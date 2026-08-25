@@ -21,7 +21,7 @@
 //     diagnóstico em `lastDiagnostics()`.
 // =====================================================================
 
-import { fetchJson, pMapDeadline } from "./http.ts";
+import { fetchJson, pMapDeadline, type FetchResult } from "./http.ts";
 
 // A ESPN devolve 403 para clientes sem User-Agent de navegador (é o que
 // acontece no runtime Deno, tanto no Lovable quanto na VPS). Sem estes
@@ -62,7 +62,7 @@ function isEspnPayload(j: any): boolean {
 
 async function espnFetch(url: string, timeoutMs: number, deadline: number, label: string) {
   const order = [mirrorIdx, ...MIRRORS.map((_, i) => i).filter((i) => i !== mirrorIdx)];
-  let last: Awaited<ReturnType<typeof fetchJson<any>>> | null = null;
+  let last: FetchResult<any> | null = null;
   for (const i of order) {
     if (Date.now() > deadline) break;
     const r = await fetchJson<any>(MIRRORS[i](url), {

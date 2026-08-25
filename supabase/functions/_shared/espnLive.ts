@@ -40,6 +40,35 @@ const ESPN_SUMMARY = (id: string) =>
 
 const LIVE_STATE = new Set(["in", "halftime"]);
 
+// A ESPN bloqueia (403) faixas de IP de datacenter — é o caso da egress do
+// Supabase hospedado e de várias VPS. Quando isso acontece repetimos a mesma
+// URL por espelhos públicos de leitura. Ordem: direto → espelhos.
+const MIRRORS: ((u: string) => string)[] = [
+  (u) => u,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+];
+
+/** Índice do espelho que funcionou por último (evita repetir o que falha). */
+let mirrorIdx = 0;
+
+async function espnFetch(url: string, timeoutMs: number, deadline: number, label: string) {
+  const order = [mirrorIdx, ...MIRRORS.map((_, i) => i).filter((i) => i !== mirrorIdx)];
+  let last = await fetchJson<any>(MIRRORS[order[0]](url), {
+    source: "espn", timeoutMs, retries: 0, deadline, headers: ESPN_HEADERS, label,
+  });
+  if (last.ok) return last;
+  for (const i of order.slice(1)) {
+    if (Date.now() > deadline) break;
+    last = await fetchJson<any>(MIRRORS[i](url), {
+      source: `espn:mirror${i}`, timeoutMs, retries: 0, deadline, headers: ESPN_HEADERS, label,
+    });
+    if (last.ok) { mirrorIdx = i; return last; }
+  }
+  return last;
+}
+
+
 export interface EspnDiagnostics {
   status: number;
   ms: number;

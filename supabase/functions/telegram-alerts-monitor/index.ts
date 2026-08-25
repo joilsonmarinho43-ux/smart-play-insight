@@ -8,9 +8,8 @@
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, escapeHtml } from '../_shared/telegram.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 const FAILURE_THRESHOLD = 5;
 const QUOTA_PCT = 0.9;
 const QUOTA_LIMIT = 7000;

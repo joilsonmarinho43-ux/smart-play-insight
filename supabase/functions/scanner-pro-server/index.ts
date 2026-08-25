@@ -3,9 +3,8 @@ import { dynamicConfidence, isDynamicConfidenceEnabled } from '../_shared/dynami
 import { classifyConfidence, resolveMatchConfidence, logConfidenceDecision } from '../_shared/confidencePolicy.ts';
 import { projectGoals } from '../_shared/goalProjection.ts';
 import { evaluateRMA } from '../_shared/rmaEngine.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 // ═══════════════════════════════════════
 // MATH HELPERS (Poisson)
 // ═══════════════════════════════════════

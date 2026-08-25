@@ -7,9 +7,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, escapeHtml, enqueueTelegramOutbox } from '../_shared/telegram.ts';
 import { brTodayDate, brTime, brDate, brHour, APP_TZ } from '../_shared/timezone.ts';
 import { isWorldCupLeague } from '../_shared/worldCup.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 const APP_URL = Deno.env.get('APP_PUBLIC_URL') || 'https://analista.funecob.com.br';
 const SEP = '━━━━━━━━━━━━━━━━━━━';
 

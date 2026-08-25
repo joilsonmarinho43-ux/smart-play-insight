@@ -1,8 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 // Market verification logic
 function checkMarketResult(market: string, homeGoals: number, awayGoals: number, corners: number, matchFinished: boolean, halfTimeGoals?: number): 'green' | 'loss' | 'pendente' {
   const totalGoals = homeGoals + awayGoals;

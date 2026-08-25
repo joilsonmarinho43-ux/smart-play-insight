@@ -5,9 +5,8 @@
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { getTelegramBotToken } from '../_shared/telegram.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return await Promise.race([
     p,

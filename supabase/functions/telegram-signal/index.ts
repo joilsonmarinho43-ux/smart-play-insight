@@ -1,8 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, enqueueTelegramOutbox, escapeHtml } from '../_shared/telegram.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 // ═══════════════════════════════════════
 // RMA ENGINE (inline)
 // ═══════════════════════════════════════

@@ -51,7 +51,12 @@ PY
 fi
 
 
-# Frontend
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build app
+# Frontend — build sempre sem cache de camada para não repetir bundle antigo
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml build --pull app
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --force-recreate app
 docker image prune -f
+
+# Verificação pós-deploy (containers, secrets, funções, fontes de dados, cron)
+bash deploy/verify.sh || echo "⚠ verify.sh apontou problemas — veja acima."
 echo "Atualização concluída."
+

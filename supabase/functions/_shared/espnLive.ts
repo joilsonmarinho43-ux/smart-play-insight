@@ -21,13 +21,66 @@
 //     diagnóstico em `lastDiagnostics()`.
 // =====================================================================
 
-import { fetchJson, pMapDeadline } from "./http.ts";
+import { fetchJson, pMapDeadline, type FetchResult } from "./http.ts";
+
+// A ESPN devolve 403 para clientes sem User-Agent de navegador (é o que
+// acontece no runtime Deno, tanto no Lovable quanto na VPS). Sem estes
+// cabeçalhos a fonte ESPN some silenciosamente (espn=0).
+const ESPN_HEADERS = {
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  Referer: "https://www.espn.com/",
+};
 
 const ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard";
 const ESPN_SUMMARY = (id: string) =>
   `https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/summary?event=${encodeURIComponent(id)}`;
 
 const LIVE_STATE = new Set(["in", "halftime"]);
+
+// A ESPN bloqueia (403) faixas de IP de datacenter — é o caso da egress do
+// Supabase hospedado e de várias VPS. Quando isso acontece repetimos a mesma
+// URL por espelhos públicos de leitura. Ordem: direto → espelhos.
+const MIRRORS: ((u: string) => string)[] = [
+  (u) => u,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+];
+
+/** Índice do espelho que funcionou por último (evita repetir o que falha). */
+let mirrorIdx = 0;
+
+/**
+ * 200 não basta: os espelhos públicos devolvem 200 com HTML "Access Denied"
+ * quando a própria ESPN os bloqueia. Só aceitamos payload JSON da ESPN.
+ */
+function isEspnPayload(j: any): boolean {
+  return !!j && typeof j === "object" && (Array.isArray(j.events) || !!j.boxscore || !!j.header);
+}
+
+async function espnFetch(url: string, timeoutMs: number, deadline: number, label: string) {
+  const order = [mirrorIdx, ...MIRRORS.map((_, i) => i).filter((i) => i !== mirrorIdx)];
+  let last: FetchResult<any> | null = null;
+  for (const i of order) {
+    if (Date.now() > deadline) break;
+    const r = await fetchJson<any>(MIRRORS[i](url), {
+      source: i === 0 ? "espn" : `espn:mirror${i}`,
+      timeoutMs, retries: 0, deadline, headers: ESPN_HEADERS, label,
+    });
+    if (r.ok && isEspnPayload(r.json)) { mirrorIdx = i; return r; }
+    if (r.ok) {
+      console.warn(`[espn:mirror${i}] ${label} status=200 error=blocked_payload (não é JSON da ESPN)`);
+      last = { ...r, ok: false, error: "blocked_payload" };
+    } else {
+      last = r;
+    }
+  }
+  return last ?? { ok: false, status: 0, ms: 0, json: null, error: "no_attempt", attempts: 0 };
+}
+
+
 
 export interface EspnDiagnostics {
   status: number;
@@ -78,13 +131,7 @@ async function fetchSummaryStats(
   eventId: string,
   deadline: number,
 ): Promise<{ home: any; away: any } | null> {
-  const r = await fetchJson<any>(ESPN_SUMMARY(eventId), {
-    source: "espn:summary",
-    timeoutMs: 5000,
-    retries: 0,
-    deadline,
-    headers: { Accept: "application/json" },
-  });
+  const r = await espnFetch(ESPN_SUMMARY(eventId), 5000, deadline, `summary=${eventId}`);
   const teams = r.json?.boxscore?.teams;
   if (!Array.isArray(teams) || teams.length < 2) return null;
   const build = (t: any) => {
@@ -131,14 +178,7 @@ export async function fetchEspnMatches(opts: EspnFetchOptions = {}): Promise<any
     ? `${ESPN_SCOREBOARD}?dates=${date.replace(/-/g, "")}&limit=200`
     : `${ESPN_SCOREBOARD}?limit=200`;
 
-  const r = await fetchJson<any>(url, {
-    source: "espn:scoreboard",
-    timeoutMs: 8000,
-    retries: 1,
-    deadline,
-    headers: { Accept: "application/json" },
-    label: date ? `date=${date}` : "live",
-  });
+  const r = await espnFetch(url, 8000, deadline, date ? `date=${date}` : "live");
 
   if (!r.ok || !r.json) {
     diagnostics = { status: r.status, ms: r.ms, events: 0, kept: 0, enriched: 0, error: r.error };

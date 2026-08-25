@@ -4,9 +4,8 @@ import { isWorldCupLeague } from '../_shared/worldCup.ts';
 import { classifyConfidence, resolveMatchConfidence, logConfidenceDecision } from '../_shared/confidencePolicy.ts';
 import { projectGoals } from '../_shared/goalProjection.ts';
 import { evaluateRMA } from '../_shared/rmaEngine.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 // ═══════════════════════════════════════
 // RMA ENGINE (inline) — pesos rebalanceados + league_weight + momentum
 // ═══════════════════════════════════════

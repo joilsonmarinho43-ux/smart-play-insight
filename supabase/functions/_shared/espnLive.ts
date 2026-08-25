@@ -52,21 +52,34 @@ const MIRRORS: ((u: string) => string)[] = [
 /** Índice do espelho que funcionou por último (evita repetir o que falha). */
 let mirrorIdx = 0;
 
+/**
+ * 200 não basta: os espelhos públicos devolvem 200 com HTML "Access Denied"
+ * quando a própria ESPN os bloqueia. Só aceitamos payload JSON da ESPN.
+ */
+function isEspnPayload(j: any): boolean {
+  return !!j && typeof j === "object" && (Array.isArray(j.events) || !!j.boxscore || !!j.header);
+}
+
 async function espnFetch(url: string, timeoutMs: number, deadline: number, label: string) {
   const order = [mirrorIdx, ...MIRRORS.map((_, i) => i).filter((i) => i !== mirrorIdx)];
-  let last = await fetchJson<any>(MIRRORS[order[0]](url), {
-    source: "espn", timeoutMs, retries: 0, deadline, headers: ESPN_HEADERS, label,
-  });
-  if (last.ok) return last;
-  for (const i of order.slice(1)) {
+  let last: Awaited<ReturnType<typeof fetchJson<any>>> | null = null;
+  for (const i of order) {
     if (Date.now() > deadline) break;
-    last = await fetchJson<any>(MIRRORS[i](url), {
-      source: `espn:mirror${i}`, timeoutMs, retries: 0, deadline, headers: ESPN_HEADERS, label,
+    const r = await fetchJson<any>(MIRRORS[i](url), {
+      source: i === 0 ? "espn" : `espn:mirror${i}`,
+      timeoutMs, retries: 0, deadline, headers: ESPN_HEADERS, label,
     });
-    if (last.ok) { mirrorIdx = i; return last; }
+    if (r.ok && isEspnPayload(r.json)) { mirrorIdx = i; return r; }
+    if (r.ok) {
+      console.warn(`[espn:mirror${i}] ${label} status=200 error=blocked_payload (não é JSON da ESPN)`);
+      last = { ...r, ok: false, error: "blocked_payload" };
+    } else {
+      last = r;
+    }
   }
-  return last;
+  return last ?? { ok: false, status: 0, ms: 0, json: null, error: "no_attempt", attempts: 0 };
 }
+
 
 
 export interface EspnDiagnostics {

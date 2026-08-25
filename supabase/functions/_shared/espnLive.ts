@@ -23,6 +23,17 @@
 
 import { fetchJson, pMapDeadline } from "./http.ts";
 
+// A ESPN devolve 403 para clientes sem User-Agent de navegador (é o que
+// acontece no runtime Deno, tanto no Lovable quanto na VPS). Sem estes
+// cabeçalhos a fonte ESPN some silenciosamente (espn=0).
+const ESPN_HEADERS = {
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  Referer: "https://www.espn.com/",
+};
+
 const ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard";
 const ESPN_SUMMARY = (id: string) =>
   `https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/summary?event=${encodeURIComponent(id)}`;
@@ -83,7 +94,7 @@ async function fetchSummaryStats(
     timeoutMs: 5000,
     retries: 0,
     deadline,
-    headers: { Accept: "application/json" },
+    headers: ESPN_HEADERS,
   });
   const teams = r.json?.boxscore?.teams;
   if (!Array.isArray(teams) || teams.length < 2) return null;
@@ -136,7 +147,7 @@ export async function fetchEspnMatches(opts: EspnFetchOptions = {}): Promise<any
     timeoutMs: 8000,
     retries: 1,
     deadline,
-    headers: { Accept: "application/json" },
+    headers: ESPN_HEADERS,
     label: date ? `date=${date}` : "live",
   });
 

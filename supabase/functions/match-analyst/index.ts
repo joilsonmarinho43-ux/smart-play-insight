@@ -7,9 +7,8 @@
 // ════════════════════════════════════════════════════════════════
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 const PROMPT_VERSION = "v7"; // odds de referência sempre numéricas, mesmo sem odds da API
 

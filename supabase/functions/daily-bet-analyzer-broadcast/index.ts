@@ -10,9 +10,8 @@ import { brTime, brDate, APP_TZ } from '../_shared/timezone.ts';
 import { loadMatchPool } from '../_shared/matchPool.ts';
 import { toAnalyzed, runBetAnalyzer, type ScenarioCard } from '../_shared/betAnalyzer.ts';
 import { svgToPng, svgEscape, truncate, sendTelegramPhoto, CARD_FONT } from '../_shared/renderCard.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 const REASON = 'daily-bet-analyzer';
 const F = CARD_FONT;
 

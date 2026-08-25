@@ -1,8 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

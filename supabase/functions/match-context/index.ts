@@ -15,9 +15,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 const CACHE_TTL_MS = 8 * 60 * 1000;
 
 let _sb: ReturnType<typeof createClient> | null = null;

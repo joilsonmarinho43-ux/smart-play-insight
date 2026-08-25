@@ -5,9 +5,8 @@
 // Não altera nenhum engine. Apenas registra comportamento.
 // =============================================================
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 // ---- pressão simplificada (não substitui pressureEngine) ----
 function pressureSide(s: any): number {
   if (!s) return 0;

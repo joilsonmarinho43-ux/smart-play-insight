@@ -1,7 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 // Parse "1 x 0" -> { home: 1, away: 0, total: 1 }
 function parseScore(score: string | null): { total: number } | null {
   if (!score) return null;

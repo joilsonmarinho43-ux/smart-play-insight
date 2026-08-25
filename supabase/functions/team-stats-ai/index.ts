@@ -10,9 +10,8 @@
 // IMPORTANTE: marca a fonte como 'ai' para a UI rotular "Estimativa IA".
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 interface SideStats {
   possession: number;
   totalShots: number;

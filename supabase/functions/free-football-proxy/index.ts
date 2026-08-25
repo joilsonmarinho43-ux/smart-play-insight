@@ -8,8 +8,8 @@
 //    snapshot bom (stale) com served_from_stale=true em vez de erro.
 // 3) Cache compartilhado entre TODOS os usuários — uma única chamada
 //    por dia abastece o app inteiro.
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const FD_KEY = Deno.env.get('FOOTBALL_DATA_ORG_KEY') || '';

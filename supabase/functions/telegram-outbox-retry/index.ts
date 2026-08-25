@@ -5,9 +5,8 @@
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage } from '../_shared/telegram.ts';
-
-
 import { corsHeaders } from '../_shared/cors.ts';
+
 const BATCH_SIZE = 25;
 
 Deno.serve(async (req) => {

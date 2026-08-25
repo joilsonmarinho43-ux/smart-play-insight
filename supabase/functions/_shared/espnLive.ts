@@ -118,13 +118,7 @@ async function fetchSummaryStats(
   eventId: string,
   deadline: number,
 ): Promise<{ home: any; away: any } | null> {
-  const r = await fetchJson<any>(ESPN_SUMMARY(eventId), {
-    source: "espn:summary",
-    timeoutMs: 5000,
-    retries: 0,
-    deadline,
-    headers: ESPN_HEADERS,
-  });
+  const r = await espnFetch(ESPN_SUMMARY(eventId), 5000, deadline, `summary=${eventId}`);
   const teams = r.json?.boxscore?.teams;
   if (!Array.isArray(teams) || teams.length < 2) return null;
   const build = (t: any) => {
@@ -171,14 +165,7 @@ export async function fetchEspnMatches(opts: EspnFetchOptions = {}): Promise<any
     ? `${ESPN_SCOREBOARD}?dates=${date.replace(/-/g, "")}&limit=200`
     : `${ESPN_SCOREBOARD}?limit=200`;
 
-  const r = await fetchJson<any>(url, {
-    source: "espn:scoreboard",
-    timeoutMs: 8000,
-    retries: 1,
-    deadline,
-    headers: ESPN_HEADERS,
-    label: date ? `date=${date}` : "live",
-  });
+  const r = await espnFetch(url, 8000, deadline, date ? `date=${date}` : "live");
 
   if (!r.ok || !r.json) {
     diagnostics = { status: r.status, ms: r.ms, events: 0, kept: 0, enriched: 0, error: r.error };

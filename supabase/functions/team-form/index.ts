@@ -15,6 +15,7 @@
 // Body: { home: string; away: string }
 // Resp: { ok, home: SideForm, away: SideForm }
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';

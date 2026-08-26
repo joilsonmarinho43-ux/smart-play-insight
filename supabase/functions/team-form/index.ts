@@ -15,6 +15,7 @@
 // Body: { home: string; away: string }
 // Resp: { ok, home: SideForm, away: SideForm }
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
@@ -366,10 +367,102 @@ async function formFor(name: string) {
   return { ...s, sources: { espn: sourceEspn, tsdb: sourceTsdb, tsdbSearch: sourceTsdbSearch } };
 }
 
+// =====================================================
+// Cache persistente (cache_api) — essencial no self-host,
+// onde o edge-runtime é um único container e perde o cache
+// em memória a cada reciclagem de worker.
+// =====================================================
+function sb() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+}
+
+const DB_TTL_H = 12;
+
+async function dbGet(name: string): Promise<any | null> {
+  try {
+    const { data } = await sb().from('cache_api')
+      .select('dados_json, ultima_atualizacao')
+      .eq('cache_key', `team-form:${normalize(name)}`).maybeSingle();
+    if (!data) return null;
+    const ageH = (Date.now() - new Date(data.ultima_atualizacao as string).getTime()) / 3.6e6;
+    if (ageH > DB_TTL_H) return null;
+    const v: any = data.dados_json;
+    if (!v || Number(v.games) <= 0) return null; // nunca servir cache vazio
+    return v;
+  } catch { return null; }
+}
+
+async function dbSet(name: string, value: any) {
+  if (!value || Number(value.games) <= 0) return;
+  try {
+    await sb().from('cache_api').upsert({
+      cache_key: `team-form:${normalize(name)}`,
+      dados_json: value,
+      ultima_atualizacao: new Date().toISOString(),
+    }, { onConflict: 'cache_key' });
+  } catch { /* noop */ }
+}
+
+const memForm = new Map<string, { ts: number; data: any }>();
+
+async function formCached(name: string): Promise<any> {
+  const k = normalize(name);
+  const hit = memForm.get(k);
+  if (hit && Date.now() - hit.ts < TTL) return hit.data;
+
+  const db = await dbGet(name);
+  if (db) { memForm.set(k, { ts: Date.now(), data: db }); return db; }
+
+  const fresh = await formFor(name);
+  memForm.set(k, { ts: Date.now(), data: fresh });
+  await dbSet(name, fresh);
+  return fresh;
+}
+
+/** Executa com limite de paralelismo e prazo global (retorna parciais). */
+async function poolDeadline<T>(
+  items: string[],
+  limit: number,
+  deadline: number,
+  fn: (name: string) => Promise<T>,
+): Promise<Record<string, T | null>> {
+  const out: Record<string, T | null> = {};
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const name = items[cursor++];
+      if (Date.now() > deadline) { out[name] = null; continue; }
+      try { out[name] = await fn(name); } catch { out[name] = null; }
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const body = await req.json().catch(() => ({}));
+
+    // ---- MODO LOTE: { teams: string[] } → { ok, forms: { nome: form } } ----
+    const teamsRaw = Array.isArray(body?.teams) ? body.teams : null;
+    if (teamsRaw) {
+      const teams = Array.from(new Set(
+        teamsRaw.map((t: any) => String(t || '').trim()).filter(Boolean),
+      )).slice(0, 24) as string[];
+      const deadline = Date.now() + 40_000;
+      const forms = await poolDeadline(teams, 4, deadline, formCached);
+      const done = Object.values(forms).filter(Boolean).length;
+      console.log(`[team-form][batch] pedidos=${teams.length} resolvidos=${done}`);
+      return new Response(JSON.stringify({ ok: true, forms }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ---- MODO PAR (compatibilidade): { home, away } ----
     const home = String(body?.home || '').trim();
     const away = String(body?.away || '').trim();
     if (!home || !away) {
@@ -377,7 +470,7 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const [h, a] = await Promise.all([formFor(home), formFor(away)]);
+    const [h, a] = await Promise.all([formCached(home), formCached(away)]);
     return new Response(JSON.stringify({ ok: true, home: h, away: a }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -387,3 +480,4 @@ Deno.serve(async (req) => {
     });
   }
 });
+

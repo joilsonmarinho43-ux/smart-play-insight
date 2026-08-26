@@ -105,6 +105,15 @@ dump SQL. Restaurar no novo com `psql < dump.sql` **depois** do `db push`.
 
 ---
 
+## Verificação pós-deploy (obrigatória)
+```bash
+bash deploy/verify.sh
+```
+Checa containers, secrets dentro do edge-runtime, `healthcheck`, diagnóstico
+das fontes de dados (`football-api` com `{"diag":true}`), jogos do dia e o
+estado dos cron jobs. Problemas conhecidos e como resolvê-los estão em
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
 ## Storage / Buckets
 Este projeto **não usa** Supabase Storage. Nenhum bucket precisa ser criado.
 

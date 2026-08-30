@@ -21,7 +21,7 @@ export const SCENARIOS: ScenarioMeta[] = [
   { key: 'btts', icon: '🎯', title: 'Ambas Marcam', order: 2 },
   { key: 'goals25', icon: '⚽', title: 'Total de Gols 2.5', order: 3 },
   { key: 'result', icon: '🏆', title: 'Resultado da Partida', order: 4 },
-  { key: 'upset', icon: '🦓', title: 'Zebra', order: 5 },
+  { key: 'upset', icon: '🦓', title: 'Zebra / Dupla Chance', order: 5 },
 ];
 
 export interface AnalyzedMatch {
@@ -504,6 +504,7 @@ function buildUpsetCard(m: AnalyzedMatch): ScenarioCard | null {
   const undProb = favIsHome ? o.away : o.home;
   if (favProb - undProb < 0.12) return null; // sem favorito claro = não é zebra
   if (undProb < 0.26) return null;           // azarão sem chance real
+  const dcProb = Math.min(0.95, undProb + o.draw);
   const fav = favIsHome ? m.homeTeam : m.awayTeam;
   const und = favIsHome ? m.awayTeam : m.homeTeam;
   const favGames = favIsHome ? homeGames : awayGames;
@@ -557,11 +558,11 @@ function buildUpsetCard(m: AnalyzedMatch): ScenarioCard | null {
     stats: [
       { label: 'Favorito', value: fav },
       { label: 'Prob. favorito', value: pctTxt(favProb) },
-      { label: 'Prob. zebra', value: pctTxt(undProb) },
-      { label: 'Odd justa (zebra)', value: undProb > 0 ? (1 / undProb).toFixed(2) : '—' },
+      { label: 'Prob. dupla chance', value: pctTxt(dcProb) },
+      { label: 'Odd justa (DC)', value: dcProb > 0 ? (1 / dcProb).toFixed(2) : '—' },
     ],
     pros, cons: consList,
-    why: 'Este cenário foi selecionado porque existem indicadores estatísticos de vulnerabilidade do favorito.',
+    why: `Favorito vulnerável e azarão competitivo: a proteção por dupla chance cobre ${pctTxt(dcProb)} dos desfechos.`,
     recent: recentRows(m),
   };
 }

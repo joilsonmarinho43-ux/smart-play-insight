@@ -7,7 +7,10 @@
 // ═══════════════════════════════════════════════════════════════
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { telegramRequest, getTelegramBotToken, escapeHtml } from '../_shared/telegram.ts';
+import { svgToPng, svgEscape, truncate, sendTelegramPhoto, CARD_FONT } from '../_shared/renderCard.ts';
+import { brDate } from '../_shared/timezone.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+
 
 const REASONS = ['daily-bet-analyzer', 'daily-correct-score'];
 /** Após esse tempo sem dado do jogo, o palpite vira VOID (não trava o bilhete). */

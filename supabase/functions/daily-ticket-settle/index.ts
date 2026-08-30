@@ -313,14 +313,32 @@ Deno.serve(async (req) => {
         '🤖 <i>Nexus 33 — conferência automática</i>',
       ].join('\n');
 
-      const sent = await telegramRequest('sendMessage', {
-        chat_id: CHAT_ID,
-        text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        reply_to_message_id: Number(group[0].telegram_message_id),
-        allow_sending_without_reply: true,
-      }, { botToken, tag: 'SETTLE' });
+      // 1) tenta responder com a IMAGEM de conferência (mercado a mercado)
+      let sent: { ok: boolean; status: number; data: any } = { ok: false, status: 0, data: null };
+      try {
+        const png = await svgToPng(buildResultSvg(title, brDate(new Date()), rows));
+        const p = await sendTelegramPhoto(botToken, CHAT_ID, png, '', {
+          tag: 'SETTLE-PHOTO',
+          filename: 'conferencia.png',
+          replyTo: Number(group[0].telegram_message_id),
+        });
+        sent = { ok: p.ok, status: p.status, data: p.data };
+      } catch (e) {
+        console.error('[SETTLE] render da conferência falhou:', e instanceof Error ? e.message : e);
+      }
+
+      // 2) fallback em texto
+      if (!sent.ok) {
+        sent = await telegramRequest('sendMessage', {
+          chat_id: CHAT_ID,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          reply_to_message_id: Number(group[0].telegram_message_id),
+          allow_sending_without_reply: true,
+        }, { botToken, tag: 'SETTLE' });
+      }
+
 
       if (sent.ok) {
         await sb.from('telegram_signals')

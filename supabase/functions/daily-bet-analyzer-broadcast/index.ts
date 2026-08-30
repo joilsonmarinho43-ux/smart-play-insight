@@ -21,38 +21,43 @@ const F = CARD_FONT;
 
 function buildSvg(cards: ScenarioCard[], dateLabel: string): string {
   const W = 1080;
-  const ROW = 196;
+  const ROW = 214;
   const TOP = 210;
   const H = TOP + cards.length * ROW + 70;
+  // Coluna esquerda: 126 → 700 | Coluna direita (âncora à direita): 720 → 1020
+  const RIGHT = 1020;
 
   const rows = cards.map((c, i) => {
     const y = TOP + i * ROW;
     const m = c.match;
     const scoreColor = c.score >= 80 ? '#22c55e' : c.score >= 70 ? '#fbbf24' : '#f97316';
     const indColor = c.indicator.value >= 70 ? '#22c55e' : c.indicator.value >= 50 ? '#fbbf24' : '#94a3b8';
-    const stats = c.stats.slice(0, 3);
+    // Apenas 2 células de estatística para não invadir a coluna da direita
+    const stats = c.stats.slice(0, 2);
     const statCells = stats.map((s, k) => {
-      const x = 126 + k * 300;
-      return `<text x="${x}" y="${y + 148}" font-family="${F}" font-size="16" fill="#64748b">${svgEscape(truncate(s.label, 22))}</text>
-      <text x="${x}" y="${y + 172}" font-family="${F}" font-size="20" font-weight="700" fill="#e2e8f0">${svgEscape(truncate(s.value, 24))}</text>`;
+      const x = 126 + k * 290;
+      return `<text x="${x}" y="${y + 152}" font-family="${F}" font-size="16" fill="#64748b">${svgEscape(truncate(s.label, 20))}</text>
+      <text x="${x}" y="${y + 178}" font-family="${F}" font-size="20" font-weight="700" fill="#e2e8f0">${svgEscape(truncate(s.value, 20))}</text>`;
     }).join('');
 
     return `<g>
     <rect x="40" y="${y}" width="1000" height="${ROW - 18}" rx="18" fill="#111c33" stroke="#1e2b47"/>
     <circle cx="86" cy="${y + 46}" r="24" fill="url(#gold)"/>
     <text x="86" y="${y + 54}" font-family="${F}" font-size="22" font-weight="700" fill="#0b1220" text-anchor="middle">${i + 1}</text>
-    <text x="126" y="${y + 38}" font-family="${F}" font-size="21" font-weight="700" fill="#f59e0b">${svgEscape(`${c.scenario.title.toUpperCase()}`)}</text>
-    <text x="126" y="${y + 70}" font-family="${F}" font-size="28" font-weight="700" fill="#f8fafc">${svgEscape(truncate(`${m.homeTeam} x ${m.awayTeam}`, 38))}</text>
-    <text x="126" y="${y + 100}" font-family="${F}" font-size="19" fill="#94a3b8">${svgEscape(truncate(m.league, 34))} • ${svgEscape(m.time)}</text>
-    <text x="126" y="${y + 126}" font-family="${F}" font-size="22" font-weight="700" fill="#22d3ee">${svgEscape(truncate(c.headline, 44))}</text>
+    <text x="126" y="${y + 38}" font-family="${F}" font-size="20" font-weight="700" fill="#f59e0b">${svgEscape(truncate(c.scenario.title.toUpperCase(), 30))}</text>
+    <text x="126" y="${y + 70}" font-family="${F}" font-size="27" font-weight="700" fill="#f8fafc">${svgEscape(truncate(`${m.homeTeam} x ${m.awayTeam}`, 32))}</text>
+    <text x="126" y="${y + 98}" font-family="${F}" font-size="18" fill="#94a3b8">${svgEscape(truncate(m.league, 26))} • ${svgEscape(m.time)}</text>
+    <text x="126" y="${y + 126}" font-family="${F}" font-size="22" font-weight="700" fill="#22d3ee">${svgEscape(truncate(c.headline, 36))}</text>
     ${statCells}
-    <text x="980" y="${y + 48}" font-family="${F}" font-size="15" fill="#94a3b8" text-anchor="end">SCORE NEXUS</text>
-    <text x="980" y="${y + 88}" font-family="${F}" font-size="38" font-weight="700" fill="${scoreColor}" text-anchor="end">${c.score}</text>
-    <text x="980" y="${y + 114}" font-family="${F}" font-size="15" fill="#64748b" text-anchor="end">${svgEscape(c.rating)} • ${svgEscape(c.quality)}</text>
-    <text x="980" y="${y + 146}" font-family="${F}" font-size="15" fill="#94a3b8" text-anchor="end">${svgEscape(truncate(c.indicator.label, 26))}</text>
-    <text x="980" y="${y + 172}" font-family="${F}" font-size="24" font-weight="700" fill="${indColor}" text-anchor="end">${c.indicator.value}/100 ${svgEscape(c.indicator.level)}</text>
+    <line x1="712" y1="${y + 22}" x2="712" y2="${y + ROW - 40}" stroke="#1e2b47" stroke-width="2"/>
+    <text x="${RIGHT}" y="${y + 42}" font-family="${F}" font-size="14" fill="#94a3b8" text-anchor="end">SCORE NEXUS</text>
+    <text x="${RIGHT}" y="${y + 82}" font-family="${F}" font-size="36" font-weight="700" fill="${scoreColor}" text-anchor="end">${c.score}</text>
+    <text x="${RIGHT}" y="${y + 106}" font-family="${F}" font-size="14" fill="#64748b" text-anchor="end">${svgEscape(truncate(`${c.rating} • ${c.quality}`, 32))}</text>
+    <text x="${RIGHT}" y="${y + 150}" font-family="${F}" font-size="14" fill="#94a3b8" text-anchor="end">${svgEscape(truncate(c.indicator.label, 28))}</text>
+    <text x="${RIGHT}" y="${y + 178}" font-family="${F}" font-size="22" font-weight="700" fill="${indColor}" text-anchor="end">${c.indicator.value}/100 ${svgEscape(c.indicator.level)}</text>
   </g>`;
   }).join('');
+
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>

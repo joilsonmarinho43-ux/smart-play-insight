@@ -156,7 +156,13 @@ export function toAnalyzed(m: any, opts: { time: string; iso: string | null; lea
 
 /** Amostra mínima para qualquer cenário. */
 function eligible(m: AnalyzedMatch): boolean {
-  return m.read.hasRealData && Math.min(m.sample.home, m.sample.away) >= 3;
+  if (!m.read.hasRealData) return false;
+  if (Math.min(m.sample.home, m.sample.away) < 4) return false;
+  const listed = Math.min(
+    m.history.homeGF.length, m.history.homeGA.length,
+    m.history.awayGF.length, m.history.awayGA.length,
+  );
+  return listed >= 4;
 }
 
 function sampleFactor(m: AnalyzedMatch): number {
@@ -189,6 +195,11 @@ function buildCorrectScoreCard(m: AnalyzedMatch): ScenarioCard | null {
   const r = m.read;
   const best = r.top[0];
   if (!best) return null;
+  // Gate de assertividade: placar exato só vale com distribuição concentrada
+  // e jogo de poucos gols. Fora disso é loteria.
+  if (best.prob < 0.115) return null;
+  if (r.comboProb < 0.32) return null;
+  if (r.homeLambda + r.awayLambda > 3.0) return null;
   const cons = weighted([
     { w: 1, v: consistency(m.history.homeGF) },
     { w: 1, v: consistency(m.history.awayGF) },
@@ -256,10 +267,12 @@ function buildBttsCard(m: AnalyzedMatch): ScenarioCard | null {
   const model = m.read.btts;
   const yes = model >= 0.5;
   const support = yes ? model : 1 - model;
+  if (support < 0.62) return null; // margem estreita = red
   const histSupport = weighted([
     { w: 1, v: yes ? bttsHome : bttsHome === null ? null : 1 - bttsHome },
     { w: 1, v: yes ? bttsAway : bttsAway === null ? null : 1 - bttsAway },
   ]);
+  if (!histSupport || histSupport < 0.55) return null; // modelo sem lastro real
   const score = Math.round(100 * weighted([
     { w: 25, v: Math.min(1, (support - 0.45) / 0.35) },
     { w: 25, v: histSupport || null },
@@ -330,10 +343,12 @@ function buildGoals25Card(m: AnalyzedMatch): ScenarioCard | null {
   const model = m.read.over25;
   const over = model >= 0.5;
   const support = over ? model : 1 - model;
+  if (support < 0.62) return null;
   const hist = weighted([
     { w: 1, v: over ? overHome : overHome === null ? null : 1 - overHome },
     { w: 1, v: over ? overAway : overAway === null ? null : 1 - overAway },
   ]);
+  if (!hist || hist < 0.55) return null; // frequência real precisa concordar
   const avgGoals = (m.read.homeLambda + m.read.awayLambda);
   const score = Math.round(100 * weighted([
     { w: 30, v: Math.min(1, (support - 0.45) / 0.32) },
@@ -405,9 +420,12 @@ function buildResultCard(m: AnalyzedMatch): ScenarioCard | null {
   const { homeGames, awayGames } = pairHistory(m);
   if (homeGames.length < 3 || awayGames.length < 3) return null;
   const o = m.read.outcome;
-  const entries: [string, number][] = [['CASA', o.home], ['EMPATE', o.draw], ['FORA', o.away]];
+  // Empate seco é o mercado de maior variância — fora do cartão.
+  const entries: [string, number][] = [['CASA', o.home], ['FORA', o.away]];
   entries.sort((a, b) => b[1] - a[1]);
   const [pick, prob] = entries[0];
+  if (prob < 0.50) return null;                       // favorito precisa ser real
+  if (prob - Math.max(o.draw, entries[1][1]) < 0.14) return null; // sem folga = red
   const winHome = freq(homeGames.map((g) => g.gf > g.ga));
   const winAway = freq(awayGames.map((g) => g.gf > g.ga));
   const formSupport = pick === 'CASA' ? winHome : pick === 'FORA' ? winAway : null;
@@ -485,6 +503,7 @@ function buildUpsetCard(m: AnalyzedMatch): ScenarioCard | null {
   const favProb = favIsHome ? o.home : o.away;
   const undProb = favIsHome ? o.away : o.home;
   if (favProb - undProb < 0.12) return null; // sem favorito claro = não é zebra
+  if (undProb < 0.26) return null;           // azarão sem chance real
   const fav = favIsHome ? m.homeTeam : m.awayTeam;
   const und = favIsHome ? m.awayTeam : m.homeTeam;
   const favGames = favIsHome ? homeGames : awayGames;
@@ -506,7 +525,7 @@ function buildUpsetCard(m: AnalyzedMatch): ScenarioCard | null {
     { w: 20, v: Math.min(1, undProb / 0.35) },
     { w: 25, v: sampleFactor(m) },
   ]));
-  if (vulnerability < 0.35 || strength < 0.35) return null;
+  if (vulnerability < 0.48 || strength < 0.48) return null;
   const pros = [
     `${fav} sofreu ${favConceded.toFixed(2)} gols por jogo nos últimos ${favGames.length}.`,
     `${fav} não venceu ${pctTxt(favNotWon)} dos jogos recentes.`,
@@ -532,7 +551,7 @@ function buildUpsetCard(m: AnalyzedMatch): ScenarioCard | null {
   );
   return {
     scenario: SCENARIOS[4], match: m,
-    headline: `Indicador de surpresa: ${und}`,
+    headline: `Dupla chance: ${und} ou empate`,
     score, rating: ratingOf(score), quality: qualityOf(m.sample, m.history),
     indicator,
     stats: [
@@ -572,7 +591,7 @@ const BUILDERS: Record<ScenarioKey, (m: AnalyzedMatch) => ScenarioCard | null> =
 };
 
 /** Score mínimo para um cenário ser publicado. */
-const MIN_SCORE = 60;
+const MIN_SCORE = 72;
 
 export interface AnalyzerResult {
   cards: ScenarioCard[];

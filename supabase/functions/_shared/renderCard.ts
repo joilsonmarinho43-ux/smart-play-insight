@@ -78,7 +78,7 @@ export async function sendTelegramPhoto(
   chatId: string | number,
   png: Uint8Array,
   caption?: string,
-  opts?: { filename?: string; tag?: string },
+  opts?: { filename?: string; tag?: string; replyTo?: number | null },
 ): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
   const tag = opts?.tag ?? 'TG-PHOTO';
   const form = new FormData();
@@ -87,11 +87,16 @@ export async function sendTelegramPhoto(
     form.append('caption', caption.slice(0, 1024));
     form.append('parse_mode', 'HTML');
   }
+  if (opts?.replyTo) {
+    form.append('reply_to_message_id', String(opts.replyTo));
+    form.append('allow_sending_without_reply', 'true');
+  }
   form.append(
     'photo',
     new Blob([png as unknown as BlobPart], { type: 'image/png' }),
     opts?.filename ?? 'nexus33.png',
   );
+
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {

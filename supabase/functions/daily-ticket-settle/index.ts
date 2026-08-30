@@ -137,19 +137,87 @@ function settle(signal: any, d: MatchResult): Verdict {
     return pick === real ? 'green' : 'loss';
   }
 
-  // Zebra — o azarão indicado vence
+  // Zebra / Dupla Chance — azarão vence OU empata
   if (type === 'upset') {
-    const und = (market.split(':').pop() || '').trim().toLowerCase();
+    const tail = (market.split(':').pop() || '').trim().toLowerCase();
+    const und = tail.replace(/\s+ou\s+empate\s*$/, '').trim();
     if (!und || !homeName || !awayName) return 'void';
-    const undIsHome = homeName.toLowerCase().includes(und) || und.includes(homeName.toLowerCase());
+    const h = homeName.toLowerCase().trim();
+    const undIsHome = h.includes(und) || und.includes(h);
+    const doubleChance = /dupla chance/.test(ml);
     const won = undIsHome ? d.homeGoals > d.awayGoals : d.awayGoals > d.homeGoals;
-    return won ? 'green' : 'loss';
+    const drew = d.homeGoals === d.awayGoals;
+    return (won || (doubleChance && drew)) ? 'green' : 'loss';
   }
 
   return 'void';
 }
 
 const ICON: Record<Verdict, string> = { green: '✅', loss: '❌', void: '⚪', pendente: '⏳' };
+const VERDICT_TXT: Record<Verdict, string> = { green: 'WIN', loss: 'LOSS', void: 'ANULADO', pendente: '—' };
+
+/* ------------------------------------------------------------------ */
+/* Card de conferência (imagem)                                        */
+/* ------------------------------------------------------------------ */
+
+function buildResultSvg(
+  title: string,
+  dateLabel: string,
+  rows: { s: any; d?: MatchResult; v: Verdict }[],
+): string {
+  const F = CARD_FONT;
+  const W = 1080;
+  const ROW = 150;
+  const TOP = 210;
+  const H = TOP + rows.length * ROW + 120;
+
+  const greens = rows.filter((r) => r.v === 'green').length;
+  const losses = rows.filter((r) => r.v === 'loss').length;
+  const decided = greens + losses;
+  const wr = decided > 0 ? Math.round((greens / decided) * 100) : 0;
+  const headline = decided === 0 ? 'BILHETE ANULADO' : losses === 0 ? 'BILHETE — WIN' : greens === 0 ? 'BILHETE — LOSS' : 'BILHETE — PARCIAL';
+  const headColor = decided === 0 ? '#94a3b8' : losses === 0 ? '#22c55e' : greens === 0 ? '#ef4444' : '#fbbf24';
+
+  const body = rows.map((r, i) => {
+    const y = TOP + i * ROW;
+    const color = r.v === 'green' ? '#22c55e' : r.v === 'loss' ? '#ef4444' : '#94a3b8';
+    const placar = r.d ? `${r.d.homeGoals} x ${r.d.awayGoals}` : '—';
+    const market = String(r.s.market || '');
+    const [head, ...rest] = market.split(':');
+    const pick = rest.join(':').trim() || head;
+    return `<g>
+    <rect x="40" y="${y}" width="1000" height="${ROW - 18}" rx="18" fill="#111c33" stroke="${color}" stroke-opacity="0.35"/>
+    <text x="76" y="${y + 58}" font-family="${F}" font-size="34">${ICON[r.v]}</text>
+    <text x="126" y="${y + 40}" font-family="${F}" font-size="18" font-weight="700" fill="#f59e0b">${svgEscape(truncate(head.toUpperCase(), 34))}</text>
+    <text x="126" y="${y + 72}" font-family="${F}" font-size="25" font-weight="700" fill="#f8fafc">${svgEscape(truncate(String(r.s.match_name || '').replace(' vs ', ' x '), 34))}</text>
+    <text x="126" y="${y + 102}" font-family="${F}" font-size="19" fill="#22d3ee">${svgEscape(truncate(pick, 44))}</text>
+    <text x="1020" y="${y + 46}" font-family="${F}" font-size="15" fill="#94a3b8" text-anchor="end">PLACAR FINAL</text>
+    <text x="1020" y="${y + 82}" font-family="${F}" font-size="30" font-weight="700" fill="#e2e8f0" text-anchor="end">${svgEscape(placar)}</text>
+    <text x="1020" y="${y + 110}" font-family="${F}" font-size="20" font-weight="700" fill="${color}" text-anchor="end">${VERDICT_TXT[r.v]}</text>
+  </g>`;
+  }).join('');
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/><stop offset="100%" stop-color="#0a1020"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#fcd34d"/>
+    </linearGradient>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
+  <rect x="0" y="0" width="${W}" height="8" fill="url(#gold)"/>
+  <text x="40" y="86" font-family="${F}" font-size="44" font-weight="700" fill="${headColor}">${svgEscape(headline)}</text>
+  <text x="40" y="128" font-family="${F}" font-size="24" fill="#f59e0b">${svgEscape(title)} • ANALISTA JOILSON</text>
+  <text x="40" y="166" font-family="${F}" font-size="22" fill="#94a3b8">${svgEscape(dateLabel)} • conferência mercado a mercado</text>
+  <line x1="40" y1="188" x2="1040" y2="188" stroke="#1e2b47" stroke-width="2"/>
+  ${body}
+  <text x="40" y="${H - 46}" font-family="${F}" font-size="26" font-weight="700" fill="#e2e8f0">${greens} WIN • ${losses} LOSS${rows.length - decided > 0 ? ` • ${rows.length - decided} anulado(s)` : ''}</text>
+  <text x="1040" y="${H - 46}" font-family="${F}" font-size="26" font-weight="700" fill="${headColor}" text-anchor="end">Aproveitamento ${wr}%</text>
+</svg>`;
+}
+
 
 /* ------------------------------------------------------------------ */
 

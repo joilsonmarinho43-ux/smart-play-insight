@@ -3,15 +3,15 @@ import type { MarketAnalysis, MatchData } from '@/types/match';
 /**
  * Nexus Core de Decisão
  *
- * Camada pura de orquestração. Não chama APIs, Supabase, localStorage ou
- * execução de apostas. Recebe evidências já produzidas pelos engines e decide
- * apenas a classe da oportunidade.
+ * Camada pura de orquestração analítica. Não chama APIs, Supabase,
+ * localStorage ou plataformas externas. O Core somente classifica a força
+ * de uma oportunidade para exibição/uso analítico.
  *
  * Regra arquitetural: este módulo NÃO altera nem importa engines existentes.
- * Integração dos engines será feita posteriormente por adapters.
+ * Integração dos engines é feita somente por adapters.
  */
 
-export type NexusDecision = 'EXECUTE' | 'CONSERVATIVE' | 'INFO_ONLY' | 'REJECT';
+export type NexusDecision = 'SIGNAL' | 'CONSERVATIVE' | 'INFO_ONLY' | 'REJECT';
 export type NexusMode = 'PRE_MATCH' | 'LIVE';
 export type EvidenceSource = 'market' | 'engine' | 'live' | 'model';
 
@@ -29,8 +29,8 @@ export interface NexusDecisionInput {
   confidence?: number | null;
   markets?: MarketAnalysis[];
   evidence?: NexusEvidence[];
-  /** Bloqueio externo: partida/mercado já processado ou não elegível. */
-  executionBlocked?: boolean;
+  /** Bloqueio analítico: partida/mercado já processado ou não elegível. */
+  analysisBlocked?: boolean;
   /** Sinaliza conflito material entre engines. */
   engineConflict?: boolean;
 }
@@ -42,7 +42,8 @@ export interface NexusDecisionOutput {
   selectedMarket: MarketAnalysis | null;
   reasonCodes: string[];
   evidenceScore: number;
-  executionAllowed: boolean;
+  /** Indica somente que o cenário é forte o bastante para ser sinalizado. */
+  signalEligible: boolean;
 }
 
 const clamp = (n: number, min = 0, max = 100): number =>
@@ -73,7 +74,7 @@ function selectMarket(markets: MarketAnalysis[]): MarketAnalysis | null {
     .sort((a, b) => b.probability - a.probability)[0] ?? null;
 }
 
-/** Deterministic decision policy. */
+/** Deterministic analyst-only decision policy. */
 export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
   const reasons: string[] = [];
   const confidence = normalizeConfidence(input.confidence);
@@ -85,16 +86,16 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
     return {
       decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100,
       selectedMarket: null, reasonCodes: ['INVALID_MATCH'], evidenceScore: 0,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
-  if (input.executionBlocked) {
-    reasons.push('EXECUTION_BLOCKED');
+  if (input.analysisBlocked) {
+    reasons.push('ANALYSIS_BLOCKED');
     return {
       decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100,
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
@@ -105,12 +106,12 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
   if (!selectedMarket) reasons.push('NO_VALID_MARKET');
   else if (bestMarketScore < 72) reasons.push('MARKET_BELOW_THRESHOLD');
 
-  // Segurança: ausência de confiança explícita nunca autoriza execução.
+  // Segurança: ausência de confiança explícita nunca autoriza um sinal forte.
   if (confidence === null) {
     return {
       decision: 'INFO_ONLY', confidence: 0, riskScore: 80,
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
@@ -118,7 +119,7 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
     return {
       decision: 'REJECT', confidence, riskScore: clamp(100 - Math.min(confidence, evScore)),
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
@@ -126,7 +127,7 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
     return {
       decision: 'INFO_ONLY', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore)),
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
@@ -134,7 +135,7 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
     return {
       decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, evScore)),
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
@@ -143,31 +144,28 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
     return {
       decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)),
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
-  if (input.mode === 'LIVE' && (input.match.isLive !== true)) {
+  if (input.mode === 'LIVE' && input.match.isLive !== true) {
     reasons.push('LIVE_STATE_UNCONFIRMED');
     return {
       decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)),
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      executionAllowed: false,
+      signalEligible: false,
     };
   }
 
-  reasons.push('CORE_APPROVED');
+  reasons.push('CORE_APPROVED_SIGNAL');
   return {
-    decision: 'EXECUTE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)),
+    decision: 'SIGNAL', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)),
     selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-    executionAllowed: true,
+    signalEligible: true,
   };
 }
 
-/**
- * Adapter mínimo para transformar os mercados atuais em evidência Nexus.
- * Não chama nenhum engine; serve somente como contrato de integração futura.
- */
+/** Transforma mercados reais em evidência analítica Nexus. */
 export function marketsToNexusEvidence(markets: MarketAnalysis[]): NexusEvidence[] {
   return markets
     .filter((m) => Number.isFinite(m.probability))

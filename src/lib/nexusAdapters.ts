@@ -80,11 +80,27 @@ export function adaptPreMatch(
   markets: MarketAnalysis[],
   confidence: number | null | undefined,
 ): NexusDecisionOutput {
+  // PRE_MATCH also passes through the same quality gate. Unlike LIVE, missing
+  // historical context is not automatically a timestamp failure, but a weak
+  // sample/provenance must reduce or reject the analytical decision.
+  const sampleSize = match.sampleSize
+    ? Math.min(match.sampleSize.homeGames, match.sampleSize.awayGames)
+    : null;
+
+  const dataQuality = assessDataQuality({
+    live: false,
+    sampleSize,
+    requiredSampleSize: 3,
+    sourceCompleteness: match.modelData && match.sampleSize ? 100 : 75,
+    requiredFeaturesPresent: markets.length > 0,
+  });
+
   return decideNexus({
     match,
     mode: 'PRE_MATCH',
     confidence,
     markets,
     evidence: marketsToNexusEvidence(markets),
+    dataQuality,
   });
 }

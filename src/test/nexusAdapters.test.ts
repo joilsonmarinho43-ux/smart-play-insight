@@ -33,6 +33,30 @@ const sniper: HybridSignal = {
   observedAt: new Date().toISOString(),
 };
 
+const strongPreMatch = {
+  id: 'p1',
+  time: '20:00',
+  league: 'Teste',
+  homeTeam: 'Casa',
+  awayTeam: 'Fora',
+  isLive: false,
+  sampleSize: { homeGames: 5, awayGames: 5, homeWithStats: 5, awayWithStats: 5 },
+  modelData: {
+    homeGoalsAvg: 1.5,
+    awayGoalsAvg: 1.2,
+    homeGoalsAgainstAvg: 1.0,
+    awayGoalsAgainstAvg: 1.1,
+    homeCornersAvg: 5,
+    awayCornersAvg: 4,
+    homeCardsAvg: 2,
+    awayCardsAvg: 2,
+    homeCornersVariance: 1,
+    awayCornersVariance: 1,
+    homeCardsVariance: 1,
+    awayCardsVariance: 1,
+  },
+};
+
 describe('Nexus adapters', () => {
   it('adapta um sinal Hybrid forte sem criar semântica de execução', () => {
     const result = adaptHybridSignal(sniper, market);
@@ -62,13 +86,19 @@ describe('Nexus adapters', () => {
     expect(result.reasonCodes).toContain('CONFIDENCE_MISSING');
   });
 
-  it('mantém pré-jogo separado do adapter LIVE', () => {
+  it('mantém pré-jogo forte quando há amostra e contexto de modelo suficientes', () => {
+    const result = adaptPreMatch(strongPreMatch, [market], 88);
+    expect(result.decision).toBe('SIGNAL');
+    expect(result.signalEligible).toBe(true);
+  });
+
+  it('não promove pré-jogo com amostra histórica insuficiente', () => {
     const result = adaptPreMatch(
-      { id: 'p1', time: '20:00', league: 'Teste', homeTeam: 'Casa', awayTeam: 'Fora', isLive: false },
+      { ...strongPreMatch, sampleSize: { homeGames: 2, awayGames: 5, homeWithStats: 2, awayWithStats: 5 } },
       [market],
       88,
     );
-    expect(result.decision).toBe('SIGNAL');
-    expect(result.signalEligible).toBe(true);
+    expect(result.decision).toBe('REJECT');
+    expect(result.reasonCodes).toContain('DATA_INSUFFICIENT_SAMPLE');
   });
 });

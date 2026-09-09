@@ -18,7 +18,8 @@ export interface HybridSignal {
   /** Analytically eligible for Nexus signal review; never means order execution. */
   signalEligible: boolean;
   signalReason: string;
-  // stats
+  /** Timestamp of the source snapshot, when supplied by the upstream adapter. */
+  observedAt: string | null;
   shotsOnGoal: number;
   totalShots: number;
   corners: number;
@@ -96,9 +97,10 @@ function extractStats(match: any) {
   const matchId = String(match.id || match.fixture?.id);
   const league = match.league?.name || match.league || '';
   const hasStats = !!(lH.shotsOnGoal || lA.shotsOnGoal || lH.dangerousAttacks || lA.dangerousAttacks || totalShots || corners);
+  const observedAt = match.observedAt ?? match.updatedAt ?? match.lastUpdatedAt ?? null;
 
   if (matchId && hasStats && minute > 0) recordSnapshot(matchId, minute, totalShots, corners);
-  return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats };
+  return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats, observedAt };
 }
 
 function trySniper(s: ReturnType<typeof extractStats>): boolean {
@@ -170,6 +172,7 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     market,
     signalEligible,
     signalReason,
+    observedAt: typeof s.observedAt === 'string' ? s.observedAt : null,
     shotsOnGoal: s.sog,
     totalShots: s.totalShots,
     corners: s.corners,

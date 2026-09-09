@@ -16,23 +16,19 @@ const decision: NexusDecisionOutput = {
 const market: MarketAnalysis = {
   market: 'Over 1.5 Gols',
   probability: 86,
+  risk: 'low',
+  category: 'goals',
   probabilitySource: 'MODEL_ESTIMATE',
   calibrationStatus: 'UNCALIBRATED',
-  odd: null,
+  odd: undefined,
 };
 
 describe('predictionLedgerPersistence', () => {
   it('builds only an authoritative pre-match model prediction', () => {
     const record = buildLedgerPrediction({
-      predictionId: 'p1',
-      matchId: 'm1',
-      decision,
-      market,
-      modelVersion: 'nexus-v1',
-      dataQualityScore: 95,
-      dataQualityStatus: 'VALID',
-      dataObservedAt: null,
-      predictedAt: '2026-09-08T10:00:00Z',
+      predictionId: 'p1', matchId: 'm1', decision, market,
+      modelVersion: 'nexus-v1', dataQualityScore: 95, dataQualityStatus: 'VALID',
+      dataObservedAt: null, predictedAt: '2026-09-08T10:00:00Z',
     });
 
     expect(record?.probability).toBe(86);
@@ -50,8 +46,8 @@ describe('predictionLedgerPersistence', () => {
 
   it('rejects heuristic probabilities even when confidence is high', () => {
     expect(buildLedgerPrediction({
-      predictionId: 'p3', matchId: 'm1',
-      decision, modelVersion: 'nexus-v1', dataQualityScore: 95, dataQualityStatus: 'VALID',
+      predictionId: 'p3', matchId: 'm1', decision,
+      modelVersion: 'nexus-v1', dataQualityScore: 95, dataQualityStatus: 'VALID',
       market: { ...market, probabilitySource: 'HEURISTIC' },
     })).toBeNull();
   });

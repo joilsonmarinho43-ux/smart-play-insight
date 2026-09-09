@@ -35,6 +35,8 @@ export interface SampleSize {
 export interface MatchData {
   id: string;
   time: string;
+  /** Canonical fixture kickoff timestamp when available; time may remain display-formatted. */
+  kickoff?: string | null;
   league: string;
   homeTeam: string;
   awayTeam: string;

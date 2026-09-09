@@ -55,10 +55,15 @@ const clamp = (n: number, min = 0, max = 100): number =>
 const normalizeConfidence = (value: number | null | undefined): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? clamp(value) : null;
 
+function validMarkets(markets: MarketAnalysis[]): MarketAnalysis[] {
+  return markets.filter(
+    (m) => Number.isFinite(m.probability) && m.probability >= 0 && m.probability <= 100,
+  );
+}
+
 function validMarketProbabilities(markets: MarketAnalysis[]): number[] {
-  return markets
+  return validMarkets(markets)
     .map((m) => Number(m.probability))
-    .filter((v) => Number.isFinite(v) && v >= 0 && v <= 100)
     .sort((a, b) => a - b);
 }
 
@@ -87,9 +92,25 @@ function evidenceScore(evidence: NexusEvidence[]): number {
 }
 
 function selectMarket(markets: MarketAnalysis[]): MarketAnalysis | null {
-  return markets
-    .filter((m) => Number.isFinite(m.probability) && m.probability >= 0 && m.probability <= 100)
-    .sort((a, b) => b.probability - a.probability)[0] ?? null;
+  return validMarkets(markets).sort((a, b) => b.probability - a.probability)[0] ?? null;
+}
+
+/**
+ * Proveniência segura:
+ * - HEURISTIC nunca pode ser promovido a SIGNAL.
+ * - UNKNOWN é legado e também não pode ser promovido a SIGNAL.
+ * - MODEL_ESTIMATE pode ser sinalizado quando todos os demais gates passam,
+ *   mas isso NÃO significa que a probabilidade esteja empiricamente calibrada.
+ * - MARKET_IMPLIED nunca é tratado como probabilidade do modelo.
+ */
+function hasUnverifiedProbability(markets: MarketAnalysis[]): boolean {
+  return markets.some(
+    (m) => m.probabilitySource === 'HEURISTIC' || m.probabilitySource === 'UNKNOWN',
+  );
+}
+
+function hasMarketImpliedProbability(markets: MarketAnalysis[]): boolean {
+  return markets.some((m) => m.probabilitySource === 'MARKET_IMPLIED');
 }
 
 /** Deterministic analyst-only decision policy. */
@@ -100,6 +121,8 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
   const bestMarketScore = marketScore(input.markets ?? []);
   const spread = marketSpread(input.markets ?? []);
   const evScore = evidenceScore(input.evidence ?? []);
+  const unverifiedProbability = hasUnverifiedProbability(input.markets ?? []);
+  const marketImpliedProbability = hasMarketImpliedProbability(input.markets ?? []);
 
   if (!input.match.id || !input.match.homeTeam || !input.match.awayTeam) {
     return { decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100, selectedMarket: null, reasonCodes: ['INVALID_MATCH'], evidenceScore: 0, signalEligible: false };
@@ -127,6 +150,8 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
   if (!selectedMarket) reasons.push('NO_VALID_MARKET');
   else if (bestMarketScore < 72) reasons.push('MARKET_BELOW_THRESHOLD');
   if (spread !== null && spread > 15) reasons.push('MARKET_DISAGREEMENT');
+  if (unverifiedProbability) reasons.push('PROBABILITY_UNVERIFIED');
+  if (marketImpliedProbability) reasons.push('MARKET_IMPLIED_NOT_MODEL_PROBABILITY');
 
   if (confidence === null) {
     return { decision: 'INFO_ONLY', confidence: 0, riskScore: 80, selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
@@ -138,6 +163,12 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
 
   if (confidence < 70 || bestMarketScore < 72) {
     return { decision: 'INFO_ONLY', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
+  }
+
+  // Heurísticas e probabilidades de mercado podem informar, mas não podem
+  // autorizar um SIGNAL analítico do Core.
+  if (unverifiedProbability || marketImpliedProbability) {
+    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   if (input.engineConflict || input.dataQuality?.status === 'DEGRADED' || (spread !== null && spread > 15)) {

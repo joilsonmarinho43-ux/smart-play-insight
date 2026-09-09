@@ -1,20 +1,21 @@
 /**
  * Public football data sources.
  *
- * This module is DATA-ONLY: it never creates probabilities, confidence,
- * EV, signals or execution actions. Raw provider data must pass through
- * the canonical normalizer before entering Nexus engines.
+ * DATA-ONLY boundary: this module never creates probabilities, confidence,
+ * EV, signals or execution actions. Provider data must be normalized before
+ * entering Nexus engines.
  *
- * Sources:
- * - ESPN Site API: public scoreboard/summary endpoints; no API key documented.
- * - OpenLigaDB: public football results API; no API key required.
- * - TheSportsDB v1: free/test API key 3 for limited read operations.
+ * Secondary sources currently supported:
+ * - ESPN Site API: public scoreboard/summary endpoints.
+ * - OpenLigaDB: public results API, no API key required.
+ * - TheSportsDB v1: free/test read API.
+ * - OpenFootAPI: public preview, limited results without authentication.
  *
- * These sources are secondary/fallback sources. They must not silently
- * override the paid primary feed when timestamps or identities disagree.
+ * These sources must not silently override the paid primary feed when
+ * identities, timestamps or scores disagree.
  */
 
-export type PublicFootballProvider = 'ESPN' | 'OPENLIGADB' | 'THESPORTSDB';
+export type PublicFootballProvider = 'ESPN' | 'OPENLIGADB' | 'THESPORTSDB' | 'OPENFOOT';
 
 export interface PublicFootballFetchResult<T> {
   provider: PublicFootballProvider;
@@ -49,10 +50,6 @@ function result<T>(provider: PublicFootballProvider, data: T): PublicFootballFet
   return { provider, fetchedAt: new Date().toISOString(), data };
 }
 
-/**
- * ESPN scoreboard. Examples of league codes include eng.1, esp.1, ita.1,
- * ger.1 and fra.1. Keep this provider at the raw-data boundary.
- */
 export async function fetchEspnScoreboard(
   league: string,
   date?: string,
@@ -63,7 +60,6 @@ export async function fetchEspnScoreboard(
   return result('ESPN', await fetchJson<unknown>(url));
 }
 
-/** Fetch an ESPN event summary, including the richer match report when available. */
 export async function fetchEspnSummary(
   league: string,
   eventId: string,
@@ -74,10 +70,6 @@ export async function fetchEspnSummary(
   return result('ESPN', await fetchJson<unknown>(url));
 }
 
-/**
- * OpenLigaDB season feed. It is especially useful as an independent result
- * cross-check for supported leagues; it is not a replacement for live stats.
- */
 export async function fetchOpenLigaSeason(
   leagueShortcut: string,
   season: string,
@@ -88,7 +80,6 @@ export async function fetchOpenLigaSeason(
   return result('OPENLIGADB', await fetchJson<unknown>(url));
 }
 
-/** TheSportsDB free v1 event list for a league/season. */
 export async function fetchSportsDbSeason(
   leagueId: string,
   season: string,
@@ -100,19 +91,31 @@ export async function fetchSportsDbSeason(
 }
 
 /**
- * Fetch several independent sources without allowing one failure to hide the
- * others. Consumers decide how to reconcile identities/timestamps.
+ * OpenFootAPI public preview. It intentionally exposes only the public
+ * preview response and does not assume authenticated access.
  */
+export async function fetchOpenFootMatches(date?: string): Promise<PublicFootballFetchResult<unknown>> {
+  const suffix = date ? `?date=${encodeURIComponent(date)}` : '';
+  const url = `https://openfootapi.com/v1/matches${suffix}`;
+  return result('OPENFOOT', await fetchJson<unknown>(url));
+}
+
+export async function fetchOpenFootCompetitions(): Promise<PublicFootballFetchResult<unknown>> {
+  return result('OPENFOOT', await fetchJson<unknown>('https://openfootapi.com/v1/competitions'));
+}
+
 export async function fetchPublicCrossChecks(input: {
   espn?: { league: string; date?: string };
   openLiga?: { leagueShortcut: string; season: string };
   sportsDb?: { leagueId: string; season: string };
+  openFoot?: { date?: string };
 }): Promise<PublicFootballFetchResult<unknown>[]> {
   const tasks: Promise<PublicFootballFetchResult<unknown>>[] = [];
 
   if (input.espn) tasks.push(fetchEspnScoreboard(input.espn.league, input.espn.date));
   if (input.openLiga) tasks.push(fetchOpenLigaSeason(input.openLiga.leagueShortcut, input.openLiga.season));
   if (input.sportsDb) tasks.push(fetchSportsDbSeason(input.sportsDb.leagueId, input.sportsDb.season));
+  if (input.openFoot) tasks.push(fetchOpenFootMatches(input.openFoot.date));
 
   const settled = await Promise.allSettled(tasks);
   return settled

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Crosshair, Loader2 } from 'lucide-react';
@@ -32,26 +32,65 @@ const Scanner = () => {
     })), [matches]);
 
   const { matches: enrichedMatches, isEnriching } = useScannerEnrichment(safeMatches);
+  const recordedIds = useRef(new Set<string>());
+  const [ledgerStatus, setLedgerStatus] = useState<{
+    running: boolean;
+    total: number;
+    processed: number;
+    recorded: number;
+    skipped: number;
+    rejected: number;
+    lastReason: string;
+  }>({
+    running: false,
+    total: 0,
+    processed: 0,
+    recorded: 0,
+    skipped: 0,
+    rejected: 0,
+    lastReason: '',
+  });
 
   // Persist only authoritative, Core-approved analytical predictions.
-  // This adds observability only; it does not alter decision thresholds or
-  // introduce any betting/trading execution capability.
+  // This does not alter decision thresholds or introduce betting/trading execution.
   useEffect(() => {
     if (isEnriching || enrichedMatches.length === 0) return;
+
+    const candidates = enrichedMatches.filter(match => {
+      const id = String(match.id ?? '');
+      return !match.isLive && Boolean(id) && !recordedIds.current.has(id);
+    });
+    if (candidates.length === 0) return;
+
+    candidates.forEach(match => recordedIds.current.add(String(match.id)));
     let cancelled = false;
+    setLedgerStatus(prev => ({
+      ...prev,
+      running: true,
+      total: candidates.length,
+      processed: 0,
+      recorded: 0,
+      skipped: 0,
+      rejected: 0,
+      lastReason: '',
+    }));
 
     void Promise.allSettled(
-      enrichedMatches
-        .filter(match => !match.isLive && Boolean(match.id))
-        .map(async match => {
+      candidates.map(async match => {
+        try {
           const result = await recordNexusPreMatchPrediction(match);
           console.info(
             `[NEXUS-LEDGER] ${String(match.homeTeam)} vs ${String(match.awayTeam)} → ${result.reason}`,
           );
           return result;
-        }),
+        } catch (error) {
+          console.error('[NEXUS-LEDGER] recorder task failed:', error);
+          throw error;
+        }
+      }),
     ).then(results => {
       if (cancelled) return;
+
       const failures = results.filter(result => result.status === 'rejected');
       const recorded = results.filter(
         result => result.status === 'fulfilled' && result.value.recorded,
@@ -59,14 +98,31 @@ const Scanner = () => {
       const skipped = results.filter(
         result => result.status === 'fulfilled' && !result.value.recorded,
       ).length;
+      const lastRejected = [...results]
+        .reverse()
+        .find(result => result.status === 'fulfilled' && !result.value.recorded);
+
+      const lastReason = lastRejected && lastRejected.status === 'fulfilled'
+        ? lastRejected.value.reason
+        : failures.length > 0
+          ? 'RECORDER_TASK_REJECTED'
+          : recorded > 0
+            ? 'RECORDED'
+            : 'NONE';
 
       console.info(
         `[NEXUS-LEDGER] scan complete: recorded=${recorded} skipped=${skipped} rejected=${failures.length}`,
       );
 
-      if (failures.length > 0) {
-        console.warn(`[NEXUS-LEDGER] ${failures.length} prediction recorder task(s) rejected`);
-      }
+      setLedgerStatus({
+        running: false,
+        total: candidates.length,
+        processed: results.length,
+        recorded,
+        skipped,
+        rejected: failures.length,
+        lastReason,
+      });
     });
 
     return () => {
@@ -96,6 +152,23 @@ const Scanner = () => {
             </div>
           )}
         </div>
+
+        {ledgerStatus.total > 0 && (
+          <div className="mb-4 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[11px] text-white/80">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <span>Ledger: {ledgerStatus.running ? 'processando…' : 'processado'}</span>
+              <span>Jogos: {ledgerStatus.processed}/{ledgerStatus.total}</span>
+              <span>Registrados: {ledgerStatus.recorded}</span>
+              <span>Ignorados: {ledgerStatus.skipped}</span>
+              <span>Erros: {ledgerStatus.rejected}</span>
+            </div>
+            {!ledgerStatus.running && ledgerStatus.lastReason && (
+              <div className="mt-1 break-all text-white/60">
+                Último diagnóstico: {ledgerStatus.lastReason}
+              </div>
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <p className="text-center text-muted-foreground py-8">Carregando jogos...</p>

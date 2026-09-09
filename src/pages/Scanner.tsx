@@ -33,10 +33,9 @@ const Scanner = () => {
 
   const { matches: enrichedMatches, isEnriching } = useScannerEnrichment(safeMatches);
 
-  // The Scanner is a real pre-match prediction surface. Once enrichment is
-  // complete, authoritative Core-approved predictions are persisted to the
-  // ledger. The recorder is idempotent, so React re-renders cannot duplicate
-  // the same prediction. No execution/order API is involved.
+  // Persist only authoritative, Core-approved analytical predictions.
+  // This adds observability only; it does not alter decision thresholds or
+  // introduce any betting/trading execution capability.
   useEffect(() => {
     if (isEnriching || enrichedMatches.length === 0) return;
     let cancelled = false;
@@ -44,10 +43,27 @@ const Scanner = () => {
     void Promise.allSettled(
       enrichedMatches
         .filter(match => !match.isLive && Boolean(match.id))
-        .map(match => recordNexusPreMatchPrediction(match)),
+        .map(async match => {
+          const result = await recordNexusPreMatchPrediction(match);
+          console.info(
+            `[NEXUS-LEDGER] ${String(match.homeTeam)} vs ${String(match.awayTeam)} → ${result.reason}`,
+          );
+          return result;
+        }),
     ).then(results => {
       if (cancelled) return;
       const failures = results.filter(result => result.status === 'rejected');
+      const recorded = results.filter(
+        result => result.status === 'fulfilled' && result.value.recorded,
+      ).length;
+      const skipped = results.filter(
+        result => result.status === 'fulfilled' && !result.value.recorded,
+      ).length;
+
+      console.info(
+        `[NEXUS-LEDGER] scan complete: recorded=${recorded} skipped=${skipped} rejected=${failures.length}`,
+      );
+
       if (failures.length > 0) {
         console.warn(`[NEXUS-LEDGER] ${failures.length} prediction recorder task(s) rejected`);
       }

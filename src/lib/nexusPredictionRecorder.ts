@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { analyzeMarkets } from '@/lib/matchAnalysis';
 import { adaptPreMatch } from '@/lib/nexusAdapters';
+import { assessDataQuality } from '@/lib/dataQualityGate';
 import { buildLedgerPrediction } from '@/lib/predictionLedgerPersistence';
 import { resolveConfidence } from '@/lib/confidencePolicy';
 import type { MatchData } from '@/types/match';
@@ -35,6 +36,16 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
 
     const markets = analyzeMarkets(match);
     const decision = adaptPreMatch(match, markets, confidence.score);
+    const sampleSize = match.sampleSize
+      ? Math.min(match.sampleSize.homeGames, match.sampleSize.awayGames)
+      : null;
+    const quality = assessDataQuality({
+      live: false,
+      sampleSize,
+      requiredSampleSize: 3,
+      sourceCompleteness: match.modelData && match.sampleSize ? 100 : 75,
+      requiredFeaturesPresent: markets.length > 0,
+    });
 
     if (decision.decision !== 'SIGNAL' || !decision.selectedMarket) {
       return { recorded: false, reason: `CORE_${decision.decision}` };
@@ -46,8 +57,8 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
       decision,
       market: decision.selectedMarket,
       modelVersion: MODEL_VERSION,
-      dataQualityScore: 100,
-      dataQualityStatus: 'VALID',
+      dataQualityScore: quality.score,
+      dataQualityStatus: quality.status,
       predictedAt: new Date().toISOString(),
       dataObservedAt: null,
     });

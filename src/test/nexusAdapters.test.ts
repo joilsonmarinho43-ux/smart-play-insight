@@ -19,8 +19,8 @@ const sniper: HybridSignal = {
   label: 'SNIPER 🔥',
   confidence: 'alta',
   market: 'Over 0.5 HT',
-  canExecute: true,
-  executionReason: 'Pronto',
+  signalEligible: true,
+  signalReason: 'Cenário LIVE atende aos filtros SNIPER',
   shotsOnGoal: 4,
   totalShots: 8,
   corners: 3,
@@ -33,7 +33,7 @@ const sniper: HybridSignal = {
 };
 
 describe('Nexus adapters', () => {
-  it('adapta um sinal Hybrid forte sem alterar o engine', () => {
+  it('adapta um sinal Hybrid forte sem criar semântica de execução', () => {
     const result = adaptHybridSignal(sniper, market);
     expect(result.decision).toBe('SIGNAL');
     expect(result.signalEligible).toBe(true);
@@ -41,7 +41,7 @@ describe('Nexus adapters', () => {
   });
 
   it('nunca promove sinal Hybrid bloqueado para sinal analítico', () => {
-    const result = adaptHybridSignal({ ...sniper, canExecute: false }, market);
+    const result = adaptHybridSignal({ ...sniper, signalEligible: false }, market);
     expect(result.signalEligible).toBe(false);
     expect(result.decision).toBe('REJECT');
     expect(result.reasonCodes).toContain('ANALYSIS_BLOCKED');

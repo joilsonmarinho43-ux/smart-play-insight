@@ -30,7 +30,7 @@ const sniper: HybridSignal = {
   pressure: 90,
   homeGoals: 0,
   awayGoals: 0,
-  observedAt: '2026-09-09T01:55:00Z',
+  observedAt: new Date().toISOString(),
 };
 
 describe('Nexus adapters', () => {

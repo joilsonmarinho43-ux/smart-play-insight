@@ -8,6 +8,8 @@ const match = {
 
 const market: MarketAnalysis = {
   market: 'Over 1.5 Gols', probability: 90, risk: 'low', category: 'goals', odd: 1.2,
+  probabilitySource: 'MODEL_ESTIMATE',
+  calibrationStatus: 'UNCALIBRATED',
 };
 
 const strongEvidence = marketsToNexusEvidence([market, {
@@ -41,12 +43,40 @@ describe('Nexus Core analítico', () => {
     expect(out.reasonCodes).toContain('ENGINE_CONFLICT');
   });
 
-  it('classifica somente cenário forte e consistente como SIGNAL', () => {
+  it('classifica somente estimativa de modelo forte e consistente como SIGNAL', () => {
     const out = decideNexus({ match, mode: 'PRE_MATCH', confidence: 92, markets: [market], evidence: strongEvidence });
     expect(out.decision).toBe('SIGNAL');
     expect(out.signalEligible).toBe(true);
     expect(out.reasonCodes).toContain('CORE_APPROVED_SIGNAL');
     expect(out.selectedMarket?.market).toBe('Over 1.5 Gols');
+  });
+
+  it('nunca promove probabilidade heurística a SIGNAL', () => {
+    const heuristic = { ...market, probabilitySource: 'HEURISTIC' as const };
+    const out = decideNexus({
+      match,
+      mode: 'PRE_MATCH',
+      confidence: 95,
+      markets: [heuristic],
+      evidence: marketsToNexusEvidence([heuristic]),
+    });
+    expect(out.decision).toBe('CONSERVATIVE');
+    expect(out.signalEligible).toBe(false);
+    expect(out.reasonCodes).toContain('PROBABILITY_UNVERIFIED');
+  });
+
+  it('nunca trata probabilidade implícita de mercado como probabilidade do modelo', () => {
+    const implied = { ...market, probabilitySource: 'MARKET_IMPLIED' as const };
+    const out = decideNexus({
+      match,
+      mode: 'PRE_MATCH',
+      confidence: 95,
+      markets: [implied],
+      evidence: marketsToNexusEvidence([implied]),
+    });
+    expect(out.decision).toBe('CONSERVATIVE');
+    expect(out.signalEligible).toBe(false);
+    expect(out.reasonCodes).toContain('MARKET_IMPLIED_NOT_MODEL_PROBABILITY');
   });
 
   it('usa consenso de mercados em vez de deixar o maior dominar', () => {

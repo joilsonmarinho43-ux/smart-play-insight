@@ -58,11 +58,12 @@ const strongPreMatch = {
 };
 
 describe('Nexus adapters', () => {
-  it('adapta um sinal Hybrid forte sem criar semântica de execução', () => {
+  it('não promove uma heurística LIVE a SIGNAL, mesmo com confiança alta', () => {
     const result = adaptHybridSignal(sniper, market);
-    expect(result.decision).toBe('SIGNAL');
-    expect(result.signalEligible).toBe(true);
-    expect(result.selectedMarket?.market).toBe('Over 0.5 HT');
+    expect(result.decision).toBe('CONSERVATIVE');
+    expect(result.signalEligible).toBe(false);
+    expect(result.reasonCodes).toContain('PROBABILITY_UNVERIFIED');
+    expect(result.selectedMarket?.probabilitySource).toBe('HEURISTIC');
   });
 
   it('rejeita LIVE quando a proveniência temporal está ausente', () => {
@@ -90,6 +91,8 @@ describe('Nexus adapters', () => {
     const result = adaptPreMatch(strongPreMatch, [market], 88);
     expect(result.decision).toBe('SIGNAL');
     expect(result.signalEligible).toBe(true);
+    expect(result.selectedMarket?.probabilitySource).toBe('MODEL_ESTIMATE');
+    expect(result.selectedMarket?.calibrationStatus).toBe('UNCALIBRATED');
   });
 
   it('não promove pré-jogo com amostra histórica insuficiente', () => {

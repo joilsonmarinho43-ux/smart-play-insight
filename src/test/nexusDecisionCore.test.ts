@@ -49,6 +49,47 @@ describe('Nexus Core analítico', () => {
     expect(out.selectedMarket?.market).toBe('Over 1.5 Gols');
   });
 
+  it('usa consenso de mercados em vez de deixar o maior dominar', () => {
+    const out = decideNexus({
+      match,
+      mode: 'PRE_MATCH',
+      confidence: 92,
+      markets: [
+        { ...market, probability: 95 },
+        { ...market, market: 'BTTS', probability: 60 },
+        { ...market, market: 'Over 2.5 Gols', probability: 58 },
+      ],
+      evidence: marketsToNexusEvidence([
+        { ...market, probability: 95 },
+        { ...market, market: 'BTTS', probability: 60 },
+        { ...market, market: 'Over 2.5 Gols', probability: 58 },
+      ]),
+    });
+    expect(out.decision).toBe('INFO_ONLY');
+    expect(out.reasonCodes).toContain('MARKET_BELOW_THRESHOLD');
+  });
+
+  it('degrada para CONSERVATIVE quando mercados divergem materialmente', () => {
+    const out = decideNexus({
+      match,
+      mode: 'PRE_MATCH',
+      confidence: 92,
+      markets: [
+        { ...market, probability: 95 },
+        { ...market, market: 'BTTS', probability: 94 },
+        { ...market, market: 'Over 2.5 Gols', probability: 70 },
+      ],
+      evidence: marketsToNexusEvidence([
+        { ...market, probability: 95 },
+        { ...market, market: 'BTTS', probability: 94 },
+        { ...market, market: 'Over 2.5 Gols', probability: 70 },
+      ]),
+    });
+    expect(out.decision).toBe('CONSERVATIVE');
+    expect(out.signalEligible).toBe(false);
+    expect(out.reasonCodes).toContain('MARKET_DISAGREEMENT');
+  });
+
   it('exige estado live confirmado quando o modo é LIVE', () => {
     const out = decideNexus({ match, mode: 'LIVE', confidence: 92, markets: [market], evidence: strongEvidence });
     expect(out.decision).toBe('CONSERVATIVE');

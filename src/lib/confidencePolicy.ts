@@ -5,7 +5,6 @@
 //   50-69  : info_only
 //   < 50   : discard
 // ════════════════════════════════════════════════════════════════
-import { supabase } from "@/integrations/supabase/client";
 
 export type ConfidenceMode = "normal" | "conservative" | "info_only" | "discard";
 
@@ -22,7 +21,7 @@ export function classifyConfidence(score: number | null | undefined): Confidence
   if (s >= 85) return { mode: "normal",       allowSignals: true,  conservative: false, label: "normal" };
   if (s >= 70) return { mode: "conservative", allowSignals: true,  conservative: true,  label: "conservador" };
   if (s >= 50) return { mode: "info_only",    allowSignals: false, conservative: false, label: "informativo" };
-  return        { mode: "discard",      allowSignals: false, conservative: false, label: "descartado" };
+  return        { mode: "discard",            allowSignals: false, conservative: false, label: "descartado" };
 }
 
 interface CacheEntry { score: number; source: string; ts: number; }
@@ -37,7 +36,11 @@ export async function resolveConfidence(payload: {
   const key = String(payload.matchId);
   const cached = memCache.get(key);
   if (cached && Date.now() - cached.ts < TTL_MS) return { score: cached.score, source: cached.source };
+
   try {
+    // Lazy-load the Supabase client so pure confidence classification/tests do not
+    // require runtime Supabase environment variables just to import this module.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase.functions.invoke("match-stats-resolver", { body: payload });
     if (error || !data) return { score: 0, source: "resolver_error" };
     const rawScore = Number((data as any).confidence_score);

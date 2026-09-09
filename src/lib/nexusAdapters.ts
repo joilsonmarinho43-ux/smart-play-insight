@@ -84,17 +84,15 @@ export function adaptPreMatch(
   markets: MarketAnalysis[],
   confidence: number | null | undefined,
 ): NexusDecisionOutput {
-  // PRE_MATCH market probabilities are model estimates when produced by the
-  // Poisson/xG/Bayes analysis layer. Existing explicit provenance is preserved;
-  // legacy values are marked UNKNOWN rather than silently treated as validated.
+  // PRE_MATCH markets produced by the current Poisson/xG/Bayes analyzer are
+  // model estimates, not empirically calibrated probabilities. Keep that
+  // distinction explicit so calibration can later be attached from the ledger.
   const normalizedMarkets = markets.map((market) => ({
     ...market,
-    probabilitySource: market.probabilitySource ?? 'UNKNOWN' as const,
+    probabilitySource: market.probabilitySource ?? 'MODEL_ESTIMATE' as const,
+    calibrationStatus: market.calibrationStatus ?? 'UNCALIBRATED' as const,
   }));
 
-  // PRE_MATCH also passes through the same quality gate. Unlike LIVE, missing
-  // historical context is not automatically a timestamp failure, but a weak
-  // sample/provenance must reduce or reject the analytical decision.
   const sampleSize = match.sampleSize
     ? Math.min(match.sampleSize.homeGames, match.sampleSize.awayGames)
     : null;

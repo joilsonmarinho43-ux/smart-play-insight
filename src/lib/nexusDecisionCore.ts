@@ -1,4 +1,5 @@
 import type { MarketAnalysis, MatchData } from '@/types/match';
+import { type DataQualityResult } from './dataQualityGate';
 
 /**
  * Nexus Core de Decisão
@@ -33,6 +34,8 @@ export interface NexusDecisionInput {
   analysisBlocked?: boolean;
   /** Sinaliza conflito material entre engines. */
   engineConflict?: boolean;
+  /** Qualidade/proveniência dos dados usados pelo sinal. */
+  dataQuality?: DataQualityResult | null;
 }
 
 export interface NexusDecisionOutput {
@@ -99,6 +102,21 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
     };
   }
 
+  if (input.dataQuality?.status === 'REJECT') {
+    reasons.push(...input.dataQuality.reasons.map((r) => `DATA_${r}`));
+    reasons.push('DATA_QUALITY_REJECT');
+    return {
+      decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100,
+      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
+      signalEligible: false,
+    };
+  }
+
+  if (input.dataQuality?.status === 'DEGRADED') {
+    reasons.push(...input.dataQuality.reasons.map((r) => `DATA_${r}`));
+    reasons.push('DATA_QUALITY_DEGRADED');
+  }
+
   if (input.engineConflict) reasons.push('ENGINE_CONFLICT');
 
   if (confidence === null) reasons.push('CONFIDENCE_MISSING');
@@ -106,7 +124,6 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
   if (!selectedMarket) reasons.push('NO_VALID_MARKET');
   else if (bestMarketScore < 72) reasons.push('MARKET_BELOW_THRESHOLD');
 
-  // Segurança: ausência de confiança explícita nunca autoriza um sinal forte.
   if (confidence === null) {
     return {
       decision: 'INFO_ONLY', confidence: 0, riskScore: 80,
@@ -131,9 +148,9 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
     };
   }
 
-  if (input.engineConflict) {
+  if (input.engineConflict || input.dataQuality?.status === 'DEGRADED') {
     return {
-      decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, evScore)),
+      decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore, input.dataQuality?.score ?? 100)),
       selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
       signalEligible: false,
     };

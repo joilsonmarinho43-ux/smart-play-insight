@@ -10,9 +10,8 @@ import type { BingoResult } from '@/lib/bingoEngine';
  * Adapter do Bingo para o Nexus Core.
  *
  * O Bingo continua responsável apenas por selecionar mercados candidatos.
- * O Core recebe os mercados reais e a confiança explícita para decidir se a
- * oportunidade pode avançar. Ausência de confidenceScore permanece segura:
- * o Core não autoriza execução sem confiança explícita.
+ * O Core classifica a oportunidade para análise. Nenhuma etapa executa
+ * apostas ou gerencia exposição financeira.
  */
 export function adaptBingoResult(
   match: MatchData,
@@ -39,19 +38,19 @@ export function adaptBingoResult(
     confidence,
     markets,
     evidence,
-    executionBlocked: bingo.confidenceMode === 'discard' || bingo.confidenceMode === 'info_only',
+    analysisBlocked: bingo.confidenceMode === 'discard' || bingo.confidenceMode === 'info_only',
   });
 }
 
 /**
  * Conveniência para o fluxo que já possui os mercados selecionados.
- * Mantém a mesma regra: confidence precisa ser explícita para EXECUTE.
+ * Confidence continua opcional na API, mas ausência nunca produz sinal forte.
  */
 export function adaptBingoMarkets(
   match: MatchData,
   markets: MarketAnalysis[],
   confidence: number | null | undefined,
-  executionBlocked = false,
+  analysisBlocked = false,
 ): NexusDecisionOutput {
   const validMarkets = markets.filter(
     (market) => Number.isFinite(market.probability) && market.probability >= 0 && market.probability <= 100,
@@ -63,6 +62,6 @@ export function adaptBingoMarkets(
     confidence,
     markets: validMarkets,
     evidence: marketsToNexusEvidence(validMarkets),
-    executionBlocked,
+    analysisBlocked,
   });
 }

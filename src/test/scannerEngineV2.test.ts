@@ -4,11 +4,7 @@ import * as matchAnalysis from '@/lib/matchAnalysis';
 import type { MatchData } from '@/types/match';
 
 const baseMatch: MatchData = {
-  id: 'scanner-test-1',
-  time: new Date(Date.now() + 86_400_000).toISOString(),
-  league: 'Test League',
-  homeTeam: 'Casa',
-  awayTeam: 'Fora',
+  id: 'scanner-test-1', time: new Date(Date.now() + 86_400_000).toISOString(), league: 'Test League', homeTeam: 'Casa', awayTeam: 'Fora',
   sampleSize: { homeGames: 8, awayGames: 8, homeWithStats: 8, awayWithStats: 8 },
   modelData: {
     homeGoalsAvg: 1.7, awayGoalsAvg: 1.3, homeGoalsAgainstAvg: 0.9, awayGoalsAgainstAvg: 1.0,
@@ -17,20 +13,22 @@ const baseMatch: MatchData = {
   },
 };
 
+const noOddMarket = { market: 'Over 1.5 Gols', probability: 80, risk: 'medium', category: 'goals' };
+
 describe('scannerEngineV2', () => {
   it('does not invent EV when no market odd exists', () => {
+    const spy = vi.spyOn(matchAnalysis, 'analyzeMarkets').mockReturnValue([noOddMarket]);
     const results = scanMatchesV2([baseMatch]);
-    expect(results.length).toBeGreaterThan(0);
-    expect(results.every(result => result.ev === null)).toBe(true);
-    expect(results.every(result => result.marketOdd === null)).toBe(true);
+    expect(results.length).toBe(1);
+    expect(results[0].ev).toBeNull();
+    expect(results[0].marketOdd).toBeNull();
+    spy.mockRestore();
   });
 
   it('preserves a real observed odd for analytical EV', () => {
     const spy = vi.spyOn(matchAnalysis, 'analyzeMarkets').mockReturnValue([{
-      market: 'Over 1.5 Gols', probability: 80, risk: 'medium', category: 'goals', odd: 1.60,
-      probabilitySource: 'MODEL_ESTIMATE', calibrationStatus: 'UNCALIBRATED',
+      ...noOddMarket, odd: 1.60, probabilitySource: 'MODEL_ESTIMATE', calibrationStatus: 'UNCALIBRATED',
     }]);
-
     const results = scanMatchesV2([baseMatch]);
     expect(results[0]?.ev).toBeCloseTo(0.28, 6);
     expect(results[0]?.marketOdd).toBe(1.6);

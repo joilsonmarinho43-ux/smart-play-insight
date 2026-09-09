@@ -35,21 +35,23 @@ const sniper: HybridSignal = {
 describe('Nexus adapters', () => {
   it('adapta um sinal Hybrid forte sem alterar o engine', () => {
     const result = adaptHybridSignal(sniper, market);
-    expect(result.decision).toBe('EXECUTE');
-    expect(result.executionAllowed).toBe(true);
+    expect(result.decision).toBe('SIGNAL');
+    expect(result.signalEligible).toBe(true);
     expect(result.selectedMarket?.market).toBe('Over 0.5 HT');
   });
 
-  it('nunca promove sinal Hybrid bloqueado para execução', () => {
+  it('nunca promove sinal Hybrid bloqueado para sinal analítico', () => {
     const result = adaptHybridSignal({ ...sniper, canExecute: false }, market);
-    expect(result.executionAllowed).toBe(false);
+    expect(result.signalEligible).toBe(false);
     expect(result.decision).toBe('REJECT');
-    expect(result.reasonCodes).toContain('EXECUTION_BLOCKED');
+    expect(result.reasonCodes).toContain('ANALYSIS_BLOCKED');
   });
 
-  it('não converte confiança padrão em autorização', () => {
+  it('não converte confiança padrão em sinal forte', () => {
     const result = adaptHybridSignal({ ...sniper, confidence: 'padrão' }, market);
-    expect(result.executionAllowed).toBe(false);
+    expect(result.signalEligible).toBe(false);
+    expect(result.decision).toBe('INFO_ONLY');
+    expect(result.reasonCodes).toContain('CONFIDENCE_MISSING');
   });
 
   it('mantém pré-jogo separado do adapter LIVE', () => {
@@ -58,7 +60,7 @@ describe('Nexus adapters', () => {
       [market],
       88,
     );
-    expect(result.decision).toBe('EXECUTE');
-    expect(result.executionAllowed).toBe(true);
+    expect(result.decision).toBe('SIGNAL');
+    expect(result.signalEligible).toBe(true);
   });
 });

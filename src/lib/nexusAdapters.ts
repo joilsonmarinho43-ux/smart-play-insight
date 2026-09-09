@@ -11,8 +11,8 @@ import type { HybridSignal } from '@/lib/hybridEngine';
 /**
  * Adapters do Nexus.
  *
- * Regra: adapters normalizam saídas dos engines; não executam apostas e não
- * alteram a lógica dos engines de origem.
+ * Regra: adapters normalizam saídas dos engines para análise. Eles não
+ * executam apostas, não gerenciam exposição e não conectam a plataformas.
  */
 
 const HYBRID_CONFIDENCE: Record<HybridSignal['confidence'], number> = {
@@ -59,7 +59,9 @@ export function adaptHybridSignal(
       ...evidence,
       ...marketsToNexusEvidence(markets),
     ],
-    executionBlocked: !signal.canExecute,
+    // Compatibilidade com o engine: canExecute significa apenas que o
+    // engine considera o sinal elegível; aqui isso vira bloqueio ANALÍTICO.
+    analysisBlocked: !signal.canExecute,
     engineConflict,
   });
 }

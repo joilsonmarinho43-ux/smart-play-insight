@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Crosshair, Loader2 } from 'lucide-react';
@@ -6,9 +6,9 @@ import { fetchMultiDayMatches } from '@/services/footballApi';
 import { isWorldCupLeague } from '@/lib/worldCupLeagues';
 import { localizeTeamName } from '@/lib/teamI18n';
 import { useScannerEnrichment } from '@/hooks/useScannerEnrichment';
+import { recordNexusPreMatchPrediction } from '@/lib/nexusPredictionRecorder';
 import ScannerProPanel from '@/components/ScannerProPanel';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
-
 
 const Scanner = () => {
   const { data: matches = [], isLoading } = useQuery({
@@ -25,18 +25,38 @@ const Scanner = () => {
       homeTeam: localizeTeamName(m.teams?.home?.name || m.homeTeam) || 'Casa',
       awayTeam: localizeTeamName(m.teams?.away?.name || m.awayTeam) || 'Fora',
       league: m.league?.name || m.league || '',
-      // Preserva a data/hora original (ISO) para o scanner exibir dia e horário
       kickoff: m.fixture?.date || m.kickoff || m.date || m.utcDate || m.time || null,
       time: m.fixture?.date
         ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Belem', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(m.fixture.date))
         : m.time || '',
     })), [matches]);
 
-  // Busca os últimos jogos reais de cada equipe para o modelo não cair na
-  // média da liga (o que deixava todos os jogos com números idênticos).
-  const { matches: enrichedMatches, isEnriching, enrichedCount } = useScannerEnrichment(safeMatches);
+  const { matches: enrichedMatches, isEnriching } = useScannerEnrichment(safeMatches);
 
+  // The Scanner is a real pre-match prediction surface. Once enrichment is
+  // complete, authoritative Core-approved predictions are persisted to the
+  // ledger. The recorder is idempotent, so React re-renders cannot duplicate
+  // the same prediction. No execution/order API is involved.
+  useEffect(() => {
+    if (isEnriching || enrichedMatches.length === 0) return;
+    let cancelled = false;
 
+    void Promise.allSettled(
+      enrichedMatches
+        .filter(match => !match.isLive && Boolean(match.id))
+        .map(match => recordNexusPreMatchPrediction(match)),
+    ).then(results => {
+      if (cancelled) return;
+      const failures = results.filter(result => result.status === 'rejected');
+      if (failures.length > 0) {
+        console.warn(`[NEXUS-LEDGER] ${failures.length} prediction recorder task(s) rejected`);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enrichedMatches, isEnriching]);
 
   return (
     <div className="min-h-screen text-white pb-8 font-sans relative">

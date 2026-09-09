@@ -1,4 +1,4 @@
-import type { MatchData } from '@/types/match';
+import type { MarketAnalysis, MatchData } from '@/types/match';
 import {
   decideNexus,
   type NexusDecisionOutput,
@@ -8,18 +8,18 @@ import type { ScenarioCard } from '@/lib/betAnalyzerEngine';
 /**
  * Adapter do Bet Analyzer para o Nexus Core.
  *
- * Importante: ScenarioCard.score é um score interno do cenário, NÃO uma
- * probabilidade de mercado. Portanto ele entra como evidência de engine e
- * nunca é convertido artificialmente em MarketAnalysis/probabilidade.
+ * ScenarioCard.score é um score interno do cenário, NÃO uma probabilidade de
+ * mercado. Ele entra somente como evidência de engine e nunca é convertido
+ * artificialmente em MarketAnalysis/probabilidade.
  *
- * Para autorização de execução, o chamador precisa fornecer a confiança
+ * Para autorização de execução, o chamador precisa fornecer confiança
  * explícita e o MarketAnalysis real produzido pelo fluxo de mercado.
  */
 export function adaptBetAnalyzerCard(
   card: ScenarioCard,
   match: MatchData,
   confidence: number | null | undefined,
-  options?: { market?: MatchData extends never ? never : import('@/types/match').MarketAnalysis; executionBlocked?: boolean },
+  options?: { market?: MarketAnalysis; executionBlocked?: boolean },
 ): NexusDecisionOutput {
   const market = options?.market;
 

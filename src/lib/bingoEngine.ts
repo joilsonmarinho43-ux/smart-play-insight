@@ -61,13 +61,22 @@ export function generatePreGameBingo(match: MatchData, confidenceScore?: number)
   if (!hasReliableData(match)) return null;
 
   // ─── CONFIDENCE POLICY ────────────────────────────────────────
-  // ≥85 normal | 70-84 conservador (limiar 80%) | 50-69 info_only | <50 discard
-  let mode: 'normal' | 'conservative' | 'info_only' | 'discard' = 'normal';
-  if (typeof confidenceScore === 'number') {
-    if (confidenceScore < 50) mode = 'discard';
-    else if (confidenceScore < 70) mode = 'info_only';
-    else if (confidenceScore < 85) mode = 'conservative';
+  // Fail closed: sem score explícito não existe autorização para
+  // tratar o Bingo como análise normal. O Core também exige confiança
+  // explícita, mas o engine deve manter a mesma regra quando usado isoladamente.
+  if (typeof confidenceScore !== 'number' || !Number.isFinite(confidenceScore)) {
+    // eslint-disable-next-line no-console
+    console.log(`[BINGO][CONFIDENCE] 🔵 ${match.homeTeam} vs ${match.awayTeam} score=missing → info_only`);
+    return null;
   }
+
+  // ≥85 normal | 70-84 conservador | 50-69 info_only | <50 discard
+  let mode: 'normal' | 'conservative' | 'info_only' | 'discard';
+  if (confidenceScore < 50) mode = 'discard';
+  else if (confidenceScore < 70) mode = 'info_only';
+  else if (confidenceScore < 85) mode = 'conservative';
+  else mode = 'normal';
+
   if (mode === 'discard' || mode === 'info_only') {
     // eslint-disable-next-line no-console
     console.log(`[BINGO][CONFIDENCE] ${mode === 'discard' ? '🔴' : '🔵'} ${match.homeTeam} vs ${match.awayTeam} score=${confidenceScore} → ${mode}`);
@@ -125,7 +134,6 @@ export function generatePreGameBingo(match: MatchData, confidenceScore?: number)
     confidenceScore,
   };
 }
-
 
 function findProb(markets: MarketAnalysis[], name: string): number {
   const found = markets.find(m => m.market === name);

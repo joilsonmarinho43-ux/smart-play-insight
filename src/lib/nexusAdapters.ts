@@ -47,7 +47,11 @@ export function adaptHybridSignal(
     minute: signal.minute,
   };
 
-  const markets = market ? [market] : [];
+  // LIVE market probabilities currently come from heuristic intensity rules
+  // in the live analysis layer. They are therefore never promoted to SIGNAL.
+  const markets = market
+    ? [{ ...market, probabilitySource: market.probabilitySource ?? 'HEURISTIC' as const }]
+    : [];
   const evidence = hybridEvidence(signal);
   const engineConflict = signal.signalEligible === false && signal.tier !== 'NORMAL';
 
@@ -80,6 +84,14 @@ export function adaptPreMatch(
   markets: MarketAnalysis[],
   confidence: number | null | undefined,
 ): NexusDecisionOutput {
+  // PRE_MATCH market probabilities are model estimates when produced by the
+  // Poisson/xG/Bayes analysis layer. Existing explicit provenance is preserved;
+  // legacy values are marked UNKNOWN rather than silently treated as validated.
+  const normalizedMarkets = markets.map((market) => ({
+    ...market,
+    probabilitySource: market.probabilitySource ?? 'UNKNOWN' as const,
+  }));
+
   // PRE_MATCH also passes through the same quality gate. Unlike LIVE, missing
   // historical context is not automatically a timestamp failure, but a weak
   // sample/provenance must reduce or reject the analytical decision.
@@ -92,15 +104,15 @@ export function adaptPreMatch(
     sampleSize,
     requiredSampleSize: 3,
     sourceCompleteness: match.modelData && match.sampleSize ? 100 : 75,
-    requiredFeaturesPresent: markets.length > 0,
+    requiredFeaturesPresent: normalizedMarkets.length > 0,
   });
 
   return decideNexus({
     match,
     mode: 'PRE_MATCH',
     confidence,
-    markets,
-    evidence: marketsToNexusEvidence(markets),
+    markets: normalizedMarkets,
+    evidence: marketsToNexusEvidence(normalizedMarkets),
     dataQuality,
   });
 }

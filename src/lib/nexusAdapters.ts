@@ -15,10 +15,12 @@ import type { HybridSignal } from '@/lib/hybridEngine';
  * executam apostas, não gerenciam exposição e não conectam a plataformas.
  */
 
-const HYBRID_CONFIDENCE: Record<HybridSignal['confidence'], number> = {
+const HYBRID_CONFIDENCE: Record<HybridSignal['confidence'], number | null> = {
   alta: 90,
   média: 75,
-  padrão: 0,
+  // "padrão" não é uma confiança numérica explícita. Deve permanecer
+  // ausente para que o Core aplique INFO_ONLY, nunca REJECT por score 0.
+  padrão: null,
 };
 
 function hybridEvidence(signal: HybridSignal): NexusEvidence[] {

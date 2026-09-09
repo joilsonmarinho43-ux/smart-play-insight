@@ -1,4 +1,4 @@
-import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Target, Crosshair } from "lucide-react";
+import { Home, Zap, Star, Shield, LogOut, Trophy, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Target, Crosshair, Database, Globe2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,17 +17,68 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Pré-Jogo", url: "/", icon: Home },
-  { title: "Live Trader", url: "/live", icon: Zap },
+const analysisItems = [
+  { title: "Dashboard", url: "/", icon: Home },
+  { title: "Análise Pré-Jogo", url: "/", icon: Target },
+  { title: "Análise Ao Vivo", url: "/live", icon: Zap },
   { title: "Scanner PRO", url: "/scanner", icon: Radar },
   { title: "Elite", url: "/elite", icon: Shield },
+];
+
+const toolsItems = [
   { title: "Placar Exato", url: "/placar-exato", icon: Target },
-  { title: "Bet Analyzer", url: "/bet-analyzer", icon: Crosshair },
-  { title: "Bingo VIP PRO", url: "/bingo", icon: Trophy },
+  { title: "Analisador de Cenários", url: "/bet-analyzer", icon: Crosshair },
+  { title: "Bingo Analítico", url: "/bingo", icon: Trophy },
   { title: "Favoritos", url: "/favorites", icon: Star },
   { title: "Sugestões", url: "/suggestions", icon: Lightbulb },
 ];
+
+const dataItems = [
+  { title: "Dados / Superbet Connect", url: "/superbet-connect", icon: Database },
+  { title: "Copa do Mundo", url: "/world-cup", icon: Globe2 },
+];
+
+function SidebarNavGroup({
+  label,
+  items,
+  collapsed,
+  onNavigate,
+}: {
+  label: string;
+  items: typeof analysisItems;
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <SidebarGroup>
+      {!collapsed && (
+        <SidebarGroupLabel className="text-gray-500 text-[10px] uppercase tracking-widest px-3">
+          {label}
+        </SidebarGroupLabel>
+      )}
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild>
+                <NavLink
+                  to={item.url}
+                  end={item.url === "/"}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                  onClick={onNavigate}
+                  activeClassName="bg-orange-500/10 text-orange-500 font-bold"
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  {!collapsed && <span className="text-sm">{item.title}</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
 
 export function AppSidebar() {
   const { state, setOpenMobile, isMobile } = useSidebar();
@@ -66,7 +117,7 @@ export function AppSidebar() {
                 <div className="h-1 w-1 rotate-45 bg-[hsl(40,90%,55%)]" />
                 <div className="h-px w-8 bg-gradient-to-l from-transparent to-[hsl(40,80%,50%,0.6)]" />
               </div>
-              <span className="mt-2 text-[0.62rem] font-semibold tracking-[0.35em] uppercase" style={{ color: "hsl(40 35% 65%)" }}>Modelo Real Pro</span>
+              <span className="mt-2 text-[0.62rem] font-semibold tracking-[0.35em] uppercase" style={{ color: "hsl(40 35% 65%)" }}>Analista Quantitativo</span>
             </div>
           ) : (
             <div className="relative z-10 flex items-center justify-center">
@@ -77,52 +128,43 @@ export function AppSidebar() {
           )}
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-gray-500 text-[10px] uppercase tracking-widest">Navegação</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+        <SidebarNavGroup label="Análise" items={analysisItems} collapsed={collapsed} onNavigate={handleNavClick} />
+        <SidebarNavGroup label="Ferramentas Analíticas" items={toolsItems} collapsed={collapsed} onNavigate={handleNavClick} />
+        <SidebarNavGroup label="Dados" items={dataItems} collapsed={collapsed} onNavigate={handleNavClick} />
+
+        {profile?.is_admin && (
+          <SidebarGroup>
+            {!collapsed && <SidebarGroupLabel className="text-gray-500 text-[10px] uppercase tracking-widest px-3">Sistema</SidebarGroupLabel>}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end={item.url === "/"} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold">
-                      <item.icon className="h-5 w-5 shrink-0" />
-                      {!collapsed && <span className="text-sm">{item.title}</span>}
+                    <NavLink to="/quality" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold">
+                      <Activity className="h-5 w-5 shrink-0 text-orange-500" />
+                      {!collapsed && <span className="text-sm">Quality Lab</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
-
-              {profile?.is_admin && (
-                <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink to="/quality" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold">
-                        <Activity className="h-5 w-5 shrink-0 text-orange-500" />
-                        {!collapsed && <span className="text-sm">Quality Lab</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink to="/context" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold">
-                        <Radar className="h-5 w-5 shrink-0 text-orange-500" />
-                        {!collapsed && <span className="text-sm">Contexto</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink to="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold">
-                        <Shield className="h-5 w-5 shrink-0 text-orange-500" />
-                        {!collapsed && <span className="text-sm">Admin</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/context" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold">
+                      <Radar className="h-5 w-5 shrink-0 text-orange-500" />
+                      {!collapsed && <span className="text-sm">Contexto</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink to="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold">
+                      <Shield className="h-5 w-5 shrink-0 text-orange-500" />
+                      {!collapsed && <span className="text-sm">Admin</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="bg-[#0f172a] border-t border-white/10 p-3 space-y-2">

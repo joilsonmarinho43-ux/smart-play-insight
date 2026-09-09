@@ -1,12 +1,8 @@
 /**
  * HYBRID SIGNAL ENGINE
  * Classifica jogos LIVE em 3 níveis: SNIPER 🔥, SEMI ⚡, NORMAL 🔍
- * Camada ADICIONAL — não altera filtros existentes.
+ * Camada analítica — não executa apostas.
  */
-
-// ═══════════════════════════════════════
-// TYPES
-// ═══════════════════════════════════════
 
 export type HybridTier = 'SNIPER' | 'SEMI' | 'NORMAL';
 
@@ -16,27 +12,26 @@ export interface HybridSignal {
   league: string;
   minute: number;
   tier: HybridTier;
-  label: string;           // "SNIPER 🔥" | "SEMI ⚡" | "NORMAL 🔍"
+  label: string;
   confidence: 'alta' | 'média' | 'padrão';
   market: string;
-  canExecute: boolean;
-  executionReason: string;
+  /** Analytically eligible for Nexus signal review; never means order execution. */
+  signalEligible: boolean;
+  signalReason: string;
   // stats
   shotsOnGoal: number;
   totalShots: number;
   corners: number;
   dangerousAttacks: number;
-  /** True quando dangerousAttacks foi estimado via fallback (API retornou 0). */
+  /** True when dangerousAttacks was estimated via fallback (API returned 0). */
   daEstimated: boolean;
-  possession: number;      // dominant team possession
+  possession: number;
   pressure: number;
   homeGoals: number;
   awayGoals: number;
 }
 
-// ═══════════════════════════════════════
-// LEGACY TYPES (kept for compatibility — actual persistence is in hybridStore.ts / Supabase)
-// ═══════════════════════════════════════
+/** Historical analytical tracking; result describes the observed match outcome. */
 export interface HybridOperation {
   id: string;
   matchId: string;
@@ -50,14 +45,6 @@ export interface HybridOperation {
   exitMinute?: number;
 }
 
-// ═══════════════════════════════════════
-// CLASSIFICATION ENGINE
-// ═══════════════════════════════════════
-
-/**
- * Snapshot history per match — guarda chutes/escanteios por minuto
- * para a Trava de Segurança (precisa de evento real nos últimos 10 min).
- */
 interface MatchSnapshot { minute: number; totalShots: number; corners: number; }
 const SNAPSHOT_HISTORY: Record<string, MatchSnapshot[]> = {};
 
@@ -74,17 +61,13 @@ function recordSnapshot(matchId: string, minute: number, totalShots: number, cor
   }
 }
 
-/** Retorna true se houve ao menos 1 chute OU escanteio NOVO nos últimos 10 min. */
 function hasRecentEvent(matchId: string, minute: number): boolean {
   const hist = SNAPSHOT_HISTORY[matchId];
   if (!hist || hist.length === 0) return false;
   const cutoff = minute - 10;
-  // baseline = snapshot mais antigo dentro da janela (≤ cutoff)
   const baseline = [...hist].reverse().find(h => h.minute <= cutoff) || hist[0];
   const current = hist[hist.length - 1];
-  const shotsDelta = current.totalShots - baseline.totalShots;
-  const cornersDelta = current.corners - baseline.corners;
-  return shotsDelta >= 1 || cornersDelta >= 1;
+  return current.totalShots - baseline.totalShots >= 1 || current.corners - baseline.corners >= 1;
 }
 
 function extractStats(match: any) {
@@ -97,7 +80,6 @@ function extractStats(match: any) {
   const totalShots = (lH.totalShots || 0) + (lA.totalShots || 0);
   const corners = (lH.corners || 0) + (lA.corners || 0);
 
-  // Fallback DA: quando API retorna 0, estima a partir de chutes e escanteios.
   let da = (lH.dangerousAttacks || 0) + (lA.dangerousAttacks || 0);
   let daEstimated = false;
   if (da === 0 && (totalShots > 0 || corners > 0)) {
@@ -115,47 +97,24 @@ function extractStats(match: any) {
   const league = match.league?.name || match.league || '';
   const hasStats = !!(lH.shotsOnGoal || lA.shotsOnGoal || lH.dangerousAttacks || lA.dangerousAttacks || totalShots || corners);
 
-  // Atualiza histórico p/ trava de 10 min
   if (matchId && hasStats && minute > 0) recordSnapshot(matchId, minute, totalShots, corners);
-
   return { minute, homeGoals, awayGoals, sog, totalShots, corners, da, daEstimated, dominantPoss, pressure, homeTeam, awayTeam, matchId, league, hasStats };
 }
 
 function trySniper(s: ReturnType<typeof extractStats>): boolean {
-  return (
-    s.minute >= 5 && s.minute <= 30 &&
-    s.homeGoals === 0 && s.awayGoals === 0 &&
-    s.sog >= 2 &&
-    s.dominantPoss >= 60 &&
-    s.da >= 8 &&
-    s.corners >= 2 &&
-    s.pressure >= 70
-  );
+  return s.minute >= 5 && s.minute <= 30 && s.homeGoals === 0 && s.awayGoals === 0 && s.sog >= 2 && s.dominantPoss >= 60 && s.da >= 8 && s.corners >= 2 && s.pressure >= 70;
 }
 
 function trySemi(s: ReturnType<typeof extractStats>): boolean {
   const validScore = (s.homeGoals === 0 && s.awayGoals === 0) || (s.homeGoals + s.awayGoals === 1);
-  return (
-    s.minute >= 5 && s.minute <= 35 &&
-    validScore &&
-    s.sog >= 1 &&
-    s.dominantPoss >= 55 &&
-    s.da >= 6 &&
-    s.corners >= 1 &&
-    s.pressure >= 60
-  );
+  return s.minute >= 5 && s.minute <= 35 && validScore && s.sog >= 1 && s.dominantPoss >= 55 && s.da >= 6 && s.corners >= 1 && s.pressure >= 60;
 }
 
 function tryNormal(s: ReturnType<typeof extractStats>): boolean {
-  return (
-    s.minute <= 70 &&
-    (s.sog >= 1 || s.da >= 5) &&
-    s.pressure >= 55
-  );
+  return s.minute <= 70 && (s.sog >= 1 || s.da >= 5) && s.pressure >= 55;
 }
 
 export function classifyHybridSignal(match: any): HybridSignal | null {
-  // Aceita tanto MatchData (com isLive) quanto JSON cru da API-Sports (com fixture.status.short)
   const liveStatuses = ['1H', '2H', 'HT', 'ET', 'P', 'LIVE'];
   const status = String(match?.fixture?.status?.short || '').toUpperCase();
   const isLive = match?.isLive === true || liveStatuses.includes(status);
@@ -164,18 +123,13 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
   const s = extractStats(match);
   if (!s.hasStats) return null;
 
-  // NOTE: blocking/duplicate checks are now handled by useHybridPerformance hook (Supabase).
-  // classifyHybridSignal is now a PURE classifier — canExecute defaults to true for eligible tiers.
-
-  // 🛡️ TRAVA DE SEGURANÇA: precisa de ≥1 chute OU escanteio NOVO nos últimos 10 min.
   const recentEvent = hasRecentEvent(s.matchId, s.minute);
-
   let tier: HybridTier;
   let label: string;
   let confidence: HybridSignal['confidence'];
   let market: string;
-  let canExecute: boolean;
-  let executionReason: string;
+  let signalEligible: boolean;
+  let signalReason: string;
 
   if (trySniper(s)) {
     if (!recentEvent && s.minute >= 15) return null;
@@ -183,8 +137,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     label = 'SNIPER 🔥';
     confidence = 'alta';
     market = 'Over 0.5 HT';
-    canExecute = true;
-    executionReason = '✅ Pronto para entrada';
+    signalEligible = true;
+    signalReason = 'Cenário LIVE atende aos filtros SNIPER';
   } else if (trySemi(s)) {
     if (!recentEvent && s.minute >= 15) return null;
     tier = 'SEMI';
@@ -192,15 +146,15 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     confidence = 'média';
     market = s.homeGoals + s.awayGoals === 0 ? 'Over 0.5' : 'Over 1.5';
     const inWindow = s.minute >= 10 && s.minute <= 30;
-    canExecute = inWindow;
-    executionReason = !inWindow ? `Fora da janela (10-30'), atual: ${s.minute}'` : '✅ Pronto para entrada';
+    signalEligible = inWindow;
+    signalReason = !inWindow ? `Fora da janela analítica (10-30'), atual: ${s.minute}'` : 'Cenário LIVE atende aos filtros SEMI';
   } else if (tryNormal(s)) {
     tier = 'NORMAL';
     label = 'NORMAL 🔍';
     confidence = 'padrão';
     market = 'Sugestão';
-    canExecute = false;
-    executionReason = 'Apenas sugestão — sem execução automática';
+    signalEligible = false;
+    signalReason = 'Apenas contexto analítico — confiança insuficiente para sinal forte';
   } else {
     return null;
   }
@@ -214,8 +168,8 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     label,
     confidence,
     market,
-    canExecute,
-    executionReason,
+    signalEligible,
+    signalReason,
     shotsOnGoal: s.sog,
     totalShots: s.totalShots,
     corners: s.corners,
@@ -227,10 +181,6 @@ export function classifyHybridSignal(match: any): HybridSignal | null {
     awayGoals: s.awayGoals,
   };
 }
-
-// ═══════════════════════════════════════
-// NOTIFICATIONS (anti-spam via localStorage)
-// ═══════════════════════════════════════
 
 export function shouldNotify(signal: HybridSignal): boolean {
   if (signal.tier === 'NORMAL') return false;
@@ -245,5 +195,5 @@ export function markNotified(matchId: string) {
 }
 
 export function buildNotificationText(signal: HybridSignal): string {
-  return `🔥 OPORTUNIDADE DETECTADA\n${signal.match} - ${signal.minute}'\n${signal.label}\n${signal.market}\nPressão: ${signal.pressure} | SoG: ${signal.shotsOnGoal} | Cantos: ${signal.corners}`;
+  return `🔥 SINAL ANALÍTICO DETECTADO\n${signal.match} - ${signal.minute}'\n${signal.label}\n${signal.market}\nPressão: ${signal.pressure} | SoG: ${signal.shotsOnGoal} | Cantos: ${signal.corners}`;
 }

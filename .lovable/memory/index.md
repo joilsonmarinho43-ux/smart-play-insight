@@ -3,8 +3,6 @@ Updated: now
 
 # Project Memory
 
-- [Execução de Apostas](mem://constraints/betting-execution) — Sem API oficial Layback/Bolsa de Aposta; só modo simulação, arquitetura BettingProvider
-
 ## Core
 - **Stack**: React, Tailwind, Supabase Edge Functions. No Lovable references. Brand: 'Analista Joilson'.
 - **Design**: Sporty dark, orange/gold on navy/black. Bebas Neue (titles), Inter/Roboto. Numbers `.toFixed(1)`.
@@ -27,7 +25,7 @@ Updated: now
 - [Database Maintenance](mem://database/maintenance) — pg_cron routines for session conflicts and cache_api cleanup
 - [Data Integrity](mem://logic/integrity) — Pre-game filters for 'NS' matches, cache staleTime 10 min
 - [Combo Signal](mem://logic/combo-signal) — Over 2.5 Goals & Over 7.5 Corners > 85% probability logic
-- [Odd Estimation](mem://logic/odd-estimation) — EV+ and Stake calculation with 8% safety margin
+- [Odd Estimation](mem://logic/odd-estimation) — EV+ and probability analysis with 8% safety margin
 - [Betting Logic](mem://logic/betting) — Risk profiles (Con 75%, Mod 65%, Agg 55%) and Opportunity Score formula
 - [Analysis Engine](mem://logic/analysis-engine) — Poisson (60%) + xG (40%), Bayesian regression (k=3), xG proxy 0.22
 - [Bingo VIP PRO](mem://features/bingo) — 10 markets, Poisson + xG, 45% HT / 55% FT, ≥ 72% confidence

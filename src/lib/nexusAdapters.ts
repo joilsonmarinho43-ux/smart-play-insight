@@ -6,6 +6,7 @@ import {
   type NexusEvidence,
   type NexusMode,
 } from '@/lib/nexusDecisionCore';
+import { assessDataQuality } from '@/lib/dataQualityGate';
 import type { HybridSignal } from '@/lib/hybridEngine';
 
 /**
@@ -49,6 +50,13 @@ export function adaptHybridSignal(
   const markets = market ? [market] : [];
   const evidence = hybridEvidence(signal);
   const engineConflict = signal.signalEligible === false && signal.tier !== 'NORMAL';
+  const dataQuality = signal.observedAt
+    ? assessDataQuality({
+        live: true,
+        observedAt: signal.observedAt,
+        estimatedData: signal.daEstimated,
+      })
+    : null;
 
   return decideNexus({
     match,
@@ -61,6 +69,7 @@ export function adaptHybridSignal(
     ],
     analysisBlocked: !signal.signalEligible,
     engineConflict,
+    dataQuality,
   });
 }
 

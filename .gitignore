@@ -23,8 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
-
-# Secrets self-hosted (nunca versionar)
+# Environment / secrets — never version
+.env
+.env.*
+!.env.example
 deploy/.env
 **/secrets.env
 supabase-docker/

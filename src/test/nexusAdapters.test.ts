@@ -30,6 +30,7 @@ const sniper: HybridSignal = {
   pressure: 90,
   homeGoals: 0,
   awayGoals: 0,
+  observedAt: '2026-09-09T01:55:00Z',
 };
 
 describe('Nexus adapters', () => {
@@ -38,6 +39,13 @@ describe('Nexus adapters', () => {
     expect(result.decision).toBe('SIGNAL');
     expect(result.signalEligible).toBe(true);
     expect(result.selectedMarket?.market).toBe('Over 0.5 HT');
+  });
+
+  it('rejeita LIVE quando a proveniência temporal está ausente', () => {
+    const result = adaptHybridSignal({ ...sniper, observedAt: undefined }, market);
+    expect(result.decision).toBe('REJECT');
+    expect(result.signalEligible).toBe(false);
+    expect(result.reasonCodes).toContain('DATA_LIVE_TIMESTAMP_MISSING');
   });
 
   it('nunca promove sinal Hybrid bloqueado para sinal analítico', () => {

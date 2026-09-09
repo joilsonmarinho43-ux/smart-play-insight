@@ -14,6 +14,9 @@ const MODEL_VERSION = 'poisson-xg-bayes-v1';
  * It records only a Core-approved SIGNAL backed by MODEL_ESTIMATE provenance.
  * It never places orders, calls a bookmaker, or fabricates market prices.
  * Duplicate prediction IDs are treated as idempotent success.
+ *
+ * Every gate returns an explicit diagnostic reason so a zero-row ledger can be
+ * investigated from the Scanner without weakening any analytical threshold.
  */
 export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
   recorded: boolean;
@@ -31,10 +34,17 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
     });
 
     if (!Number.isFinite(confidence.score) || confidence.score < 85) {
-      return { recorded: false, reason: 'CONFIDENCE_BELOW_SIGNAL_THRESHOLD' };
+      return {
+        recorded: false,
+        reason: `CONFIDENCE_BELOW_SIGNAL_THRESHOLD:${Number.isFinite(confidence.score) ? confidence.score : 'invalid'}:${confidence.source}`,
+      };
     }
 
     const markets = analyzeMarkets(match);
+    if (markets.length === 0) {
+      return { recorded: false, reason: 'NO_MARKETS' };
+    }
+
     const decision = adaptPreMatch(match, markets, confidence.score);
     const sampleSize = match.sampleSize
       ? Math.min(match.sampleSize.homeGames, match.sampleSize.awayGames)
@@ -48,7 +58,12 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
     });
 
     if (decision.decision !== 'SIGNAL' || !decision.selectedMarket) {
-      return { recorded: false, reason: `CORE_${decision.decision}` };
+      const codes = decision.reasonCodes.length ? decision.reasonCodes.join('|') : 'NONE';
+      const market = decision.selectedMarket?.market ?? 'NONE';
+      return {
+        recorded: false,
+        reason: `CORE_${decision.decision}:markets=${markets.length}:selected=${market}:codes=${codes}:quality=${quality.status}:${quality.score}`,
+      };
     }
 
     const ledgerRecord = buildLedgerPrediction({
@@ -63,7 +78,12 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
       dataObservedAt: null,
     });
 
-    if (!ledgerRecord) return { recorded: false, reason: 'LEDGER_GATE_REJECTED' };
+    if (!ledgerRecord) {
+      return {
+        recorded: false,
+        reason: `LEDGER_GATE_REJECTED:source=${decision.selectedMarket.probabilitySource ?? 'UNKNOWN'}:quality=${quality.status}:${quality.score}:codes=${decision.reasonCodes.join('|') || 'NONE'}`,
+      };
+    }
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
@@ -90,12 +110,12 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
     if (error) {
       if (error.code === '23505') return { recorded: false, reason: 'ALREADY_RECORDED' };
       console.error('[NEXUS-LEDGER] insert failed:', error);
-      return { recorded: false, reason: 'PERSISTENCE_ERROR' };
+      return { recorded: false, reason: `PERSISTENCE_ERROR:${error.code || 'UNKNOWN'}` };
     }
 
     return { recorded: true, reason: 'RECORDED' };
   } catch (error) {
     console.error('[NEXUS-LEDGER] recorder failed:', error);
-    return { recorded: false, reason: 'RECORDER_ERROR' };
+    return { recorded: false, reason: `RECORDER_ERROR:${error instanceof Error ? error.message : 'UNKNOWN'}` };
   }
 }

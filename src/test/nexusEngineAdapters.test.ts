@@ -50,7 +50,7 @@ describe('Nexus engine adapters', () => {
   it('does not turn Bet Analyzer score into a fake market probability', () => {
     const result = adaptBetAnalyzerCard(card, match, 95);
 
-    expect(result.executionAllowed).toBe(false);
+    expect(result.signalEligible).toBe(false);
     expect(result.decision).toBe('REJECT');
     expect(result.reasonCodes).toContain('NO_VALID_MARKET');
   });
@@ -58,15 +58,15 @@ describe('Nexus engine adapters', () => {
   it('allows Bingo market evidence to reach Core only with explicit confidence', () => {
     const result = adaptBingoMarkets(match, [market], 90);
 
-    expect(result.decision).toBe('EXECUTE');
-    expect(result.executionAllowed).toBe(true);
+    expect(result.decision).toBe('SIGNAL');
+    expect(result.signalEligible).toBe(true);
     expect(result.selectedMarket?.market).toBe('Over 1.5 Gols');
   });
 
-  it('never authorizes Bingo without explicit confidence', () => {
+  it('never produces a strong signal for Bingo without explicit confidence', () => {
     const result = adaptBingoMarkets(match, [market], undefined);
 
-    expect(result.executionAllowed).toBe(false);
+    expect(result.signalEligible).toBe(false);
     expect(result.decision).toBe('INFO_ONLY');
     expect(result.reasonCodes).toContain('CONFIDENCE_MISSING');
   });
@@ -74,8 +74,8 @@ describe('Nexus engine adapters', () => {
   it('blocks Bingo when its confidence policy already discarded the opportunity', () => {
     const result = adaptBingoMarkets(match, [market], 90, true);
 
-    expect(result.executionAllowed).toBe(false);
+    expect(result.signalEligible).toBe(false);
     expect(result.decision).toBe('REJECT');
-    expect(result.reasonCodes).toContain('EXECUTION_BLOCKED');
+    expect(result.reasonCodes).toContain('ANALYSIS_BLOCKED');
   });
 });

@@ -18,8 +18,6 @@ import type { HybridSignal } from '@/lib/hybridEngine';
 const HYBRID_CONFIDENCE: Record<HybridSignal['confidence'], number | null> = {
   alta: 90,
   média: 75,
-  // "padrão" não é uma confiança numérica explícita. Deve permanecer
-  // ausente para que o Core aplique INFO_ONLY, nunca REJECT por score 0.
   padrão: null,
 };
 
@@ -50,7 +48,7 @@ export function adaptHybridSignal(
 
   const markets = market ? [market] : [];
   const evidence = hybridEvidence(signal);
-  const engineConflict = signal.canExecute === false && signal.tier !== 'NORMAL';
+  const engineConflict = signal.signalEligible === false && signal.tier !== 'NORMAL';
 
   return decideNexus({
     match,
@@ -61,14 +59,11 @@ export function adaptHybridSignal(
       ...evidence,
       ...marketsToNexusEvidence(markets),
     ],
-    // Compatibilidade com o engine: canExecute significa apenas que o
-    // engine considera o sinal elegível; aqui isso vira bloqueio ANALÍTICO.
-    analysisBlocked: !signal.canExecute,
+    analysisBlocked: !signal.signalEligible,
     engineConflict,
   });
 }
 
-/** Adapta uma análise pré-jogo sem acoplar o engine ao Core. */
 export function adaptPreMatch(
   match: MatchData,
   markets: MarketAnalysis[],

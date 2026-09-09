@@ -72,12 +72,33 @@ export interface MatchData {
 
 export type RiskProfile = 'conservador' | 'moderado' | 'agressivo';
 
+/**
+ * Proveniência da probabilidade analítica.
+ *
+ * MODEL_ESTIMATE = estimativa de modelo (Poisson/xG/Bayes etc.),
+ * HEURISTIC = regra/proxy operacional sem calibração estatística demonstrada,
+ * DERIVED = transformação de outra probabilidade (ex.: complemento),
+ * MARKET_IMPLIED = probabilidade implícita de preço/odd de mercado,
+ * UNKNOWN = legado ou origem não informada.
+ */
+export type ProbabilitySource =
+  | 'MODEL_ESTIMATE'
+  | 'HEURISTIC'
+  | 'DERIVED'
+  | 'MARKET_IMPLIED'
+  | 'UNKNOWN';
+
+/** Estado de calibração empírica; não deve ser inferido apenas pela confiança. */
+export type CalibrationStatus = 'UNCALIBRATED' | 'CALIBRATED';
+
 export interface MarketAnalysis {
   market: string;
   probability: number;
   risk: string;
   category: string;
   odd?: number;
+  probabilitySource?: ProbabilitySource;
+  calibrationStatus?: CalibrationStatus;
 }
 
 export interface HomeAwayStats {

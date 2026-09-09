@@ -2,7 +2,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const FINISHED = new Set(['FT', 'AET', 'PEN', 'AP', 'AWARDED', 'FINISHED', 'ENDED', 'FULL TIME', 'FULLTIME', 'FULL-TIME']);
-
 type Resolution = 'green' | 'loss' | 'pending';
 
 function finiteNumber(value: unknown): number | null {
@@ -10,24 +9,16 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function checkMarket(
-  market: string,
-  homeGoals: number,
-  awayGoals: number,
-  corners: number,
-  finished: boolean,
-  halfTimeGoals?: number,
-): Resolution {
+function checkMarket(market: string, homeGoals: number, awayGoals: number, corners: number, finished: boolean, halfTimeGoals?: number): Resolution {
   const totalGoals = homeGoals + awayGoals;
   const m = market.toLowerCase().trim();
 
-  // Period markets must be evaluated only from their own period result.
   if (m.includes('over 0.5 ht') || m.includes('over 0.5 1t') || m.includes('gol no 1º tempo') || m.includes('gol no 1° tempo')) {
     if (halfTimeGoals == null) return 'pending';
     return halfTimeGoals > 0 ? 'green' : 'loss';
   }
   if (m.includes('gol no 2t') || m.includes('gol no 2° tempo') || m.includes('gol no 2º tempo')) {
-    if (!finished) return 'pending';
+    if (!finished || halfTimeGoals == null) return 'pending';
     return totalGoals > halfTimeGoals ? 'green' : 'loss';
   }
 
@@ -77,17 +68,13 @@ function checkMarket(
     return awayGoals > homeGoals ? 'green' : 'loss';
   }
 
-  // Unknown markets are deliberately left unresolved. Never manufacture a LOSS.
   return 'pending';
 }
 
 async function getFixtureData(supabaseUrl: string, serviceKey: string, matchId: string) {
   const response = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ fixture: matchId }),
   });
   if (!response.ok) return null;
@@ -102,7 +89,6 @@ async function getFixtureData(supabaseUrl: string, serviceKey: string, matchId: 
 
   const status = String(extra?.status || '').toUpperCase();
   const finished = FINISHED.has(status) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
-
   let corners = 0;
   for (const team of payload?.response || []) {
     const stat = (team?.statistics || []).find((s: any) => s?.type === 'Corner Kicks');
@@ -113,7 +99,6 @@ async function getFixtureData(supabaseUrl: string, serviceKey: string, matchId: 
   const htHome = finiteNumber(extra?.halftime?.home);
   const htAway = finiteNumber(extra?.halftime?.away);
   const halfTimeGoals = htHome != null && htAway != null ? htHome + htAway : undefined;
-
   return { goalsHome, goalsAway, corners, finished, halfTimeGoals };
 }
 
@@ -132,7 +117,6 @@ Deno.serve(async (req) => {
       .is('outcome', null)
       .order('predicted_at', { ascending: true })
       .limit(100);
-
     if (error) throw new Error(`ledger_fetch_failed: ${error.message}`);
 
     let resolved = 0;
@@ -146,15 +130,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const resolution = checkMarket(
-        String(row.market),
-        fixture.goalsHome,
-        fixture.goalsAway,
-        fixture.corners,
-        fixture.finished,
-        fixture.halfTimeGoals,
-      );
-
+      const resolution = checkMarket(String(row.market), fixture.goalsHome, fixture.goalsAway, fixture.corners, fixture.finished, fixture.halfTimeGoals);
       if (resolution === 'pending') {
         skipped++;
         continue;
@@ -162,19 +138,13 @@ Deno.serve(async (req) => {
 
       const { error: updateError } = await sb
         .from('prediction_ledger')
-        .update({
-          outcome: resolution === 'green',
-          resolved_at: new Date().toISOString(),
-        })
+        .update({ outcome: resolution === 'green', resolved_at: new Date().toISOString() })
         .eq('id', row.id)
         .is('outcome', null);
-
       if (updateError) {
-        // The immutable trigger intentionally rejects invalid/racing mutations.
         console.error(`[PREDICTION-LEDGER] resolution failed id=${row.id}: ${updateError.message}`);
         continue;
       }
-
       resolved++;
     }
 

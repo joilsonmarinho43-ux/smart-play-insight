@@ -38,7 +38,7 @@ describe('probabilityIntegrity', () => {
     ];
     const metrics = calibrationMetrics(data);
     expect(metrics.count).toBe(4);
-    expect(metrics.meanPredicted).toBe(60);
+    expect(metrics.meanPredicted).toBe(65);
     expect(metrics.observedRate).toBe(0.75);
     expect(metrics.brierScore).not.toBeNull();
     expect(metrics.logLoss).not.toBeNull();

@@ -35,10 +35,19 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
       kickoffISO: match.kickoff ?? match.time,
     });
 
+    console.info('[NEXUS-CONFIDENCE] resolution', {
+      matchId: String(match.id),
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      score: confidence.score,
+      source: confidence.source,
+      diagnostic: confidence.diagnostic ?? 'NONE',
+    });
+
     if (!Number.isFinite(confidence.score) || confidence.score < 85) {
       return {
         recorded: false,
-        reason: `CONFIDENCE_BELOW_SIGNAL_THRESHOLD:${Number.isFinite(confidence.score) ? confidence.score : 'invalid'}:${confidence.source}`,
+        reason: `CONFIDENCE_BELOW_SIGNAL_THRESHOLD:${Number.isFinite(confidence.score) ? confidence.score : 'invalid'}:${confidence.source}:${confidence.diagnostic ?? 'NONE'}`,
       };
     }
 

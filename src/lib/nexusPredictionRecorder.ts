@@ -30,7 +30,9 @@ export async function recordNexusPreMatchPrediction(match: MatchData): Promise<{
       homeTeam: match.homeTeam,
       awayTeam: match.awayTeam,
       league: match.league,
-      kickoffISO: match.time,
+      // Scanner keeps `time` display-friendly; confidence needs the canonical
+      // fixture timestamp when it is available.
+      kickoffISO: match.kickoff ?? match.time,
     });
 
     if (!Number.isFinite(confidence.score) || confidence.score < 85) {

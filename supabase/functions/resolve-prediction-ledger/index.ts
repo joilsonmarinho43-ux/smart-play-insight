@@ -9,7 +9,7 @@ function finiteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function checkMarket(market: string, homeGoals: number, awayGoals: number, corners: number, finished: boolean, halfTimeGoals?: number): Resolution {
+function checkMarket(market: string, homeGoals: number, awayGoals: number, corners: number | null, finished: boolean, halfTimeGoals?: number): Resolution {
   const totalGoals = homeGoals + awayGoals;
   const m = market.toLowerCase().trim();
 
@@ -46,7 +46,7 @@ function checkMarket(market: string, homeGoals: number, awayGoals: number, corne
   const cornersOver = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:escanteios|cantos|corners)/);
   if (cornersOver) {
     const threshold = Number(cornersOver[1]);
-    if (!Number.isFinite(threshold)) return 'pending';
+    if (!Number.isFinite(threshold) || corners == null) return 'pending';
     if (corners > threshold) return 'green';
     return finished ? 'loss' : 'pending';
   }
@@ -89,12 +89,17 @@ async function getFixtureData(supabaseUrl: string, serviceKey: string, matchId: 
 
   const status = String(extra?.status || '').toUpperCase();
   const finished = FINISHED.has(status) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
-  let corners = 0;
+  let corners: number | null = null;
+  let cornerStatsFound = false;
   for (const team of payload?.response || []) {
     const stat = (team?.statistics || []).find((s: any) => s?.type === 'Corner Kicks');
     const value = finiteNumber(stat?.value);
-    if (value != null) corners += value;
+    if (value != null) {
+      corners = (corners ?? 0) + value;
+      cornerStatsFound = true;
+    }
   }
+  if (!cornerStatsFound) corners = null;
 
   const htHome = finiteNumber(extra?.halftime?.home);
   const htAway = finiteNumber(extra?.halftime?.away);

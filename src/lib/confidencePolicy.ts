@@ -36,6 +36,54 @@ export interface ConfidenceResolution {
 
 /**
  * Resolve confiança via edge function.
+ * Falhas e ausência de dados permanecem fail-closed em score=0.
+ *
+ * Fallback auditado:
+ * se o match-stats-resolver não encontrar provider, usamos a função
+ * team-form, que possui ESPN como fonte histórica primária e TheSportsDB
+ * como complemento. A confiança do fallback é derivada SOMENTE do tamanho
+ * da amostra histórica disponível; não transforma gols em probabilidade.
+ */
+async function resolveFromTeamForm(homeTeam: string, awayTeam: string): Promise<ConfidenceResolution | null> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data, error } = await supabase.functions.invoke("team-form", {
+      body: { home: homeTeam, away: awayTeam },
+    });
+    if (error || !data?.ok) return null;
+
+    const home = data.home as any;
+    const away = data.away as any;
+    const homeGames = Number(home?.games ?? 0);
+    const awayGames = Number(away?.games ?? 0);
+    const homeGoals = Number(home?.goalsForAvg ?? 0);
+    const awayGoals = Number(away?.goalsForAvg ?? 0);
+
+    if (!Number.isFinite(homeGames) || !Number.isFinite(awayGames) || homeGames < 3 || awayGames < 3) {
+      return null;
+    }
+    if (!Number.isFinite(homeGoals) || !Number.isFinite(awayGoals) || homeGoals <= 0 || awayGoals <= 0) {
+      return null;
+    }
+
+    // 5+ jogos reais de cada lado = amostra mínima para o modo normal.
+    // 3-4 jogos = conservador; nunca é promovido para SIGNAL.
+    const score = homeGames >= 5 && awayGames >= 5 ? 85 : 75;
+    const diagnostic = `TEAM_FORM_SAMPLE:${homeGames}x${awayGames}`;
+
+    return {
+      score,
+      source: "team-form-historical",
+      diagnostic,
+    };
+  } catch (error) {
+    console.warn("[NEXUS-CONFIDENCE] team-form fallback failed", error);
+    return null;
+  }
+}
+
+/**
+ * Resolve confiança via edge function.
  * Falhas e ausência de dados permanecem fail-closed em score=0, mas a causa
  * é preservada para diagnóstico operacional do Scanner.
  */
@@ -50,8 +98,6 @@ export async function resolveConfidence(payload: {
   }
 
   try {
-    // Lazy-load the Supabase client so pure confidence classification/tests do not
-    // require runtime Supabase environment variables just to import this module.
     const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase.functions.invoke("match-stats-resolver", { body: payload });
 
@@ -62,6 +108,12 @@ export async function resolveConfidence(payload: {
         awayTeam: payload.awayTeam,
         error: error?.message ?? 'NO_RESPONSE',
       });
+
+      const fallback = await resolveFromTeamForm(payload.homeTeam, payload.awayTeam);
+      if (fallback) {
+        memCache.set(key, { ...fallback, ts: Date.now() });
+        return fallback;
+      }
       return { score: 0, source: "resolver_error", diagnostic: error?.message ?? 'NO_RESPONSE' };
     }
 
@@ -87,9 +139,24 @@ export async function resolveConfidence(payload: {
       source,
       diagnostic,
     };
-    memCache.set(key, { ...out, ts: Date.now() });
 
+    // Se o resolver principal não encontrou provider, tenta o histórico
+    // auditado do team-form antes de descartar a partida.
     if (out.score === 0 || source === 'none') {
+      const fallback = await resolveFromTeamForm(payload.homeTeam, payload.awayTeam);
+      if (fallback) {
+        memCache.set(key, { ...fallback, ts: Date.now() });
+        console.info('[NEXUS-CONFIDENCE] team-form fallback accepted', {
+          matchId: key,
+          homeTeam: payload.homeTeam,
+          awayTeam: payload.awayTeam,
+          score: fallback.score,
+          source: fallback.source,
+          diagnostic: fallback.diagnostic,
+        });
+        return fallback;
+      }
+
       console.warn('[NEXUS-CONFIDENCE] no usable confidence', {
         matchId: key,
         homeTeam: payload.homeTeam,
@@ -100,6 +167,7 @@ export async function resolveConfidence(payload: {
       });
     }
 
+    memCache.set(key, { ...out, ts: Date.now() });
     return out;
   } catch (error) {
     const diagnostic = error instanceof Error ? error.message : 'UNKNOWN';
@@ -109,6 +177,13 @@ export async function resolveConfidence(payload: {
       awayTeam: payload.awayTeam,
       diagnostic,
     });
+
+    const fallback = await resolveFromTeamForm(payload.homeTeam, payload.awayTeam);
+    if (fallback) {
+      memCache.set(key, { ...fallback, ts: Date.now() });
+      return fallback;
+    }
+
     return { score: 0, source: "resolver_unreachable", diagnostic };
   }
 }

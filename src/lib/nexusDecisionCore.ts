@@ -55,11 +55,26 @@ const clamp = (n: number, min = 0, max = 100): number =>
 const normalizeConfidence = (value: number | null | undefined): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? clamp(value) : null;
 
-function marketScore(markets: MarketAnalysis[]): number {
-  const usable = markets
+function validMarketProbabilities(markets: MarketAnalysis[]): number[] {
+  return markets
     .map((m) => Number(m.probability))
-    .filter((v) => Number.isFinite(v) && v >= 0 && v <= 100);
-  return usable.length ? Math.max(...usable) : 0;
+    .filter((v) => Number.isFinite(v) && v >= 0 && v <= 100)
+    .sort((a, b) => a - b);
+}
+
+/** Uses the median rather than the maximum market probability. */
+function marketScore(markets: MarketAnalysis[]): number {
+  const values = validMarketProbabilities(markets);
+  if (!values.length) return 0;
+  const middle = Math.floor(values.length / 2);
+  return values.length % 2 === 0
+    ? (values[middle - 1] + values[middle]) / 2
+    : values[middle];
+}
+
+function marketSpread(markets: MarketAnalysis[]): number | null {
+  const values = validMarketProbabilities(markets);
+  return values.length >= 2 ? values[values.length - 1] - values[0] : null;
 }
 
 function evidenceScore(evidence: NexusEvidence[]): number {
@@ -83,33 +98,22 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
   const confidence = normalizeConfidence(input.confidence);
   const selectedMarket = selectMarket(input.markets ?? []);
   const bestMarketScore = marketScore(input.markets ?? []);
+  const spread = marketSpread(input.markets ?? []);
   const evScore = evidenceScore(input.evidence ?? []);
 
   if (!input.match.id || !input.match.homeTeam || !input.match.awayTeam) {
-    return {
-      decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100,
-      selectedMarket: null, reasonCodes: ['INVALID_MATCH'], evidenceScore: 0,
-      signalEligible: false,
-    };
+    return { decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100, selectedMarket: null, reasonCodes: ['INVALID_MATCH'], evidenceScore: 0, signalEligible: false };
   }
 
   if (input.analysisBlocked) {
     reasons.push('ANALYSIS_BLOCKED');
-    return {
-      decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100,
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+    return { decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100, selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   if (input.dataQuality?.status === 'REJECT') {
     reasons.push(...input.dataQuality.reasons.map((r) => `DATA_${r}`));
     reasons.push('DATA_QUALITY_REJECT');
-    return {
-      decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100,
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+    return { decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100, selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   if (input.dataQuality?.status === 'DEGRADED') {
@@ -118,68 +122,40 @@ export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
   }
 
   if (input.engineConflict) reasons.push('ENGINE_CONFLICT');
-
   if (confidence === null) reasons.push('CONFIDENCE_MISSING');
   if (evScore < 55) reasons.push('INSUFFICIENT_EVIDENCE');
   if (!selectedMarket) reasons.push('NO_VALID_MARKET');
   else if (bestMarketScore < 72) reasons.push('MARKET_BELOW_THRESHOLD');
+  if (spread !== null && spread > 15) reasons.push('MARKET_DISAGREEMENT');
 
   if (confidence === null) {
-    return {
-      decision: 'INFO_ONLY', confidence: 0, riskScore: 80,
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+    return { decision: 'INFO_ONLY', confidence: 0, riskScore: 80, selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   if (confidence < 50 || reasons.includes('INSUFFICIENT_EVIDENCE') || reasons.includes('NO_VALID_MARKET')) {
-    return {
-      decision: 'REJECT', confidence, riskScore: clamp(100 - Math.min(confidence, evScore)),
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+    return { decision: 'REJECT', confidence, riskScore: clamp(100 - Math.min(confidence, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   if (confidence < 70 || bestMarketScore < 72) {
-    return {
-      decision: 'INFO_ONLY', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore)),
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+    return { decision: 'INFO_ONLY', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
-  if (input.engineConflict || input.dataQuality?.status === 'DEGRADED') {
-    return {
-      decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore, input.dataQuality?.score ?? 100)),
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+  if (input.engineConflict || input.dataQuality?.status === 'DEGRADED' || (spread !== null && spread > 15)) {
+    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore, input.dataQuality?.score ?? 100)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   if (confidence < 85) {
     reasons.push('CONSERVATIVE_CONFIDENCE');
-    return {
-      decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)),
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   if (input.mode === 'LIVE' && input.match.isLive !== true) {
     reasons.push('LIVE_STATE_UNCONFIRMED');
-    return {
-      decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)),
-      selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-      signalEligible: false,
-    };
+    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
   }
 
   reasons.push('CORE_APPROVED_SIGNAL');
-  return {
-    decision: 'SIGNAL', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)),
-    selectedMarket, reasonCodes: reasons, evidenceScore: evScore,
-    signalEligible: true,
-  };
+  return { decision: 'SIGNAL', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: true };
 }
 
 /** Transforma mercados reais em evidência analítica Nexus. */

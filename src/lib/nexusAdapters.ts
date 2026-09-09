@@ -50,13 +50,15 @@ export function adaptHybridSignal(
   const markets = market ? [market] : [];
   const evidence = hybridEvidence(signal);
   const engineConflict = signal.signalEligible === false && signal.tier !== 'NORMAL';
-  const dataQuality = signal.observedAt
-    ? assessDataQuality({
-        live: true,
-        observedAt: signal.observedAt,
-        estimatedData: signal.daEstimated,
-      })
-    : null;
+
+  // LIVE is fail-closed: absence of an observation timestamp is itself a
+  // provenance failure. We must never allow a live signal from an unknown-age
+  // snapshot to reach the Core as if it were current.
+  const dataQuality = assessDataQuality({
+    live: true,
+    observedAt: signal.observedAt ?? null,
+    estimatedData: signal.daEstimated,
+  });
 
   return decideNexus({
     match,

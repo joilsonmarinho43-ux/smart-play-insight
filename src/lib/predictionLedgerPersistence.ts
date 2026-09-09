@@ -8,6 +8,8 @@ export interface LedgerPersistenceInput {
   decision: NexusDecisionOutput;
   market: MarketAnalysis;
   modelVersion: string;
+  dataQualityScore: number;
+  dataQualityStatus: 'VALID' | 'DEGRADED' | 'REJECT';
   predictedAt?: string;
   dataObservedAt?: string | null;
 }
@@ -22,12 +24,11 @@ export interface LedgerPersistenceInput {
  */
 export function buildLedgerPrediction(input: LedgerPersistenceInput): PredictionRecord | null {
   if (input.decision.decision !== 'SIGNAL' || !input.decision.signalEligible) return null;
+  if (input.decision.reasonCodes.includes('DATA_QUALITY_REJECT')) return null;
   if (input.market.probabilitySource !== 'MODEL_ESTIMATE') return null;
+  if (input.dataQualityStatus !== 'VALID') return null;
 
   const predictedAt = input.predictedAt ?? new Date().toISOString();
-  const dataQualityScore = input.decision.riskScore != null
-    ? Math.max(0, Math.min(100, 100 - input.decision.riskScore))
-    : 0;
 
   return createPredictionRecord({
     predictionId: input.predictionId,
@@ -42,7 +43,7 @@ export function buildLedgerPrediction(input: LedgerPersistenceInput): Prediction
     marketOdd: input.market.odd ?? null,
     predictedAt,
     dataObservedAt: input.dataObservedAt ?? null,
-    dataQualityScore,
-    dataQualityStatus: 'VALID',
+    dataQualityScore: input.dataQualityScore,
+    dataQualityStatus: input.dataQualityStatus,
   });
 }

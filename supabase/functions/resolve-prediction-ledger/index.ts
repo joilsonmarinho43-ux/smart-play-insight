@@ -22,6 +22,16 @@ function checkMarket(market: string, homeGoals: number, awayGoals: number, corne
     return totalGoals > halfTimeGoals ? 'green' : 'loss';
   }
 
+  // Corner markets must be evaluated before generic Over/Under markets.
+  // Otherwise "Over 8 corners" would incorrectly compare the goal total to 8.
+  const cornersOver = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:escanteios|cantos|corners)/);
+  if (cornersOver) {
+    const threshold = Number(cornersOver[1]);
+    if (!Number.isFinite(threshold) || corners == null) return 'pending';
+    if (corners > threshold) return 'green';
+    return finished ? 'loss' : 'pending';
+  }
+
   const over = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:gols|goals)?/);
   if (over) {
     const threshold = Number(over[1]);
@@ -40,14 +50,6 @@ function checkMarket(market: string, homeGoals: number, awayGoals: number, corne
 
   if (m.includes('btts') || m.includes('ambas marcam')) {
     if (homeGoals > 0 && awayGoals > 0) return 'green';
-    return finished ? 'loss' : 'pending';
-  }
-
-  const cornersOver = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:escanteios|cantos|corners)/);
-  if (cornersOver) {
-    const threshold = Number(cornersOver[1]);
-    if (!Number.isFinite(threshold) || corners == null) return 'pending';
-    if (corners > threshold) return 'green';
     return finished ? 'loss' : 'pending';
   }
 
@@ -114,6 +116,17 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!supabaseUrl || !serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_URL missing');
+
+    // This resolver performs privileged writes. It must not be publicly callable
+    // with an anon/user token. Scheduled/internal callers authenticate with the
+    // service-role bearer token already present in the Edge Runtime environment.
+    const authorization = req.headers.get('Authorization');
+    if (req.method !== 'POST' || authorization !== `Bearer ${serviceKey}`) {
+      return new Response(JSON.stringify({ ok: false, error: 'UNAUTHORIZED' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const sb = createClient(supabaseUrl, serviceKey);
     const { data: rows, error } = await sb

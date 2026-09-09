@@ -28,21 +28,18 @@ import Suggestions from "./pages/Suggestions";
 import Paywall from "./pages/Paywall";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
-import AutoPilot from "./pages/AutoPilot";
 import WorldCup from "./pages/WorldCup";
 import SuperbetConnect from "./pages/SuperbetConnect";
-import BettingExecution from "./pages/BettingExecution";
 import { AppLayout } from "./components/AppLayout";
 
 import { Loader2 } from "lucide-react";
 
-// 🔥 CONFIGURAÇÃO PROFISSIONAL: Economiza API Pro
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,   // 🛡️ Impedimos o gasto de API ao alternar abas
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
-      staleTime: 1000 * 60 * 5,     // Dados "frescos" por 5 minutos
+      staleTime: 1000 * 60 * 5,
       retry: 1,
     },
   },
@@ -54,7 +51,6 @@ const LoadingScreen = () => (
   </div>
 );
 
-// 🛡️ PROTEÇÃO DE ACESSO PAGO
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { session, profile, loading } = useProfile();
   useSessionGuard();
@@ -62,9 +58,8 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   if (loading) return <LoadingScreen />;
   if (!session) return <Navigate to="/auth" replace />;
 
-  // Se não for admin e o acesso expirou
-  const isExpired = profile?.subscription_expiry_date 
-    ? new Date(profile.subscription_expiry_date) < new Date() 
+  const isExpired = profile?.subscription_expiry_date
+    ? new Date(profile.subscription_expiry_date) < new Date()
     : true;
 
   if (!profile?.is_admin && isExpired) {
@@ -74,7 +69,6 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
-// 🛡️ PROTEÇÃO EXCLUSIVA ADMIN
 const AdminRoute = ({ children }: { children: ReactNode }) => {
   const { profile, loading } = useProfile();
   useDataProviderHealthMonitor(!!profile?.is_admin);
@@ -92,11 +86,9 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* Rotas de Usuário Comum (Protegidas por Assinatura) */}
             <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
             <Route path="/live" element={<ProtectedRoute><AppLayout><Live /></AppLayout></ProtectedRoute>} />
             <Route path="/match/:id" element={<ProtectedRoute><AppLayout><MatchDetails /></AppLayout></ProtectedRoute>} />
-            
             <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
             <Route path="/elite" element={<ProtectedRoute><AppLayout><Elite /></AppLayout></ProtectedRoute>} />
             <Route path="/placar-exato" element={<ProtectedRoute><AppLayout><CorrectScore /></AppLayout></ProtectedRoute>} />
@@ -104,24 +96,17 @@ const App = () => {
             <Route path="/bingo" element={<ProtectedRoute><AppLayout><Bingo /></AppLayout></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
             <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
-            <Route path="/autopilot" element={<ProtectedRoute><AppLayout><AutoPilot /></AppLayout></ProtectedRoute>} />
             <Route path="/world-cup" element={<ProtectedRoute><AppLayout><WorldCup /></AppLayout></ProtectedRoute>} />
             <Route path="/superbet-connect" element={<ProtectedRoute><AppLayout><SuperbetConnect /></AppLayout></ProtectedRoute>} />
-            
-            
-            {/* Rota de Gestão (Só para o Jamilson/Joilson) */}
+
             <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />
             <Route path="/quality" element={<AdminRoute><AppLayout><Quality /></AppLayout></AdminRoute>} />
             <Route path="/diagnostics" element={<AdminRoute><AppLayout><Diagnostics /></AppLayout></AdminRoute>} />
             <Route path="/context" element={<AdminRoute><AppLayout><Context /></AppLayout></AdminRoute>} />
-            <Route path="/betting-execution" element={<AdminRoute><AppLayout><BettingExecution /></AppLayout></AdminRoute>} />
-            
-            {/* Rotas de Fluxo de Usuário */}
+
             <Route path="/expired" element={<Paywall />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            
-            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
@@ -131,4 +116,3 @@ const App = () => {
 };
 
 export default App;
-              

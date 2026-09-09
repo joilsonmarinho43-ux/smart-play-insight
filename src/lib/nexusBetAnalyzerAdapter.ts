@@ -12,14 +12,14 @@ import type { ScenarioCard } from '@/lib/betAnalyzerEngine';
  * mercado. Ele entra somente como evidência de engine e nunca é convertido
  * artificialmente em MarketAnalysis/probabilidade.
  *
- * Para autorização de execução, o chamador precisa fornecer confiança
- * explícita e o MarketAnalysis real produzido pelo fluxo de mercado.
+ * O Core classifica a oportunidade para fins analíticos. Não há autorização,
+ * colocação de aposta, gestão de stake ou conexão com plataforma externa.
  */
 export function adaptBetAnalyzerCard(
   card: ScenarioCard,
   match: MatchData,
   confidence: number | null | undefined,
-  options?: { market?: MarketAnalysis; executionBlocked?: boolean },
+  options?: { market?: MarketAnalysis; analysisBlocked?: boolean },
 ): NexusDecisionOutput {
   const market = options?.market;
 
@@ -42,6 +42,6 @@ export function adaptBetAnalyzerCard(
         weight: 0.5,
       },
     ],
-    executionBlocked: options?.executionBlocked,
+    analysisBlocked: options?.analysisBlocked,
   });
 }

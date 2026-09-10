@@ -19,7 +19,7 @@ const market: MarketAnalysis = {
   risk: 'low',
   category: 'goals',
   probabilitySource: 'MODEL_ESTIMATE',
-  calibrationStatus: 'UNCALIBRATED',
+  calibrationStatus: 'CALIBRATED',
   odd: undefined,
 };
 
@@ -52,13 +52,21 @@ describe('predictionLedgerPersistence', () => {
     })).toBeNull();
   });
 
+  it('rejects uncalibrated probabilities', () => {
+    expect(buildLedgerPrediction({
+      predictionId: 'p4', matchId: 'm1', decision,
+      modelVersion: 'nexus-v1', dataQualityScore: 95, dataQualityStatus: 'VALID',
+      market: { ...market, calibrationStatus: 'UNCALIBRATED' },
+    })).toBeNull();
+  });
+
   it('rejects degraded or rejected data quality', () => {
     expect(buildLedgerPrediction({
-      predictionId: 'p4', matchId: 'm1', decision, market, modelVersion: 'nexus-v1',
+      predictionId: 'p5', matchId: 'm1', decision, market, modelVersion: 'nexus-v1',
       dataQualityScore: 70, dataQualityStatus: 'DEGRADED',
     })).toBeNull();
     expect(buildLedgerPrediction({
-      predictionId: 'p5', matchId: 'm1', decision, market, modelVersion: 'nexus-v1',
+      predictionId: 'p6', matchId: 'm1', decision, market, modelVersion: 'nexus-v1',
       dataQualityScore: 0, dataQualityStatus: 'REJECT',
     })).toBeNull();
   });

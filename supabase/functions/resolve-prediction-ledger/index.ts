@@ -3,177 +3,68 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 const FINISHED = new Set(['FT', 'AET', 'PEN', 'AP', 'AWARDED', 'FINISHED', 'ENDED', 'FULL TIME', 'FULLTIME', 'FULL-TIME']);
 type Resolution = 'green' | 'loss' | 'pending';
+const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 
-function finiteNumber(value: unknown): number | null {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
+function checkMarket(market: string, f: { homeGoals: number; awayGoals: number; corners: number | null; yellowCards: number | null; offsides: number | null; finished: boolean; halfTimeGoals?: number }): Resolution {
+  const totalGoals = f.homeGoals + f.awayGoals; const m = market.toLowerCase().trim();
+  const finish = (yes: boolean) => yes ? 'green' : f.finished ? 'loss' : 'pending' as Resolution;
+  if (m.includes('over 0.5 ht') || m.includes('over 0.5 1t') || m.includes('gol no 1º tempo') || m.includes('gol no 1° tempo')) return f.halfTimeGoals == null ? 'pending' : finish(f.halfTimeGoals > 0);
+  if (m.includes('gol no 2t') || m.includes('gol no 2° tempo') || m.includes('gol no 2º tempo')) return !f.finished || f.halfTimeGoals == null ? 'pending' : finish(totalGoals > f.halfTimeGoals);
 
-function checkMarket(market: string, homeGoals: number, awayGoals: number, corners: number | null, finished: boolean, halfTimeGoals?: number): Resolution {
-  const totalGoals = homeGoals + awayGoals;
-  const m = market.toLowerCase().trim();
+  const marketTotal = (value: number | null, names: string[]) => {
+    const r = m.match(new RegExp(`over\\s*(\\d+(?:\\.\\d+)?)\\s*(?:${names.join('|')})`));
+    if (r) { const t = Number(r[1]); return value == null || !Number.isFinite(t) ? 'pending' : finish(value > t); }
+    const u = m.match(new RegExp(`under\\s*(\\d+(?:\\.\\d+)?)\\s*(?:${names.join('|')})`));
+    if (u) { const t = Number(u[1]); return value == null || !Number.isFinite(t) ? 'pending' : finish(value < t); }
+    return null;
+  };
+  const corners = marketTotal(f.corners, ['escanteios','cantos','corners']); if (corners) return corners;
+  const cards = marketTotal(f.yellowCards, ['cart[oõ]es','cards','cartoes']); if (cards) return cards;
+  const offsides = marketTotal(f.offsides, ['impedimentos','offsides','offside']); if (offsides) return offsides;
 
-  if (m.includes('over 0.5 ht') || m.includes('over 0.5 1t') || m.includes('gol no 1º tempo') || m.includes('gol no 1° tempo')) {
-    if (halfTimeGoals == null) return 'pending';
-    return halfTimeGoals > 0 ? 'green' : 'loss';
-  }
-  if (m.includes('gol no 2t') || m.includes('gol no 2° tempo') || m.includes('gol no 2º tempo')) {
-    if (!finished || halfTimeGoals == null) return 'pending';
-    return totalGoals > halfTimeGoals ? 'green' : 'loss';
-  }
-
-  // Corner markets must be evaluated before generic Over/Under markets.
-  // Otherwise "Over 8 corners" would incorrectly compare the goal total to 8.
-  const cornersOver = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:escanteios|cantos|corners)/);
-  if (cornersOver) {
-    const threshold = Number(cornersOver[1]);
-    if (!Number.isFinite(threshold) || corners == null) return 'pending';
-    if (corners > threshold) return 'green';
-    return finished ? 'loss' : 'pending';
-  }
-
-  const over = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:gols|goals)?/);
-  if (over) {
-    const threshold = Number(over[1]);
-    if (!Number.isFinite(threshold)) return 'pending';
-    if (totalGoals > threshold) return 'green';
-    return finished ? 'loss' : 'pending';
-  }
-
-  const under = m.match(/under\s*(\d+(?:\.\d+)?)\s*(?:gols|goals)?/);
-  if (under) {
-    const threshold = Number(under[1]);
-    if (!Number.isFinite(threshold)) return 'pending';
-    if (totalGoals < threshold) return 'green';
-    return finished ? 'loss' : 'pending';
-  }
-
-  if (m.includes('btts') || m.includes('ambas marcam')) {
-    if (homeGoals > 0 && awayGoals > 0) return 'green';
-    return finished ? 'loss' : 'pending';
-  }
-
-  if (m.includes('1x') || m.includes('casa ou empate')) {
-    if (!finished) return 'pending';
-    return homeGoals >= awayGoals ? 'green' : 'loss';
-  }
-  if (m.includes('x2') || m.includes('empate ou fora')) {
-    if (!finished) return 'pending';
-    return awayGoals >= homeGoals ? 'green' : 'loss';
-  }
-  if (m.includes('vitória casa') || m.includes('vitoria casa') || m === 'casa') {
-    if (!finished) return 'pending';
-    return homeGoals > awayGoals ? 'green' : 'loss';
-  }
-  if (m.includes('vitória fora') || m.includes('vitoria fora') || m === 'fora') {
-    if (!finished) return 'pending';
-    return awayGoals > homeGoals ? 'green' : 'loss';
-  }
-
+  const over = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:gols|goals)?/); if (over) return finish(totalGoals > Number(over[1]));
+  const under = m.match(/under\s*(\d+(?:\.\d+)?)\s*(?:gols|goals)?/); if (under) return finish(totalGoals < Number(under[1]));
+  if (m.includes('btts') || m.includes('ambas marcam')) return finish(f.homeGoals > 0 && f.awayGoals > 0);
+  if (m.includes('1x') || m.includes('casa ou empate')) return f.finished ? finish(f.homeGoals >= f.awayGoals) : 'pending';
+  if (m.includes('x2') || m.includes('empate ou fora')) return f.finished ? finish(f.awayGoals >= f.homeGoals) : 'pending';
+  if (m.includes('vitória casa') || m.includes('vitoria casa') || m === 'casa') return f.finished ? finish(f.homeGoals > f.awayGoals) : 'pending';
+  if (m.includes('vitória fora') || m.includes('vitoria fora') || m === 'fora') return f.finished ? finish(f.awayGoals > f.homeGoals) : 'pending';
   return 'pending';
 }
 
-async function getFixtureData(supabaseUrl: string, serviceKey: string, matchId: string) {
-  const response = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fixture: matchId }),
-  });
+async function getFixtureData(base: string, key: string, matchId: string) {
+  const response = await fetch(`${base}/functions/v1/football-api`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ fixture: matchId }) });
   if (!response.ok) return null;
-
-  const payload = await response.json().catch(() => null);
-  if (!payload) return null;
-
-  const extra = payload?.extra || {};
-  const goalsHome = finiteNumber(extra?.goals?.home);
-  const goalsAway = finiteNumber(extra?.goals?.away);
-  if (goalsHome == null || goalsAway == null) return null;
-
-  const status = String(extra?.status || '').toUpperCase();
-  const finished = FINISHED.has(status) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
-  let corners: number | null = null;
-  let cornerStatsFound = false;
-  for (const team of payload?.response || []) {
-    const stat = (team?.statistics || []).find((s: any) => s?.type === 'Corner Kicks');
-    const value = finiteNumber(stat?.value);
-    if (value != null) {
-      corners = (corners ?? 0) + value;
-      cornerStatsFound = true;
-    }
+  const payload = await response.json().catch(() => null); if (!payload) return null;
+  const extra = payload?.extra || {}; const homeGoals = n(extra?.goals?.home); const awayGoals = n(extra?.goals?.away); if (homeGoals == null || awayGoals == null) return null;
+  const status = String(extra?.status || '').toUpperCase(); const finished = FINISHED.has(status) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
+  let corners: number | null = null, yellowCards: number | null = null, offsides: number | null = null;
+  for (const team of payload?.response || []) for (const stat of team?.statistics || []) {
+    const type = String(stat?.type || '').toLowerCase(); const value = n(stat?.value); if (value == null) continue;
+    if (type === 'corner kicks') corners = (corners ?? 0) + value;
+    else if (type === 'yellow cards') yellowCards = (yellowCards ?? 0) + value;
+    else if (type === 'offsides') offsides = (offsides ?? 0) + value;
   }
-  if (!cornerStatsFound) corners = null;
-
-  const htHome = finiteNumber(extra?.halftime?.home);
-  const htAway = finiteNumber(extra?.halftime?.away);
-  const halfTimeGoals = htHome != null && htAway != null ? htHome + htAway : undefined;
-  return { goalsHome, goalsAway, corners, finished, halfTimeGoals };
+  const htHome = n(extra?.halftime?.home), htAway = n(extra?.halftime?.away); const halfTimeGoals = htHome != null && htAway != null ? htHome + htAway : undefined;
+  return { homeGoals, awayGoals, corners, yellowCards, offsides, finished, halfTimeGoals };
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_URL missing');
-
-    // This resolver performs privileged writes. It must not be publicly callable
-    // with an anon/user token. Scheduled/internal callers authenticate with the
-    // service-role bearer token already present in the Edge Runtime environment.
-    const authorization = req.headers.get('Authorization');
-    if (req.method !== 'POST' || authorization !== `Bearer ${serviceKey}`) {
-      return new Response(JSON.stringify({ ok: false, error: 'UNAUTHORIZED' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const sb = createClient(supabaseUrl, serviceKey);
-    const { data: rows, error } = await sb
-      .from('prediction_ledger')
-      .select('id, prediction_id, match_id, market, predicted_at, outcome')
-      .is('outcome', null)
-      .order('predicted_at', { ascending: true })
-      .limit(100);
-    if (error) throw new Error(`ledger_fetch_failed: ${error.message}`);
-
-    let resolved = 0;
-    let pending = 0;
-    let skipped = 0;
-
+    const base = Deno.env.get('SUPABASE_URL'); const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'); if (!base || !key) throw new Error('SUPABASE configuration missing');
+    if (req.method !== 'POST' || req.headers.get('Authorization') !== `Bearer ${key}`) return new Response(JSON.stringify({ ok: false, error: 'UNAUTHORIZED' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const sb = createClient(base, key); const { data: rows, error } = await sb.from('prediction_ledger').select('id, match_id, market, predicted_at, outcome').is('outcome', null).order('predicted_at', { ascending: true }).limit(100); if (error) throw error;
+    let resolved = 0, pending = 0, skipped = 0;
     for (const row of rows || []) {
-      const fixture = await getFixtureData(supabaseUrl, serviceKey, String(row.match_id));
-      if (!fixture || !fixture.finished) {
-        pending++;
-        continue;
-      }
-
-      const resolution = checkMarket(String(row.market), fixture.goalsHome, fixture.goalsAway, fixture.corners, fixture.finished, fixture.halfTimeGoals);
-      if (resolution === 'pending') {
-        skipped++;
-        continue;
-      }
-
-      const { error: updateError } = await sb
-        .from('prediction_ledger')
-        .update({ outcome: resolution === 'green', resolved_at: new Date().toISOString() })
-        .eq('id', row.id)
-        .is('outcome', null);
-      if (updateError) {
-        console.error(`[PREDICTION-LEDGER] resolution failed id=${row.id}: ${updateError.message}`);
-        continue;
-      }
+      const fixture = await getFixtureData(base, key, String(row.match_id)); if (!fixture || !fixture.finished) { pending++; continue; }
+      const resolution = checkMarket(String(row.market), fixture); if (resolution === 'pending') { skipped++; continue; }
+      const { error: updateError } = await sb.from('prediction_ledger').update({ outcome: resolution === 'green', resolved_at: new Date().toISOString() }).eq('id', row.id).is('outcome', null);
+      if (updateError) { console.error(`[PREDICTION-LEDGER] resolution failed id=${row.id}: ${updateError.message}`); continue; }
       resolved++;
     }
-
-    return new Response(JSON.stringify({ ok: true, scanned: rows?.length || 0, resolved, pending, skipped }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ ok: true, scanned: rows?.length || 0, resolved, pending, skipped }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error) {
-    console.error('[PREDICTION-LEDGER] resolver failed:', error);
-    return new Response(JSON.stringify({ ok: false, error: 'RESOLVER_FAILED' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('[PREDICTION-LEDGER] resolver failed:', error); return new Response(JSON.stringify({ ok: false, error: 'RESOLVER_FAILED' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

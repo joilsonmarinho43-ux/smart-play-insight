@@ -10,25 +10,20 @@ export interface LedgerPersistenceInput {
   modelVersion: string;
   dataQualityScore: number;
   dataQualityStatus: 'VALID' | 'DEGRADED' | 'REJECT';
+  mode?: 'PRE_MATCH' | 'LIVE';
   predictedAt?: string;
   dataObservedAt?: string | null;
 }
 
-/**
- * Converts an authoritative Nexus analytical decision into an immutable
- * ledger record. This function has no database side effects.
- *
- * Only SIGNAL decisions with a genuine model probability can enter the
- * prediction ledger. LIVE heuristic probabilities remain audit data and are
- * intentionally rejected here.
- */
+/** Only an authoritative, calibrated Core SIGNAL can enter calibration history. */
 export function buildLedgerPrediction(input: LedgerPersistenceInput): PredictionRecord | null {
   if (input.decision.decision !== 'SIGNAL' || !input.decision.signalEligible) return null;
   if (input.decision.reasonCodes.includes('DATA_QUALITY_REJECT')) return null;
   if (input.market.probabilitySource !== 'MODEL_ESTIMATE') return null;
+  if (input.market.calibrationStatus !== 'CALIBRATED') return null;
   if (input.dataQualityStatus !== 'VALID') return null;
-
-  const predictedAt = input.predictedAt ?? new Date().toISOString();
+  if (!Number.isFinite(input.market.probability) || input.market.probability <= 0 || input.market.probability > 100) return null;
+  if (!Number.isFinite(input.decision.confidence) || input.decision.confidence < 85) return null;
 
   return createPredictionRecord({
     predictionId: input.predictionId,
@@ -37,11 +32,11 @@ export function buildLedgerPrediction(input: LedgerPersistenceInput): Prediction
     probability: input.market.probability,
     confidence: input.decision.confidence,
     modelVersion: input.modelVersion,
-    mode: 'PRE_MATCH',
+    mode: input.mode ?? 'PRE_MATCH',
     probabilitySource: 'MODEL_ESTIMATE',
-    calibrationStatus: input.market.calibrationStatus ?? 'UNCALIBRATED',
+    calibrationStatus: 'CALIBRATED',
     marketOdd: input.market.odd ?? null,
-    predictedAt,
+    predictedAt: input.predictedAt ?? new Date().toISOString(),
     dataObservedAt: input.dataObservedAt ?? null,
     dataQualityScore: input.dataQualityScore,
     dataQualityStatus: input.dataQualityStatus,

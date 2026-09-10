@@ -8,111 +8,14 @@ import { useSessionGuard } from "@/hooks/useSessionGuard";
 import { useApiKeyValidator } from "@/hooks/useApiKeyValidator";
 import { useDataProviderHealthMonitor } from "@/hooks/useDataProviderHealthMonitor";
 import { ReactNode } from "react";
-
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Admin from "./pages/Admin";
-import Quality from "./pages/Quality";
-import Diagnostics from "./pages/Diagnostics";
-import Context from "./pages/Context";
-import Live from "./pages/Live";
-import MatchDetails from "./pages/MatchDetails";
-
-import Favorites from "./pages/Favorites";
-import Scanner from "./pages/Scanner";
-import CorrectScore from "./pages/CorrectScore";
-import BetAnalyzer from "./pages/BetAnalyzer";
-import Elite from "./pages/Elite";
-import Bingo from "./pages/Bingo";
-import Suggestions from "./pages/Suggestions";
-import Paywall from "./pages/Paywall";
-import ResetPassword from "./pages/ResetPassword";
-import NotFound from "./pages/NotFound";
-import WorldCup from "./pages/WorldCup";
-import SuperbetConnect from "./pages/SuperbetConnect";
-import { AppLayout } from "./components/AppLayout";
-
-import { Loader2 } from "lucide-react";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
-      staleTime: 1000 * 60 * 5,
-      retry: 1,
-    },
-  },
-});
-
-const LoadingScreen = () => (
-  <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-  </div>
-);
-
-const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const { session, profile, loading } = useProfile();
-  useSessionGuard();
-
-  if (loading) return <LoadingScreen />;
-  if (!session) return <Navigate to="/auth" replace />;
-
-  const isExpired = profile?.subscription_expiry_date
-    ? new Date(profile.subscription_expiry_date) < new Date()
-    : true;
-
-  if (!profile?.is_admin && isExpired) {
-    return <Navigate to="/expired" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const AdminRoute = ({ children }: { children: ReactNode }) => {
-  const { profile, loading } = useProfile();
-  useDataProviderHealthMonitor(!!profile?.is_admin);
-  if (loading) return <LoadingScreen />;
-  if (!profile?.is_admin) return <Navigate to="/" replace />;
-  return <>{children}</>;
-};
-
-const App = () => {
-  useApiKeyValidator();
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
-            <Route path="/live" element={<ProtectedRoute><AppLayout><Live /></AppLayout></ProtectedRoute>} />
-            <Route path="/match/:id" element={<ProtectedRoute><AppLayout><MatchDetails /></AppLayout></ProtectedRoute>} />
-            <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
-            <Route path="/elite" element={<ProtectedRoute><AppLayout><Elite /></AppLayout></ProtectedRoute>} />
-            <Route path="/placar-exato" element={<ProtectedRoute><AppLayout><CorrectScore /></AppLayout></ProtectedRoute>} />
-            <Route path="/bet-analyzer" element={<ProtectedRoute><AppLayout><BetAnalyzer /></AppLayout></ProtectedRoute>} />
-            <Route path="/bingo" element={<ProtectedRoute><AppLayout><Bingo /></AppLayout></ProtectedRoute>} />
-            <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
-            <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
-            <Route path="/world-cup" element={<ProtectedRoute><AppLayout><WorldCup /></AppLayout></ProtectedRoute>} />
-            <Route path="/superbet-connect" element={<ProtectedRoute><AppLayout><SuperbetConnect /></AppLayout></ProtectedRoute>} />
-
-            <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />
-            <Route path="/quality" element={<AdminRoute><AppLayout><Quality /></AppLayout></AdminRoute>} />
-            <Route path="/diagnostics" element={<AdminRoute><AppLayout><Diagnostics /></AppLayout></AdminRoute>} />
-            <Route path="/context" element={<AdminRoute><AppLayout><Context /></AppLayout></AdminRoute>} />
-
-            <Route path="/expired" element={<Paywall />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-};
-
-export default App;
+import Index from "./pages/Index"; import Auth from "./pages/Auth"; import Admin from "./pages/Admin"; import Quality from "./pages/Quality"; import Diagnostics from "./pages/Diagnostics"; import Context from "./pages/Context"; import Live from "./pages/Live"; import MatchDetails from "./pages/MatchDetails"; import Favorites from "./pages/Favorites"; import Scanner from "./pages/Scanner"; import Suggestions from "./pages/Suggestions"; import Paywall from "./pages/Paywall"; import ResetPassword from "./pages/ResetPassword"; import NotFound from "./pages/NotFound"; import WorldCup from "./pages/WorldCup"; import { AppLayout } from "./components/AppLayout"; import { Loader2 } from "lucide-react";
+const queryClient=new QueryClient({defaultOptions:{queries:{refetchOnWindowFocus:false,refetchOnReconnect:true,staleTime:1000*60*5,retry:1}}});
+const LoadingScreen=()=> <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center"><Loader2 className="w-8 h-8 text-primary animate-spin"/></div>;
+const ProtectedRoute=({children}:{children:ReactNode})=>{const {session,profile,loading}=useProfile();useSessionGuard();if(loading)return <LoadingScreen/>;if(!session)return <Navigate to="/auth" replace/>;const expired=profile?.subscription_expiry_date?new Date(profile.subscription_expiry_date)<new Date():true;if(!profile?.is_admin&&expired)return <Navigate to="/expired" replace/>;return <>{children}</>;};
+const AdminRoute=({children}:{children:ReactNode})=>{const {profile,loading}=useProfile();useDataProviderHealthMonitor(!!profile?.is_admin);if(loading)return <LoadingScreen/>;if(!profile?.is_admin)return <Navigate to="/" replace/>;return <>{children}</>;};
+const LegacyRedirect=()=> <Navigate to="/" replace/>;
+const App=()=>{useApiKeyValidator();return <QueryClientProvider client={queryClient}><TooltipProvider><Toaster/><Sonner/><BrowserRouter><Routes>
+<Route path="/" element={<ProtectedRoute><AppLayout><Index/></AppLayout></ProtectedRoute>}/><Route path="/live" element={<ProtectedRoute><AppLayout><Live/></AppLayout></ProtectedRoute>}/><Route path="/match/:id" element={<ProtectedRoute><AppLayout><MatchDetails/></AppLayout></ProtectedRoute>}/><Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner/></AppLayout></ProtectedRoute>}/><Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites/></AppLayout></ProtectedRoute>}/><Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions/></AppLayout></ProtectedRoute>}/><Route path="/world-cup" element={<ProtectedRoute><AppLayout><WorldCup/></AppLayout></ProtectedRoute>}/>
+{/* Legacy betting/trading surfaces are inaccessible until Core-governed replacements exist. */}<Route path="/elite" element={<LegacyRedirect/>}/><Route path="/placar-exato" element={<LegacyRedirect/>}/><Route path="/bet-analyzer" element={<LegacyRedirect/>}/><Route path="/bingo" element={<LegacyRedirect/>}/><Route path="/superbet-connect" element={<LegacyRedirect/>}/>
+<Route path="/admin" element={<AdminRoute><AppLayout><Admin/></AppLayout></AdminRoute>}/><Route path="/quality" element={<AdminRoute><AppLayout><Quality/></AppLayout></AdminRoute>}/><Route path="/diagnostics" element={<AdminRoute><AppLayout><Diagnostics/></AppLayout></AdminRoute>}/><Route path="/context" element={<AdminRoute><AppLayout><Context/></AppLayout></AdminRoute>}/><Route path="/expired" element={<Paywall/>}/><Route path="/auth" element={<Auth/>}/><Route path="/reset-password" element={<ResetPassword/>}/><Route path="*" element={<NotFound/>}/>
+</Routes></BrowserRouter></TooltipProvider></QueryClientProvider>;}; export default App;

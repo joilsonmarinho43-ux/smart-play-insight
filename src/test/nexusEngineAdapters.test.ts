@@ -2,80 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { adaptBetAnalyzerCard } from '@/lib/nexusBetAnalyzerAdapter';
 import { adaptBingoMarkets } from '@/lib/nexusBingoAdapter';
 import type { MatchData, MarketAnalysis } from '@/types/match';
-import type { ScenarioCard } from '@/lib/betAnalyzerEngine';
 
-const match: MatchData = {
-  id: 'adapter-test-1',
-  time: '20:00',
-  league: 'Premier League',
-  homeTeam: 'Alpha',
-  awayTeam: 'Beta',
-  isLive: false,
-};
+const match:MatchData={id:'adapter-test-1',time:'20:00',league:'Premier League',homeTeam:'Alpha',awayTeam:'Beta',isLive:false};
+const market:MarketAnalysis={market:'Over 1.5 Gols',probability:90,risk:'baixo',category:'goals'};
+const card:any={scenario:{key:'goals25',icon:'⚽',title:'Total de Gols 2.5',order:3},match:{id:match.id,league:match.league,time:match.time,iso:null,live:false,homeTeam:match.homeTeam,awayTeam:match.awayTeam,sample:{home:6,away:6},history:{homeGF:[2,1,2],homeGA:[1,0,1],awayGF:[1,2,1],awayGA:[0,1,1]},read:{}},headline:'OVER 2.5',score:92,rating:'EXCELENTE CONSISTÊNCIA',quality:'ALTA',indicator:{label:'teste',value:90,level:'FORTE',caption:'teste',components:[]},stats:[],pros:[],cons:[],why:'teste',recent:[]};
 
-const market: MarketAnalysis = {
-  market: 'Over 1.5 Gols',
-  probability: 90,
-  risk: 'baixo',
-  category: 'goals',
-};
-
-const card = {
-  scenario: { key: 'goals25', icon: '⚽', title: 'Total de Gols 2.5', order: 3 },
-  match: {
-    id: match.id,
-    league: match.league,
-    time: match.time,
-    iso: null,
-    live: false,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
-    sample: { home: 6, away: 6 },
-    history: { homeGF: [2, 1, 2], homeGA: [1, 0, 1], awayGF: [1, 2, 1], awayGA: [0, 1, 1] },
-    read: {} as ScenarioCard['match']['read'],
-  },
-  headline: 'OVER 2.5',
-  score: 92,
-  rating: 'EXCELENTE CONSISTÊNCIA',
-  quality: 'ALTA',
-  indicator: { label: 'teste', value: 90, level: 'FORTE', caption: 'teste', components: [] },
-  stats: [],
-  pros: [],
-  cons: [],
-  why: 'teste',
-  recent: [],
-} as ScenarioCard;
-
-describe('Nexus engine adapters', () => {
-  it('does not turn Bet Analyzer score into a fake market probability', () => {
-    const result = adaptBetAnalyzerCard(card, match, 95);
-
-    expect(result.signalEligible).toBe(false);
-    expect(result.decision).toBe('REJECT');
-    expect(result.reasonCodes).toContain('NO_VALID_MARKET');
-  });
-
-  it('allows Bingo market evidence to reach Core only with explicit confidence', () => {
-    const result = adaptBingoMarkets(match, [market], 90);
-
-    expect(result.decision).toBe('SIGNAL');
-    expect(result.signalEligible).toBe(true);
-    expect(result.selectedMarket?.market).toBe('Over 1.5 Gols');
-  });
-
-  it('never produces a strong signal for Bingo without explicit confidence', () => {
-    const result = adaptBingoMarkets(match, [market], undefined);
-
-    expect(result.signalEligible).toBe(false);
-    expect(result.decision).toBe('INFO_ONLY');
-    expect(result.reasonCodes).toContain('CONFIDENCE_MISSING');
-  });
-
-  it('blocks Bingo when its confidence policy already discarded the opportunity', () => {
-    const result = adaptBingoMarkets(match, [market], 90, true);
-
-    expect(result.signalEligible).toBe(false);
-    expect(result.decision).toBe('REJECT');
-    expect(result.reasonCodes).toContain('ANALYSIS_BLOCKED');
-  });
+describe('Nexus engine adapters',()=>{
+ it('does not turn Bet Analyzer score into a fake market probability',()=>{const result=adaptBetAnalyzerCard(card,match,95);expect(result.signalEligible).toBe(false);expect(result.decision).toBe('REJECT');});
+ it('blocks Bingo candidate generation from becoming an official decision',()=>{const result=adaptBingoMarkets(match,[market],90);expect(result.decision).toBe('REJECT');expect(result.signalEligible).toBe(false);expect(result.reasonCodes).toContain('ANALYSIS_BLOCKED');});
+ it('blocks Bingo even without explicit confidence',()=>{const result=adaptBingoMarkets(match,[market],undefined);expect(result.signalEligible).toBe(false);expect(result.decision).toBe('REJECT');expect(result.reasonCodes).toContain('ANALYSIS_BLOCKED');});
+ it('blocks Bingo when its confidence policy already discarded the opportunity',()=>{const result=adaptBingoMarkets(match,[market],90,true);expect(result.signalEligible).toBe(false);expect(result.decision).toBe('REJECT');expect(result.reasonCodes).toContain('ANALYSIS_BLOCKED');});
 });

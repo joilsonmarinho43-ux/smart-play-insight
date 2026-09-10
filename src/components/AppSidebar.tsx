@@ -6,19 +6,19 @@ import { useProfile } from '@/hooks/useProfile';
 import { useFontScale } from '@/hooks/useFontScale';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter } from '@/components/ui/sidebar';
 
-const analysisItems = [
+type NavItem = { title: string; url: string; icon: typeof Home };
+
+const analysisItems: NavItem[] = [
   { title: 'Análise Pré-Jogo', url: '/', icon: Home },
   { title: 'Análise Ao Vivo', url: '/live', icon: Zap },
 ];
 
-const toolsItems = [
+const toolsItems: NavItem[] = [
   { title: 'Favoritos', url: '/favorites', icon: Star },
   { title: 'Sugestões', url: '/suggestions', icon: Lightbulb },
 ];
 
-type Item = typeof analysisItems[number];
-
-function SidebarNavGroup({ label, items, collapsed, onNavigate }: { label: string; items: Item[]; collapsed: boolean; onNavigate: () => void }) {
+function SidebarNavGroup({ label, items, collapsed, onNavigate }: { label: string; items: NavItem[]; collapsed: boolean; onNavigate: () => void }) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel className="text-gray-500 text-[10px] uppercase tracking-widest px-3">{!collapsed ? label : ''}</SidebarGroupLabel>
@@ -53,39 +53,25 @@ export function AppSidebar() {
       <SidebarContent className="bg-[#0f172a]">
         <div className={`relative w-full overflow-hidden ${collapsed ? 'py-4' : 'py-7'}`} style={{ background: 'radial-gradient(ellipse 120% 80% at 50% 0%, #1a1305 0%, #0d0a05 45%, #07070a 100%)' }}>
           <div className="relative z-10 flex flex-col items-center justify-center px-4 text-center">
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-[1.6rem] leading-none tracking-[0.14em] uppercase text-white">Nexus</span>
-              <span className="font-display text-[1.6rem] leading-none tracking-[0.06em] text-orange-400">33</span>
-            </div>
+            <div className="flex items-baseline gap-1.5"><span className="font-display text-[1.6rem] leading-none tracking-[0.14em] uppercase text-white">Nexus</span><span className="font-display text-[1.6rem] leading-none tracking-[0.06em] text-orange-400">33</span></div>
             <span className="mt-2 text-[0.62rem] font-semibold tracking-[0.35em] uppercase text-gray-400">Analista Quantitativo</span>
           </div>
         </div>
-
         <SidebarNavGroup label="Análise" items={analysisItems} collapsed={collapsed} onNavigate={handleNavClick} />
         <SidebarNavGroup label="Ferramentas Analíticas" items={toolsItems} collapsed={collapsed} onNavigate={handleNavClick} />
-
         {profile?.is_admin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-gray-500 text-[10px] uppercase tracking-widest px-3">{!collapsed ? 'Sistema' : ''}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem><SidebarMenuButton asChild><NavLink to="/quality" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"><Activity className="h-5 w-5 shrink-0" />{!collapsed && <span className="text-sm">Quality Lab</span>}</NavLink></SidebarMenuButton></SidebarMenuItem>
-                <SidebarMenuItem><SidebarMenuButton asChild><NavLink to="/context" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"><Radar className="h-5 w-5 shrink-0" />{!collapsed && <span className="text-sm">Contexto</span>}</NavLink></SidebarMenuButton></SidebarMenuItem>
-                <SidebarMenuItem><SidebarMenuButton asChild><NavLink to="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"><Shield className="h-5 w-5 shrink-0" />{!collapsed && <span className="text-sm">Admin</span>}</NavLink></SidebarMenuButton></SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
+            <SidebarGroupContent><SidebarMenu>
+              <SidebarMenuItem><SidebarMenuButton asChild><NavLink to="/quality" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"><Activity className="h-5 w-5 shrink-0" />{!collapsed && <span className="text-sm">Quality Lab</span>}</NavLink></SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton asChild><NavLink to="/context" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"><Radar className="h-5 w-5 shrink-0" />{!collapsed && <span className="text-sm">Contexto</span>}</NavLink></SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem><SidebarMenuButton asChild><NavLink to="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400" onClick={handleNavClick} activeClassName="bg-orange-500/10 text-orange-500 font-bold"><Shield className="h-5 w-5 shrink-0" />{!collapsed && <span className="text-sm">Admin</span>}</NavLink></SidebarMenuButton></SidebarMenuItem>
+            </SidebarMenu></SidebarGroupContent>
           </SidebarGroup>
         )}
       </SidebarContent>
-
       <SidebarFooter className="bg-[#0f172a] border-t border-white/10 p-3 space-y-2">
-        <div className="flex items-center gap-1 px-1">
-          <span className="text-[10px] text-gray-500 font-medium">{!collapsed ? 'Zoom' : ''}</span>
-          <div className="flex items-center gap-1">
-            <button onClick={decrease} disabled={!canDecrease} aria-label="Diminuir tamanho da fonte" className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-gray-300 disabled:opacity-40"><ZoomOut className="h-4 w-4" /></button>
-            <button onClick={increase} disabled={!canIncrease} aria-label="Aumentar tamanho da fonte" className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-gray-300 disabled:opacity-40"><ZoomIn className="h-4 w-4" /></button>
-          </div>
-        </div>
+        <div className="flex items-center gap-1 px-1"><span className="text-[10px] text-gray-500 font-medium">{!collapsed ? 'Zoom' : ''}</span><div className="flex items-center gap-1"><button onClick={decrease} disabled={!canDecrease} aria-label="Diminuir tamanho da fonte" className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-gray-300 disabled:opacity-40"><ZoomOut className="h-4 w-4" /></button><button onClick={increase} disabled={!canIncrease} aria-label="Aumentar tamanho da fonte" className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-gray-300 disabled:opacity-40"><ZoomIn className="h-4 w-4" /></button></div></div>
         <button onClick={signOut} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"><LogOut className="h-5 w-5 shrink-0" />{!collapsed && <span className="text-sm font-bold">SAIR</span>}</button>
       </SidebarFooter>
     </Sidebar>

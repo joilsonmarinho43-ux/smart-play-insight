@@ -1,197 +1,42 @@
-import type { MarketAnalysis, MatchData } from '@/types/match';
+import type { MarketAnalysis, MatchData, CalibrationStatus, ProbabilitySource } from '@/types/match';
 import { type DataQualityResult } from './dataQualityGate';
 
-/**
- * Nexus Core de Decisão
- *
- * Camada pura de orquestração analítica. Não chama APIs, Supabase,
- * localStorage ou plataformas externas. O Core somente classifica a força
- * de uma oportunidade para exibição/uso analítico.
- *
- * Regra arquitetural: este módulo NÃO altera nem importa engines existentes.
- * Integração dos engines é feita somente por adapters.
- */
-
+/** Nexus Core — autoridade única para SIGNAL analítico. Nunca executa operações. */
 export type NexusDecision = 'SIGNAL' | 'CONSERVATIVE' | 'INFO_ONLY' | 'REJECT';
 export type NexusMode = 'PRE_MATCH' | 'LIVE';
 export type EvidenceSource = 'market' | 'engine' | 'live' | 'model';
-
-export interface NexusEvidence {
-  source: EvidenceSource;
-  name: string;
-  value: number;
-  weight?: number;
-  supports?: boolean;
-}
-
+export interface NexusEvidence { source: EvidenceSource; name: string; value: number; weight?: number; supports?: boolean; }
 export interface NexusDecisionInput {
   match: Pick<MatchData, 'id' | 'homeTeam' | 'awayTeam' | 'league' | 'isLive' | 'status' | 'minute'>;
-  mode: NexusMode;
-  confidence?: number | null;
-  markets?: MarketAnalysis[];
-  evidence?: NexusEvidence[];
-  /** Bloqueio analítico: partida/mercado já processado ou não elegível. */
-  analysisBlocked?: boolean;
-  /** Sinaliza conflito material entre engines. */
-  engineConflict?: boolean;
-  /** Qualidade/proveniência dos dados usados pelo sinal. */
-  dataQuality?: DataQualityResult | null;
+  mode: NexusMode; confidence?: number | null; markets?: MarketAnalysis[]; evidence?: NexusEvidence[];
+  analysisBlocked?: boolean; engineConflict?: boolean; dataQuality?: DataQualityResult | null;
+  calibrationStatus?: CalibrationStatus | null; probabilitySource?: ProbabilitySource | null;
 }
+export interface NexusDecisionOutput { decision:NexusDecision; confidence:number; riskScore:number; selectedMarket:MarketAnalysis|null; reasonCodes:string[]; evidenceScore:number; signalEligible:boolean; }
+const clamp=(n:number,min=0,max=100)=>Math.max(min,Math.min(max,Number.isFinite(n)?n:min));
+const norm=(v:number|null|undefined)=>typeof v==='number'&&Number.isFinite(v)?clamp(v):null;
+const valid=(m:MarketAnalysis[])=>m.filter(x=>Number.isFinite(x.probability)&&x.probability>=0&&x.probability<=100);
+const score=(m:MarketAnalysis[])=>{const v=valid(m).map(x=>x.probability).sort((a,b)=>a-b);if(!v.length)return 0;const i=Math.floor(v.length/2);return v.length%2?v[i]:(v[i-1]+v[i])/2;};
+const spread=(m:MarketAnalysis[])=>{const v=valid(m).map(x=>x.probability).sort((a,b)=>a-b);return v.length>=2?v[v.length-1]-v[0]:null;};
+const evidence=(e:NexusEvidence[])=>{const u=e.map(x=>({v:clamp(x.value),w:Math.max(0,x.weight??1)})).filter(x=>x.w>0);if(!u.length)return 0;const t=u.reduce((s,x)=>s+x.w,0);return Math.round(u.reduce((s,x)=>s+x.v*x.w,0)/t);};
+const selected=(m:MarketAnalysis[])=>valid(m).sort((a,b)=>b.probability-a.probability)[0]??null;
 
-export interface NexusDecisionOutput {
-  decision: NexusDecision;
-  confidence: number;
-  riskScore: number;
-  selectedMarket: MarketAnalysis | null;
-  reasonCodes: string[];
-  evidenceScore: number;
-  /** Indica somente que o cenário é forte o bastante para ser sinalizado. */
-  signalEligible: boolean;
+export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput{
+ const reasons:string[]=[];const confidence=norm(input.confidence);const markets=input.markets??[];const selectedMarket=selected(markets);const best=score(markets);const sp=spread(markets);const ev=evidence(input.evidence??[]);
+ const unverified=markets.some(m=>m.probabilitySource==='HEURISTIC'||m.probabilitySource==='UNKNOWN');
+ const source=input.probabilitySource??selectedMarket?.probabilitySource??null;const calibration=input.calibrationStatus??selectedMarket?.calibrationStatus??null;
+ if(!input.match.id||!input.match.homeTeam||!input.match.awayTeam)return {decision:'REJECT',confidence:confidence??0,riskScore:100,selectedMarket:null,reasonCodes:['INVALID_MATCH'],evidenceScore:0,signalEligible:false};
+ if(input.analysisBlocked)return {decision:'REJECT',confidence:confidence??0,riskScore:100,selectedMarket,reasonCodes:['ANALYSIS_BLOCKED'],evidenceScore:ev,signalEligible:false};
+ if(input.dataQuality?.status==='REJECT')return {decision:'REJECT',confidence:confidence??0,riskScore:100,selectedMarket,reasonCodes:[...input.dataQuality.reasons.map(r=>`DATA_${r}`),'DATA_QUALITY_REJECT'],evidenceScore:ev,signalEligible:false};
+ if(input.dataQuality?.status==='DEGRADED')reasons.push(...input.dataQuality.reasons.map(r=>`DATA_${r}`),'DATA_QUALITY_DEGRADED');
+ if(input.engineConflict)reasons.push('ENGINE_CONFLICT');if(confidence===null)reasons.push('CONFIDENCE_MISSING');if(ev<55)reasons.push('INSUFFICIENT_EVIDENCE');if(!selectedMarket)reasons.push('NO_VALID_MARKET');else if(best<72)reasons.push('MARKET_BELOW_THRESHOLD');if(sp!==null&&sp>15)reasons.push('MARKET_DISAGREEMENT');if(unverified)reasons.push('PROBABILITY_UNVERIFIED');if(source!=='MODEL_ESTIMATE')reasons.push('PROBABILITY_SOURCE_NOT_MODEL');if(calibration!=='CALIBRATED')reasons.push('PROBABILITY_NOT_CALIBRATED');
+ if(confidence===null)return {decision:'INFO_ONLY',confidence:0,riskScore:80,selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
+ if(confidence<50||ev<55||!selectedMarket)return {decision:'REJECT',confidence,riskScore:clamp(100-Math.min(confidence,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
+ if(confidence<70||best<72)return {decision:'INFO_ONLY',confidence,riskScore:clamp(100-Math.min(confidence,best)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
+ if(unverified||source!=='MODEL_ESTIMATE'||calibration!=='CALIBRATED')return {decision:'CONSERVATIVE',confidence,riskScore:clamp(100-Math.min(confidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
+ if(input.engineConflict||input.dataQuality?.status==='DEGRADED'||(sp!==null&&sp>15))return {decision:'CONSERVATIVE',confidence,riskScore:clamp(100-Math.min(confidence,best,ev,input.dataQuality?.score??100)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
+ if(confidence<85){reasons.push('CONSERVATIVE_CONFIDENCE');return {decision:'CONSERVATIVE',confidence,riskScore:clamp(100-Math.min(confidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};}
+ if(input.mode==='LIVE'&&input.match.isLive!==true){reasons.push('LIVE_STATE_UNCONFIRMED');return {decision:'CONSERVATIVE',confidence,riskScore:clamp(100-Math.min(confidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};}
+ reasons.push('CORE_APPROVED_SIGNAL');return {decision:'SIGNAL',confidence,riskScore:clamp(100-Math.min(confidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:true};
 }
-
-const clamp = (n: number, min = 0, max = 100): number =>
-  Math.max(min, Math.min(max, Number.isFinite(n) ? n : min));
-
-const normalizeConfidence = (value: number | null | undefined): number | null =>
-  typeof value === 'number' && Number.isFinite(value) ? clamp(value) : null;
-
-function validMarkets(markets: MarketAnalysis[]): MarketAnalysis[] {
-  return markets.filter(
-    (m) => Number.isFinite(m.probability) && m.probability >= 0 && m.probability <= 100,
-  );
-}
-
-function validMarketProbabilities(markets: MarketAnalysis[]): number[] {
-  return validMarkets(markets)
-    .map((m) => Number(m.probability))
-    .sort((a, b) => a - b);
-}
-
-/** Uses the median rather than the maximum market probability. */
-function marketScore(markets: MarketAnalysis[]): number {
-  const values = validMarketProbabilities(markets);
-  if (!values.length) return 0;
-  const middle = Math.floor(values.length / 2);
-  return values.length % 2 === 0
-    ? (values[middle - 1] + values[middle]) / 2
-    : values[middle];
-}
-
-function marketSpread(markets: MarketAnalysis[]): number | null {
-  const values = validMarketProbabilities(markets);
-  return values.length >= 2 ? values[values.length - 1] - values[0] : null;
-}
-
-function evidenceScore(evidence: NexusEvidence[]): number {
-  const usable = evidence
-    .map((e) => ({ value: clamp(e.value), weight: Math.max(0, e.weight ?? 1) }))
-    .filter((e) => e.weight > 0);
-  if (!usable.length) return 0;
-  const totalWeight = usable.reduce((sum, e) => sum + e.weight, 0);
-  return Math.round(usable.reduce((sum, e) => sum + e.value * e.weight, 0) / totalWeight);
-}
-
-function selectMarket(markets: MarketAnalysis[]): MarketAnalysis | null {
-  return validMarkets(markets).sort((a, b) => b.probability - a.probability)[0] ?? null;
-}
-
-/**
- * Proveniência segura:
- * - HEURISTIC nunca pode ser promovido a SIGNAL.
- * - UNKNOWN é legado e também não pode ser promovido a SIGNAL.
- * - MODEL_ESTIMATE pode ser sinalizado quando todos os demais gates passam,
- *   mas isso NÃO significa que a probabilidade esteja empiricamente calibrada.
- * - MARKET_IMPLIED nunca é tratado como probabilidade do modelo.
- */
-function hasUnverifiedProbability(markets: MarketAnalysis[]): boolean {
-  return markets.some(
-    (m) => m.probabilitySource === 'HEURISTIC' || m.probabilitySource === 'UNKNOWN',
-  );
-}
-
-function hasMarketImpliedProbability(markets: MarketAnalysis[]): boolean {
-  return markets.some((m) => m.probabilitySource === 'MARKET_IMPLIED');
-}
-
-/** Deterministic analyst-only decision policy. */
-export function decideNexus(input: NexusDecisionInput): NexusDecisionOutput {
-  const reasons: string[] = [];
-  const confidence = normalizeConfidence(input.confidence);
-  const selectedMarket = selectMarket(input.markets ?? []);
-  const bestMarketScore = marketScore(input.markets ?? []);
-  const spread = marketSpread(input.markets ?? []);
-  const evScore = evidenceScore(input.evidence ?? []);
-  const unverifiedProbability = hasUnverifiedProbability(input.markets ?? []);
-  const marketImpliedProbability = hasMarketImpliedProbability(input.markets ?? []);
-
-  if (!input.match.id || !input.match.homeTeam || !input.match.awayTeam) {
-    return { decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100, selectedMarket: null, reasonCodes: ['INVALID_MATCH'], evidenceScore: 0, signalEligible: false };
-  }
-
-  if (input.analysisBlocked) {
-    reasons.push('ANALYSIS_BLOCKED');
-    return { decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100, selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  if (input.dataQuality?.status === 'REJECT') {
-    reasons.push(...input.dataQuality.reasons.map((r) => `DATA_${r}`));
-    reasons.push('DATA_QUALITY_REJECT');
-    return { decision: 'REJECT', confidence: confidence ?? 0, riskScore: 100, selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  if (input.dataQuality?.status === 'DEGRADED') {
-    reasons.push(...input.dataQuality.reasons.map((r) => `DATA_${r}`));
-    reasons.push('DATA_QUALITY_DEGRADED');
-  }
-
-  if (input.engineConflict) reasons.push('ENGINE_CONFLICT');
-  if (confidence === null) reasons.push('CONFIDENCE_MISSING');
-  if (evScore < 55) reasons.push('INSUFFICIENT_EVIDENCE');
-  if (!selectedMarket) reasons.push('NO_VALID_MARKET');
-  else if (bestMarketScore < 72) reasons.push('MARKET_BELOW_THRESHOLD');
-  if (spread !== null && spread > 15) reasons.push('MARKET_DISAGREEMENT');
-  if (unverifiedProbability) reasons.push('PROBABILITY_UNVERIFIED');
-  if (marketImpliedProbability) reasons.push('MARKET_IMPLIED_NOT_MODEL_PROBABILITY');
-
-  if (confidence === null) {
-    return { decision: 'INFO_ONLY', confidence: 0, riskScore: 80, selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  if (confidence < 50 || reasons.includes('INSUFFICIENT_EVIDENCE') || reasons.includes('NO_VALID_MARKET')) {
-    return { decision: 'REJECT', confidence, riskScore: clamp(100 - Math.min(confidence, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  if (confidence < 70 || bestMarketScore < 72) {
-    return { decision: 'INFO_ONLY', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  // Heurísticas e probabilidades de mercado podem informar, mas não podem
-  // autorizar um SIGNAL analítico do Core.
-  if (unverifiedProbability || marketImpliedProbability) {
-    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  if (input.engineConflict || input.dataQuality?.status === 'DEGRADED' || (spread !== null && spread > 15)) {
-    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore, input.dataQuality?.score ?? 100)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  if (confidence < 85) {
-    reasons.push('CONSERVATIVE_CONFIDENCE');
-    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  if (input.mode === 'LIVE' && input.match.isLive !== true) {
-    reasons.push('LIVE_STATE_UNCONFIRMED');
-    return { decision: 'CONSERVATIVE', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: false };
-  }
-
-  reasons.push('CORE_APPROVED_SIGNAL');
-  return { decision: 'SIGNAL', confidence, riskScore: clamp(100 - Math.min(confidence, bestMarketScore, evScore)), selectedMarket, reasonCodes: reasons, evidenceScore: evScore, signalEligible: true };
-}
-
-/** Transforma mercados reais em evidência analítica Nexus. */
-export function marketsToNexusEvidence(markets: MarketAnalysis[]): NexusEvidence[] {
-  return markets
-    .filter((m) => Number.isFinite(m.probability))
-    .map((m) => ({ source: 'market', name: m.market, value: clamp(m.probability), weight: 1 }));
-}
+export function marketsToNexusEvidence(markets:MarketAnalysis[]):NexusEvidence[]{return markets.filter(m=>Number.isFinite(m.probability)).map(m=>({source:'market',name:m.market,value:clamp(m.probability),weight:1}));}

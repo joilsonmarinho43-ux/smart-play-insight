@@ -27,11 +27,38 @@ export function classifyConfidence(score: number | null | undefined): Confidence
 interface CacheEntry { score: number; source: string; diagnostic?: string; ts: number; }
 const memCache = new Map<string, CacheEntry>();
 const TTL_MS = 10 * 60 * 1000; // 10 min
+const EDGE_TIMEOUT_MS = 9000;
 
 export interface ConfidenceResolution {
   score: number;
   source: string;
   diagnostic?: string;
+}
+
+/**
+ * Invoca uma Edge Function com limite de tempo no cliente.
+ * O Scanner nunca pode ficar indefinidamente aguardando um resolver externo.
+ */
+async function invokeWithTimeout<T = unknown>(
+  invoke: () => Promise<{ data: T | null; error: { message?: string } | null }>,
+  timeoutMs = EDGE_TIMEOUT_MS,
+): Promise<{ data: T | null; error: { message?: string } | null }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      invoke(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`EDGE_FUNCTION_TIMEOUT:${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } catch (error) {
+    return {
+      data: null,
+      error: { message: error instanceof Error ? error.message : 'EDGE_FUNCTION_ERROR' },
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**
@@ -47,13 +74,13 @@ export interface ConfidenceResolution {
 async function resolveFromTeamForm(homeTeam: string, awayTeam: string): Promise<ConfidenceResolution | null> {
   try {
     const { supabase } = await import("@/integrations/supabase/client");
-    const { data, error } = await supabase.functions.invoke("team-form", {
+    const { data, error } = await invokeWithTimeout(() => supabase.functions.invoke("team-form", {
       body: { home: homeTeam, away: awayTeam },
-    });
-    if (error || !data?.ok) return null;
+    }));
+    if (error || !data || !(data as any).ok) return null;
 
-    const home = data.home as any;
-    const away = data.away as any;
+    const home = (data as any).home as any;
+    const away = (data as any).away as any;
     const homeGames = Number(home?.games ?? 0);
     const awayGames = Number(away?.games ?? 0);
     const homeGoals = Number(home?.goalsForAvg ?? 0);
@@ -99,7 +126,7 @@ export async function resolveConfidence(payload: {
 
   try {
     const { supabase } = await import("@/integrations/supabase/client");
-    const { data, error } = await supabase.functions.invoke("match-stats-resolver", { body: payload });
+    const { data, error } = await invokeWithTimeout(() => supabase.functions.invoke("match-stats-resolver", { body: payload }));
 
     if (error || !data) {
       console.error('[NEXUS-CONFIDENCE] resolver_error', {

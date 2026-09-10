@@ -66,10 +66,11 @@ async function invokeWithTimeout<T = unknown>(
  * Falhas e ausência de dados permanecem fail-closed em score=0.
  *
  * Fallback auditado:
- * se o match-stats-resolver não encontrar provider, usamos a função
- * team-form, que possui ESPN como fonte histórica primária e TheSportsDB
- * como complemento. A confiança do fallback é derivada SOMENTE do tamanho
- * da amostra histórica disponível; não transforma gols em probabilidade.
+ * se o match-stats-resolver não encontrar provider, ou ficar abaixo do
+ * limiar normal, usamos team-form somente para verificar se existe uma
+ * amostra histórica independente suficientemente forte. A confiança do
+ * fallback é derivada SOMENTE do tamanho da amostra histórica disponível;
+ * não transforma gols em probabilidade.
  */
 async function resolveFromTeamForm(homeTeam: string, awayTeam: string): Promise<ConfidenceResolution | null> {
   try {
@@ -167,31 +168,26 @@ export async function resolveConfidence(payload: {
       diagnostic,
     };
 
-    // Se o resolver principal não encontrou provider, tenta o histórico
-    // auditado do team-form antes de descartar a partida.
-    if (out.score === 0 || source === 'none') {
+    // Uma fonte secundária não pode reduzir nem inflar artificialmente a
+    // confiança. Para scores abaixo de 85, consultamos o histórico auditado
+    // apenas para verificar se há uma amostra independente forte o bastante
+    // para atingir legitimamente o limiar normal.
+    if (out.score < 85) {
       const fallback = await resolveFromTeamForm(payload.homeTeam, payload.awayTeam);
-      if (fallback) {
+      if (fallback && fallback.score > out.score) {
         memCache.set(key, { ...fallback, ts: Date.now() });
-        console.info('[NEXUS-CONFIDENCE] team-form fallback accepted', {
+        console.info('[NEXUS-CONFIDENCE] historical fallback improved', {
           matchId: key,
           homeTeam: payload.homeTeam,
           awayTeam: payload.awayTeam,
-          score: fallback.score,
-          source: fallback.source,
+          primaryScore: out.score,
+          primarySource: out.source,
+          fallbackScore: fallback.score,
+          fallbackSource: fallback.source,
           diagnostic: fallback.diagnostic,
         });
         return fallback;
       }
-
-      console.warn('[NEXUS-CONFIDENCE] no usable confidence', {
-        matchId: key,
-        homeTeam: payload.homeTeam,
-        awayTeam: payload.awayTeam,
-        score: out.score,
-        source: out.source,
-        diagnostic: out.diagnostic ?? 'NONE',
-      });
     }
 
     memCache.set(key, { ...out, ts: Date.now() });

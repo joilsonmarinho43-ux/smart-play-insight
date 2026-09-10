@@ -22,7 +22,7 @@ export interface ModelData {
   homeCornersVariance: number | null;
   awayCornersVariance: number | null;
   homeCardsVariance: number | null;
-  awayCardsVariance: number | null;
+  awayCardsVariance: null | number;
 }
 
 export interface SampleSize {
@@ -35,35 +35,26 @@ export interface SampleSize {
 export interface MatchData {
   id: string;
   time: string;
-  /** Canonical fixture kickoff timestamp when available; time may remain display-formatted. */
   kickoff?: string | null;
   league: string;
   homeTeam: string;
   awayTeam: string;
-
   homeLogo?: string;
   awayLogo?: string;
-
   metrics?: MatchMetrics;
   modelData?: ModelData;
   sampleSize?: SampleSize;
-
   predictions?: {
     homeWin: string;
     draw: string;
     awayWin: string;
+    probabilitySource?: ProbabilitySource;
+    calibrationStatus?: CalibrationStatus;
   };
-
-  // LIVE
   isLive?: boolean;
   status?: string;
   minute?: number;
-
-  liveScore?: {
-    home: number;
-    away: number;
-  };
-
+  liveScore?: { home: number; away: number };
   liveStats?: {
     dangerousAttacks: [number, number];
     corners: [number, number];
@@ -74,15 +65,6 @@ export interface MatchData {
 
 export type RiskProfile = 'conservador' | 'moderado' | 'agressivo';
 
-/**
- * Proveniência da probabilidade analítica.
- *
- * MODEL_ESTIMATE = estimativa de modelo (Poisson/xG/Bayes etc.),
- * HEURISTIC = regra/proxy operacional sem calibração estatística demonstrada,
- * DERIVED = transformação de outra probabilidade (ex.: complemento),
- * MARKET_IMPLIED = probabilidade implícita de preço/odd de mercado,
- * UNKNOWN = legado ou origem não informada.
- */
 export type ProbabilitySource =
   | 'MODEL_ESTIMATE'
   | 'HEURISTIC'
@@ -90,7 +72,6 @@ export type ProbabilitySource =
   | 'MARKET_IMPLIED'
   | 'UNKNOWN';
 
-/** Estado de calibração empírica; não deve ser inferido apenas pela confiança. */
 export type CalibrationStatus = 'UNCALIBRATED' | 'CALIBRATED';
 
 export interface MarketAnalysis {
@@ -103,10 +84,7 @@ export interface MarketAnalysis {
   calibrationStatus?: CalibrationStatus;
 }
 
-export interface HomeAwayStats {
-  goalsFor: number;
-  goalsAgainst: number;
-}
+export interface HomeAwayStats { goalsFor: number; goalsAgainst: number; }
 
 export interface LiveSideStats {
   dangerousAttacks: number;

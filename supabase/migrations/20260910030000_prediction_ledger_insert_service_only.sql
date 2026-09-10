@@ -1,5 +1,5 @@
 -- Calibration history must not be writable by an authenticated browser client.
--- A client can otherwise construct a syntactically valid MODEL_ESTIMATE and poison calibration.
+-- A client can otherwise construct a syntactically valid prediction and poison calibration.
 DROP POLICY IF EXISTS "Users can insert own predictions" ON public.prediction_ledger;
 REVOKE INSERT ON public.prediction_ledger FROM authenticated;
 REVOKE INSERT ON public.prediction_ledger FROM anon;
@@ -20,10 +20,10 @@ BEGIN
     RAISE EXCEPTION 'PREDICTION_MUST_START_UNRESOLVED';
   END IF;
 
-  IF NEW.probability_source <> 'MODEL_ESTIMATE'
-     OR NEW.calibration_status <> 'CALIBRATED'
-     OR NEW.data_quality_status <> 'VALID'
-     OR NEW.confidence < 85 THEN
+  IF NEW.probability_source IS DISTINCT FROM 'MODEL_ESTIMATE'
+     OR NEW.calibration_status IS DISTINCT FROM 'CALIBRATED'
+     OR NEW.data_quality_status IS DISTINCT FROM 'VALID'
+     OR COALESCE(NEW.confidence, 0) < 85 THEN
     RAISE EXCEPTION 'PREDICTION_NOT_CORE_ELIGIBLE';
   END IF;
 

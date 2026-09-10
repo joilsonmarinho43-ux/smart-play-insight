@@ -1,274 +1,54 @@
-import { useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, Loader2, Brain } from 'lucide-react';
+import { ArrowLeft, BarChart3, Clock, Database, ShieldAlert } from 'lucide-react';
 import { fetchLiveMatches, fetchMultiDayMatches } from '@/services/footballApi';
-import { useMatchReading } from '@/hooks/useMatchReading';
-import { useLiveAIReading } from '@/hooks/useLiveAIReading';
-import { MatchReadingModal } from '@/components/MatchReadingModal';
-import { localizeTeamName } from '@/lib/teamI18n';
-
-
+import type { MatchData } from '@/types/match';
 
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();
+  const { data: live, isLoading: loadingLive } = useQuery({ queryKey: ['liveMatches'], queryFn: fetchLiveMatches, staleTime: 120_000, refetchOnWindowFocus: false });
+  const { data: multi, isLoading: loadingMulti } = useQuery({ queryKey: ['multi-day-matches-detail'], queryFn: () => fetchMultiDayMatches(6), staleTime: 600_000, refetchOnWindowFocus: false });
 
-  const { data: live, isLoading: loadingLive } = useQuery({
-    queryKey: ['liveMatches'],
-    queryFn: fetchLiveMatches,
-    refetchInterval: 120_000,
-    staleTime: 240_000,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: multi, isLoading: loadingMulti } = useQuery({
-    queryKey: ['multi-day-matches-detail'],
-    queryFn: () => fetchMultiDayMatches(6),
-    staleTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false,
-  });
-
-  const isLoading = loadingLive || loadingMulti;
-
-  const match: any = useMemo(() => {
+  const match = useMemo(() => {
     const sid = String(id || '');
-    const findIn = (arr: any[] | undefined) =>
-      arr?.find((m) => String(m?.id ?? m?.fixture?.id) === sid);
-    return findIn(live) || findIn(multi);
+    const all = [...(live || []), ...(multi || [])] as MatchData[];
+    return all.find((item) => String(item.id) === sid) || null;
   }, [live, multi, id]);
 
-  // Normalização: pré-jogo vem com m.fixture / m.teams; live vem com flat fields
-  const view = useMemo(() => {
-    if (!match) return null;
-    const homeTeam = localizeTeamName(match.homeTeam || match.teams?.home?.name) || 'Casa';
-    const awayTeam = localizeTeamName(match.awayTeam || match.teams?.away?.name) || 'Fora';
-    const league = match.league?.name || match.league || '';
-    const isLive = !!(match.minute || match.liveScore || match.liveStats);
-    const dateIso = match.fixture?.date || match.date || null;
-    const kickoff = dateIso
-      ? new Intl.DateTimeFormat('pt-BR', {
-          timeZone: 'America/Belem',
-          day: '2-digit',
-          month: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        }).format(new Date(dateIso))
-      : null;
-    return { homeTeam, awayTeam, league, isLive, kickoff };
-  }, [match]);
+  if (loadingLive || loadingMulti) return <div className="p-6 text-sm text-muted-foreground">Carregando dados do jogo…</div>;
+  if (!match) return <div className="p-6"><Link to="/" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="h-4 w-4" /> Voltar</Link><p className="mt-6 text-sm text-muted-foreground">Jogo não encontrado na fonte de dados atual.</p></div>;
 
-  const [readingOpen, setReadingOpen] = useState(false);
-  const normalizedMatch = useMemo(() => {
-    if (!match || !view) return null;
-    return {
-      ...(match as any),
-      id: String((match as any).id ?? id ?? ''),
-      homeTeam: view.homeTeam,
-      awayTeam: view.awayTeam,
-      league: view.league,
-    } as any;
-  }, [match, view, id]);
-  const { reading, loading: readingLoading, context: readingContext, analyst, analystLoading, analystError, fallback } = useMatchReading(
-    (normalizedMatch || (match as any)) ?? ({ homeTeam: '', awayTeam: '', id: '' } as any),
-    readingOpen && !!normalizedMatch,
-  );
+  const metrics = match.metrics;
+  const sample = match.sampleSize;
+  const model = match.modelData;
+  const sufficientSample = !!sample && Math.min(sample.homeGames, sample.awayGames) >= 3;
 
+  return <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
+    <Link to="/" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
+    <header className="mt-5 rounded-2xl border border-border/50 bg-card p-5">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{match.league}</p>
+      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3"><h1 className="text-right text-lg font-bold">{match.homeTeam}</h1><span className="rounded-lg bg-secondary px-3 py-1 text-xs font-semibold">{match.isLive && match.liveScore ? `${match.liveScore.home}–${match.liveScore.away}` : 'VS'}</span><h1 className="text-lg font-bold">{match.awayTeam}</h1></div>
+      <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> {match.time}{match.isLive ? ` · AO VIVO${match.minute != null ? ` · ${match.minute}'` : ''}` : ''}</div>
+    </header>
 
-  return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
-      <Link
-        to="/live"
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-4 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Voltar
-      </Link>
+    <section className="mt-4 rounded-2xl border border-border/50 bg-card p-5">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><BarChart3 className="h-4 w-4" /> Dados observados</div>
+      {metrics ? <div className="grid grid-cols-2 gap-2 text-xs"><div>Posse: {metrics.possession?.[0] ?? '—'}% / {metrics.possession?.[1] ?? '—'}%</div><div>Finalizações: {metrics.totalShots?.[0] ?? '—'} / {metrics.totalShots?.[1] ?? '—'}</div><div>No alvo: {metrics.shotsOnTarget?.[0] ?? '—'} / {metrics.shotsOnTarget?.[1] ?? '—'}</div><div>Grandes chances: {metrics.bigChances?.[0] ?? '—'} / {metrics.bigChances?.[1] ?? '—'}</div><div>Escanteios: {metrics.corners?.[0] ?? '—'} / {metrics.corners?.[1] ?? '—'}</div><div>Cartões: {metrics.yellowCards?.[0] ?? '—'} / {metrics.yellowCards?.[1] ?? '—'}</div></div> : <p className="text-xs text-muted-foreground">Estatísticas observadas não disponíveis.</p>}
+    </section>
 
-      {isLoading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        </div>
-      )}
+    <section className="mt-4 rounded-2xl border border-border/50 bg-card p-5">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Database className="h-4 w-4" /> Qualidade da amostra</div>
+      {sample ? <p className="text-xs text-muted-foreground">Casa: {sample.homeGames} jogos · Fora: {sample.awayGames} jogos · com estatísticas: {sample.homeWithStats}/{sample.awayWithStats}</p> : <p className="text-xs text-destructive">Amostra não informada.</p>}
+      {!sufficientSample && <div className="mt-3 flex items-center gap-2 text-xs text-amber-400"><ShieldAlert className="h-4 w-4" /> A amostra atual não é suficiente para uma decisão estatística forte.</div>}
+    </section>
 
-      {!isLoading && !match && (
-        <div className="text-center py-20 text-muted-foreground">
-          Jogo não encontrado ou já finalizado.
-        </div>
-      )}
-
-      {match && view && (
-        <div className="space-y-4">
-          <div className="bg-secondary/40 border border-border rounded-xl p-4 text-center">
-            <div className="text-xs text-muted-foreground mb-1">{view.league}</div>
-            <div className="font-display text-lg">
-              {view.isLive ? (
-                <>
-                  {view.homeTeam}{' '}
-                  <span className="text-primary">
-                    {match.liveScore?.home ?? 0} - {match.liveScore?.away ?? 0}
-                  </span>{' '}
-                  {view.awayTeam}
-                </>
-              ) : (
-                <>
-                  {view.homeTeam} <span className="text-muted-foreground">vs</span> {view.awayTeam}
-                </>
-              )}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {view.isLive
-                ? `${match.status ?? 'LIVE'} · ${match.minute ?? 0}'`
-                : view.kickoff
-                ? `Início: ${view.kickoff}`
-                : 'Pré-jogo'}
-            </div>
-          </div>
-
-          <button
-            onClick={() => setReadingOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary to-primary/70 text-primary-foreground font-bold text-sm shadow-lg hover:opacity-95 transition-opacity"
-          >
-            <BookOpen className="w-4 h-4" />
-            📖 Leitura do Jogo
-          </button>
-
-
-
-          {view.isLive && (
-            <>
-              <LiveAIBlock match={normalizedMatch || match} />
-              <div className="grid grid-cols-2 gap-3">
-                <StatBox
-                  label="Posse de bola"
-                  home={match.liveStats?.possession?.[0] ?? 0}
-                  away={match.liveStats?.possession?.[1] ?? 0}
-                  suffix="%"
-                />
-                <StatBox
-                  label="Escanteios"
-                  home={match.liveStats?.corners?.[0] ?? 0}
-                  away={match.liveStats?.corners?.[1] ?? 0}
-                />
-                <StatBox
-                  label="Ataques perigosos"
-                  home={match.liveStats?.dangerousAttacks?.[0] ?? 0}
-                  away={match.liveStats?.dangerousAttacks?.[1] ?? 0}
-                />
-                <StatBox
-                  label="Pressão (PI)"
-                  home={match.liveStats?.pressureIndex?.[0] ?? 0}
-                  away={match.liveStats?.pressureIndex?.[1] ?? 0}
-                />
-              </div>
-            </>
-          )}
-
-
-          {!view.isLive && (
-            <div className="bg-secondary/30 border border-border rounded-xl p-4 text-center text-sm text-muted-foreground">
-              Confira a análise completa deste jogo no Bingo VIP PRO ou no Scanner PRO.
-              <div className="mt-3 flex gap-2 justify-center">
-                <Link to="/bingo" className="px-3 py-1.5 rounded-lg bg-primary/15 text-primary text-xs font-bold">
-                  Abrir Bingo
-                </Link>
-                <Link to="/scanner" className="px-3 py-1.5 rounded-lg bg-primary/15 text-primary text-xs font-bold">
-                  Abrir Scanner
-                </Link>
-              </div>
-            </div>
-          )}
-
-          <div className="text-center text-xs text-muted-foreground py-2">
-            🏆 {view.league}
-          </div>
-        </div>
-      )}
-
-      <MatchReadingModal
-        open={readingOpen}
-        onOpenChange={setReadingOpen}
-        reading={reading}
-        loading={readingLoading}
-        homeTeam={view?.homeTeam || ''}
-        awayTeam={view?.awayTeam || ''}
-        context={readingContext}
-        analyst={analyst}
-        analystLoading={analystLoading}
-        analystError={analystError}
-        fallback={fallback}
-      />
-
-    </div>
-  );
-};
-
-const StatBox = ({
-  label,
-  home,
-  away,
-  suffix = '',
-}: {
-  label: string;
-  home: number;
-  away: number;
-  suffix?: string;
-}) => (
-  <div className="bg-secondary/40 border border-border rounded-xl p-3">
-    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2 text-center">
-      {label}
-    </div>
-    <div className="flex items-center justify-between font-display text-lg">
-      <span className="text-primary">
-        {home}
-        {suffix}
-      </span>
-      <span className="text-muted-foreground text-xs">vs</span>
-      <span className="text-primary">
-        {away}
-        {suffix}
-      </span>
-    </div>
-  </div>
-);
-
-const LiveAIBlock = ({ match }: { match: any }) => {
-  const { data, loading, error, generate } = useLiveAIReading();
-  return (
-    <div className="bg-secondary/40 border border-primary/30 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-primary" />
-          <span className="text-xs uppercase font-bold tracking-wider text-primary">Leitura IA ao Vivo</span>
-        </div>
-        <button
-          onClick={() => generate(match)}
-          disabled={loading}
-          className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
-        >
-          {loading ? 'Analisando…' : data ? 'Atualizar' : 'Analisar'}
-        </button>
-      </div>
-      {loading && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="w-3 h-3 animate-spin" /> Gerando análise tática…
-        </div>
-      )}
-      {error && <div className="text-xs text-red-400">{error}</div>}
-      {data && !loading && (
-        <>
-          <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{data.text}</p>
-          <div className="text-[10px] text-muted-foreground mt-2 uppercase">
-            Fonte: {data.source === 'groq' ? 'Groq Llama 3.3 70B' : 'Gemini 2.5 Flash'}
-          </div>
-        </>
-      )}
-      {!data && !loading && !error && (
-        <p className="text-xs text-muted-foreground">Clique em "Analisar" para gerar uma leitura tática baseada nos dados ao vivo.</p>
-      )}
-    </div>
-  );
+    <section className="mt-4 rounded-2xl border border-border/50 bg-card p-5">
+      <h2 className="text-sm font-semibold">Modelo</h2>
+      {model && sufficientSample ? <div className="mt-3 grid grid-cols-2 gap-3 text-xs"><div>Gols médios casa: <b>{model.homeGoalsAvg ?? '—'}</b></div><div>Gols médios fora: <b>{model.awayGoalsAvg ?? '—'}</b></div><div>Escanteios casa: <b>{model.homeCornersAvg ?? '—'}</b></div><div>Escanteios fora: <b>{model.awayCornersAvg ?? '—'}</b></div></div> : <p className="mt-2 text-xs text-muted-foreground">Modelo não liberado para decisão com a evidência disponível.</p>}
+      <p className="mt-3 text-[10px] text-muted-foreground">Grandes chances são uma estatística observada. Não são convertidas em xG. Probabilidade oficial só pode vir do Nexus Core.</p>
+    </section>
+  </div>;
 };
 
 export default MatchDetails;
-

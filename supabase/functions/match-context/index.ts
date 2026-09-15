@@ -14,7 +14,7 @@ async function cacheGet(key: string) {
   } catch { return null; }
 }
 async function cacheSet(key: string, value: unknown) {
-  try { await sb().from('cache_api').upsert({ cache_key: key, dados_json: value, status_jogo: 'PRE', ultima_atualizacao: new Date().toISOString() }, { onConflict: 'cache_key' }); } catch { /* cache is non-authoritative */ }
+  try { await sb().from('cache_api').upsert({ cache_key: key, dados_json: value, status_jogo: 'PRE', ultima_atualizacao: new Date().toISOString() }, { onConflict: 'cache_key' }); } catch {}
 }
 
 async function sportsrc(type: string, id: string | number) {
@@ -72,34 +72,47 @@ function parseOdds(payload: any) {
 
 function parseFatigue(payload: any) {
   const d = payload?.data || payload || {};
+  const homeList = Array.isArray(d?.last_home) ? d.last_home : [];
+  const awayList = Array.isArray(d?.last_away) ? d.last_away : [];
   const calc = (list: any[]) => {
-    const now = Date.now(); const days = list.map((m) => typeof m?.timestamp === 'number' ? (now - m.timestamp * (m.timestamp < 1e12 ? 1000 : 1)) / 86400000 : null).filter((x): x is number => x != null && x >= 0);
-    return { gamesLast10d: days.filter((x) => x <= 10).length, restDays: days.length ? Math.round(Math.min(...days)) : null };
+    const now = Date.now();
+    const days = list.map((m) => typeof m?.timestamp === 'number' ? (now - m.timestamp * (m.timestamp < 1e12 ? 1000 : 1)) / 86400000 : null).filter((x): x is number => x != null && x >= 0);
+    return { gamesLast10d: days.filter((x) => x <= 10).length, restDays: days.length ? Math.round(Math.min(...days)) : null, available: days.length > 0 };
   };
-  return { home: calc(Array.isArray(d?.last_home) ? d.last_home : []), away: calc(Array.isArray(d?.last_away) ? d.last_away : []) };
+  const home = calc(homeList);
+  const away = calc(awayList);
+  return { home, away, available: home.available || away.available, source: home.available || away.available ? 'provider_history' : 'unavailable' };
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
-    const body = await req.json().catch(() => ({})); const { fixtureId, homeName, awayName, kickoffISO } = body;
+    const body = await req.json().catch(() => ({}));
+    const { fixtureId, homeName, awayName, kickoffISO } = body;
     if (!fixtureId) return new Response(JSON.stringify({ reliability: 'limitado', error: 'fixtureId required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    const key = `ctx_v2_${fixtureId}`; const cached = await cacheGet(key);
+    const key = `ctx_v2_${fixtureId}`;
+    const cached = await cacheGet(key);
     if (cached) return new Response(JSON.stringify(cached), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    const [lineupsRaw, oddsRaw, standingRaw, h2hRaw] = await Promise.all([sportsrc('lineups', fixtureId), sportsrc('odds', fixtureId), sportsrc('standing', fixtureId), sportsrc('h2h', fixtureId)]);
-    const lineups = parseLineups(lineupsRaw); const odds = parseOdds(oddsRaw); const standing = parseStanding(standingRaw, homeName, awayName); const fatigue = parseFatigue(h2hRaw);
+    const [lineupsRaw, oddsRaw, standingRaw, h2hRaw] = await Promise.all([
+      sportsrc('lineups', fixtureId), sportsrc('odds', fixtureId), sportsrc('standing', fixtureId), sportsrc('h2h', fixtureId),
+    ]);
+    const lineups = parseLineups(lineupsRaw);
+    const odds = parseOdds(oddsRaw);
+    const standing = parseStanding(standingRaw, homeName, awayName);
+    const fatigue = parseFatigue(h2hRaw);
     const injuries = { home: { count: null, players: null, impact: 'unknown' }, away: { count: null, players: null, impact: 'unknown' }, source: 'unavailable' };
 
     const kickoffMs = kickoffISO ? new Date(kickoffISO).getTime() : NaN;
     const nearKickoff = Number.isFinite(kickoffMs) && Math.abs(kickoffMs - Date.now()) <= 2 * 3600000;
-    const evidence = [!!odds, standing.haveStandings, !!fatigue.home || !!fatigue.away, !!(lineups.home.confirmed && lineups.away.confirmed)];
+    const evidence = [!!odds, standing.haveStandings, fatigue.available, !!(lineups.home.confirmed && lineups.away.confirmed)];
     const score = evidence.filter(Boolean).length;
     const reliability = score >= 4 ? 'completo' : score >= 2 ? 'parcial' : 'limitado';
     const warnings = [
       !lineups.home.confirmed || !lineups.away.confirmed ? 'lineups_unconfirmed' : null,
       nearKickoff && (!lineups.home.confirmed || !lineups.away.confirmed) ? 'lineups_expected_but_unavailable' : null,
       !odds ? 'odds_unavailable' : null,
+      !fatigue.available ? 'fatigue_unavailable' : null,
       'injuries_unavailable',
     ].filter(Boolean);
 

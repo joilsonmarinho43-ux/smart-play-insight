@@ -23,11 +23,9 @@ export interface GoalProjection {
 /**
  * Projeção conservadora.
  *
- * O cálculo original podia somar eventos fortemente correlacionados
- * (SoG/chutes/DA/cantos) e transformar uma amostra curta em um lambda muito
- * alto. Aqui DA estimado tem peso reduzido e a contribuição total dos eventos
- * auxiliares é limitada. O objetivo é reduzir falsos positivos, não maximizar
- * volume de sinais.
+ * Eventos ao vivo são parcialmente correlacionados. A projeção não deve
+ * transformar uma amostra curta em um lambda exagerado. DA sem garantia de
+ * origem é tratado como estimado por padrão.
  */
 export function projectGoals(i: GoalProjectionInput): GoalProjection {
   const min = Math.max(1, i.minute);
@@ -35,9 +33,10 @@ export function projectGoals(i: GoalProjectionInput): GoalProjection {
   const totalShots = Math.max(0, i.totalShots || 0);
   const da = Math.max(0, i.da || 0);
   const corners = Math.max(0, i.corners || 0);
+  const daEstimated = i.daEstimated !== false;
 
   const offTarget = Math.max(0, totalShots - sog);
-  const daWeight = i.daEstimated ? 0.004 : 0.012;
+  const daWeight = daEstimated ? 0.004 : 0.012;
 
   const xgSoFar =
     sog * 0.09 +
@@ -47,21 +46,18 @@ export function projectGoals(i: GoalProjectionInput): GoalProjection {
 
   const observedRate = xgSoFar / min;
   const priorRate = 2.55 / 90;
-
-  // Amostra curta recebe pouco peso. O peso máximo fica abaixo de 0.75.
   const evidenceWeight = Math.min(0.74, Math.max(0.22, min / (min + 22)));
   let ratePerMin = observedRate * evidenceWeight + priorRate * (1 - evidenceWeight);
 
-  // Evita que um pico inicial de eventos gere uma extrapolação extrema.
+  // Limite superior conservador para impedir picos artificiais no início.
   ratePerMin = Math.min(ratePerMin, 0.075);
 
   const remaining = Math.max(0, 90 - i.minute);
   const lambda = ratePerMin * remaining;
-
   const p0 = Math.exp(-lambda);
   const p1 = lambda * p0;
 
-  const evidenceQuality = i.daEstimated
+  const evidenceQuality = daEstimated
     ? (sog >= 4 && totalShots >= 7 ? 'mixed' : 'weak')
     : 'real';
 

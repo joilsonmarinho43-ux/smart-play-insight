@@ -1,4 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
 import type { ResearchEvidence, ResearchEvidenceType } from "@/lib/researchEvidence";
 
 export interface ResearchContextRequest {
@@ -59,6 +58,7 @@ export function getResearchGapFields(context: any): ResearchEvidenceType[] {
 export async function fetchResearchContext(request: ResearchContextRequest): Promise<ResearchContextResult> {
   const fields = request.fields?.length ? request.fields : ALL_GAP_FIELDS;
   try {
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase.functions.invoke("research-context", {
       body: {
         match: {

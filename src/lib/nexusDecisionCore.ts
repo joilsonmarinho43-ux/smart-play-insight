@@ -33,7 +33,7 @@ export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput {
   if((input.researchEvidence?.length??0)>0&&research<55)reasons.push('RESEARCH_EVIDENCE_WEAK');
   if(sp!==null&&sp>15)reasons.push('MARKET_DISAGREEMENT'); if(unverified)reasons.push('PROBABILITY_UNVERIFIED'); if(marketImplied)reasons.push('MARKET_IMPLIED_NOT_MODEL_PROBABILITY'); if(source!=='MODEL_ESTIMATE')reasons.push('PROBABILITY_SOURCE_NOT_MODEL'); if(calibration!=='CALIBRATED')reasons.push('PROBABILITY_NOT_CALIBRATED'); if(input.mode==='LIVE'&&input.match.isLive!==true)reasons.push('LIVE_STATE_UNCONFIRMED');
   const safeConfidence = confidence === null ? 0 : Math.min(confidence,95);
-  if(confidence===null)return{decision:'INFO_ONLY',confidence:0,riskScore:80,selectedMarket,easonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};
+  if(confidence===null)return{decision:'INFO_ONLY',confidence:0,riskScore:80,selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};
   if(confidence<50||combinedEvidence<55||!selectedMarket)return{decision:'REJECT',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,combinedEvidence)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};
   if(confidence<70||best<72)return{decision:'INFO_ONLY',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};
   if(input.mode==='LIVE'&&input.match.isLive!==true)return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};

@@ -1,17 +1,15 @@
-// ════════════════════════════════════════════════════════════════
 // goalProjection — projeção Poisson de gols restantes
 // Usado por auto-mode-server e scanner-pro-server para validar
-// se um jogo 0x0 ainda tem tempo/ritmo suficiente para 2 gols
-// (Over 1.5 FT entrando em 0x0 exige DOIS gols).
-// ════════════════════════════════════════════════════════════════
+// se um jogo 0x0 ainda tem tempo/ritmo suficiente para 2 gols.
 
 export interface GoalProjectionInput {
   minute: number;
-  sog: number;          // chutes no gol (total)
-  totalShots: number;   // chutes totais
-  da: number;           // ataques perigosos (total)
+  sog: number;
+  totalShots: number;
+  da: number;
   corners: number;
-  pressure: number;     // 0-100
+  pressure: number;
+  daEstimated?: boolean;
 }
 
 export interface GoalProjection {
@@ -19,42 +17,55 @@ export interface GoalProjection {
   lambdaRemaining: number;
   probAtLeast1: number;
   probAtLeast2: number;
+  evidenceQuality: 'real' | 'mixed' | 'weak';
 }
 
 /**
- * Taxa de xG por minuto derivada de eventos reais + λ restante até o min 90.
- * Pesos calibrados: SoG ≈ 0.09 xG, chute fora ≈ 0.025, DA ≈ 0.012, escanteio ≈ 0.022.
+ * Projeção conservadora.
+ *
+ * Eventos ao vivo são parcialmente correlacionados. A projeção não deve
+ * transformar uma amostra curta em um lambda exagerado. DA sem garantia de
+ * origem é tratado como estimado por padrão.
  */
 export function projectGoals(i: GoalProjectionInput): GoalProjection {
   const min = Math.max(1, i.minute);
-  const offTarget = Math.max(0, (i.totalShots || 0) - (i.sog || 0));
-  const xgSoFar =
-    (i.sog || 0) * 0.09 +
-    offTarget * 0.025 +
-    (i.da || 0) * 0.012 +
-    (i.corners || 0) * 0.022;
+  const sog = Math.max(0, i.sog || 0);
+  const totalShots = Math.max(0, i.totalShots || 0);
+  const da = Math.max(0, i.da || 0);
+  const corners = Math.max(0, i.corners || 0);
+  const daEstimated = i.daEstimated !== false;
 
-  // Regressão Bayesiana para não extrapolar 8-12 minutos como se o ritmo
-  // inicial fosse durar a partida inteira. O peso da amostra cresce com o
-  // relógio; antes disso, mistura com baseline neutro de 2.55 gols/90.
+  const offTarget = Math.max(0, totalShots - sog);
+  const daWeight = daEstimated ? 0.004 : 0.012;
+
+  const xgSoFar =
+    sog * 0.09 +
+    offTarget * 0.025 +
+    da * daWeight +
+    corners * 0.018;
+
   const observedRate = xgSoFar / min;
   const priorRate = 2.55 / 90;
-  const evidenceWeight = Math.min(0.82, Math.max(0.30, min / (min + 18)));
+  const evidenceWeight = Math.min(0.74, Math.max(0.22, min / (min + 22)));
   let ratePerMin = observedRate * evidenceWeight + priorRate * (1 - evidenceWeight);
 
-  // Não multiplicar pela pressão instantânea: ela já deriva de SoG, chutes,
-  // DA e cantos, que estão em xgSoFar. Reutilizá-la contaria os eventos duas vezes.
+  // Limite superior conservador para impedir picos artificiais no início.
+  ratePerMin = Math.min(ratePerMin, 0.075);
 
   const remaining = Math.max(0, 90 - i.minute);
   const lambda = ratePerMin * remaining;
-
   const p0 = Math.exp(-lambda);
   const p1 = lambda * p0;
+
+  const evidenceQuality = daEstimated
+    ? (sog >= 4 && totalShots >= 7 ? 'mixed' : 'weak')
+    : 'real';
 
   return {
     xgRatePerMin: Number(ratePerMin.toFixed(4)),
     lambdaRemaining: Number(lambda.toFixed(2)),
     probAtLeast1: Number((1 - p0).toFixed(3)),
     probAtLeast2: Number((1 - p0 - p1).toFixed(3)),
+    evidenceQuality,
   };
 }

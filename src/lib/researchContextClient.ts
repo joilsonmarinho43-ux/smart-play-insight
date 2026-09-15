@@ -25,9 +25,9 @@ const ALL_GAP_FIELDS: ResearchEvidenceType[] = [
   "FORM",
   "H2H",
   "MOTIVATION",
+  "ODDS",
   "REFEREE",
   "WEATHER",
-  "ODDS",
 ];
 
 export function getResearchGapFields(context: any): ResearchEvidenceType[] {

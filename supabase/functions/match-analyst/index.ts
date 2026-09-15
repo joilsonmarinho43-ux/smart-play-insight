@@ -2,177 +2,30 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
-const VERSION = 'v10';
+const VERSION = 'v11';
 
-function sb() {
-  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-}
+function sb() { return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!); }
+async function cacheGet(key:string){try{const {data}=await sb().from('cache_api').select('dados_json,ultima_atualizacao').eq('cache_key',key).maybeSingle();if(!data)return null;if(Date.now()-new Date(data.ultima_atualizacao).getTime()>CACHE_TTL_MS)return null;return data.dados_json;}catch{return null;}}
+async function cacheSet(key:string,value:unknown){try{await sb().from('cache_api').upsert({cache_key:key,dados_json:value,status_jogo:'PRE',ultima_atualizacao:new Date().toISOString()});}catch{}}
 
-async function cacheGet(key: string) {
-  try {
-    const { data } = await sb().from('cache_api').select('dados_json,ultima_atualizacao').eq('cache_key', key).maybeSingle();
-    if (!data) return null;
-    if (Date.now() - new Date(data.ultima_atualizacao).getTime() > CACHE_TTL_MS) return null;
-    return data.dados_json;
-  } catch {
-    return null;
-  }
-}
-
-async function cacheSet(key: string, value: unknown) {
-  try {
-    await sb().from('cache_api').upsert({ cache_key: key, dados_json: value, status_jogo: 'PRE', ultima_atualizacao: new Date().toISOString() });
-  } catch {}
-}
-
-const SYSTEM = `Você é o Analista de Performance do Nexus 33. Você interpreta dados esportivos reais. Você não executa operações externas, não envia ordens e não define valores financeiros.
-REGRAS ABSOLUTAS:
-1. Dado ausente, desconhecido ou não confirmado permanece desconhecido. Nunca transforme ausência em zero ou em fato positivo.
-2. Números só podem vir do payload ou de pesquisa web comprovada. Nunca invente médias, xG, cartões, escanteios, H2H, probabilidades ou preços observados.
-3. Big Chances NÃO é xG.
-4. Se um preço real não estiver no payload/pesquisa, use null. NUNCA estime um preço e apresente-o como observado.
-5. Probabilidade de modelo e confiança são conceitos diferentes. Heurística não é probabilidade calibrada.
-6. Nunca trate 98% ou 99% como certeza.
-7. O veredito deve ser analítico: Sinal analítico, Aguardar atualização ou Sem evidência suficiente. Não use linguagem operacional.
-8. Mercado sem dados suficientes deve dizer dados insuficientes.
-9. Divergência entre fontes deve ser declarada.
-10. Responda SOMENTE JSON válido.
-FORMATO: {"cenario":"...","pontoAtencao":"...","veredito":"...","risco":"baixo|medio|alto","contextoDetalhado":{"desfalques":"...","arbitro":"...","clima":"...","motivacao":"..."},"mercados":{"vitoria":"...","duplaChance":"...","handicap":"...","overUnderGols":"...","btts":"...","escanteios":"...","cartoes":"...","placarExato":"..."},"oddsReferencia":{"casa":null,"empate":null,"fora":null,"over25":null,"under25":null,"bttsSim":null,"escanteiosOver9":null,"cartoesOver4":null}}`;
-const RESEARCH = SYSTEM + `\nMODO PESQUISA: use google_search. Cruze fontes para lesões, suspensões e escalações. Só apresente preço observado se uma fonte realmente mostrar o valor. Caso contrário null.`;
-
-function payload(body: any) {
-  const m = body?.match ?? {}, r = body?.reading ?? {}, c = body?.context ?? {}, fb = body?.fallbackStats ?? null;
-  return JSON.stringify({
-    partida: { casa: m.homeTeam ?? null, fora: m.awayTeam ?? null, liga: m.league ?? null, horario: m.time ?? null, status: m.status ?? null, minuto: m.minute ?? null },
-    probabilidades_modelo: m.matchProbabilities ?? null,
-    leitura_tecnica: { projetados: r.projectedGoals ?? null, placares: r.likelyScores ?? null, tendencias: r.trendTags ?? null, oportunidades: r.opportunities ?? null, linhas_gols: r.goalLines ?? null },
-    contexto: { confiabilidade: c.reliability ?? null, escalacoes: c.lineups ?? null, lesoes: c.injuries ?? null, motivacao: c.motivation ?? null, desgaste: c.fatigue ?? null },
-    mercado_observado: c.odds ?? null,
-    fallback_stats: fb ? { fonte: fb.source ?? null, confianca: fb.confidence_score ?? null, baixa_confianca: fb.lowConfidence ?? null, campos_ausentes: fb.missing ?? [], dados: fb.stats ?? {} } : null,
-  });
-}
-
-function parse(raw: string) {
-  try {
-    const s = raw.trim().replace(/^```json/i, '').replace(/```$/i, '').trim();
-    const o = JSON.parse(s);
-    return o && typeof o === 'object' ? o : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalize(o: any, research: boolean) {
-  const text = (v: any, f = 'não confirmado') => typeof v === 'string' && v.trim() ? v.trim() : f;
-  const odd = (v: any) => {
-    if (v === null || v === undefined || v === '') return null;
-    const n = Number(v);
-    return Number.isFinite(n) && n > 1 ? n : null;
-  };
-  return {
-    cenario: text(o.cenario),
-    pontoAtencao: text(o.pontoAtencao),
-    veredito: text(o.veredito),
-    risco: ['baixo', 'medio', 'alto'].includes(o.risco) ? o.risco : 'alto',
-    contextoDetalhado: {
-      desfalques: text(o.contextoDetalhado?.desfalques),
-      arbitro: text(o.contextoDetalhado?.arbitro),
-      clima: text(o.contextoDetalhado?.clima),
-      motivacao: text(o.contextoDetalhado?.motivacao),
-    },
-    mercados: {
-      vitoria: text(o.mercados?.vitoria, 'dados insuficientes'),
-      duplaChance: text(o.mercados?.duplaChance, 'dados insuficientes'),
-      handicap: text(o.mercados?.handicap, 'dados insuficientes'),
-      overUnderGols: text(o.mercados?.overUnderGols, 'dados insuficientes'),
-      btts: text(o.mercados?.btts, 'dados insuficientes'),
-      escanteios: text(o.mercados?.escanteios, 'dados insuficientes'),
-      cartoes: text(o.mercados?.cartoes, 'dados insuficientes'),
-      placarExato: text(o.mercados?.placarExato, 'dados insuficientes'),
-    },
-    oddsReferencia: {
-      casa: odd(o.oddsReferencia?.casa), empate: odd(o.oddsReferencia?.empate), fora: odd(o.oddsReferencia?.fora),
-      over25: odd(o.oddsReferencia?.over25), under25: odd(o.oddsReferencia?.under25), bttsSim: odd(o.oddsReferencia?.bttsSim),
-      escanteiosOver9: odd(o.oddsReferencia?.escanteiosOver9), cartoesOver4: odd(o.oddsReferencia?.cartoesOver4),
-    },
-    _source: research ? 'research' : 'analyst',
-  };
-}
-
-function safe(reason: string) {
-  return {
-    cenario: 'Não há dados suficientes para uma leitura responsável.',
-    pontoAtencao: `Análise incompleta: ${reason}. Nenhum dado ausente foi inferido.`,
-    veredito: 'Sem evidência suficiente', risco: 'alto',
-    contextoDetalhado: { desfalques: 'não confirmado', arbitro: 'não confirmado', clima: 'não confirmado', motivacao: 'não confirmado' },
-    mercados: { vitoria: 'dados insuficientes', duplaChance: 'dados insuficientes', handicap: 'dados insuficientes', overUnderGols: 'dados insuficientes', btts: 'dados insuficientes', escanteios: 'dados insuficientes', cartoes: 'dados insuficientes', placarExato: 'dados insuficientes' },
-    oddsReferencia: { casa: null, empate: null, fora: null, over25: null, under25: null, bttsSim: null, escanteiosOver9: null, cartoesOver4: null },
-    _source: 'safe_fallback', _fallback_reason: reason,
-  };
-}
-
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  try {
-    const body = await req.json();
-    const research = body?.pesquisaWeb === true;
-    const id = body?.match?.id ?? body?.fixtureId ?? 'unknown';
-    const key = `analyst:${VERSION}:${research ? 'research' : 'standard'}:${id}`;
-    const cached = await cacheGet(key);
-    if (cached) return new Response(JSON.stringify({ ...cached, cached: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-    const user = payload(body);
-    const system = research ? RESEARCH : SYSTEM;
-    const groq = Deno.env.get('GROQ_API_KEY');
-    const gemini = Deno.env.get('GEMINI_API_KEY');
-    let content = '';
-    let source = '';
-
-    const callOpenAICompatible = async (url: string, key: string, model: string) => {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: 'Analise somente este payload:\n' + user }], response_format: { type: 'json_object' }, temperature: 0.2, max_tokens: 2200 }),
-      });
-      if (!resp.ok) return '';
-      const d = await resp.json();
-      return d?.choices?.[0]?.message?.content ?? '';
-    };
-
-    if (research && gemini) {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system_instruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: 'Analise somente este payload:\n' + user }] }], generationConfig: { temperature: 0.2 }, tools: [{ google_search: {} }] }),
-      });
-      if (resp.ok) {
-        const d = await resp.json();
-        content = (d?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('');
-        source = 'gemini';
-      }
-    } else {
-      if (groq) {
-        content = await callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions', groq, 'llama-3.3-70b-versatile');
-        if (content) source = 'groq';
-      }
-      if (!content && gemini) {
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemini}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ system_instruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } }),
-        });
-        if (resp.ok) {
-          const d = await resp.json();
-          content = (d?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('');
-          source = 'gemini';
-        }
-      }
-    }
-
-    const parsed = parse(content);
-    const result = parsed ? normalize(parsed, research) : safe(content ? 'invalid_ai_response' : 'provider_unavailable');
-    result._source = source || result._source;
-    await cacheSet(key, result);
-    return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  } catch (e) {
-    return new Response(JSON.stringify(safe(e instanceof Error ? e.message : 'internal_error')), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
-});
+const SYSTEM=`Você é o auditor pré-jogo do Nexus 33. Sua função é revisar uma leitura quantitativa já produzida, detectar inconsistências e riscos de contexto. Você NÃO cria probabilidades, NÃO inventa odds, NÃO escolhe mercado por conta própria e NÃO aumenta confiança.
+REGRAS:
+1. Dado ausente permanece desconhecido; nunca transforme null em zero ou em fato.
+2. Probabilidades e estatísticas devem ser tratadas como fornecidas pelo payload; não recalibre números por opinião.
+3. Big Chances não é xG.
+4. Odds só são reais quando observadas no payload ou confirmadas na pesquisa.
+5. A IA pode apenas manter, reduzir confiança qualitativa ou BLOQUEAR por risco explícito. Nunca pode promover um sinal.
+6. BLOCK só é permitido quando houver evidência direta no payload/pesquisa de contradição crítica, dado inválido ou contexto decisivo não confirmado perto do início. Ausência comum gera CAUTION, não BLOCK.
+7. Não use linguagem de certeza.
+8. Responda SOMENTE JSON válido.
+FORMATO: {"cenario":"...","pontoAtencao":"...","veredito":"Sinal analítico|Aguardar atualização|Sem evidência suficiente","risco":"baixo|medio|alto","aiAudit":{"status":"PASS|CAUTION|BLOCK","reasons":["..."],"evidenceQuality":"alta|media|baixa","source":"payload|research|mixed"},"contextoDetalhado":{"desfalques":"...","arbitro":"...","clima":"...","motivacao":"..."},"mercados":{"vitoria":"...","duplaChance":"...","handicap":"...","overUnderGols":"...","btts":"...","escanteios":"...","cartoes":"...","placarExato":"..."},"oddsReferencia":{"casa":null,"empate":null,"fora":null,"over25":null,"under25":null,"bttsSim":null,"escanteiosOver9":null,"cartoesOver4":null}}`;
+const RESEARCH=SYSTEM+`\nMODO PESQUISA: use google_search apenas para verificar lesões/suspensões, escalações, contexto competitivo, árbitro ou clima quando o payload marcar esses itens como indisponíveis. Cruze fontes. Não invente uma confirmação. Se as fontes divergirem, declare a divergência.`;
+function payload(body:any){const m=body?.match??{},r=body?.reading??{},c=body?.context??{},fb=body?.fallbackStats??null;return JSON.stringify({partida:{casa:m.homeTeam??null,fora:m.awayTeam??null,liga:m.league??null,horario:m.time??null,status:m.status??null,minuto:m.minute??null},probabilidades_modelo:m.matchProbabilities??null,leitura_tecnica:{projetados:r.projectedGoals??null,placares:r.likelyScores??null,tendencias:r.trendTags??null,oportunidades:r.opportunities??null,linhas_gols:r.goalLines??null},contexto:{confiabilidade:c.reliability??null,escalacoes:c.lineups??null,lesoes:c.injuries??null,motivacao:c.motivation??null,desgaste:c.fatigue??null},mercado_observado:c.odds??null,fallback_stats:fb?{fonte:fb.source??null,confianca:fb.confidence_score??null,baixa_confianca:fb.lowConfidence??null,camp os_ausentes:fb.missing??[],dados:fb.stats??{}}:null});}
+function parse(raw:string){try{const s=raw.trim().replace(/^```json/i,'').replace(/```$/i,'').trim();const o=JSON.parse(s);return o&&typeof o==='object'?o:null;}catch{return null;}}
+function normalize(o:any,research:boolean){const text=(v:any,f='não confirmado')=>typeof v==='string'&&v.trim()?v.trim():f;const odd=(v:any)=>{if(v===null||v===undefined||v==='')return null;const n=Number(v);return Number.isFinite(n)&&n>1?n:null;};const audit=o.aiAudit??{};return{cenario:text(o.cenario),pontoAtencao:text(o.pontoAtencao),veredito:text(o.veredito),risco:['baixo','medio','alto'].includes(o.risco)?o.risco:'alto',aiAudit:{status:['PASS','CAUTION','BLOCK'].includes(audit.status)?audit.status:'CAUTION',reasons:Array.isArray(audit.reasons)?audit.reasons.filter((x:any)=>typeof x==='string').slice(0,6):['auditoria_incompleta'],evidenceQuality:['alta','media','baixa'].includes(audit.evidenceQuality)?audit.evidenceQuality:'baixa',source:research?'research':(['payload','mixed'].includes(audit.source)?audit.source:'payload')},contextoDetalhado:{desfalques:text(o.contextoDetalhado?.desfalques),arbitro:text(o.contextoDetalhado?.arbitro),clima:text(o.contextoDetalhado?.clima),motivacao:text(o.contextoDetalhado?.motivacao)},mercados:{vitoria:text(o.mercados?.vitoria,'dados insuficientes'),duplaChance:text(o.mercados?.duplaChance,'dados insuficientes'),handicap:text(o.mercados?.handicap,'dados insuficientes'),overUnderGols:text(o.mercados?.overUnderGols,'dados insuficientes'),btts:text(o.mercados?.btts,'dados insuficientes'),escanteios:text(o.mercados?.escanteios,'dados insuficientes'),cartoes:text(o.mercados?.cartoes,'dados insuficientes'),placarExato:text(o.mercados?.placarExato,'dados insuficientes')},oddsReferencia:{casa:odd(o.oddsReferencia?.casa),empate:odd(o.oddsReferencia?.empate),fora:odd(o.oddsReferencia?.fora),over25:odd(o.oddsReferencia?.over25),under25:odd(o.oddsReferencia?.under25),bttsSim:odd(o.oddsReferencia?.bttsSim),escanteiosOver9:odd(o.oddsReferencia?.escanteiosOver9),cartoesOver4:odd(o.oddsReferencia?.cartoesOver4)},_source:research?'research':'analyst'};}
+function safe(reason:string){return{cenario:'Não há dados suficientes para uma leitura responsável.',pontoAtencao:`Análise incompleta: ${reason}.`,veredito:'Sem evidência suficiente',risco:'alto',aiAudit:{status:'CAUTION',reasons:[reason],evidenceQuality:'baixa',source:'payload'},contextoDetalhado:{desfalques:'não confirmado',arbitro:'não confirmado',clima:'não confirmado',motivacao:'não confirmado'},mercados:{vitoria:'dados insuficientes',duplaChance:'dados insuficientes',handicap:'dados insuficientes',overUnderGols:'dados insuficientes',btts:'dados insuficientes',escanteios:'dados insuficientes',cartoes:'dados insuficientes',placarExato:'dados insuficientes'},oddsReferencia:{casa:null,empate:null,fora:null,over25:null,under25:null,bttsSim:null,escanteiosOver9:null,cartoesOver4:null},_source:'safe_fallback'};}
+Deno.serve(async(req)=>{if(req.method==='OPTIONS')return new Response(null,{headers:corsHeaders});try{const body=await req.json();const research=body?.pesquisaWeb===true;const id=body?.match?.id??body?.fixtureId??'unknown';const key=`analyst:${VERSION}:${research?'research':'standard'}:${id}`;const cached=await cacheGet(key);if(cached)return new Response(JSON.stringify({...cached,cached:true}),{headers:{...corsHeaders,'Content-Type':'application/json'}});const user=payload(body);const system=research?RESEARCH:SYSTEM;const groq=Deno.env.get('GROQ_API_KEY');const gemini=Deno.env.get('GEMINI_API_KEY');let content='';let source='';
+const callOpenAICompatible=async(url:string,key:string,model:string)=>{const resp=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:'Audite somente este payload pré-jogo:\n'+user}],response_format:{type:'json_object'},temperature:0.1,max_tokens:2200})});if(!resp.ok)return '';const d=await resp.json();return d?.choices?.[0]?.message?.content??'';};
+if(research&&gemini){const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:'Audite somente este payload pré-jogo:\n'+user}]}],generationConfig:{temperature:0.1},tools:[{google_search:{}}]})});if(resp.ok){const d=await resp.json();content=(d?.candidates?.[0]?.content?.parts??[]).map((p:any)=>p?.text??'').join('');source='gemini';}}
+else{if(groq){content=await callOpenAICompatible('https://api.groq.com/openai/v1/chat/completions',groq,'llama-3.3-70b-versatile');if(content)source='groq';}if(!content&&gemini){const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{temperature:0.1,responseMimeType:'application/json'}})});if(resp.ok){const d=await resp.json();content=(d?.candidates?.[0]?.content?.parts??[]).map((p:any)=>p?.text??'').join('');source='gemini';}}}
+const parsed=parse(content);const result=parsed?normalize(parsed,research):safe(content?'invalid_ai_response':'provider_unavailable');result._source=source||result._source;await cacheSet(key,result);return new Response(JSON.stringify(result),{headers:{...corsHeaders,'Content-Type':'application/json'}});}catch(e){return new Response(JSON.stringify(safe(e instanceof Error?e.message:'internal_error')),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});}});

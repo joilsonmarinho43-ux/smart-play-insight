@@ -1,8 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
 import { sendTelegramMessage, escapeHtml, enqueueTelegramOutbox } from '../_shared/telegram.ts';
+import { computeObservedMarketValue } from '../_shared/marketValue.ts';
 
-/** Downstream-only Telegram publisher. It never calculates or promotes a signal. */
+/** Downstream-only Telegram publisher. It never decides or promotes a signal. */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -24,10 +25,7 @@ Deno.serve(async (req) => {
 
     const modelProbabilityValid = Number.isFinite(probability) && probability >= 0 && probability <= 100;
     const observedOddValid = Number.isFinite(odd) && odd > 1;
-    const impliedProbability = observedOddValid ? (100 / odd) : null;
-    const expectedValue = observedOddValid && modelProbabilityValid
-      ? Number(((probability / 100) * odd - 1).toFixed(6))
-      : null;
+    const marketValue = computeObservedMarketValue(probability, odd);
 
     const coreGateOk =
       !!market &&
@@ -39,7 +37,8 @@ Deno.serve(async (req) => {
       modelProbabilityValid &&
       Number.isFinite(confidence) &&
       confidence >= 85 &&
-      observedOddValid;
+      observedOddValid &&
+      !!marketValue;
 
     if (!coreGateOk) {
       return new Response(JSON.stringify({
@@ -75,7 +74,9 @@ Deno.serve(async (req) => {
     const matchName = `${match.homeTeam || 'Casa'} x ${match.awayTeam || 'Fora'}`;
     const league = String(match.league || body?.league || 'Liga não informada');
     const minute = Number(match.minute ?? body?.minute ?? 0);
-    const evPercent = expectedValue! * 100;
+    const impliedProbability = marketValue!.impliedProbability;
+    const expectedValue = marketValue!.expectedValue;
+    const evPercent = expectedValue * 100;
 
     const text = [
       '🎯 <b>NEXUS 33 — SINAL ANALÍTICO</b>',
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
       `📌 <b>Mercado:</b> ${escapeHtml(market)}`,
       `📊 <b>Probabilidade do modelo:</b> ${probability.toFixed(2)}%`,
       `💰 <b>Odd observada:</b> ${odd.toFixed(2)}`,
-      `📐 <b>Prob. implícita:</b> ${impliedProbability!.toFixed(2)}%`,
+      `📐 <b>Prob. implícita:</b> ${impliedProbability.toFixed(2)}%`,
       `📈 <b>EV real:</b> ${evPercent.toFixed(2)}%`,
       `🧠 <b>Confiança:</b> ${confidence.toFixed(0)}%`,
       '',

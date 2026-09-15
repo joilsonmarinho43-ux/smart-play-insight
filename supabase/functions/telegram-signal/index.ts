@@ -120,7 +120,6 @@ Deno.serve(async (req) => {
         league,
         minute: Number.isFinite(minute) ? minute : 0,
         confidence,
-        probability_source: undefined,
         model_probability: probability,
         implied_probability: impliedProbability,
         expected_value: expectedValue,

@@ -9,10 +9,11 @@ export interface NexusDecisionOutput { decision: NexusDecision; confidence: numb
 const clamp = (n:number,min=0,max=100) => Math.max(min, Math.min(max, Number.isFinite(n) ? n : min));
 const norm = (v:number|null|undefined) => typeof v === 'number' && Number.isFinite(v) ? clamp(v) : null;
 const valid = (m:MarketAnalysis[]) => m.filter(x => Number.isFinite(x.probability) && x.probability >= 0 && x.probability <= 100);
+const signalCandidates = (m:MarketAnalysis[]) => valid(m).filter(x => x.probabilitySource === 'MODEL_ESTIMATE' && x.calibrationStatus === 'CALIBRATED');
 const score = (m:MarketAnalysis[]) => { const v=valid(m).map(x=>x.probability).sort((a,b)=>a-b); if(!v.length)return 0; const i=Math.floor(v.length/2); return v.length%2?v[i]:(v[i-1]+v[i])/2; };
-const spread = (m:MarketAnalysis[]) => { const v=valid(m).map(x=>x.probability).sort((a,b)=>a-b); return v.length>=2?v[v.length-1]-v[0]:null; };
+const spread = (m:MarketAnalysis[]) => { const v=signalCandidates(m).map(x=>x.probability).sort((a,b)=>a-b); return v.length>=2?v[v.length-1]-v[0]:null; };
 const evidence = (e:NexusEvidence[]) => { const u=e.map(x=>({v:clamp(x.value),w:Math.max(0,x.weight??1)})).filter(x=>x.w>0); if(!u.length)return 0; const t=u.reduce((s,x)=>s+x.w,0); return Math.round(u.reduce((s,x)=>s+x.v*x.w,0)/t); };
-const selected = (m:MarketAnalysis[]) => valid(m).sort((a,b)=>b.probability-a.probability)[0] ?? null;
+const selected = (m:MarketAnalysis[]) => signalCandidates(m).sort((a,b)=>b.probability-a.probability)[0] ?? null;
 
 export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput {
   const reasons:string[]=[]; const confidence=norm(input.confidence); const markets=input.markets??[]; const selectedMarket=selected(markets); const best=score(markets); const sp=spread(markets); const ev=evidence(input.evidence??[]);
@@ -26,7 +27,7 @@ export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput {
   if(input.dataQuality?.status!=='VALID')reasons.push('DATA_QUALITY_NOT_VALID');
   if(input.dataQuality?.status==='DEGRADED')reasons.push(...input.dataQuality.reasons.map(r=>`DATA_${r}`),'DATA_QUALITY_DEGRADED');
   if(input.engineConflict)reasons.push('ENGINE_CONFLICT'); if(confidence===null)reasons.push('CONFIDENCE_MISSING'); if(confidence!==null&&confidence>95)reasons.push('CONFIDENCE_CAPPED');
-  if(ev<55)reasons.push('INSUFFICIENT_EVIDENCE'); if(!selectedMarket)reasons.push('NO_VALID_MARKET'); else if(best<72)reasons.push('MARKET_BELOW_THRESHOLD');
+  if(ev<55)reasons.push('INSUFFICIENT_EVIDENCE'); if(!selectedMarket)reasons.push('NO_CALIBRATED_MODEL_MARKET'); else if(best<72)reasons.push('MARKET_BELOW_THRESHOLD');
   if(sp!==null&&sp>15)reasons.push('MARKET_DISAGREEMENT'); if(unverified)reasons.push('PROBABILITY_UNVERIFIED'); if(marketImplied)reasons.push('MARKET_IMPLIED_NOT_MODEL_PROBABILITY'); if(source!=='MODEL_ESTIMATE')reasons.push('PROBABILITY_SOURCE_NOT_MODEL'); if(calibration!=='CALIBRATED')reasons.push('PROBABILITY_NOT_CALIBRATED'); if(input.mode==='LIVE'&&input.match.isLive!==true)reasons.push('LIVE_STATE_UNCONFIRMED');
   const safeConfidence = confidence === null ? 0 : Math.min(confidence,95);
   if(confidence===null)return{decision:'INFO_ONLY',confidence:0,riskScore:80,selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
@@ -34,6 +35,7 @@ export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput {
   if(confidence<70||best<72)return{decision:'INFO_ONLY',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
   if(input.mode==='LIVE'&&input.match.isLive!==true)return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
   if(input.dataQuality?.status!=='VALID'||unverified||marketImplied||source!=='MODEL_ESTIMATE'||calibration!=='CALIBRATED')return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,ev,input.dataQuality?.score??0)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};
+  if(!selectedMarket.odd || !Number.isFinite(selectedMarket.odd) || selectedMarket.odd <= 1){ reasons.push('MARKET_ODD_MISSING'); return {decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false}; }
   if(input.engineConflict||(sp!==null&&sp>15)){return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,ev,input.dataQuality?.score??0)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};}
   if(confidence<85){reasons.push('CONSERVATIVE_CONFIDENCE');return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:false};}
   reasons.push('CORE_APPROVED_SIGNAL'); return{decision:'SIGNAL',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,ev)),selectedMarket,reasonCodes:reasons,evidenceScore:ev,signalEligible:true};

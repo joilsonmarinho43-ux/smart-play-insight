@@ -24,9 +24,10 @@ export function adaptHybridSignal(signal: LegacyLiveSignal, market?: MarketAnaly
   const dataQuality=assessDataQuality({live:true,observedAt:signal.observedAt??null,estimatedData:signal.daEstimated});
   return decideNexus({match,mode:'LIVE' satisfies NexusMode,confidence:signal.confidence==='alta'?90:signal.confidence==='média'?75:null,markets,evidence:[...liveEvidence(signal),...marketsToNexusEvidence(markets)],analysisBlocked:signal.signalEligible===false,engineConflict:true,dataQuality});
 }
-export function adaptPreMatch(match:MatchData,markets:MarketAnalysis[],confidence:number|null|undefined,calibrationStatus:CalibrationStatus='UNCALIBRATED'):NexusDecisionOutput {
-  const normalizedMarkets=markets.map(m=>({...m,probabilitySource:m.probabilitySource??'MODEL_ESTIMATE' as const,calibrationStatus:m.calibrationStatus??calibrationStatus}));
+export function adaptPreMatch(match:MatchData,markets:MarketAnalysis[],confidence:number|null|undefined,calibrationStatus?:CalibrationStatus):NexusDecisionOutput {
+  const inheritedCalibration = calibrationStatus ?? match.predictions?.calibrationStatus ?? 'UNCALIBRATED';
+  const normalizedMarkets=markets.map(m=>({...m,probabilitySource:m.probabilitySource??match.predictions?.probabilitySource??'MODEL_ESTIMATE' as const,calibrationStatus:m.calibrationStatus??inheritedCalibration}));
   const sampleSize=match.sampleSize?Math.min(match.sampleSize.homeGames,match.sampleSize.awayGames):null;
   const dataQuality=assessDataQuality({live:false,sampleSize,requiredSampleSize:3,sourceCompleteness:match.modelData&&match.sampleSize?100:75,requiredFeaturesPresent:normalizedMarkets.length>0});
-  return decideNexus({match,mode:'PRE_MATCH',confidence,markets:normalizedMarkets,evidence:marketsToNexusEvidence(normalizedMarkets),dataQuality,calibrationStatus,probabilitySource:'MODEL_ESTIMATE'});
+  return decideNexus({match,mode:'PRE_MATCH',confidence,markets:normalizedMarkets,evidence:marketsToNexusEvidence(normalizedMarkets),dataQuality,calibrationStatus:inheritedCalibration,probabilitySource:'MODEL_ESTIMATE'});
 }

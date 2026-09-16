@@ -17,10 +17,12 @@ import Context from "./pages/Context";
 import Live from "./pages/Live";
 import MatchDetails from "./pages/MatchDetails";
 import Favorites from "./pages/Favorites";
+import Scanner from "./pages/Scanner";
 import Suggestions from "./pages/Suggestions";
 import Paywall from "./pages/Paywall";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import WorldCup from "./pages/WorldCup";
 import { AppLayout } from "./components/AppLayout";
 import { Loader2 } from "lucide-react";
 
@@ -34,8 +36,10 @@ const App = () => { useApiKeyValidator(); return <QueryClientProvider client={qu
   <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
   <Route path="/live" element={<ProtectedRoute><AppLayout><Live /></AppLayout></ProtectedRoute>} />
   <Route path="/match/:id" element={<ProtectedRoute><AppLayout><MatchDetails /></AppLayout></ProtectedRoute>} />
+  <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
   <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
   <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
+  <Route path="/world-cup" element={<ProtectedRoute><AppLayout><WorldCup /></AppLayout></ProtectedRoute>} />
   <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />
   <Route path="/quality" element={<AdminRoute><AppLayout><Quality /></AppLayout></AdminRoute>} />
   <Route path="/diagnostics" element={<AdminRoute><AppLayout><Diagnostics /></AppLayout></AdminRoute>} />
@@ -43,9 +47,7 @@ const App = () => { useApiKeyValidator(); return <QueryClientProvider client={qu
   <Route path="/expired" element={<Paywall />} />
   <Route path="/auth" element={<Auth />} />
   <Route path="/reset-password" element={<ResetPassword />} />
-  {/* Historical screens remain routable only as compatibility redirects; they are not part of the analyst UI. */}
-  <Route path="/scanner" element={<LegacyRedirect />} />
-  <Route path="/world-cup" element={<LegacyRedirect />} />
+  {/* Historical betting/trading surfaces remain redirects until governed replacements exist. */}
   <Route path="/elite" element={<LegacyRedirect />} />
   <Route path="/placar-exato" element={<LegacyRedirect />} />
   <Route path="/bet-analyzer" element={<LegacyRedirect />} />

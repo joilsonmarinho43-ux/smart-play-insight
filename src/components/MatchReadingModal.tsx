@@ -24,7 +24,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { MatchReadingV2, MatchContext } from "@/lib/readingEngine";
 import type { AnalystReading } from "@/hooks/useMatchReading";
-import { BookmakerFinder } from "@/components/BookmakerFinder";
 import { localizeTeamName } from "@/lib/teamI18n";
 
 interface Props {
@@ -809,7 +808,6 @@ export const MatchReadingModal = ({
             <div className="text-xs text-muted-foreground text-center px-4 italic">
               Sem histórico estatístico da API para esta partida — leitura gerada por pesquisa externa da IA.
             </div>
-            <BookmakerFinder homeTeam={homeTeam} awayTeam={awayTeam} />
           </div>
         )}
 
@@ -1099,7 +1097,6 @@ export const MatchReadingModal = ({
               {reading.signature}
             </div>
 
-            <BookmakerFinder homeTeam={homeTeam} awayTeam={awayTeam} />
           </div>
         )}
       </DialogContent>

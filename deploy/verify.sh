@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# =====================================================================
 # NEXUS 33 — verificação PÓS-deploy (VPS).
 # Confere containers, secrets, edge functions e as fontes de dados.
 # Não altera nada.
-#   bash deploy/verify.sh
-# =====================================================================
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,10 +26,14 @@ for c in supabase-db supabase-kong supabase-auth supabase-rest supabase-edge-fun
   st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo ausente)"
   [ "$st" = "running" ] && ok "$c: running" || bad "$c: $st"
 done
-st="$(docker inspect -f '{{.State.Status}}' nexus33-app-1 2>/dev/null \
-      || docker inspect -f '{{.State.Status}}' "$(docker ps --filter ancestor=nexus33-app:latest -q | head -1)" 2>/dev/null \
-      || echo ausente)"
-[ "$st" = "running" ] && ok "frontend: running" || warn "frontend: $st"
+APP_ST="$(docker inspect -f '{{.State.Status}}' nexus33-app-1 2>/dev/null || true)"
+if [ -z "$APP_ST" ]; then
+  APP_ST="$(docker inspect -f '{{.State.Status}}' deploy-app-1 2>/dev/null || true)"
+fi
+if [ -z "$APP_ST" ]; then
+  APP_ST="$(docker ps --filter ancestor=nexus33-app:latest --format '{{.Status}}' | head -1 || true)"
+fi
+[ "$APP_ST" = "running" ] && ok "frontend: running" || bad "frontend: ${APP_ST:-ausente}"
 
 sec "2. Secrets dentro do edge-runtime"
 ENVDUMP="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' supabase-edge-functions 2>/dev/null || true)"
@@ -40,7 +41,7 @@ for k in SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT
          SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
   if echo "$ENVDUMP" | grep -q "^${k}=."; then ok "$k presente"; else bad "$k AUSENTE (rode: bash deploy/fix-secrets.sh)"; fi
 done
-for k in GEMINI_API_KEY GROQ_API_KEY LOVABLE_API_KEY; do
+for k in GEMINI_API_KEY GROQ_API_KEY; do
   echo "$ENVDUMP" | grep -q "^${k}=." && ok "$k presente" || warn "$k ausente (IA cai no fallback local)"
 done
 
@@ -55,6 +56,7 @@ curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $KEY" \
      -H 'Content-Type: application/json' -d '{"diag":true}' -o /tmp/nx_diag.json
 python3 - <<'PY' || warn "não foi possível interpretar o diagnóstico"
 import json
+
 d = json.load(open('/tmp/nx_diag.json'))
 env = d.get('env', {})
 for k, v in env.items():

@@ -1,0 +1,42 @@
+name: Nexus VPS Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/workflows/nexus-vps-deploy.yml'
+
+concurrency:
+  group: nexus-vps-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy through SSH
+        env:
+          VPS_HOST: ${{ secrets.NEXUS_VPS_HOST }}
+          VPS_USER: ${{ secrets.NEXUS_VPS_USER }}
+          VPS_PORT: ${{ secrets.NEXUS_VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.NEXUS_VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          : "${VPS_HOST:?Missing NEXUS_VPS_HOST repository secret}"
+          : "${VPS_USER:?Missing NEXUS_VPS_USER repository secret}"
+          : "${VPS_SSH_KEY:?Missing NEXUS_VPS_SSH_KEY repository secret}"
+          PORT="${VPS_PORT:-22}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/nexus_vps_key
+          chmod 600 ~/.ssh/nexus_vps_key
+          ssh-keyscan -p "$PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/nexus_vps_key -p "$PORT" -o BatchMode=yes "$VPS_USER@$VPS_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /root/nexus33
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+          git clean -fd -e deploy/.env -e supabase-docker/.env -e /etc/nexus33
+          bash deploy/update.sh
+          REMOTE

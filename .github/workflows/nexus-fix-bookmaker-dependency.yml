@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   fix:
-    if: contains(github.event.head_commit.message, 'fix(ui): remove stale bookmaker dependency') == false
+    if: "!contains(github.event.head_commit.message, 'fix(ui): remove stale bookmaker dependency')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -41,3 +41,5 @@ jobs:
           git add -A .github/workflows/nexus-fix-bookmaker-dependency.yml
           git commit -m "fix(ui): remove stale bookmaker dependency"
           git push origin HEAD:main
+
+# One-shot fixer: this file removes itself after the dependency is corrected.

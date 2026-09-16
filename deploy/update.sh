@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Atualiza o NEXUS 33 na VPS após um git pull.
+# Atualiza o NEXUS 33 na VPS.
+# O CI já sincroniza main antes de chamar este script.
 #   bash deploy/update.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-git pull --ff-only
-
 VAULT="${NEXUS33_VAULT:-/etc/nexus33/secrets.env}"
 if [ ! -f "$VAULT" ]; then
   echo "⚠ Cofre de chaves ausente ($VAULT)."
-  echo "  Rode uma única vez:  bash deploy/set-secrets.sh"
+  echo "  Rode uma única vez: bash deploy/set-secrets.sh"
 fi
 
 if [ -d supabase-docker ]; then
@@ -37,26 +36,21 @@ open(path, "w").write(text.rstrip() + "\n")
 PY
 
   (cd supabase-docker && docker compose up -d --force-recreate auth)
-  # Edge functions
   bash deploy/sync-functions.sh
-  # re-declara TODOS os secrets (deploy/.env + cofre) e reinicia o edge-runtime
   bash deploy/fix-secrets.sh
-  # migrations novas (ledger em public.selfhost_migrations, idempotente)
-  bash deploy/apply-migrations.sh || echo "⚠ revise as migrations manualmente"
-  # cron jobs apontando para o domínio local
-  bash deploy/fix-cron.sh || echo "⚠ revise os cron jobs manualmente"
-  # envios diários em foto (placar exato + bet analyzer)
-  bash deploy/enable-daily-broadcasts.sh || echo "⚠ revise os crons dos envios diários"
-
+  bash deploy/apply-migrations.sh
+  # Cron estrutural já é validado por verify.sh. O script fix-cron.sh fica
+  # disponível para correções manuais sem bloquear o deploy automático.
+  bash deploy/enable-daily-broadcasts.sh
 fi
 
-
-# Frontend — build sempre sem cache de camada para não repetir bundle antigo
+# Frontend — mantém a mesma interface e infraestrutura, recriando somente
+# o container da aplicação a partir do commit já validado pelo CI.
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml build --pull app
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --force-recreate app
 docker image prune -f
 
-# Verificação pós-deploy (containers, secrets, funções, fontes de dados, cron)
-bash deploy/verify.sh || echo "⚠ verify.sh apontou problemas — veja acima."
-echo "Atualização concluída."
-
+# Verificação pós-deploy é parte obrigatória do deploy: qualquer falha real
+# retorna código diferente de zero e faz o GitHub Actions marcar o deploy como falho.
+bash deploy/verify.sh
+echo "Atualização concluída com verificação pós-deploy aprovada."

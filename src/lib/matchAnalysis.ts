@@ -70,14 +70,8 @@ export function analyzeMarkets(match: MatchData): MarketAnalysis[] {
     }
   }
 
-  // Live pressure is deliberately an observation, never a probability.
-  const live = (match as any).liveStats;
-  if (match.isLive === true && live) {
-    const da = Number(live.dangerousAttacks?.[0] ?? 0) + Number(live.dangerousAttacks?.[1] ?? 0);
-    const sog = Number(live.shotsOnGoal?.[0] ?? 0) + Number(live.shotsOnGoal?.[1] ?? 0);
-    const corners = Number(live.corners?.[0] ?? 0) + Number(live.corners?.[1] ?? 0);
-    const pressure = Math.min(100, Math.round(da * 0.7 + sog * 6 + corners * 3));
-    add(markets, 'Pressão Ofensiva ao Vivo', pressure, pressure >= 70 ? 'Médio' : 'Alto', 'live_pressure', 'HEURISTIC', 'UNCALIBRATED');
-  }
+  // Live pressure remains an observation only. It is intentionally not emitted
+  // as a MarketAnalysis item, so it cannot become a betting opportunity,
+  // bestPick, fair-odd or EV-like value by downstream ranking.
   return markets;
 }

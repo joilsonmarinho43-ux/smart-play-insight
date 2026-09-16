@@ -23,6 +23,12 @@ export interface ModelData {
   awayCornersVariance: number | null;
   homeCardsVariance: number | null;
   awayCardsVariance: null | number;
+  /** Neutral Bayesian goal prior; never presented as observed league data. */
+  leagueAvg?: number | null;
+  /** Provenance for the quantitative inputs. */
+  source?: string | null;
+  historicalSample?: number | null;
+  dataQuality?: 'VALID' | 'PARTIAL' | 'INSUFFICIENT';
 }
 
 export interface SampleSize {
@@ -72,7 +78,8 @@ export type ProbabilitySource =
   | 'MARKET_IMPLIED'
   | 'UNKNOWN';
 
-export type CalibrationStatus = 'UNCALIBRATED' | 'CALIBRATED';
+/** CALIBRATED is reserved for empirical calibration; MODEL_VALIDATED is structural validation only. */
+export type CalibrationStatus = 'UNCALIBRATED' | 'MODEL_VALIDATED' | 'CALIBRATED';
 
 export interface MarketAnalysis {
   market: string;

@@ -65,3 +65,5 @@ jobs:
           git clean -fd -e deploy/.env -e supabase-docker/.env
           bash deploy/update.sh
           REMOTE
+
+# Keep the production deploy workflow active on the corrected Nexus tree.

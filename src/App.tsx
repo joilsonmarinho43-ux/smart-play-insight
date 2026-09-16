@@ -22,15 +22,14 @@ import Suggestions from "./pages/Suggestions";
 import Paywall from "./pages/Paywall";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
-import WorldCup from "./pages/WorldCup";
 import { AppLayout } from "./components/AppLayout";
 import { Loader2 } from "lucide-react";
+import { BingoVIPPro, ElitePerformance, CorrectScore, BetAnalyzer } from "./pages/AnalyticalTools";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, refetchOnReconnect: true, staleTime: 1000 * 60 * 5, retry: 1 } } });
 const LoadingScreen = () => <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center"><Loader2 className="w-8 h-8 text-primary animate-spin" /></div>;
 const ProtectedRoute = ({ children }: { children: ReactNode }) => { const { session, profile, loading } = useProfile(); useSessionGuard(); if (loading) return <LoadingScreen />; if (!session) return <Navigate to="/auth" replace />; const expired = profile?.subscription_expiry_date ? new Date(profile.subscription_expiry_date) < new Date() : true; if (!profile?.is_admin && expired) return <Navigate to="/expired" replace />; return <>{children}</>; };
 const AdminRoute = ({ children }: { children: ReactNode }) => { const { profile, loading } = useProfile(); useDataProviderHealthMonitor(!!profile?.is_admin); if (loading) return <LoadingScreen />; if (!profile?.is_admin) return <Navigate to="/" replace />; return <>{children}</>; };
-const LegacyRedirect = () => <Navigate to="/" replace />;
 
 const App = () => { useApiKeyValidator(); return <QueryClientProvider client={queryClient}><TooltipProvider><Toaster /><Sonner /><BrowserRouter><Routes>
   <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
@@ -39,7 +38,10 @@ const App = () => { useApiKeyValidator(); return <QueryClientProvider client={qu
   <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
   <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
   <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
-  <Route path="/world-cup" element={<ProtectedRoute><AppLayout><WorldCup /></AppLayout></ProtectedRoute>} />
+  <Route path="/bingo" element={<ProtectedRoute><AppLayout><BingoVIPPro /></AppLayout></ProtectedRoute>} />
+  <Route path="/elite" element={<ProtectedRoute><AppLayout><ElitePerformance /></AppLayout></ProtectedRoute>} />
+  <Route path="/placar-exato" element={<ProtectedRoute><AppLayout><CorrectScore /></AppLayout></ProtectedRoute>} />
+  <Route path="/bet-analyzer" element={<ProtectedRoute><AppLayout><BetAnalyzer /></AppLayout></ProtectedRoute>} />
   <Route path="/admin" element={<AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute>} />
   <Route path="/quality" element={<AdminRoute><AppLayout><Quality /></AppLayout></AdminRoute>} />
   <Route path="/diagnostics" element={<AdminRoute><AppLayout><Diagnostics /></AppLayout></AdminRoute>} />
@@ -47,12 +49,6 @@ const App = () => { useApiKeyValidator(); return <QueryClientProvider client={qu
   <Route path="/expired" element={<Paywall />} />
   <Route path="/auth" element={<Auth />} />
   <Route path="/reset-password" element={<ResetPassword />} />
-  {/* Historical betting/trading surfaces remain redirects until governed replacements exist. */}
-  <Route path="/elite" element={<LegacyRedirect />} />
-  <Route path="/placar-exato" element={<LegacyRedirect />} />
-  <Route path="/bet-analyzer" element={<LegacyRedirect />} />
-  <Route path="/bingo" element={<LegacyRedirect />} />
-  <Route path="/superbet-connect" element={<LegacyRedirect />} />
   <Route path="*" element={<NotFound />} />
 </Routes></BrowserRouter></TooltipProvider></QueryClientProvider>; };
 export default App;

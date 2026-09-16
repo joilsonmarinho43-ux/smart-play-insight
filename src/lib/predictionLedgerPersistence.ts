@@ -15,16 +15,17 @@ export interface LedgerPersistenceInput {
   dataObservedAt?: string | null;
 }
 
-/** Only an authoritative, calibrated Core SIGNAL can enter calibration history. */
+/** Only a Core SIGNAL with explicit model validation can enter the operational ledger. Empirical calibration remains distinct. */
 export function buildLedgerPrediction(input: LedgerPersistenceInput): PredictionRecord | null {
   if (input.decision.decision !== 'SIGNAL' || !input.decision.signalEligible) return null;
   if (input.decision.reasonCodes.includes('DATA_QUALITY_REJECT')) return null;
   if (input.market.probabilitySource !== 'MODEL_ESTIMATE') return null;
-  if (input.market.calibrationStatus !== 'CALIBRATED') return null;
+  if (input.market.calibrationStatus !== 'CALIBRATED' && input.market.calibrationStatus !== 'MODEL_VALIDATED') return null;
   if (input.dataQualityStatus !== 'VALID') return null;
   if (!Number.isFinite(input.market.probability) || input.market.probability <= 0 || input.market.probability > 100) return null;
   if (!Number.isFinite(input.decision.confidence) || input.decision.confidence < 85) return null;
 
+  const status = input.market.calibrationStatus;
   return createPredictionRecord({
     predictionId: input.predictionId,
     matchId: input.matchId,
@@ -34,7 +35,7 @@ export function buildLedgerPrediction(input: LedgerPersistenceInput): Prediction
     modelVersion: input.modelVersion,
     mode: input.mode ?? 'PRE_MATCH',
     probabilitySource: 'MODEL_ESTIMATE',
-    calibrationStatus: 'CALIBRATED',
+    calibrationStatus: status,
     marketOdd: input.market.odd ?? null,
     predictedAt: input.predictedAt ?? new Date().toISOString(),
     dataObservedAt: input.dataObservedAt ?? null,

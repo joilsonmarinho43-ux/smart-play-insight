@@ -1,4 +1,4 @@
-import { Home, Zap, Star, Shield, LogOut, Activity, Radar, ZoomIn, ZoomOut, Lightbulb } from 'lucide-react';
+import { Home, Zap, Star, Shield, LogOut, Activity, Radar, ZoomIn, ZoomOut, Lightbulb, Target, Globe2 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,13 +9,19 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 type NavItem = { title: string; url: string; icon: typeof Home };
 
 const analysisItems: NavItem[] = [
-  { title: 'Análise Pré-Jogo', url: '/', icon: Home },
+  { title: 'Dashboard', url: '/', icon: Home },
+  { title: 'Análise Pré-Jogo', url: '/', icon: Target },
   { title: 'Análise Ao Vivo', url: '/live', icon: Zap },
+  { title: 'Scanner PRO', url: '/scanner', icon: Radar },
 ];
 
 const toolsItems: NavItem[] = [
   { title: 'Favoritos', url: '/favorites', icon: Star },
   { title: 'Sugestões', url: '/suggestions', icon: Lightbulb },
+];
+
+const dataItems: NavItem[] = [
+  { title: 'Copa do Mundo', url: '/world-cup', icon: Globe2 },
 ];
 
 function SidebarNavGroup({ label, items, collapsed, onNavigate }: { label: string; items: NavItem[]; collapsed: boolean; onNavigate: () => void }) {
@@ -59,6 +65,7 @@ export function AppSidebar() {
         </div>
         <SidebarNavGroup label="Análise" items={analysisItems} collapsed={collapsed} onNavigate={handleNavClick} />
         <SidebarNavGroup label="Ferramentas Analíticas" items={toolsItems} collapsed={collapsed} onNavigate={handleNavClick} />
+        <SidebarNavGroup label="Dados" items={dataItems} collapsed={collapsed} onNavigate={handleNavClick} />
         {profile?.is_admin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-gray-500 text-[10px] uppercase tracking-widest px-3">{!collapsed ? 'Sistema' : ''}</SidebarGroupLabel>

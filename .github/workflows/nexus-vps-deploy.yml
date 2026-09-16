@@ -28,6 +28,9 @@ jobs:
       - name: Governance audit — analyst only
         run: node scripts/nexus-governance-audit.mjs
 
+      - name: AI provider governance audit
+        run: node scripts/nexus-ai-governance-audit.mjs
+
       - name: Type check
         run: npx tsc --noEmit
 

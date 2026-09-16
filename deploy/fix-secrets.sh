@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # =====================================================================
-# NEXUS 33 — injeta TODOS os secrets nas Edge Functions self-hosted
+# NEXUS 33 — injeta os secrets nas Edge Functions self-hosted
 #
 #   bash deploy/fix-secrets.sh
 #
-# Por que existe: no Supabase self-hosted o serviço `functions` só enxerga
-# variáveis DECLARADAS no docker-compose. Colocar a chave no .env não basta
-# — por isso as APIs de futebol (SportsRC / football-data.org), as IAs
-# (Gemini / Groq) e o Telegram voltavam vazios.
+# No Supabase self-hosted o serviço `functions` só enxerga variáveis
+# DECLARADAS no docker-compose. Colocar a chave no .env não basta — por
+# isso as APIs de futebol (SportsRC / football-data.org), as IAs
+# (Gemini / Groq) e o Telegram precisam ser injetados no edge-runtime.
 #
 # O script:
 #   1. deriva valores faltantes (APP_PUBLIC_URL, SUPABASE_URL, chaves)
 #   2. grava tudo em supabase-docker/.env
-#   3. gera supabase-docker/docker-compose.override.yml declarando as vars
+#   3. gera o env_file dedicado do edge-runtime
 #   4. reinicia o edge-runtime e mostra ✓/✗ de cada variável
 # =====================================================================
 set -euo pipefail
@@ -23,11 +23,9 @@ cd "$ROOT"
 SB="supabase-docker"
 [ -d "$SB" ] || { echo "Pasta $SB não encontrada. Rode na raiz do projeto."; exit 1; }
 
-# 1. carrega deploy/.env (fonte das chaves) + cofre fora do git
 [ -f deploy/.env ] || { echo "deploy/.env não existe (copie de deploy/.env.example)."; exit 1; }
 set -a; . deploy/.env; set +a
 
-# /etc/nexus33/secrets.env tem prioridade: chaves reais da VPS, nunca versionadas.
 VAULT="${NEXUS33_VAULT:-/etc/nexus33/secrets.env}"
 if [ -f "$VAULT" ]; then
   set -a; . "$VAULT"; set +a
@@ -38,8 +36,6 @@ fi
 
 readenv() { grep -E "^$1=" "$SB/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'; }
 
-
-# 2. derivações automáticas — nada de configuração manual
 : "${APP_DOMAIN:?defina APP_DOMAIN em deploy/.env}"
 : "${API_DOMAIN:?defina API_DOMAIN em deploy/.env}"
 APP_PUBLIC_URL="${APP_PUBLIC_URL:-https://${APP_DOMAIN}}"
@@ -48,22 +44,16 @@ SUPABASE_ANON_KEY="$(readenv ANON_KEY)"
 SUPABASE_SERVICE_ROLE_KEY="$(readenv SERVICE_ROLE_KEY)"
 POSTGRES_PASSWORD="$(readenv POSTGRES_PASSWORD)"
 SUPABASE_DB_URL="${SUPABASE_DB_URL:-postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres}"
-# o bot do Telegram aceita as duas variáveis (código usa BOT_TOKEN ou API_KEY)
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-${TELEGRAM_API_KEY:-}}"
 TELEGRAM_API_KEY="${TELEGRAM_API_KEY:-${TELEGRAM_BOT_TOKEN:-}}"
 TELEGRAM_ADMIN_CHAT_ID="${TELEGRAM_ADMIN_CHAT_ID:-${TELEGRAM_CHAT_ID:-}}"
 
-# chaves obrigatórias para o app funcionar como no Lovable
 REQUIRED=(SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY GEMINI_API_KEY GROQ_API_KEY
           TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID)
-# demais chaves suportadas
-OPTIONAL=(TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY LOVABLE_API_KEY)
-# infra (derivadas)
+OPTIONAL=(TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY)
 INFRA=(APP_PUBLIC_URL SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_URL)
-
 KEYS=("${REQUIRED[@]}" "${OPTIONAL[@]}" "${INFRA[@]}")
 
-# 3. grava/atualiza no .env do supabase-docker
 for K in "${KEYS[@]}"; do
   V="${!K:-}"
   [ -z "$V" ] && continue
@@ -80,7 +70,6 @@ PY
   fi
 done
 
-# 4. arquivo de env dedicado ao edge-runtime (valores literais, chmod 600)
 FENV="$SB/functions.secrets.env"
 : > "$FENV"; chmod 600 "$FENV"
 for K in "${KEYS[@]}"; do
@@ -90,25 +79,21 @@ for K in "${KEYS[@]}"; do
 done
 echo "Secrets literais gravados em $FENV ($(wc -l < "$FENV") vars)"
 
-# 5. PATCH no docker-compose.yml do Supabase — o override era ignorado quando o
-#    serviço do edge-runtime não se chama "functions" ou quando o compose é
-#    invocado com -f explícito. Aqui injetamos env_file direto no serviço real.
 python3 - "$SB/docker-compose.yml" "functions.secrets.env" <<'PY'
-import re, shutil, sys
+import os, re, shutil, sys
 path, envfile = sys.argv[1:3]
 src = open(path).read()
-if not path.endswith('.bak') and not __import__('os').path.exists(path + '.bak'):
+if not path.endswith('.bak') and not os.path.exists(path + '.bak'):
     shutil.copy(path, path + '.bak')
 
 lines = src.splitlines()
-# localiza bloco "services:" e cada serviço de 1º nível (indent 2)
 svc_starts = []
 in_services = False
 for i, l in enumerate(lines):
     if re.match(r'^services:\s*$', l):
         in_services = True; continue
     if in_services:
-        if re.match(r'^\S', l):  # saiu de services
+        if re.match(r'^\S', l):
             break
         m = re.match(r'^  ([A-Za-z0-9_.-]+):\s*$', l)
         if m:
@@ -134,7 +119,6 @@ if not target:
 
 idx, name, s, e = target
 body_lines = lines[s:e]
-# remove env_file anterior nosso (bloco de lista) para regravar
 cleaned, skip = [], False
 for l in body_lines:
     if re.match(r'^    env_file:\s*$', l):
@@ -152,16 +136,12 @@ open(path, 'w').write("\n".join(lines) + "\n")
 print(f"  ✓ env_file ./{envfile} injetado no serviço '{name}' (backup: {path}.bak)")
 PY
 
-# override antigo não é mais necessário (podia ser ignorado com -f explícito)
 rm -f "$SB/docker-compose.override.yml"
-
-# 6. recria o edge-runtime pegando o novo env_file
 SVC="$(cd "$SB" && docker compose config --services 2>/dev/null | grep -E '^(functions|edge-functions)$' | head -1)"
 SVC="${SVC:-functions}"
 (cd "$SB" && docker compose up -d --force-recreate "$SVC")
 sleep 5
 
-# 7. relatório
 echo
 echo "Variáveis dentro do container do edge-runtime:"
 MISSING=0
@@ -183,6 +163,7 @@ done
 echo
 if [ "$MISSING" -eq 1 ]; then
   echo "⚠ Preencha as chaves obrigatórias em deploy/.env e rode este script de novo."
+  exit 1
 else
   echo "✅ Todos os secrets obrigatórios estão no edge-runtime."
 fi

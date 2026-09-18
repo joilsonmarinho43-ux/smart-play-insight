@@ -4,7 +4,7 @@ import type { MarketAnalysis } from '@/types/match';
 
 const match={id:'test-1',homeTeam:'Home',awayTeam:'Away',league:'League',isLive:false};
 const dataQuality={status:'VALID' as const,score:95,reasons:[] as string[]};
-const market:MarketAnalysis={market:'Over 1.5 Gols',probability:90,risk:'low',category:'goals',odd:1.2,probabilitySource:'MODEL_ESTIMATE',calibrationStatus:'CALIBRATED'};
+const market:MarketAnalysis={market:'Over 1.5 Gols',probability:90,risk:'low',category:'goals',odd:1.2,oddSource:'OBSERVED',probabilitySource:'MODEL_ESTIMATE',calibrationStatus:'CALIBRATED'};
 const strongEvidence=marketsToNexusEvidence([market,{...market,market:'BTTS',probability:88}]);
 const base={dataQuality};
 
@@ -24,6 +24,6 @@ describe('Nexus Core analítico',()=>{
  it('ignora probabilidades inválidas ao construir evidências',()=>{const out=marketsToNexusEvidence([market,{...market,probability:Number.NaN}]);expect(out).toHaveLength(1);expect(out[0].value).toBe(90);});
  it('bloqueia ausência de qualidade de dados',()=>{const out=decideNexus({match,mode:'PRE_MATCH',confidence:92,markets:[market],evidence:strongEvidence});expect(out.decision).toBe('CONSERVATIVE');expect(out.signalEligible).toBe(false);expect(out.reasonCodes).toContain('DATA_QUALITY_NOT_VALID');});
  it('corta confiança acima de 95',()=>{const out=decideNexus({...base,match,mode:'PRE_MATCH',confidence:99,markets:[market],evidence:strongEvidence});expect(out.confidence).toBe(95);expect(out.decision).toBe('SIGNAL');});
- it('não aprova SIGNAL quando a odd observada não gera EV positivo',()=>{const lowValue={...market,probability:80,odd:1.1};const out=decideNexus({...base,match,mode:'PRE_MATCH',confidence:92,markets:[lowValue],evidence:marketsToNexusEvidence([lowValue])});expect(out.decision).toBe('CONSERVATIVE');expect(out.signalEligible).toBe(false);expect(out.reasonCodes).toContain('NO_POSITIVE_EV_MARKET');});
- it('seleciona o mercado validado com EV positivo quando o consenso não tem preço',()=>{const noPrice={...market,market:'Over 1.5 Gols',probability:92,odd:undefined};const value={...market,market:'BTTS',probability:84,odd:1.3};const out=decideNexus({...base,match,mode:'PRE_MATCH',confidence:92,markets:[noPrice,value],evidence:marketsToNexusEvidence([noPrice,value])});expect(out.selectedMarket?.market).toBe('BTTS');expect(out.decision).toBe('SIGNAL');expect(out.signalEligible).toBe(true);});
+ it('não aprova SIGNAL quando a odd observada não gera EV positivo',()=>{const lowValue={...market,probability:80,odd:1.1,oddSource:'OBSERVED' as const};const out=decideNexus({...base,match,mode:'PRE_MATCH',confidence:92,markets:[lowValue],evidence:marketsToNexusEvidence([lowValue])});expect(out.decision).toBe('CONSERVATIVE');expect(out.signalEligible).toBe(false);expect(out.reasonCodes).toContain('NO_POSITIVE_EV_MARKET');});
+ it('seleciona o mercado validado com EV positivo quando o consenso não tem preço',()=>{const noPrice={...market,market:'Over 1.5 Gols',probability:92,odd:undefined};const value={...market,market:'BTTS',probability:84,odd:1.3,oddSource:'OBSERVED' as const};const out=decideNexus({...base,match,mode:'PRE_MATCH',confidence:92,markets:[noPrice,value],evidence:marketsToNexusEvidence([noPrice,value])});expect(out.selectedMarket?.market).toBe('BTTS');expect(out.decision).toBe('SIGNAL');expect(out.signalEligible).toBe(true);});
 });

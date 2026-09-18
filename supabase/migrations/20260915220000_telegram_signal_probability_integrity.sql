@@ -36,3 +36,19 @@ where model_probability is not null
   and implied_probability is not null
   and abs(model_probability - implied_probability) < 0.0001
   and (expected_value is null or market_type = 'correct_score');
+
+
+-- Preserve the provenance used by the Core gate so the signal ledger is
+-- independently auditable after publication.
+alter table public.telegram_signals
+  add column if not exists probability_source text,
+  add column if not exists calibration_status text,
+  add column if not exists odd_source text,
+  add column if not exists core_approved boolean,
+  add column if not exists core_reason_codes jsonb;
+
+create index if not exists idx_telegram_signals_odd_source
+  on public.telegram_signals (odd_source);
+
+create index if not exists idx_telegram_signals_probability_source
+  on public.telegram_signals (probability_source);

@@ -19,7 +19,7 @@ const researchScore = (e:ResearchEvidence[]) => { const valid=e.filter(x=>typeof
 const selected = (m:MarketAnalysis[]) => valid(m).sort((a,b)=>b.probability-a.probability)[0] ?? null;
 
 export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput {
-  const reasons:string[]=[]; const confidence=norm(input.confidence); const markets=input.markets??[]; const allSelected=selected(markets); const calibratedMarket=signalCandidates(markets).sort((a,b)=>b.probability-a.probability)[0] ?? null; const selectedMarket=calibratedMarket??allSelected; const best=score(markets); const sp=spread(markets); const ev=evidence(input.evidence??[]); const research=researchScore(input.researchEvidence??[]); const combinedEvidence=Math.round((ev+research)/((input.researchEvidence?.length??0)>0?2:1));
+  const reasons:string[]=[]; const confidence=norm(input.confidence); const markets=input.markets??[]; const allSelected=selected(markets); const calibratedMarket=signalCandidates(markets).sort((a,b)=>b.probability-a.probability)[0] ?? null; const selectedMarket=calibratedMarket??allSelected; const best=calibratedMarket?.probability??allSelected?.probability??0; const sp=spread(markets); const ev=evidence(input.evidence??[]); const research=researchScore(input.researchEvidence??[]); const combinedEvidence=Math.round((ev+research)/((input.researchEvidence?.length??0)>0?2:1));
   const unverified=markets.some(m=>m.probabilitySource==='HEURISTIC'||m.probabilitySource==='UNKNOWN');
   const marketImplied=markets.some(m=>m.probabilitySource==='MARKET_IMPLIED');
   const source=input.probabilitySource??selectedMarket?.probabilitySource??null;

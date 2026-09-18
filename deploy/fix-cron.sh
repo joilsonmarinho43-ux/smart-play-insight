@@ -24,6 +24,17 @@ docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
+-- Remove definitivamente schedulers legados que não pertencem ao fluxo atual.
+-- A geração de sinais não pode nascer de pg_cron fora do Nexus Core.
+DELETE FROM cron.job
+WHERE jobname IN (
+  'daily-bet-analyzer-broadcast',
+  'daily-correct-score-broadcast',
+  'daily-ticket-settle',
+  'daily-bingo-broadcast',
+  'telegram-signal'
+);
+
 -- reaponta host antigo e chave antiga
 UPDATE cron.job
    SET command = replace(command, 'https://${OLD_REF}.supabase.co', 'https://${NEW_API}')

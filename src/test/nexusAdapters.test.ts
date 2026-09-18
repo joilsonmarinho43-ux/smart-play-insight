@@ -5,7 +5,7 @@ import { adaptHybridSignal, adaptPreMatch } from '@/lib/nexusAdapters';
 
 const market:MarketAnalysis={market:'Over 0.5 HT',probability:88,risk:'baixo',category:'goals'};
 const modelMarket:MarketAnalysis={...market,probabilitySource:'MODEL_ESTIMATE',calibrationStatus:'CALIBRATED'};
-const observedMarket:MarketAnalysis={...market,odd:1.7};
+const observedMarket:MarketAnalysis={...market,odd:1.7,oddSource:'OBSERVED'};
 const liveSignal:LegacyLiveSignal={matchId:'h1',match:'Casa vs Fora',league:'Teste',minute:18,confidence:'alta',signalEligible:true,shotsOnGoal:4,corners:3,dangerousAttacks:12,daEstimated:false,possession:64,pressure:90,observedAt:new Date().toISOString()};
 const strongPreMatch={id:'p1',time:'20:00',league:'Teste',homeTeam:'Casa',awayTeam:'Fora',isLive:false,sampleSize:{homeGames:5,awayGames:5,homeWithStats:5,awayWithStats:5},modelData:{homeGoalsAvg:1.5,awayGoalsAvg:1.2,homeGoalsAgainstAvg:1,awayGoalsAgainstAvg:1.1,homeCornersAvg:5,awayCornersAvg:4,homeCardsAvg:2,awayCardsAvg:2,homeCornersVariance:1,awayCornersVariance:1,homeCardsVariance:1,awayCardsVariance:1}};
 

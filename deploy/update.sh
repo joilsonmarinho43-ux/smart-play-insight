@@ -41,7 +41,8 @@ PY
   bash deploy/apply-migrations.sh
   # Cron estrutural já é validado por verify.sh. O script fix-cron.sh fica
   # disponível para correções manuais sem bloquear o deploy automático.
-  bash deploy/enable-daily-broadcasts.sh
+  # Não reativa broadcasts legados nem settlement antigo durante o deploy.
+  # A geração/registro de sinais permanece sob o Nexus Core.
 fi
 
 # Frontend — mantém a mesma interface e infraestrutura, recriando somente

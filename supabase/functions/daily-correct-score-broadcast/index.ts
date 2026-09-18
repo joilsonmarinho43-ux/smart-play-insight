@@ -338,28 +338,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    const rows = top.map((p) => ({
-      match_id: p.matchId,
-      match_name: `${p.home} vs ${p.away}`,
-      market: `Placar Exato ${p.score}`,
-      market_type: 'correct_score',
-      minute: 0,
-      confidence: p.confidence,
-      score: '0-0',
-      reason: REASON,
-      sensitivity: 'PRE',
-      success: null,
-      status: 'pendente',
-      telegram_message_id: messageId,
-      // Correct-score broadcast has no observed bookmaker odd here.
-      // Store the model probability only; never masquerade fair odds as market odds.
-      odd: null,
-      implied_probability: null,
-      model_probability: p.scoreProb,
-    }));
-    const { error: insErr } = await sb.from('telegram_signals').insert(rows);
-    if (insErr) console.error('[CS] insert falhou:', insErr.message);
-
+    // Correct-score is an informational broadcast, not a Nexus signal.
+    // It must not write to telegram_signals: that ledger is reserved for
+    // Core-approved signals with observed market odds and real EV.
     console.log(`[CS] ok photo=${sentAsPhoto} picks=${top.length} elapsed=${Date.now() - t0}ms`);
     return new Response(JSON.stringify({
       ok: true, picks: top.length, photo: sentAsPhoto, message_id: messageId, elapsed_ms: Date.now() - t0,

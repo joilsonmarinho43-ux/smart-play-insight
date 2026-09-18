@@ -28,11 +28,11 @@ export function adaptHybridSignal(signal: LegacyLiveSignal, market?: MarketAnaly
 
 export function adaptPreMatch(match:MatchData,markets:MarketAnalysis[],confidence:number|null|undefined,calibrationStatus?:CalibrationStatus,researchEvidence:ResearchEvidence[]=[]): NexusDecisionOutput {
   const inheritedCalibration = calibrationStatus ?? match.predictions?.calibrationStatus ?? null;
-  const normalizedMarkets=markets.map(m=>({...m,probabilitySource:m.probabilitySource??match.predictions?.probabilitySource??'MODEL_ESTIMATE' as const,calibrationStatus:m.calibrationStatus??inheritedCalibration??'UNCALIBRATED'}));
+  const normalizedMarkets=markets.map(m=>({...m,probabilitySource:m.probabilitySource??'UNKNOWN' as const,calibrationStatus:m.calibrationStatus??inheritedCalibration??'UNCALIBRATED'}));
   const validatedMarket=normalizedMarkets.find(m=>m.probabilitySource==='MODEL_ESTIMATE'&&(m.calibrationStatus==='CALIBRATED'||m.calibrationStatus==='MODEL_VALIDATED'));
   const effectiveCalibration=validatedMarket?.calibrationStatus??inheritedCalibration;
   const sampleSize=match.sampleSize?Math.min(match.sampleSize.homeGames,match.sampleSize.awayGames):null;
   const modelDataValid=Boolean(match.modelData&&sampleSize!==null&&sampleSize>=3&&Number.isFinite(match.modelData.homeGoalsAvg)&&Number.isFinite(match.modelData.awayGoalsAvg)&&Number.isFinite(match.modelData.homeGoalsAgainstAvg)&&Number.isFinite(match.modelData.awayGoalsAgainstAvg));
   const dataQuality=assessDataQuality({live:false,sampleSize,requiredSampleSize:3,sourceCompleteness:modelDataValid?100:75,requiredFeaturesPresent:normalizedMarkets.length>0});
-  return decideNexus({match,mode:'PRE_MATCH',confidence,markets:normalizedMarkets,evidence:[...marketsToNexusEvidence(normalizedMarkets),...researchToNexusEvidence(researchEvidence)],researchEvidence,dataQuality,calibrationStatus:effectiveCalibration,probabilitySource:validatedMarket?.probabilitySource??'MODEL_ESTIMATE'});
+  return decideNexus({match,mode:'PRE_MATCH',confidence,markets:normalizedMarkets,evidence:[...marketsToNexusEvidence(normalizedMarkets),...researchToNexusEvidence(researchEvidence)],researchEvidence,dataQuality,calibrationStatus:effectiveCalibration,probabilitySource:validatedMarket?.probabilitySource??null});
 }

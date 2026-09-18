@@ -265,7 +265,7 @@ export function buildMatchReadingV2(
   };
 
   let markets: MarketAnalysis[] = [];
-  try { markets = analyzeMarkets(match); } catch { markets = []; }
+  try { markets = analyzeMarkets(match, { homeLambda: hL, awayLambda: aL }); } catch { markets = []; }
   if (markets.length === 0) return null;
 
   // Sincroniza as linhas Over/Under de gols com o λ ajustado ANTES de

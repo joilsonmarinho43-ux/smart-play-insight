@@ -7,7 +7,7 @@
 # - confirma que pg_cron/pg_net estão ativos
 # - mostra os jobs e as últimas execuções
 # - reaponta qualquer job que ainda chame a URL antiga para o seu
-#   API_DOMAIN e a ANON_KEY locais
+#   API_DOMAIN e normaliza tokens JWT de cron para o SERVICE_ROLE_KEY local
 # =====================================================================
 set -euo pipefail
 
@@ -17,7 +17,8 @@ set -a; . deploy/.env; set +a
 
 OLD_REF="yeyctdphzrmyxgskehru"
 NEW_API="${API_DOMAIN:?defina API_DOMAIN em deploy/.env}"
-ANON="$(grep -E '^ANON_KEY=' supabase-docker/.env | cut -d= -f2-)"
+SERVICE_ROLE_KEY="$(grep -E '^SERVICE_ROLE_KEY=' supabase-docker/.env | cut -d= -f2-)"
+[ -n "$SERVICE_ROLE_KEY" ] || { echo "SERVICE_ROLE_KEY ausente em supabase-docker/.env"; exit 1; }
 
 docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
 CREATE EXTENSION IF NOT EXISTS pg_cron;

@@ -12,18 +12,22 @@ const norm = (v:number|null|undefined) => typeof v === 'number' && Number.isFini
 const valid = (m:MarketAnalysis[]) => m.filter(x => Number.isFinite(x.probability) && x.probability >= 0 && x.probability <= 100);
 const signalCalibration = (x:MarketAnalysis) => x.calibrationStatus === 'CALIBRATED' || x.calibrationStatus === 'MODEL_VALIDATED';
 const signalCandidates = (m:MarketAnalysis[]) => valid(m).filter(x => x.probabilitySource === 'MODEL_ESTIMATE' && signalCalibration(x));
+const observedValueCandidates = (m:MarketAnalysis[]) => signalCandidates(m).filter(x => Number.isFinite(x.odd) && Number(x.odd) > 1 && (x.probability / 100) * Number(x.odd) - 1 > 0);
 const spread = (m:MarketAnalysis[]) => { const v=signalCandidates(m).map(x=>x.probability).sort((a,b)=>a-b); return v.length>=2?v[v.length-1]-v[0]:null; };
 const evidence = (e:NexusEvidence[]) => { const u=e.map(x=>({v:clamp(x.value),w:Math.max(0,x.weight??1)})).filter(x=>x.w>0); if(!u.length)return 0; const t=u.reduce((s,x)=>s+x.w,0); return Math.round(u.reduce((s,x)=>s+x.v*x.w,0)/t); };
 const researchScore = (e:ResearchEvidence[]) => { const valid=e.filter(x=>typeof x.claim==='string'&&x.claim.trim()&&Number.isFinite(x.confidence)); if(!valid.length)return 0; const weighted=valid.reduce((s,x)=>s+clamp(x.confidence)*(x.observed&&!x.estimated?1:0.5),0); const weights=valid.reduce((s,x)=>s+(x.observed&&!x.estimated?1:0.5),0); return weights?Math.round(weighted/weights):0; };
 const selected = (m:MarketAnalysis[]) => valid(m).sort((a,b)=>b.probability-a.probability)[0] ?? null;
+const valueSelected = (m:MarketAnalysis[]) => observedValueCandidates(m).sort((a,b)=>((b.probability/100)*Number(b.odd)-1)-((a.probability/100)*Number(a.odd)-1))[0] ?? null;
 const consensusSelected = (m:MarketAnalysis[]) => { const v=signalCandidates(m).slice().sort((a,b)=>a.probability-b.probability); if(!v.length)return null; return v[Math.floor((v.length-1)/2)] ?? null; };
 
 export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput {
-  const reasons:string[]=[]; const confidence=norm(input.confidence); const markets=input.markets??[]; const allSelected=selected(markets); const calibratedMarket=consensusSelected(markets); const selectedMarket=calibratedMarket??allSelected; const best=calibratedMarket?.probability??allSelected?.probability??0; const sp=spread(markets); const ev=evidence(input.evidence??[]); const research=researchScore(input.researchEvidence??[]); const combinedEvidence=Math.round((ev+research)/((input.researchEvidence?.length??0)>0?2:1));
+  const reasons:string[]=[]; const confidence=norm(input.confidence); const markets=input.markets??[]; const allSelected=selected(markets); const calibratedMarket=consensusSelected(markets); const valueMarket=valueSelected(markets); const selectedMarket=valueMarket??calibratedMarket??allSelected; const best=calibratedMarket?.probability??allSelected?.probability??0; const sp=spread(markets); const ev=evidence(input.evidence??[]); const research=researchScore(input.researchEvidence??[]); const combinedEvidence=Math.round((ev+research)/((input.researchEvidence?.length??0)>0?2:1));
   const unverified=markets.some(m=>m.probabilitySource==='HEURISTIC'||m.probabilitySource==='UNKNOWN');
   const marketImplied=markets.some(m=>m.probabilitySource==='MARKET_IMPLIED');
   const source=input.probabilitySource??selectedMarket?.probabilitySource??null;
   const calibration=input.calibrationStatus??selectedMarket?.calibrationStatus??null;
+  if(calibratedMarket && !valueMarket) reasons.push('NO_POSITIVE_EV_MARKET');
+  if(selectedMarket && (!Number.isFinite(selectedMarket.odd) || Number(selectedMarket.odd) <= 1)) reasons.push('MARKET_ODD_MISSING');
   if(!input.match.id||!input.match.homeTeam||!input.match.awayTeam)return{decision:'REJECT',confidence:confidence??0,riskScore:100,selectedMarket:null,reasonCodes:['INVALID_MATCH'],evidenceScore:0,signalEligible:false};
   if(input.analysisBlocked)return{decision:'REJECT',confidence:confidence??0,riskScore:100,selectedMarket,reasonCodes:['ANALYSIS_BLOCKED'],evidenceScore:combinedEvidence,signalEligible:false};
   if(input.dataQuality?.status==='REJECT')return{decision:'REJECT',confidence:confidence??0,riskScore:100,selectedMarket,reasonCodes:[...input.dataQuality.reasons.map(r=>`DATA_${r}`),'DATA_QUALITY_REJECT'],evidenceScore:combinedEvidence,signalEligible:false};
@@ -41,7 +45,9 @@ export function decideNexus(input:NexusDecisionInput):NexusDecisionOutput {
   if(input.dataQuality?.status!=='VALID'||unverified||marketImplied||source!=='MODEL_ESTIMATE'||!(calibration==='CALIBRATED'||calibration==='MODEL_VALIDATED')||!calibratedMarket)return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence,input.dataQuality?.score??0)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};
   if(input.engineConflict||(sp!==null&&sp>15)){return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence,input.dataQuality?.score??0)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};}
   if(confidence<85){reasons.push('CONSERVATIVE_CONFIDENCE');return{decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false};}
-  if(!selectedMarket.odd || !Number.isFinite(selectedMarket.odd) || selectedMarket.odd <= 1){ reasons.push('MARKET_ODD_MISSING'); return {decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false}; }
+  if(!valueMarket){ return {decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false}; }
+  const selectedEv = (selectedMarket.probability / 100) * Number(selectedMarket.odd) - 1;
+  if(!(selectedEv > 0)){ reasons.push('NO_POSITIVE_EV_MARKET'); return {decision:'CONSERVATIVE',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:false}; }
   reasons.push('CORE_APPROVED_SIGNAL'); return{decision:'SIGNAL',confidence:safeConfidence,riskScore:clamp(100-Math.min(safeConfidence,best,combinedEvidence)),selectedMarket,reasonCodes:reasons,evidenceScore:combinedEvidence,signalEligible:true};
 }
 export function marketsToNexusEvidence(markets:MarketAnalysis[]):NexusEvidence[]{return markets.filter(m=>Number.isFinite(m.probability)).map(m=>({source:'market',name:m.market,value:clamp(m.probability),weight:1}));}

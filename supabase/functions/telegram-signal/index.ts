@@ -91,9 +91,6 @@ Deno.serve(async (req) => {
         },
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    if (!coreGateOk) {
-      return new Response(JSON.stringify({ success: false, disabled: true, reason: 'CORE_GATE_REJECTED', detail: { signalEligible, coreApproved, selectedMarketMatches, probabilitySource, calibrationStatus, oddSource, hasModelProbability: modelProbabilityValid, hasObservedOdd: observedOddValid, positiveObservedValue, aiStatus } }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
     const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const chatId = Deno.env.get('TELEGRAM_CHAT_ID');
     if (!chatId) return new Response(JSON.stringify({ success: false, disabled: true, reason: 'TELEGRAM_CHAT_ID_MISSING' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

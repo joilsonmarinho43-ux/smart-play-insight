@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { sendTelegramMessage, editTelegramMessage, getTelegramBotToken, escapeHtml } from '../_shared/telegram.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireInternalServiceCall } from '../_shared/internalAuth.ts';
 
 type Verdict = 'green' | 'loss' | 'pendente' | 'void';
 
@@ -86,6 +87,8 @@ function calcRoi(odd: number | null, status: 'green' | 'loss' | 'void'): number 
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const internal = requireInternalServiceCall(req, corsHeaders);
+  if (internal) return internal;
   const t0 = Date.now();
 
   try {

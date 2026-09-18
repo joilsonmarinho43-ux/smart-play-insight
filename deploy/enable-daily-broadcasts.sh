@@ -1,75 +1,16 @@
 #!/usr/bin/env bash
 # =====================================================================
-# NEXUS 33 — agenda os envios diários em FOTO no Telegram:
-#   • Placar Exato do dia
-#   • Bet Analyzer do dia (5 cenários)
+# NEXUS 33 — LEGACY / DESABILITADO
 #
-#   bash deploy/enable-daily-broadcasts.sh
-#   HORA_PLACAR=10 HORA_ANALYZER=11 bash deploy/enable-daily-broadcasts.sh
+# Este script não cria cron jobs. Os broadcasts legados e o
+# daily-ticket-settle foram retirados do fluxo operacional.
+# A geração/registro de sinais pertence exclusivamente ao Nexus Core.
 #
-# Horários em BRT (UTC-3). pg_cron roda em UTC — a conversão é automática.
+# Mantido apenas para impedir que instalações antigas recriem jobs
+# desabilitados acidentalmente.
 # =====================================================================
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
-set -a; . deploy/.env; set +a
-
-API="${API_DOMAIN:?defina API_DOMAIN em deploy/.env}"
-ANON="$(grep -E '^ANON_KEY=' supabase-docker/.env | cut -d= -f2-)"
-
-HORA_PLACAR="${HORA_PLACAR:-08}"
-HORA_ANALYZER="${HORA_ANALYZER:-09}"
-
-utc() { echo $(( (10#$1 + 3) % 24 )); }
-
-schedule() {
-  local job="$1" fn="$2" hora_brt="$3"
-  local hora_utc; hora_utc=$(utc "$hora_brt")
-  echo "→ ${job}: ${hora_brt}:00 BRT (${hora_utc}:00 UTC)"
-  docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
-SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = '${job}';
-
-SELECT cron.schedule(
-  '${job}',
-  '0 ${hora_utc} * * *',
-  \$\$
-  SELECT net.http_post(
-    url := 'https://${API}/functions/v1/${fn}',
-    headers := '{"Content-Type":"application/json","apikey":"${ANON}","Authorization":"Bearer ${ANON}"}'::jsonb,
-    body := '{"source":"cron"}'::jsonb
-  );
-  \$\$
-);
-SQL
-}
-
-schedule 'daily-correct-score-broadcast' 'daily-correct-score-broadcast' "$HORA_PLACAR"
-schedule 'daily-bet-analyzer-broadcast'  'daily-bet-analyzer-broadcast'  "$HORA_ANALYZER"
-
-# Conferência automática do bilhete (WIN/LOSS) — a cada 30 minutos
-echo "→ daily-ticket-settle: a cada 30 min"
-docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
-SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = 'daily-ticket-settle';
-SELECT cron.schedule(
-  'daily-ticket-settle',
-  '*/30 * * * *',
-  \$\$
-  SELECT net.http_post(
-    url := 'https://${API}/functions/v1/daily-ticket-settle',
-    headers := '{"Content-Type":"application/json","apikey":"${ANON}","Authorization":"Bearer ${ANON}"}'::jsonb,
-    body := '{"source":"cron"}'::jsonb
-  );
-  \$\$
-);
-SQL
-
-docker exec -i supabase-db psql -U postgres -d postgres -c \
-  "SELECT jobname, schedule, active FROM cron.job WHERE jobname LIKE 'daily-%';"
-
-echo
-echo "✅ Agendado. Teste manual:"
-echo "curl -s -X POST https://${API}/functions/v1/daily-bet-analyzer-broadcast -H 'Content-Type: application/json' -H \"apikey: ${ANON:0:12}...\" -d '{\"force\":true}'"
+echo "NEXUS 33: broadcasts legados e daily-ticket-settle permanecem DESABILITADOS."
+echo "Nenhum pg_cron job foi criado."
+exit 0

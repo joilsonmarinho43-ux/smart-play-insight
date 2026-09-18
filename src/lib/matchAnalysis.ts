@@ -7,6 +7,19 @@ function bayes(value:number,prior:number,n:number,strength=3):number{if(!Number.
 function resultProbabilities(h:number,a:number){let home=0,draw=0,away=0;for(let i=0;i<=10;i++)for(let j=0;j<=10;j++){const p=poisson(h,i)*poisson(a,j);if(i>j)home+=p;else if(i===j)draw+=p;else away+=p;}const sum=home+draw+away;return sum?{home:home/sum,draw:draw/sum,away:away/sum}:{home:0,draw:0,away:0};}
 function realXG(match:MatchData){const h=(match as any).homeStats?.expectedGoals??match.metrics?.xG?.[0],a=(match as any).awayStats?.expectedGoals??match.metrics?.xG?.[1];return{home:typeof h==='number'&&Number.isFinite(h)&&h>=0?h:null,away:typeof a==='number'&&Number.isFinite(a)&&a>=0?a:null};}
 function modelLambdas(match:MatchData){const h=(match as any).homeStats||{},a=(match as any).awayStats||{};const homeN=Number(match.sampleSize?.homeGames??h.gamesCount??0),awayN=Number(match.sampleSize?.awayGames??a.gamesCount??0),n=Math.min(homeN,awayN);const leagueRaw=Number(match.modelData?.leagueAvg??h.leagueAvg??a.leagueAvg??2.5),league=Number.isFinite(leagueRaw)&&leagueRaw>0?leagueRaw:null;const hGF=Number(match.modelData?.homeGoalsAvg??h.goalsFor??NaN),aGF=Number(match.modelData?.awayGoalsAvg??a.goalsFor??NaN),hGA=Number(match.modelData?.homeGoalsAgainstAvg??h.goalsAgainst??NaN),aGA=Number(match.modelData?.awayGoalsAgainstAvg??a.goalsAgainst??NaN);if(!(n>=3&&league!==null&&[hGF,aGF,hGA,aGA].every(Number.isFinite)&&hGF>=0&&aGF>=0&&hGA>=0&&aGA>=0))return null;const hAttack=bayes(hGF,league!,homeN),aDefense=bayes(aGA,league!,awayN),aAttack=bayes(aGF,league!,awayN),hDefense=bayes(hGA,league!,homeN);return{home:Math.max(.01,(hAttack/league!)*(aDefense/league!)*league!),away:Math.max(.01,(aAttack/league!)*(hDefense/league!)*league!),n};}
+export interface CanonicalGoalLambdas { homeLambda: number; awayLambda: number; sampleSize: number; leagueAvg: number; }
+
+/** Canonical base goal model used by all market/score consumers. Contextual adjustments belong upstream (e.g. readingEngine). */
+export function getCanonicalGoalLambdas(match:MatchData):CanonicalGoalLambdas|null{
+  const h=(match as any).homeStats||{},a=(match as any).awayStats||{};
+  const homeN=Number(match.sampleSize?.homeGames??h.gamesCount??0),awayN=Number(match.sampleSize?.awayGames??a.gamesCount??0),n=Math.min(homeN,awayN);
+  const leagueRaw=Number(match.modelData?.leagueAvg??h.leagueAvg??a.leagueAvg??2.5),league=Number.isFinite(leagueRaw)&&leagueRaw>0?leagueRaw:null;
+  const hGF=Number(match.modelData?.homeGoalsAvg??h.goalsFor??NaN),aGF=Number(match.modelData?.awayGoalsAvg??a.goalsFor??NaN),hGA=Number(match.modelData?.homeGoalsAgainstAvg??h.goalsAgainst??NaN),aGA=Number(match.modelData?.awayGoalsAgainstAvg??a.goalsAgainst??NaN);
+  if(!(n>=3&&league!==null&&[hGF,aGF,hGA,aGA].every(Number.isFinite)&&hGF>=0&&aGF>=0&&hGA>=0&&aGA>=0))return null;
+  const hAttack=bayes(hGF,league!,homeN),aDefense=bayes(aGA,league!,awayN),aAttack=bayes(aGF,league!,awayN),hDefense=bayes(hGA,league!,homeN);
+  return {homeLambda:Math.max(.01,(hAttack/league!)*(aDefense/league!)*league!),awayLambda:Math.max(.01,(aAttack/league!)*(hDefense/league!)*league!),sampleSize:n,leagueAvg:league!};
+}
+
 function add(markets:MarketAnalysis[],market:string,probability:number,risk:string,category:string,source:MarketAnalysis['probabilitySource'],calibration:MarketAnalysis['calibrationStatus']='UNCALIBRATED'){if(!Number.isFinite(probability))return;markets.push({market,probability:Math.max(0,Math.min(100,Math.round(probability))),risk,category,probabilitySource:source,calibrationStatus:calibration});}
 export function isValidBet(probability:number,ev=0):boolean{return Number.isFinite(probability)&&probability>=60&&Number.isFinite(ev)&&ev>=0;}
 export interface MarketLambdaOverride { homeLambda: number; awayLambda: number; }

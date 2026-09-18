@@ -87,6 +87,8 @@ export interface MarketAnalysis {
   risk: string;
   category: string;
   odd?: number;
+  /** Provenance of the price; SIGNAL requires an explicitly observed market odd. */
+  oddSource?: 'OBSERVED' | 'UNKNOWN';
   probabilitySource?: ProbabilitySource;
   calibrationStatus?: CalibrationStatus;
 }

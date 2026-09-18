@@ -43,4 +43,21 @@ describe('Nexus Core pre-match hardening', () => {
     expect(r.signalEligible).toBe(false);
     expect(r.reasonCodes).toContain('MARKET_ODD_MISSING');
   });
+  it('não usa probabilidade não validada para superar o limiar do mercado validado', () => {
+    const validated = market(1.25);
+    const unvalidated = {...market(1.1), market:'Over 4.5 Escanteios', probability:99, calibrationStatus:'UNCALIBRATED' as const};
+    const r = decideNexus({match,mode:'PRE_MATCH',confidence:90,markets:[validated,unvalidated],evidence:[{source:'market',name:'m',value:90}],dataQuality:{status:'VALID',score:90,reasons:[]},calibrationStatus:'CALIBRATED',probabilitySource:'MODEL_ESTIMATE'});
+    expect(r.decision).toBe('SIGNAL');
+    expect(r.selectedMarket?.market).toBe('Over 2.5 Gols');
+  });
+
+  it('bloqueia quando o único mercado validado está abaixo do limiar mesmo que outro mercado não validado seja alto', () => {
+    const validated = {...market(1.4), probability:70};
+    const unvalidated = {...market(1.1), market:'Over 4.5 Escanteios', probability:99, calibrationStatus:'UNCALIBRATED' as const};
+    const r = decideNexus({match,mode:'PRE_MATCH',confidence:90,markets:[validated,unvalidated],evidence:[{source:'market',name:'m',value:90}],dataQuality:{status:'VALID',score:90,reasons:[]},calibrationStatus:'CALIBRATED',probabilitySource:'MODEL_ESTIMATE'});
+    expect(r.decision).toBe('INFO_ONLY');
+    expect(r.signalEligible).toBe(false);
+    expect(r.reasonCodes).toContain('MARKET_BELOW_THRESHOLD');
+  });
+
 });

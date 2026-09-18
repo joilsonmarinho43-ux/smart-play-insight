@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     // Stake remains a reporting assumption, while ROI/odds come from each
     // resolved signal; never substitute a synthetic average odd.
     const stakeBase = 20;
-    const resolvedSignals = signals || [];
+    const resolvedSignals = (signals || []).filter((s: any) => s.status === 'green' || s.status === 'loss');
     const observedOdds = resolvedSignals
       .map((s: any) => Number(s.odd))
       .filter((odd: number) => Number.isFinite(odd) && odd > 1);

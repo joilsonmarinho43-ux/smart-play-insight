@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { BarChart3, BookOpen, Clock, Database, Target, TrendingUp, Trophy, ShieldAlert, RefreshCw } from 'lucide-react';
 import type { MatchData } from '@/types/match';
 import { useTeamForm, mergeFormIntoMatch } from '@/hooks/useTeamForm';
-import { useTeamStatsAI, mergeAIStatsIntoMatch } from '@/hooks/useTeamStatsAI';
 import { useMatchReading } from '@/hooks/useMatchReading';
 import { MatchReadingModal } from './MatchReadingModal';
 import { analyzeMarkets, exactScoreDistribution } from '@/lib/matchAnalysis';
@@ -46,7 +45,7 @@ function Ticket({ match }: { match: MatchData }) {
 export default function MatchCard({ match: rawMatch, isPremium }: Props) {
   const [tab,setTab]=useState<Tab>('stats'); const [readingOpen,setReadingOpen]=useState(false);
   const {data:form}=useTeamForm(rawMatch); const withForm=useMemo(()=>mergeFormIntoMatch(rawMatch,form),[rawMatch,form]);
-  const {data:aiStats}=useTeamStatsAI(withForm); const match=useMemo(()=>mergeAIStatsIntoMatch(withForm,aiStats),[withForm,aiStats]);
+  const match=withForm;
   const {reading,loading,context,analyst,analystLoading,analystError,fallback}=useMatchReading(match,readingOpen);
   const tabs:[Tab,string,any][]=[['stats','Estatísticas',BarChart3],['poisson','Poisson',TrendingUp],['ticket','Bilhete',Target]];
   return <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#101521]/90 shadow-2xl shadow-black/20 backdrop-blur-xl">

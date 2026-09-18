@@ -6,6 +6,7 @@
 // =============================================================
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireInternalServiceCall } from '../_shared/internalAuth.ts';
 
 // ---- pressão simplificada (não substitui pressureEngine) ----
 function pressureSide(s: any): number {
@@ -71,6 +72,8 @@ function recomputeAggregates(snaps: any[]): any {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const internal = requireInternalServiceCall(req, corsHeaders);
+  if (internal) return internal;
   try {
     const sb = createClient(
       Deno.env.get('SUPABASE_URL')!,

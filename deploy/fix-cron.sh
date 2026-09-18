@@ -32,7 +32,7 @@ UPDATE cron.job
 UPDATE cron.job
    SET command = regexp_replace(command,
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_.-]*',
-        '${ANON}', 'g')
+        '${SERVICE_ROLE_KEY}', 'g')
  WHERE command ~ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.';
 
 SELECT jobid, jobname, schedule, active FROM cron.job ORDER BY jobname;

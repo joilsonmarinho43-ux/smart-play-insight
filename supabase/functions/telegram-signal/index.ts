@@ -7,6 +7,22 @@ import { computeObservedMarketValue } from '../_shared/marketValue.ts';
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   try {
+    // This publisher is service-to-service only. It writes the privileged
+    // telegram_signals ledger and must never accept a browser/public caller.
+    // Keep verify_jwt=false because self-hosted deployments may use the
+    // service-role API key rather than a user JWT; authenticate the capability
+    // explicitly against the server-only SUPABASE_SERVICE_ROLE_KEY.
+    const configuredServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const authorization = req.headers.get('authorization')?.replace(/^Bearer\\s+/i, '').trim() || '';
+    const apiKey = req.headers.get('apikey')?.trim() || '';
+    const internalAuthorized = !!configuredServiceKey && (authorization === configuredServiceKey || apiKey === configuredServiceKey);
+    if (!internalAuthorized) {
+      return new Response(JSON.stringify({ success: false, disabled: true, reason: 'INTERNAL_CALL_REQUIRED' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const body = await req.json();
     const decision = body?.decision ?? {};
     const market = String(body?.market || '');

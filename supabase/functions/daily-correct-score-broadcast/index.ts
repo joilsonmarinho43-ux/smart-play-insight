@@ -222,7 +222,7 @@ function buildCaption(picks: Pick[], dateLabel: string): string {
   lines.push('');
   picks.forEach((p, i) => {
     lines.push(`${i + 1}. <b>${escapeHtml(p.home)} x ${escapeHtml(p.away)}</b> — ${escapeHtml(p.time)}`);
-    lines.push(`   🥇 ${escapeHtml(p.score)} (${p.scoreProb}%) • cobertura ${escapeHtml(p.combo.join(' / '))} (${p.comboProb}%) • odd mín. ${p.comboOdd.toFixed(2)}`);
+    lines.push(`   🥇 ${escapeHtml(p.score)} (${p.scoreProb}%) • cobertura ${escapeHtml(p.combo.join(' / '))} (${p.comboProb}%) • odd justa cobertura ${p.comboOdd.toFixed(2)}`);
   });
   lines.push('');
   lines.push('⚠️ Gestão de banca: máx. 1% por entrada.');
@@ -351,8 +351,10 @@ Deno.serve(async (req) => {
       success: null,
       status: 'pendente',
       telegram_message_id: messageId,
-      odd: p.scoreOdd,
-      implied_probability: p.scoreProb,
+      // Correct-score broadcast has no observed bookmaker odd here.
+      // Store the model probability only; never masquerade fair odds as market odds.
+      odd: null,
+      implied_probability: null,
       model_probability: p.scoreProb,
     }));
     const { error: insErr } = await sb.from('telegram_signals').insert(rows);

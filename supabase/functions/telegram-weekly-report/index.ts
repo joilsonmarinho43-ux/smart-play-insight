@@ -37,8 +37,7 @@ Deno.serve(async (req) => {
     const { data: signals, error } = await supabase
       .from('telegram_signals')
       .select('*')
-      .gte('created_at', weekAgoISO)
-      .eq('success', true);
+      .gte('created_at', weekAgoISO);
 
     if (error) throw error;
 

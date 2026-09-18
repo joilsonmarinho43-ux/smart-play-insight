@@ -1,3 +1,4 @@
+import { requireInternalServiceCall, requireAdminUser } from '../_shared/internalAuth.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -62,6 +63,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseKey) return new Response(JSON.stringify({ ok: false, error: 'SERVER_CONFIG_MISSING' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const sb = createClient(supabaseUrl, supabaseKey);
+  const admin = await requireAdminUser(req, sb, corsHeaders);
+  if (admin) return admin;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

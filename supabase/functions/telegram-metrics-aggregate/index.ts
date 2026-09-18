@@ -1,3 +1,4 @@
+import { requireInternalServiceCall, requireAdminUser } from '../_shared/internalAuth.ts';
 // ═══════════════════════════════════════════════════════════════
 // telegram-metrics-aggregate — snapshot de envios (cron 5min)
 // ═══════════════════════════════════════════════════════════════
@@ -6,6 +7,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const internal = requireInternalServiceCall(req, corsHeaders);
+  if (internal) return internal;
   try {
     const sb = createClient(
       Deno.env.get('SUPABASE_URL')!,

@@ -1,3 +1,4 @@
+import { requireInternalServiceCall, requireAdminUser } from '../_shared/internalAuth.ts';
 // ═══════════════════════════════════════════════════════════════
 // telegram-test — envia mensagem de validação para TELEGRAM_CHAT_ID
 // Admin-only (verify_jwt = true por padrão; chamada pelo painel admin)
@@ -8,6 +9,12 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseKey) return new Response(JSON.stringify({ ok: false, error: 'SERVER_CONFIG_MISSING' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const sb = createClient(supabaseUrl, supabaseKey);
+  const admin = await requireAdminUser(req, sb, corsHeaders);
+  if (admin) return admin;
   try {
     const chatId = Deno.env.get('TELEGRAM_CHAT_ID');
     if (!chatId) throw new Error('TELEGRAM_CHAT_ID not configured');

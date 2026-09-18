@@ -1,3 +1,4 @@
+import { requireInternalServiceCall, requireAdminUser } from '../_shared/internalAuth.ts';
 // ═══════════════════════════════════════════════════════════════
 // daily-correct-score-broadcast — PLACAR EXATO DO DIA (1x por dia)
 // Envia UMA imagem (PNG) no Telegram com os melhores placares exatos
@@ -231,6 +232,8 @@ function buildCaption(picks: Pick[], dateLabel: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const internal = requireInternalServiceCall(req, corsHeaders);
+  if (internal) return internal;
 
   const t0 = Date.now();
   try {

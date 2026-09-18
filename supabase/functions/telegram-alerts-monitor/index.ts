@@ -1,3 +1,4 @@
+import { requireInternalServiceCall, requireAdminUser } from '../_shared/internalAuth.ts';
 // ═══════════════════════════════════════════════════════════════
 // telegram-alerts-monitor — cron 2min
 // Dispara alerta para TELEGRAM_ADMIN_CHAT_ID quando:
@@ -16,6 +17,8 @@ const QUOTA_LIMIT = 7000;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const internal = requireInternalServiceCall(req, corsHeaders);
+  if (internal) return internal;
   try {
     // ⚠️ Alertas operacionais SOMENTE para admin (nunca para o grupo de sinais).
     // Exige TELEGRAM_ADMIN_CHAT_ID explicitamente; se não houver, apenas loga.

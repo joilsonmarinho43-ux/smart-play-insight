@@ -12,6 +12,18 @@ const BATCH_SIZE = 25;
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  // Telegram retry workers are privileged server-to-server operations.
+  const configuredServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const authorization = req.headers.get('authorization')?.replace(/^Bearer\\s+/i, '').trim() || '';
+  const apiKey = req.headers.get('apikey')?.trim() || '';
+  const internalAuthorized = !!configuredServiceKey && (authorization === configuredServiceKey || apiKey === configuredServiceKey);
+  if (!internalAuthorized) {
+    return new Response(JSON.stringify({ ok: false, error: 'INTERNAL_CALL_REQUIRED' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const sb = createClient(
       Deno.env.get('SUPABASE_URL')!,

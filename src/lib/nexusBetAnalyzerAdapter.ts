@@ -3,7 +3,13 @@ import {
   decideNexus,
   type NexusDecisionOutput,
 } from '@/lib/nexusDecisionCore';
-import type { ScenarioCard } from '@/lib/betAnalyzerEngine';
+
+/** Minimal structural input from the Bet Analyzer. Kept local so the Nexus frontend does not depend on a removed analyzer module. */
+export interface ScenarioCard {
+  scenario: { key: string };
+  score: number;
+  quality: 'ALTA' | 'MÉDIA' | 'BAIXA' | string;
+}
 
 /**
  * Adapter do Bet Analyzer para o Nexus Core.

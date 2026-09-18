@@ -1,3 +1,5 @@
+import { getCanonicalGoalLambdas } from '@/lib/matchAnalysis';
+
 // 🎯 Motor de Placar Exato — Poisson bivariado com ajuste Dixon-Coles.
 // Regras de integridade:
 //  • Só usa números reais das equipes (modelData / homeStats / últimos jogos).
@@ -84,39 +86,21 @@ export function extractLambdas(match: any): {
   sample: { home: number; away: number };
   hasRealData: boolean;
 } {
+  const canonical = getCanonicalGoalLambdas(match);
   const hs = match?.homeStats || {};
   const as = match?.awayStats || {};
-  const md = match?.modelData || {};
-
-  const leagueAvg = num(hs.leagueAvg ?? as.leagueAvg, 1.35);
-
-  // Prioridade: últimos jogos com decaimento > média agregada
-  const hGF = weightedAvg(hs.recentGoalsFor) ?? num(md.homeGoalsAvg ?? hs.goalsFor);
-  const aGF = weightedAvg(as.recentGoalsFor) ?? num(md.awayGoalsAvg ?? as.goalsFor);
-  const hGA = weightedAvg(hs.recentGoalsAgainst) ?? num(md.homeGoalsAgainstAvg ?? hs.goalsAgainst);
-  const aGA = weightedAvg(as.recentGoalsAgainst) ?? num(md.awayGoalsAgainstAvg ?? as.goalsAgainst);
-
-  const homeN = num(match?.sampleSize?.homeGames ?? hs.gamesCount);
-  const awayN = num(match?.sampleSize?.awayGames ?? as.gamesCount);
-
-  const hasRealData = homeN > 0 && awayN > 0 && hGF > 0 && aGF > 0;
-
-  const reg = (v: number, n: number) => (n > 0 && v > 0 ? (n * v + K * leagueAvg) / (n + K) : leagueAvg);
-  const adjHGF = reg(hGF, homeN);
-  const adjAGF = reg(aGF, awayN);
-  const adjHGA = reg(hGA, homeN);
-  const adjAGA = reg(aGA, awayN);
-
-  // Força de ataque × fraqueza defensiva do adversário + vantagem de mando
-  const HOME_ATT = 1.10;   // casa marca ~10% mais
-  const AWAY_ATT = 0.94;   // visitante marca ~6% menos
-  let homeLambda = (adjHGF / leagueAvg) * (adjAGA / leagueAvg) * leagueAvg * HOME_ATT;
-  let awayLambda = (adjAGF / leagueAvg) * (adjHGA / leagueAvg) * leagueAvg * AWAY_ATT;
-
-  homeLambda = Math.min(4, Math.max(0.25, homeLambda));
-  awayLambda = Math.min(4, Math.max(0.2, awayLambda));
-
-  return { homeLambda, awayLambda, sample: { home: homeN, away: awayN }, hasRealData };
+  const homeN = Number(match?.sampleSize?.homeGames ?? hs.gamesCount ?? 0);
+  const awayN = Number(match?.sampleSize?.awayGames ?? as.gamesCount ?? 0);
+  const hGF = Number(match?.modelData?.homeGoalsAvg ?? hs.goalsFor ?? NaN);
+  const aGF = Number(match?.modelData?.awayGoalsAvg ?? as.goalsFor ?? NaN);
+  const hasRealData = !!canonical && homeN > 0 && awayN > 0 && hGF > 0 && aGF > 0;
+  if (!canonical) return { homeLambda: 0, awayLambda: 0, sample: { home: homeN, away: awayN }, hasRealData: false };
+  return {
+    homeLambda: canonical.homeLambda,
+    awayLambda: canonical.awayLambda,
+    sample: { home: homeN, away: awayN },
+    hasRealData,
+  };
 }
 
 export function buildCorrectScore(match: any): CorrectScoreRead {

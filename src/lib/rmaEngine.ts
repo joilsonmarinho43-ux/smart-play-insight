@@ -1,10 +1,7 @@
 /**
  * RMA ENGINE — Ritmo, Momento e Agressividade
- * 
- * Camada de validação paralela que classifica sinais como
- * CONFIRMADO, BLOQUEADO ou NEUTRO sem alterar a lógica existente.
- * 
- * Modo Shadow: apenas registra decisões, sem interferir no usuário.
+ * Canonical live-pressure validator. This score is a validation signal,
+ * never a market probability.
  */
 
 export type RMAVerdict = 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO';
@@ -12,79 +9,58 @@ export type RMAVerdict = 'CONFIRMADO' | 'BLOQUEADO' | 'NEUTRO';
 export interface RMAResult {
   verdict: RMAVerdict;
   score: number;
-  ap_norm: number;
-  f_norm: number;
-  sot_norm: number;
-  acceleration: number;
   blockReason: string | null;
 }
 
 export interface RMAInput {
-  /** Minuto atual do jogo (>= 1) */
   minute: number;
-  /** Índice de pressão 0-100 */
   pressure: number;
-  /** Ataques perigosos acumulados */
   dangerousAttacks: number;
-  /** Total de finalizações */
   totalShots: number;
-  /** Finalizações no gol */
-  shotsOnTarget: number;
-  /** Ataques perigosos nos últimos 5 min (opcional, para aceleração) */
-  recentDA?: number;
-  /** Ataques perigosos nos 5 min anteriores (opcional, para aceleração) */
-  previousDA?: number;
+  shotsOnGoal: number;
+  leagueWeight?: number;
+  momentumDelta?: number;
+  daEstimated?: boolean;
 }
 
-/**
- * Calcula o score RMA e classifica o sinal.
- */
-export function evaluateRMA(input: RMAInput): RMAResult {
-  const safeMinute = Math.max(input.minute, 1);
+/** Same scoring/gates used by the edge-runtime RMA validator. */
+export function evaluateRMA(i: RMAInput): RMAResult {
+  const minute = Math.max(1, i.minute);
+  const daRate = (Math.max(0, i.dangerousAttacks) / minute) * 10;
+  const shotsRate = (Math.max(0, i.totalShots) / minute) * 10;
+  const sotRate = (Math.max(0, i.shotsOnGoal) / minute) * 10;
+  const estimated = i.daEstimated === true;
 
-  // Normalize per-minute rates × 10
-  const ap_norm = (input.dangerousAttacks / safeMinute) * 10;
-  const f_norm = (input.totalShots / safeMinute) * 10;
-  const sot_norm = (input.shotsOnTarget / safeMinute) * 10;
+  const qualityPenalty = estimated ? 8 : 0;
+  const earlyPenalty = minute < 15 ? 6 : minute < 20 ? 3 : 0;
+  const raw =
+    i.pressure * 0.24 +
+    daRate * 0.28 +
+    shotsRate * 0.18 +
+    sotRate * 0.30 +
+    Math.max(-4, Math.min(5, i.leagueWeight ?? 0)) +
+    Math.max(-5, Math.min(5, i.momentumDelta ?? 0)) -
+    qualityPenalty - earlyPenalty;
 
-  // Composite score
-  let rma_score =
-    (input.pressure * 0.4) +
-    (ap_norm * 0.35) +
-    (f_norm * 0.15) +
-    (sot_norm * 0.10);
+  const score = Math.round(Math.max(0, Math.min(100, raw)) * 100) / 100;
 
-  // Acceleration (reforço / enfraquecimento)
-  const acceleration = (input.recentDA ?? 0) - (input.previousDA ?? 0);
-
-  // ── Hard-block: only obvious fake pressure ──
-  if (input.pressure > 60 && input.dangerousAttacks === 0 && input.shotsOnTarget === 0) {
-    return { verdict: 'BLOQUEADO', score: rma_score, ap_norm, f_norm, sot_norm, acceleration, blockReason: 'Pressão fake: pressão alta sem atividade' };
-  }
-
-  // Apply acceleration bonus/penalty (±5 pts max)
-  if (acceleration > 0) {
-    rma_score += Math.min(acceleration * 2, 5);
-  } else if (acceleration < 0) {
-    rma_score += Math.max(acceleration * 2, -5);
-  }
-
-  // ── Classification — thresholds calibrados para dados reais ──
-  let verdict: RMAVerdict;
-  if (rma_score > 15) {
-    verdict = 'CONFIRMADO';
-  } else if (rma_score >= 8) {
-    verdict = 'NEUTRO';
-  } else {
-    verdict = 'BLOQUEADO';
-  }
-
-  return { verdict, score: Math.round(rma_score * 100) / 100, ap_norm: Math.round(ap_norm * 100) / 100, f_norm: Math.round(f_norm * 100) / 100, sot_norm: Math.round(sot_norm * 100) / 100, acceleration, blockReason: verdict === 'BLOQUEADO' ? `Score ${Math.round(rma_score)} < 8` : null };
+  if (estimated && (i.shotsOnGoal < 4 || i.totalShots < 7))
+    return { verdict: 'BLOQUEADO', score, blockReason: `DA estimado sem volume real suficiente (SoG=${i.shotsOnGoal}, chutes=${i.totalShots})` };
+  if (estimated && i.pressure > 68 && i.shotsOnGoal < 5)
+    return { verdict: 'BLOQUEADO', score, blockReason: 'Pressão elevada pode estar inflada por DA estimado; SoG insuficiente' };
+  if (minute < 15 && i.shotsOnGoal < 3)
+    return { verdict: 'BLOQUEADO', score, blockReason: 'Amostra ao vivo muito curta para confirmar pressão ofensiva' };
+  if (sotRate < 0.60)
+    return { verdict: 'BLOQUEADO', score, blockReason: `Ritmo de SoG insuficiente (${sotRate.toFixed(2)})` };
+  if (daRate < 1.50)
+    return { verdict: 'BLOQUEADO', score, blockReason: `Ritmo de ataques perigosos insuficiente (${daRate.toFixed(2)})` };
+  if (i.pressure > 60 && i.dangerousAttacks <= 0)
+    return { verdict: 'BLOQUEADO', score, blockReason: 'Pressão sem ataques perigosos' };
+  if (score >= 55) return { verdict: 'CONFIRMADO', score, blockReason: null };
+  if (score >= 30) return { verdict: 'NEUTRO', score, blockReason: null };
+  return { verdict: 'BLOQUEADO', score, blockReason: `Score RMA ${score.toFixed(1)} abaixo de 30` };
 }
 
-/**
- * Helper: build RMAInput from typical live match stats.
- */
 export function buildRMAInput(
   homeStats: { dangerousAttacks?: number; totalShots?: number; shotsOnGoal?: number },
   awayStats: { dangerousAttacks?: number; totalShots?: number; shotsOnGoal?: number },
@@ -96,6 +72,6 @@ export function buildRMAInput(
     pressure,
     dangerousAttacks: (homeStats.dangerousAttacks || 0) + (awayStats.dangerousAttacks || 0),
     totalShots: (homeStats.totalShots || 0) + (awayStats.totalShots || 0),
-    shotsOnTarget: (homeStats.shotsOnGoal || 0) + (awayStats.shotsOnGoal || 0),
+    shotsOnGoal: (homeStats.shotsOnGoal || 0) + (awayStats.shotsOnGoal || 0),
   };
 }

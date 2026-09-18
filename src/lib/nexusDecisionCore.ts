@@ -12,7 +12,6 @@ const norm = (v:number|null|undefined) => typeof v === 'number' && Number.isFini
 const valid = (m:MarketAnalysis[]) => m.filter(x => Number.isFinite(x.probability) && x.probability >= 0 && x.probability <= 100);
 const signalCalibration = (x:MarketAnalysis) => x.calibrationStatus === 'CALIBRATED' || x.calibrationStatus === 'MODEL_VALIDATED';
 const signalCandidates = (m:MarketAnalysis[]) => valid(m).filter(x => x.probabilitySource === 'MODEL_ESTIMATE' && signalCalibration(x));
-const score = (m:MarketAnalysis[]) => { const v=valid(m).map(x=>x.probability).sort((a,b)=>a-b); if(!v.length)return 0; const i=Math.floor(v.length/2); return v.length%2?v[i]:(v[i-1]+v[i])/2; };
 const spread = (m:MarketAnalysis[]) => { const v=signalCandidates(m).map(x=>x.probability).sort((a,b)=>a-b); return v.length>=2?v[v.length-1]-v[0]:null; };
 const evidence = (e:NexusEvidence[]) => { const u=e.map(x=>({v:clamp(x.value),w:Math.max(0,x.weight??1)})).filter(x=>x.w>0); if(!u.length)return 0; const t=u.reduce((s,x)=>s+x.w,0); return Math.round(u.reduce((s,x)=>s+x.v*x.w,0)/t); };
 const researchScore = (e:ResearchEvidence[]) => { const valid=e.filter(x=>typeof x.claim==='string'&&x.claim.trim()&&Number.isFinite(x.confidence)); if(!valid.length)return 0; const weighted=valid.reduce((s,x)=>s+clamp(x.confidence)*(x.observed&&!x.estimated?1:0.5),0); const weights=valid.reduce((s,x)=>s+(x.observed&&!x.estimated?1:0.5),0); return weights?Math.round(weighted/weights):0; };

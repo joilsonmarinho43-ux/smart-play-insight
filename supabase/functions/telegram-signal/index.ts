@@ -25,15 +25,32 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const decision = body?.decision ?? {};
-    const market = String(body?.market || '');
     const match = body?.match ?? {};
-    const selectedMarket = body?.selectedMarket ?? decision?.selectedMarket ?? {};
-    const probability = Number(body?.probability ?? selectedMarket?.probability);
-    const confidence = Number(body?.confidence);
-    const odd = Number(body?.odd ?? selectedMarket?.odd);
-    const probabilitySource = String(body?.probabilitySource ?? selectedMarket?.probabilitySource ?? 'UNKNOWN');
-    const calibrationStatus = String(body?.calibrationStatus ?? selectedMarket?.calibrationStatus ?? 'UNCALIBRATED');
-    const oddSource = String(body?.oddSource ?? selectedMarket?.oddSource ?? 'UNKNOWN').toUpperCase();
+    // Nexus Core is the sole authority for the selected market and its model
+    // metadata. Top-level duplicates are accepted only as integrity checks;
+    // they can never override decision.selectedMarket.
+    const coreSelectedMarket = decision?.selectedMarket ?? null;
+    const selectedMarketPresent = !!coreSelectedMarket && typeof coreSelectedMarket === 'object';
+    const hasOwn = (key: string) => Object.prototype.hasOwnProperty.call(body ?? {}, key);
+    const numericMatches = (key: string, coreValue: unknown) => {
+      if (!hasOwn(key)) return true;
+      const payloadValue = Number(body?.[key]);
+      const normalizedCore = Number(coreValue);
+      return Number.isFinite(payloadValue) && Number.isFinite(normalizedCore) && payloadValue === normalizedCore;
+    };
+    const stringMatches = (key: string, coreValue: unknown) => {
+      if (!hasOwn(key)) return true;
+      return String(body?.[key]) === String(coreValue ?? '');
+    };
+    const nestedSelectedMarketMatches = !hasOwn('selectedMarket') ||
+      JSON.stringify(body?.selectedMarket ?? null) === JSON.stringify(coreSelectedMarket);
+    const market = String(coreSelectedMarket?.market || '');
+    const probability = Number(coreSelectedMarket?.probability);
+    const confidence = Number(decision?.confidence ?? body?.confidence);
+    const odd = Number(coreSelectedMarket?.odd);
+    const probabilitySource = String(coreSelectedMarket?.probabilitySource ?? 'UNKNOWN');
+    const calibrationStatus = String(coreSelectedMarket?.calibrationStatus ?? 'UNCALIBRATED');
+    const oddSource = String(coreSelectedMarket?.oddSource ?? 'UNKNOWN').toUpperCase();
     const aiStatus = String(body?.aiAudit?.status || 'CAUTION');
     const signalEligible = decision?.signalEligible === true && decision?.decision === 'SIGNAL';
     const modelProbabilityValid = Number.isFinite(probability) && probability >= 0 && probability <= 100;
@@ -41,9 +58,39 @@ Deno.serve(async (req) => {
     const modelValidated = calibrationStatus === 'CALIBRATED' || calibrationStatus === 'MODEL_VALIDATED';
     const marketValue = computeObservedMarketValue(probability, odd);
     const coreApproved = Array.isArray(decision?.reasonCodes) && decision.reasonCodes.includes('CORE_APPROVED_SIGNAL');
-    const selectedMarketMatches = !selectedMarket?.market || String(selectedMarket.market) === market;
+    const payloadMatchesCore = nestedSelectedMarketMatches &&
+      numericMatches('probability', coreSelectedMarket?.probability) &&
+      numericMatches('odd', coreSelectedMarket?.odd) &&
+      stringMatches('market', coreSelectedMarket?.market) &&
+      stringMatches('probabilitySource', coreSelectedMarket?.probabilitySource) &&
+      stringMatches('calibrationStatus', coreSelectedMarket?.calibrationStatus) &&
+      stringMatches('oddSource', coreSelectedMarket?.oddSource) &&
+      (!hasOwn('confidence') || Number(body?.confidence) === Number(decision?.confidence ?? body?.confidence));
     const positiveObservedValue = !!marketValue && marketValue.expectedValue > 0;
-    const coreGateOk = !!market && signalEligible && coreApproved && selectedMarketMatches && probabilitySource === 'MODEL_ESTIMATE' && modelValidated && oddSource === 'OBSERVED' && aiStatus !== 'BLOCK' && modelProbabilityValid && Number.isFinite(confidence) && confidence >= 85 && observedOddValid && positiveObservedValue;
+    const coreGateOk = selectedMarketPresent && !!market && signalEligible && coreApproved && payloadMatchesCore &&
+      probabilitySource === 'MODEL_ESTIMATE' && modelValidated && oddSource === 'OBSERVED' &&
+      aiStatus !== 'BLOCK' && modelProbabilityValid && Number.isFinite(confidence) &&
+      confidence >= 85 && observedOddValid && positiveObservedValue;
+    if (!coreGateOk) {
+      return new Response(JSON.stringify({
+        success: false,
+        disabled: true,
+        reason: 'CORE_GATE_REJECTED',
+        detail: {
+          signalEligible,
+          coreApproved,
+          selectedMarketPresent,
+          payloadMatchesCore,
+          probabilitySource,
+          calibrationStatus,
+          oddSource,
+          hasModelProbability: modelProbabilityValid,
+          hasObservedOdd: observedOddValid,
+          positiveObservedValue,
+          aiStatus,
+        },
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     if (!coreGateOk) {
       return new Response(JSON.stringify({ success: false, disabled: true, reason: 'CORE_GATE_REJECTED', detail: { signalEligible, coreApproved, selectedMarketMatches, probabilitySource, calibrationStatus, oddSource, hasModelProbability: modelProbabilityValid, hasObservedOdd: observedOddValid, positiveObservedValue, aiStatus } }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

@@ -11,8 +11,11 @@ Deno.serve(async (req) => {
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !supabaseKey) return new Response(JSON.stringify({ ok: false, error: 'SERVER_CONFIG_MISSING' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   const sb = createClient(supabaseUrl, supabaseKey);
-  const admin = await requireAdminUser(req, sb, corsHeaders);
-  if (admin) return admin;
+  const internal = requireInternalServiceCall(req, corsHeaders);
+  if (internal) {
+    const admin = await requireAdminUser(req, sb, corsHeaders);
+    if (admin) return admin;
+  }
 
   try {
     const TELEGRAM_BOT_TOKEN = getTelegramBotToken();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decideNexus } from './nexusDecisionCore';
 
 const match = { id:'1', homeTeam:'A', awayTeam:'B', league:'L', isLive:false, status:'NS', minute:0 } as const;
-const market = (odd:number|null) => ({ market:'Over 2.5 Gols', probability:86, risk:'baixo', category:'goals', probabilitySource:'MODEL_ESTIMATE' as const, calibrationStatus:'CALIBRATED' as const, odd:odd ?? undefined });
+const market = (odd:number|null) => ({ market:'Over 2.5 Gols', probability:86, risk:'baixo', category:'goals', probabilitySource:'MODEL_ESTIMATE' as const, calibrationStatus:'CALIBRATED' as const, odd:odd ?? undefined, oddSource:odd != null ? 'OBSERVED' as const : 'UNKNOWN' as const });
 
 const research = [{
   type:'INJURY' as const,

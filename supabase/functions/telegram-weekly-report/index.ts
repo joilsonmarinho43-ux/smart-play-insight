@@ -48,13 +48,30 @@ Deno.serve(async (req) => {
     const pending = signals?.filter((s: any) => s.status === 'pendente').length || 0;
     const winRate = greens + losses > 0 ? ((greens / (greens + losses)) * 100).toFixed(1) : '0.0';
 
-    // Estimated profit calculation (flat stake R$20, odd avg 1.80)
-    const oddMedia = 1.80;
+    // Financial calculation uses the persisted signal ledger.
+    // Stake remains a reporting assumption, while ROI/odds come from each
+    // resolved signal; never substitute a synthetic average odd.
     const stakeBase = 20;
-    const lucroGreens = greens * stakeBase * (oddMedia - 1);
+    const resolvedSignals = signals || [];
+    const observedOdds = resolvedSignals
+      .map((s: any) => Number(s.odd))
+      .filter((odd: number) => Number.isFinite(odd) && odd > 1);
+    const oddMedia = observedOdds.length > 0
+      ? observedOdds.reduce((sum: number, odd: number) => sum + odd, 0) / observedOdds.length
+      : null;
+    const roiUnits = resolvedSignals.reduce((sum: number, s: any) => {
+      const value = Number(s.roi);
+      return Number.isFinite(value) ? sum + value : sum;
+    }, 0);
+    const lucroLiquido = roiUnits * stakeBase;
+    const lucroGreens = resolvedSignals.reduce((sum: number, s: any) => {
+      if (s.status !== 'green') return sum;
+      const odd = Number(s.odd);
+      return Number.isFinite(odd) && odd > 1 ? sum + stakeBase * (odd - 1) : sum;
+    }, 0);
     const prejuizoLosses = losses * stakeBase;
-    const lucroLiquido = lucroGreens - prejuizoLosses;
-    const roi = total > 0 ? ((lucroLiquido / (total * stakeBase)) * 100).toFixed(1) : '0.0';
+    const resolvedStake = resolvedSignals.length * stakeBase;
+    const roi = resolvedStake > 0 ? ((lucroLiquido / resolvedStake) * 100).toFixed(1) : '0.0';
 
     // Build performance bars
     const barLength = 10;
@@ -86,7 +103,7 @@ ${progressBar}
 
 ${lucroEmoji} <b>ESTIMATIVA FINANCEIRA</b>
 ├ Stake Base: R$ ${stakeBase.toFixed(2)}
-├ Odd Média: ${oddMedia.toFixed(2)}
+├ Odd Média Observada: ${oddMedia !== null ? oddMedia.toFixed(2) : '—'}
 ├ Lucro Bruto: R$ ${lucroGreens.toFixed(2)}
 ├ Prejuízo: R$ ${prejuizoLosses.toFixed(2)}
 ├ <b>Lucro Líquido: R$ ${lucroLiquido.toFixed(2)}</b>

@@ -188,6 +188,18 @@ export function buildMatchReadingV2(
   const oddD = ctx?.odds?.draw ?? null;
   const oddA = ctx?.odds?.away ?? null;
   const oddO = ctx?.odds?.over25 ?? null;
+  // Somente preços efetivamente observados pelo contexto entram como odd de mercado.
+  const oddByMarket = (name: string): number | null => {
+    const o = ctx?.odds;
+    if (!o) return null;
+    if (name === "Vitória Casa") return o.home ?? null;
+    if (name === "Vitória Fora") return o.away ?? null;
+    if (name === "Empate") return o.draw ?? null;
+    if (name === "Over 2.5 Gols") return o.over25 ?? null;
+    if (name === "Under 2.5 Gols") return o.under25 ?? null;
+    if (name === "Ambas Marcam") return o.bttsYes ?? null;
+    return null;
+  };
 
   // Perfis táticos (medidos sobre a produção bruta das equipes)
   const homeAttacks = hGF >= 1.6;
@@ -275,15 +287,14 @@ export function buildMatchReadingV2(
   markets = markets.map((m) => {
     const mOver = m.market.match(/Over\s+(\d\.\d)\s+Gols/i);
     const mUnder = m.market.match(/Under\s+(\d\.\d)\s+Gols/i);
-    if (mOver) {
-      return { ...m, probability: Math.round(probOver(parseFloat(mOver[1])) * 100) };
-    }
-    if (mUnder) {
-      return { ...m, probability: Math.round((1 - probOver(parseFloat(mUnder[1]))) * 100) };
-    }
-    return m;
+    const probability = mOver
+      ? Math.round(probOver(parseFloat(mOver[1])) * 100)
+      : mUnder
+        ? Math.round((1 - probOver(parseFloat(mUnder[1]))) * 100)
+        : m.probability;
+    const odd = oddByMarket(m.market);
+    return { ...m, probability, odd: odd ?? undefined, oddSource: odd != null ? 'OBSERVED' as const : 'UNKNOWN' as const };
   });
-
   const o25Prob = markets.find((m) => m.market === "Over 2.5 Gols")?.probability ?? 0;
   const bttsProb = markets.find((m) => m.market === "Ambas Marcam")?.probability ?? 0;
   const u25Prob = markets.find((m) => m.market === "Under 2.5 Gols")?.probability ?? Math.max(0, 100 - o25Prob);
@@ -982,18 +993,6 @@ export function buildMatchReadingV2(
   // quando disponível, penaliza mercados rasos, e bonifica mercados específicos
   // (cantos, cartões, dupla chance, handicap) quando atingem confiança suficiente,
   // evitando que o "melhor pick" seja sempre a mesma linha de gols.
-  const oddByMarket = (name: string): number | null => {
-    const o = ctx?.odds;
-    if (!o) return null;
-    if (name === "Vitória Casa") return o.home ?? null;
-    if (name === "Vitória Fora") return o.away ?? null;
-    if (name === "Empate") return o.draw ?? null;
-    if (/Over 2\.5/i.test(name)) return o.over25 ?? null;
-    if (/Under 2\.5/i.test(name)) return o.under25 ?? null;
-    if (/Ambas Marcam/i.test(name)) return o.bttsYes ?? null;
-    return null;
-  };
-
   // Suporte de dados por categoria: um mercado só ganha peso extra quando
   // existe amostra REAL por trás dele. Antes havia bônus fixo (cantos +3,
   // handicap +4...) mesmo sem média capturada — isso é achismo e podia
@@ -1021,7 +1020,8 @@ export function buildMatchReadingV2(
       // que é amortecida): usar a confiança inflava artificialmente o edge.
       const p = op.modelProbability ?? op.confidence;
       const fairOdd = p > 0 ? Number((100 / p).toFixed(2)) : null;
-      const marketOdd = oddByMarket(op.market);
+      const sourceMarket = markets.find((m) => m.market === op.market);
+      const marketOdd = sourceMarket?.oddSource === 'OBSERVED' && Number.isFinite(sourceMarket.odd) ? Number(sourceMarket.odd) : null;
       let edgePct: number | null = null;
       if (marketOdd && fairOdd) {
         edgePct = Number((((marketOdd / fairOdd) - 1) * 100).toFixed(1));

@@ -23,11 +23,11 @@ describe('NEXUS quantitative pipeline', () => {
     expect(modelMarkets.every(m => m.calibrationStatus === 'MODEL_VALIDATED')).toBe(true);
   });
 
-  it('never turns a derived Under market into a model signal candidate', () => {
+  it('keeps Under 2.5 as a validated model market', () => {
     const markets = analyzeMarkets(match);
     const under = markets.find(m => m.market === 'Under 2.5 Gols');
-    expect(under?.probabilitySource).toBe('DERIVED');
-    expect(under?.calibrationStatus).toBe('UNCALIBRATED');
+    expect(under?.probabilitySource).toBe('MODEL_ESTIMATE');
+    expect(under?.calibrationStatus).toBe('MODEL_VALIDATED');
   });
 
   it('uses the validated model market as the decision candidate', () => {

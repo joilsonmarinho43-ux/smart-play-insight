@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     const odd = Number(body?.odd ?? selectedMarket?.odd);
     const probabilitySource = String(body?.probabilitySource ?? selectedMarket?.probabilitySource ?? 'UNKNOWN');
     const calibrationStatus = String(body?.calibrationStatus ?? selectedMarket?.calibrationStatus ?? 'UNCALIBRATED');
-    const oddSource = String(body?.oddSource || 'UNKNOWN').toUpperCase();
+    const oddSource = String(body?.oddSource ?? selectedMarket?.oddSource ?? 'UNKNOWN').toUpperCase();
     const aiStatus = String(body?.aiAudit?.status || 'CAUTION');
     const signalEligible = decision?.signalEligible === true && decision?.decision === 'SIGNAL';
     const modelProbabilityValid = Number.isFinite(probability) && probability >= 0 && probability <= 100;

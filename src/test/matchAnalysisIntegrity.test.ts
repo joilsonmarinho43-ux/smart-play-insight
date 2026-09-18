@@ -16,8 +16,11 @@ describe('matchAnalysis integrity', () => {
   it('does not treat big chances as xG', () => {
     const match: any = { ...base, homeStats: { leagueAvg: 1.4, bigChances: 8 }, awayStats: { leagueAvg: 1.4, bigChances: 9 } };
     const markets = analyzeMarkets(match);
+    const changed = analyzeMarkets({ ...match, homeStats: { leagueAvg: 1.4, bigChances: 80 }, awayStats: { leagueAvg: 1.4, bigChances: 90 } });
     expect(markets.some(m => m.probabilitySource === 'MODEL_ESTIMATE')).toBe(true);
-    expect(markets.every(m => m.probability !== 99)).toBe(true);
+    const goalMarkets = markets.filter(m => m.category === 'goals' || m.category === 'btts');
+    const changedGoalMarkets = changed.filter(m => m.category === 'goals' || m.category === 'btts');
+    expect(goalMarkets.map(m => [m.market, m.probability])).toEqual(changedGoalMarkets.map(m => [m.market, m.probability]));
   });
 
   it('does not fabricate a five-game sample when sample data is absent', () => {

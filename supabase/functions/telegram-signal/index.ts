@@ -24,9 +24,12 @@ Deno.serve(async (req) => {
     const observedOddValid = Number.isFinite(odd) && odd > 1;
     const modelValidated = calibrationStatus === 'CALIBRATED' || calibrationStatus === 'MODEL_VALIDATED';
     const marketValue = computeObservedMarketValue(probability, odd);
-    const coreGateOk = !!market && signalEligible && probabilitySource === 'MODEL_ESTIMATE' && modelValidated && oddSource === 'OBSERVED' && aiStatus !== 'BLOCK' && modelProbabilityValid && Number.isFinite(confidence) && confidence >= 85 && observedOddValid && !!marketValue;
+    const coreApproved = Array.isArray(decision?.reasonCodes) && decision.reasonCodes.includes('CORE_APPROVED_SIGNAL');
+    const selectedMarketMatches = !selectedMarket?.market || String(selectedMarket.market) === market;
+    const positiveObservedValue = !!marketValue && marketValue.expectedValue > 0;
+    const coreGateOk = !!market && signalEligible && coreApproved && selectedMarketMatches && probabilitySource === 'MODEL_ESTIMATE' && modelValidated && oddSource === 'OBSERVED' && aiStatus !== 'BLOCK' && modelProbabilityValid && Number.isFinite(confidence) && confidence >= 85 && observedOddValid && positiveObservedValue;
     if (!coreGateOk) {
-      return new Response(JSON.stringify({ success: false, disabled: true, reason: 'CORE_GATE_REJECTED', detail: { signalEligible, probabilitySource, calibrationStatus, oddSource, hasModelProbability: modelProbabilityValid, hasObservedOdd: observedOddValid, aiStatus } }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: false, disabled: true, reason: 'CORE_GATE_REJECTED', detail: { signalEligible, coreApproved, selectedMarketMatches, probabilitySource, calibrationStatus, oddSource, hasModelProbability: modelProbabilityValid, hasObservedOdd: observedOddValid, positiveObservedValue, aiStatus } }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
     const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const chatId = Deno.env.get('TELEGRAM_CHAT_ID');

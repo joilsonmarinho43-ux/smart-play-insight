@@ -164,11 +164,10 @@ Deno.serve(async (req) => {
 
         if (cached?.dados_json) {
           const resArr = cached.dados_json.response || [];
-          let corners = 0;
-          for (const team of resArr) {
-            const cornerStat = (team.statistics || []).find((s: any) => s.type === 'Corner Kicks');
-            corners += (cornerStat?.value ?? 0);
-          }
+          const cornerValues = resArr.map((team: any) => Number((team.statistics || []).find((s: any) => s.type === 'Corner Kicks')?.value)).filter(Number.isFinite);
+          const corners = cornerValues.length === resArr.length && resArr.length > 0
+            ? cornerValues.reduce((sum: number, value: number) => sum + value, 0)
+            : null;
           // Estatísticas sem placar não podem resolver a aposta. Marcar 0x0
           // aqui transformava partidas ausentes em LOSS falso.
           const fixture = cached.dados_json.fixture || resArr[0]?.fixture;
@@ -178,9 +177,10 @@ Deno.serve(async (req) => {
             matchData[mId] = {
               homeGoals: Number(goals.home), awayGoals: Number(goals.away), corners,
               halfTimeGoals: Number.isFinite(Number(cached.dados_json.score?.halftime?.home)) && Number.isFinite(Number(cached.dados_json.score?.halftime?.away))
-                ? Number(cached.dados_json.score.halftime.home) + Number(cached.dados_json.score.halftime.away)
-                : undefined,
-              finished: ['FT', 'AET', 'PEN'].includes(String(fixture?.status?.short || '')), status: fixture?.status?.short || '',
+                ? Number(cached.dados_json.score.halftime.home) + Number(cached.dados_json.score.halftime.away) : undefined,
+              secondHalfGoals: Number.isFinite(Number(cached.dados_json.score?.halftime?.home)) && Number.isFinite(Number(cached.dados_json.score?.halftime?.away))
+                ? (Number(goals.home) + Number(goals.away)) - (Number(cached.dados_json.score.halftime.home) + Number(cached.dados_json.score.halftime.away)) : undefined,
+              finished: true, status: fixture?.status?.short || '',
             };
           }
         }

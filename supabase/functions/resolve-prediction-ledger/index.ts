@@ -38,13 +38,20 @@ async function getFixtureData(base: string, key: string, matchId: string) {
   const payload = await response.json().catch(() => null); if (!payload) return null;
   const extra = payload?.extra || {}; const homeGoals = n(extra?.goals?.home); const awayGoals = n(extra?.goals?.away); if (homeGoals == null || awayGoals == null) return null;
   const status = String(extra?.status || '').toUpperCase(); const finished = FINISHED.has(status) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
-  let corners: number | null = null, yellowCards: number | null = null, offsides: number | null = null;
-  for (const team of payload?.response || []) for (const stat of team?.statistics || []) {
-    const type = String(stat?.type || '').toLowerCase(); const value = n(stat?.value); if (value == null) continue;
-    if (type === 'corner kicks') corners = (corners ?? 0) + value;
-    else if (type === 'yellow cards') yellowCards = (yellowCards ?? 0) + value;
-    else if (type === 'offsides') offsides = (offsides ?? 0) + value;
-  }
+  const teams = Array.isArray(payload?.response) ? payload.response : [];
+  const collectComplete = (statType: string): number | null => {
+    if (teams.length < 2) return null;
+    const values = teams.map((team: any) => {
+      const stat = (team?.statistics || []).find((s: any) => String(s?.type || '').toLowerCase() === statType);
+      return n(stat?.value);
+    });
+    return values.every((v: number | null): v is number => v != null)
+      ? values.reduce((sum: number, value: number) => sum + value, 0)
+      : null;
+  };
+  const corners = collectComplete('corner kicks');
+  const yellowCards = collectComplete('yellow cards');
+  const offsides = collectComplete('offsides');
   const htHome = n(extra?.halftime?.home), htAway = n(extra?.halftime?.away); const halfTimeGoals = htHome != null && htAway != null ? htHome + htAway : undefined;
   return { homeGoals, awayGoals, corners, yellowCards, offsides, finished, halfTimeGoals };
 }

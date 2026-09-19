@@ -487,7 +487,7 @@ serve(async (req) => {
     // 2) SportsRC v2 (provider primário — prioridade 1)
     const src = await fromSportsRC(matchId, homeTeam, awayTeam);
     if (src) {
-      const score = computeConfidence(src, "api-football"); // peso máximo
+      const score = computeConfidence(src, "sportsrc");
       await persist({
         match_id: matchId, home_team: homeTeam, away_team: awayTeam,
         league, kickoff_at: kickoffISO,

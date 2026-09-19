@@ -7,7 +7,7 @@ type Verdict = 'green' | 'loss' | 'pendente' | 'void';
 
 interface MatchData {
   homeGoals: number; awayGoals: number;
-  htHomeGoals: number; htAwayGoals: number;
+  htHomeGoals: number | null; htAwayGoals: number | null;
   corners: number | null; cards: number | null;
   finished: boolean;
   sourceValid: boolean;
@@ -55,6 +55,7 @@ function checkMarketResult(market: string, marketType: string | null, d: MatchDa
 
   // Gol HT
   if (t === 'ht_goal' || ml.includes('1º tempo') || ml.includes('1o tempo') || ml.includes('1t')) {
+    if (d.htHomeGoals === null || d.htAwayGoals === null) return 'pendente';
     const ht = d.htHomeGoals + d.htAwayGoals;
     if (ht > 0) return 'green';
     return d.finished ? 'loss' : 'pendente';
@@ -62,7 +63,7 @@ function checkMarketResult(market: string, marketType: string | null, d: MatchDa
 
   // Gol FT (2º tempo)
   if (t === 'ft_goal' || ml.includes('2º tempo') || ml.includes('2o tempo') || ml.includes('2t')) {
-    if (!d.finished) return 'pendente';
+    if (!d.finished || d.htHomeGoals === null || d.htAwayGoals === null) return 'pendente';
     const ft2 = total - (d.htHomeGoals + d.htAwayGoals);
     return ft2 > 0 ? 'green' : 'loss';
   }
@@ -140,8 +141,8 @@ Deno.serve(async (req) => {
             const redValues = teams.map((t: any) => Number((t.statistics || []).find((x: any) => x.type === 'Red Cards')?.value)).filter(Number.isFinite);
             fixtures[id] = {
               homeGoals, awayGoals,
-              htHomeGoals: Number.isFinite(htHomeGoals) ? htHomeGoals : 0,
-              htAwayGoals: Number.isFinite(htAwayGoals) ? htAwayGoals : 0,
+              htHomeGoals: Number.isFinite(htHomeGoals) ? htHomeGoals : null,
+              htAwayGoals: Number.isFinite(htAwayGoals) ? htAwayGoals : null,
               corners: cornerValues.length === teams.length ? cornerValues.reduce((a: number, b: number) => a + b, 0) : null,
               cards: (yellowValues.length === teams.length && redValues.length === teams.length)
                 ? [...yellowValues, ...redValues].reduce((a: number, b: number) => a + b, 0) : null,

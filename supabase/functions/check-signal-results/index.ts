@@ -4,7 +4,7 @@ import { editTelegramMessage, getTelegramBotToken } from '../_shared/telegram.ts
 import { corsHeaders } from '../_shared/cors.ts';
 
 // Market verification logic
-function checkMarketResult(market: string, homeGoals: number, awayGoals: number, corners: number, matchFinished: boolean, halfTimeGoals?: number): 'green' | 'loss' | 'pendente' {
+function checkMarketResult(market: string, homeGoals: number, awayGoals: number, corners: number | null, matchFinished: boolean, halfTimeGoals?: number, secondHalfGoals?: number): 'green' | 'loss' | 'pendente' {
   const totalGoals = homeGoals + awayGoals;
   const marketLower = market.toLowerCase();
 
@@ -42,6 +42,7 @@ function checkMarketResult(market: string, homeGoals: number, awayGoals: number,
 
   const cornerMatch = marketLower.match(/over\s*(\d+\.?\d*)\s*(?:escanteios|corners)/);
   if (cornerMatch) {
+    if (corners === null) return 'pendente';
     const threshold = parseFloat(cornerMatch[1]);
     if (corners > threshold) return 'green';
     if (matchFinished) return 'loss';
@@ -50,7 +51,8 @@ function checkMarketResult(market: string, homeGoals: number, awayGoals: number,
 
   if (marketLower.includes('gol no 2t') || marketLower.includes('gol 2t')) {
     if (matchFinished) {
-      return totalGoals > 0 ? 'green' : 'loss';
+      if (typeof secondHalfGoals !== 'number') return 'pendente';
+      return secondHalfGoals > 0 ? 'green' : 'loss';
     }
     return 'pendente';
   }
@@ -126,16 +128,21 @@ Deno.serve(async (req) => {
         const finished = ['FT', 'AET', 'PEN'].includes(status);
         
         // Get corners from stats if available
-        let corners = 0;
-        if (m.stats?.home?.corners != null || m.stats?.away?.corners != null) {
-          corners = (m.stats?.home?.corners || 0) + (m.stats?.away?.corners || 0);
+        let corners: number | null = null;
+        if (m.stats?.home?.corners != null && m.stats?.away?.corners != null) {
+          const homeCorners = Number(m.stats.home.corners);
+          const awayCorners = Number(m.stats.away.corners);
+          if (Number.isFinite(homeCorners) && Number.isFinite(awayCorners)) corners = homeCorners + awayCorners;
         }
 
         matchData[mId] = {
-          homeGoals: m.goals?.home ?? 0,
-          awayGoals: m.goals?.away ?? 0,
+          homeGoals: Number(m.goals?.home),
+          awayGoals: Number(m.goals?.away),
           halfTimeGoals: Number.isFinite(Number(m.score?.halftime?.home)) && Number.isFinite(Number(m.score?.halftime?.away))
             ? Number(m.score.halftime.home) + Number(m.score.halftime.away)
+            : undefined,
+          secondHalfGoals: Number.isFinite(Number(m.goals?.home)) && Number.isFinite(Number(m.goals?.away)) && Number.isFinite(Number(m.score?.halftime?.home)) && Number.isFinite(Number(m.score?.halftime?.away))
+            ? (Number(m.goals.home) + Number(m.goals.away)) - (Number(m.score.halftime.home) + Number(m.score.halftime.away))
             : undefined,
           corners,
           finished,
@@ -166,7 +173,8 @@ Deno.serve(async (req) => {
           // aqui transformava partidas ausentes em LOSS falso.
           const fixture = cached.dados_json.fixture || resArr[0]?.fixture;
           const goals = cached.dados_json.goals || resArr[0]?.goals;
-          if (goals && Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away))) {
+          const cachedStatus = String(fixture?.status?.short || '').toUpperCase();
+          if (goals && Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away)) && ['FT', 'AET', 'PEN'].includes(cachedStatus)) {
             matchData[mId] = {
               homeGoals: Number(goals.home), awayGoals: Number(goals.away), corners,
               halfTimeGoals: Number.isFinite(Number(cached.dados_json.score?.halftime?.home)) && Number.isFinite(Number(cached.dados_json.score?.halftime?.away))
@@ -189,20 +197,23 @@ Deno.serve(async (req) => {
           });
           const json = await resp.json();
            const teams = json?.response || [];
-          const corners = teams.reduce((sum: number, t: any) => {
+          const cornerValues = teams.map((t: any) => Number((t.statistics || []).find((s: any) => s.type === 'Corner Kicks')?.value)).filter(Number.isFinite);
+          const corners = cornerValues.length === teams.length && teams.length > 0 ? cornerValues.reduce((sum: number, value: number) => sum + value, 0) : null;
             const cs = (t.statistics || []).find((s: any) => s.type === 'Corner Kicks');
-            return sum + Number(cs?.value ?? 0);
+            const value = Number(cs?.value);
+            return Number.isFinite(value) ? sum + value : sum;
           }, 0);
            const resolvedMatch = json?.matches?.[0] || json?.match || json?.fixture;
-           const goals = resolvedMatch?.goals;
-           const status = resolvedMatch?.fixture?.status?.short || resolvedMatch?.status?.short || '';
+           const goals = json?.extra?.goals || resolvedMatch?.goals;
+           const status = String(json?.extra?.status || resolvedMatch?.fixture?.status?.short || resolvedMatch?.status?.short || '').toUpperCase();
            const halfTime = resolvedMatch?.score?.halftime;
            if (goals && Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away))) {
              matchData[String(id)] = {
                homeGoals: Number(goals.home), awayGoals: Number(goals.away), corners,
                halfTimeGoals: Number.isFinite(Number(halfTime?.home)) && Number.isFinite(Number(halfTime?.away))
-                 ? Number(halfTime.home) + Number(halfTime.away)
-                 : undefined,
+                 ? Number(halfTime.home) + Number(halfTime.away) : undefined,
+               secondHalfGoals: Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away)) && Number.isFinite(Number(halfTime?.home)) && Number.isFinite(Number(halfTime?.away))
+                 ? (Number(goals.home) + Number(goals.away)) - (Number(halfTime.home) + Number(halfTime.away)) : undefined,
                finished: ['FT', 'AET', 'PEN'].includes(status), status,
              };
            }
@@ -231,6 +242,7 @@ Deno.serve(async (req) => {
           data.corners,
           data.finished,
           data.halfTimeGoals,
+          data.secondHalfGoals,
         );
 
         if (newStatus === 'pendente') continue;

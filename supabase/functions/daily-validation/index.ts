@@ -8,8 +8,9 @@ type Verdict = 'green' | 'loss' | 'pendente' | 'void';
 interface MatchData {
   homeGoals: number; awayGoals: number;
   htHomeGoals: number; htAwayGoals: number;
-  corners: number; cards: number;
+  corners: number | null; cards: number | null;
   finished: boolean;
+  sourceValid: boolean;
   homeName?: string; awayName?: string;
 }
 
@@ -37,7 +38,7 @@ function checkMarketResult(market: string, marketType: string | null, d: MatchDa
   // Escanteios
   if (t === 'corners' || ml.includes('escanteio') || ml.includes('corner')) {
     const m = ml.match(/(\d+\.\d+)/);
-    if (!m) return d.finished ? 'void' : 'pendente';
+    if (!m || d.corners === null) return 'pendente';
     const th = parseFloat(m[1]);
     if (d.corners > th) return 'green';
     return d.finished ? 'loss' : 'pendente';
@@ -46,7 +47,7 @@ function checkMarketResult(market: string, marketType: string | null, d: MatchDa
   // Cartões
   if (t === 'cards' || ml.includes('cartões') || ml.includes('cards') || ml.includes('cartoes')) {
     const m = ml.match(/(\d+\.\d+)/);
-    if (!m) return d.finished ? 'void' : 'pendente';
+    if (!m || d.cards === null) return 'pendente';
     const th = parseFloat(m[1]);
     if (d.cards > th) return 'green';
     return d.finished ? 'loss' : 'pendente';
@@ -121,46 +122,42 @@ Deno.serve(async (req) => {
             headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ fixture: id }),
           });
-          const sJson = await sr.json();
-          const teams = sJson?.response || [];
-          const corners = teams.reduce((s: number, t: any) =>
-            s + Number((t.statistics || []).find((x: any) => x.type === 'Corner Kicks')?.value ?? 0), 0);
-          const yellows = teams.reduce((s: number, t: any) =>
-            s + Number((t.statistics || []).find((x: any) => x.type === 'Yellow Cards')?.value ?? 0), 0);
-          const reds = teams.reduce((s: number, t: any) =>
-            s + Number((t.statistics || []).find((x: any) => x.type === 'Red Cards')?.value ?? 0), 0);
-          // Busca placar via live cache
-          const liveResp = await fetch(`${supabaseUrl}/functions/v1/football-api`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ live: true }),
-          });
-          const liveJson = await liveResp.json();
-          const f = (liveJson?.matches || []).find((m: any) => String(m.id) === String(id));
-          fixtures[id] = {
-            homeGoals: f?.goals?.home ?? 0,
-            awayGoals: f?.goals?.away ?? 0,
-            htHomeGoals: 0,
-            htAwayGoals: 0,
-            corners, cards: yellows + reds,
-            finished: f ? ['FT', 'AET', 'PEN'].includes(f.fixture?.status?.short) : true,
-            homeName: f?.teams?.home?.name,
-            awayName: f?.teams?.away?.name,
-          };
-        } catch (e) {
-          console.error(`[VAL] fetch ${id}`, e);
-        }
+          const sJson = await sr.json().catch(() => null);
+          const teams = Array.isArray(sJson?.response) ? sJson.response : [];
+          const extra = sJson?.extra ?? {};
+          const homeGoals = Number(extra?.goals?.home);
+          const awayGoals = Number(extra?.goals?.away);
+          const htHomeGoals = Number(extra?.halftime?.home);
+          const htAwayGoals = Number(extra?.halftime?.away);
+          const statusRaw = String(extra?.status ?? '').toUpperCase().replace(/[\\s_-]+/g, '');
+          const finished = ['FT', 'FULLTIME', 'FINISHED', 'ENDED', 'AET', 'PEN'].includes(statusRaw);
+          const cancelled = ['CANC', 'CANCELED', 'CANCELLED', 'POSTPONED', 'ABANDONED'].includes(statusRaw);
+          const validScore = Number.isFinite(homeGoals) && Number.isFinite(awayGoals);
+          const validSource = sr.ok && !sJson?.error && validScore && teams.length > 0 && !cancelled;
+          if (validSource) {
+            const cornerValues = teams.map((t: any) => Number((t.statistics || []).find((x: any) => x.type === 'Corner Kicks')?.value)).filter(Number.isFinite);
+            const yellowValues = teams.map((t: any) => Number((t.statistics || []).find((x: any) => x.type === 'Yellow Cards')?.value)).filter(Number.isFinite);
+            const redValues = teams.map((t: any) => Number((t.statistics || []).find((x: any) => x.type === 'Red Cards')?.value)).filter(Number.isFinite);
+            fixtures[id] = {
+              homeGoals, awayGoals,
+              htHomeGoals: Number.isFinite(htHomeGoals) ? htHomeGoals : 0,
+              htAwayGoals: Number.isFinite(htAwayGoals) ? htAwayGoals : 0,
+              corners: cornerValues.length === teams.length ? cornerValues.reduce((a: number, b: number) => a + b, 0) : null,
+              cards: (yellowValues.length === teams.length && redValues.length === teams.length)
+                ? [...yellowValues, ...redValues].reduce((a: number, b: number) => a + b, 0) : null,
+              finished, sourceValid: true,
+              homeName: teams[0]?.team?.name, awayName: teams[1]?.team?.name,
+            };
+          } else console.warn(`[VAL] authoritative fixture data unavailable for ${id}; keeping pending`);
+        } catch (e) { console.error(`[VAL] fetch ${id}`, e); }
         await new Promise(r => setTimeout(r, 200));
       }
-
       // group signals by match for editing once
       const byMatch: Record<string, any[]> = {};
       for (const s of pending) {
         const data = fixtures[s.match_id];
-        if (!data) continue;
-        const age = Date.now() - new Date(s.created_at).getTime();
-        const timeout = age > 6 * 60 * 60 * 1000;
-        const v = checkMarketResult(s.market, s.market_type, { ...data, finished: data.finished || timeout });
+        if (!data || !data.sourceValid) continue;
+        const v = checkMarketResult(s.market, s.market_type, data);
         if (v === 'pendente') continue;
 
         const odd = s.odd ? Number(s.odd) : null;

@@ -5,7 +5,7 @@ const FINISHED = new Set(['FT', 'AET', 'PEN', 'AP', 'AWARDED', 'FINISHED', 'ENDE
 type Resolution = 'green' | 'loss' | 'pending';
 const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 
-function checkMarket(market: string, f: { homeGoals: number; awayGoals: number; corners: number | null; yellowCards: number | null; offsides: number | null; finished: boolean; halfTimeGoals?: number }): Resolution {
+function checkMarket(market: string, f: { homeGoals: number; awayGoals: number; corners: number | null; yellowCards: number | null; redCards: number | null; offsides: number | null; finished: boolean; halfTimeGoals?: number }): Resolution {
   const totalGoals = f.homeGoals + f.awayGoals; const m = market.toLowerCase().trim();
   const finish = (yes: boolean) => yes ? 'green' : f.finished ? 'loss' : 'pending' as Resolution;
   if (m.includes('over 0.5 ht') || m.includes('over 0.5 1t') || m.includes('gol no 1º tempo') || m.includes('gol no 1° tempo')) return f.halfTimeGoals == null ? 'pending' : finish(f.halfTimeGoals > 0);
@@ -19,7 +19,8 @@ function checkMarket(market: string, f: { homeGoals: number; awayGoals: number; 
     return null;
   };
   const corners = marketTotal(f.corners, ['escanteios','cantos','corners']); if (corners) return corners;
-  const cards = marketTotal(f.yellowCards, ['cart[oõ]es','cards','cartoes']); if (cards) return cards;
+  const cardsValue = f.yellowCards != null && f.redCards != null ? f.yellowCards + f.redCards : null;
+  const cards = marketTotal(cardsValue, ['cart[oõ]es','cards','cartoes']); if (cards) return cards;
   const offsides = marketTotal(f.offsides, ['impedimentos','offsides','offside']); if (offsides) return offsides;
 
   const over = m.match(/over\s*(\d+(?:\.\d+)?)\s*(?:gols|goals)?/); if (over) return finish(totalGoals > Number(over[1]));

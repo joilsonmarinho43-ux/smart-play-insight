@@ -82,9 +82,28 @@ else
 fi
 
 sec "6. Cron"
-docker exec supabase-db psql -U postgres -tAc \
-  "select jobname||' :: '||schedule||' :: '||case when active then 'ativo' else 'INATIVO' end from cron.job order by jobname;" \
-  2>/dev/null | while read -r l; do [ -n "$l" ] && case "$l" in *INATIVO*) warn "$l";; *) ok "$l";; esac; done
+mapfile -t CRON_ROWS < <(docker exec supabase-db psql -U postgres -At -F $'\t' -c \
+  "select jobname, active::text, command from cron.job order by jobname;" 2>/dev/null || true)
 
+if [ "${#CRON_ROWS[@]}" -eq 0 ]; then
+  warn "não foi possível ler cron.job"
+else
+  for row in "${CRON_ROWS[@]}"; do
+    IFS=$'\t' read -r jobname active command <<< "$row"
+    [ -n "$jobname" ] || continue
+
+    if printf '%s\n' "$jobname $command" | grep -Eiq \
+      'daily-bet-analyzer-broadcast|daily-correct-score-broadcast|daily-ticket-settle|daily-bingo-broadcast|telegram-signal|scanner-pro-server|auto-mode-server'; then
+      bad "cron PROIBIDO detectado: $jobname"
+      continue
+    fi
+
+    if [ "$active" = "false" ]; then
+      warn "$jobname :: INATIVO"
+    else
+      ok "$jobname :: ativo"
+    fi
+  done
+fi
 echo -e "\n\033[1mResultado: $OK ok, $WARN avisos, $FAIL falhas\033[0m"
 [ "$FAIL" -eq 0 ] || exit 1

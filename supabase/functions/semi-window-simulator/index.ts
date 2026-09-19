@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireAdminUser } from '../_shared/internalAuth.ts';
 
 // Parse "1 x 0" -> { home: 1, away: 0, total: 1 }
 function parseScore(score: string | null): { total: number } | null {
@@ -40,6 +41,8 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const admin = await requireAdminUser(req, supabase, corsHeaders);
+    if (admin) return admin;
 
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
     const days = Number(body.days ?? 14);

@@ -195,28 +195,24 @@ Deno.serve(async (req) => {
             headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ fixture: id }),
           });
-          const json = await resp.json();
-           const teams = json?.response || [];
+          const json = await resp.json().catch(() => null);
+          const teams = Array.isArray(json?.response) ? json.response : [];
           const cornerValues = teams.map((t: any) => Number((t.statistics || []).find((s: any) => s.type === 'Corner Kicks')?.value)).filter(Number.isFinite);
           const corners = cornerValues.length === teams.length && teams.length > 0 ? cornerValues.reduce((sum: number, value: number) => sum + value, 0) : null;
-            const cs = (t.statistics || []).find((s: any) => s.type === 'Corner Kicks');
-            const value = Number(cs?.value);
-            return Number.isFinite(value) ? sum + value : sum;
-          }, 0);
-           const resolvedMatch = json?.matches?.[0] || json?.match || json?.fixture;
-           const goals = json?.extra?.goals || resolvedMatch?.goals;
-           const status = String(json?.extra?.status || resolvedMatch?.fixture?.status?.short || resolvedMatch?.status?.short || '').toUpperCase();
-           const halfTime = resolvedMatch?.score?.halftime;
-           if (goals && Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away))) {
-             matchData[String(id)] = {
-               homeGoals: Number(goals.home), awayGoals: Number(goals.away), corners,
-               halfTimeGoals: Number.isFinite(Number(halfTime?.home)) && Number.isFinite(Number(halfTime?.away))
-                 ? Number(halfTime.home) + Number(halfTime.away) : undefined,
-               secondHalfGoals: Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away)) && Number.isFinite(Number(halfTime?.home)) && Number.isFinite(Number(halfTime?.away))
-                 ? (Number(goals.home) + Number(goals.away)) - (Number(halfTime.home) + Number(halfTime.away)) : undefined,
-               finished: ['FT', 'AET', 'PEN'].includes(status), status,
-             };
-           }
+          const resolvedMatch = json?.matches?.[0] || json?.match || json?.fixture;
+          const goals = json?.extra?.goals || resolvedMatch?.goals;
+          const status = String(json?.extra?.status || resolvedMatch?.fixture?.status?.short || resolvedMatch?.status?.short || '').toUpperCase();
+          const halfTime = json?.extra?.halftime || resolvedMatch?.score?.halftime;
+          if (goals && Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away)) && ['FT', 'AET', 'PEN'].includes(status)) {
+            matchData[String(id)] = {
+              homeGoals: Number(goals.home), awayGoals: Number(goals.away), corners,
+              halfTimeGoals: Number.isFinite(Number(halfTime?.home)) && Number.isFinite(Number(halfTime?.away))
+                ? Number(halfTime.home) + Number(halfTime.away) : undefined,
+              secondHalfGoals: Number.isFinite(Number(goals.home)) && Number.isFinite(Number(goals.away)) && Number.isFinite(Number(halfTime?.home)) && Number.isFinite(Number(halfTime?.away))
+                ? (Number(goals.home) + Number(goals.away)) - (Number(halfTime.home) + Number(halfTime.away)) : undefined,
+              finished: true, status,
+            };
+          }
         } catch (e) {
           console.error(`SportsRC stats fetch failed for ${id}:`, e);
         }

@@ -24,6 +24,11 @@ docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
+-- Em instalações onde a tabela do pg_cron recebeu ACL restritiva,
+-- o usuário operacional local (postgres) precisa conseguir higienizar
+-- jobs legados antes da verificação do deploy.
+GRANT SELECT, INSERT, UPDATE, DELETE ON cron.job TO postgres;
+
 -- Remove definitivamente schedulers legados que não pertencem ao fluxo atual.
 -- A geração de sinais não pode nascer de pg_cron fora do Nexus Core.
 DELETE FROM cron.job

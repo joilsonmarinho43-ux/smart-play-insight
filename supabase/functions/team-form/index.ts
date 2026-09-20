@@ -106,4 +106,45 @@ async function form(name:string){
   return result;
 }
 
-Deno.serve(async(req)=>{if(req.method==='OPTIONS')return new Response(null,{headers:corsHeaders});try{const body=await req.json();const home=String(body?.home||'').trim(),away=String(body?.away||'').trim();if(!home||!away)return new Response(JSON.stringify({ok:false,error:'home_and_away_required'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});const [h,a]=await Promise.all([form(home),form(away)]);return new Response(JSON.stringify({ok:true,home:h,away:a,source:'ESPN public API + TheSportsDB free',generatedAt:new Date().toISOString()}),{headers:{...corsHeaders,'Content-Type':'application/json'}});}catch(e){return new Response(JSON.stringify({ok:false,error:e instanceof Error?e.message:'internal_error'}),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});}});
+Deno.serve(async(req)=>{
+  if(req.method==='OPTIONS')return new Response(null,{headers:corsHeaders});
+  try{
+    const body=await req.json();
+
+    // Single-match compatibility path used by MatchCard/MatchDetails.
+    const home=String(body?.home||'').trim(),away=String(body?.away||'').trim();
+    if(home&&away){
+      const [h,a]=await Promise.all([form(home),form(away)]);
+      return new Response(JSON.stringify({ok:true,home:h,away:a,source:'ESPN public API + TheSportsDB free',generatedAt:new Date().toISOString()}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
+    }
+
+    // Batch path used by analytical screens. One invocation reuses the
+    // in-memory team/schedule/summary caches and avoids N+1 edge calls.
+    const requested=Array.isArray(body?.matches)?body.matches:[];
+    const matches=requested
+      .map((m:any)=>({id:String(m?.id||''),home:String(m?.home||'').trim(),away:String(m?.away||'').trim()}))
+      .filter((m:any)=>m.home&&m.away)
+      .slice(0,8);
+    if(!matches.length)return new Response(JSON.stringify({ok:false,error:'home_and_away_required'}),{status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
+
+    const results:any[]=new Array(matches.length);
+    let cursor=0;
+    const worker=async()=>{
+      while(true){
+        const i=cursor++;
+        if(i>=matches.length)return;
+        const m=matches[i];
+        try{
+          const [h,a]=await Promise.all([form(m.home),form(m.away)]);
+          results[i]={id:m.id,home:h,away:a};
+        }catch{
+          results[i]={id:m.id,home:null,away:null};
+        }
+      }
+    };
+    await Promise.all([worker(),worker()]);
+    return new Response(JSON.stringify({ok:true,matches:results.filter(Boolean),source:'ESPN public API + TheSportsDB free',generatedAt:new Date().toISOString()}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
+  }catch(e){
+    return new Response(JSON.stringify({ok:false,error:e instanceof Error?e.message:'internal_error'}),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});
+  }
+});

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { MatchData } from "@/types/match";
+import { mergeFormIntoMatch } from "@/hooks/useTeamForm";
 import { buildMatchReadingV2, type MatchContext, type MatchReadingV2 } from "@/lib/readingEngine";
 import { fetchResearchContext, getResearchGapFields } from "@/lib/researchContextClient";
 import type { ResearchEvidence } from "@/lib/researchEvidence";
@@ -18,8 +19,43 @@ async function enrichQuantitativeData(match: MatchData): Promise<MatchData> {
     const home = data.home || {}, away = data.away || {}; const homeGames = Number(home.games ?? 0), awayGames = Number(away.games ?? 0); const homeGF = Number(home.goalsForAvg), awayGF = Number(away.goalsForAvg), homeGA = Number(home.goalsAgainstAvg), awayGA = Number(away.goalsAgainstAvg);
     if (![homeGames, awayGames, homeGF, awayGF, homeGA, awayGA].every(Number.isFinite) || homeGames < 3 || awayGames < 3) return match;
     const sample = Math.min(homeGames, awayGames);
-    const modelData = { ...(match.modelData || {}), homeGoalsAvg: homeGF, awayGoalsAvg: awayGF, homeGoalsAgainstAvg: homeGA, awayGoalsAgainstAvg: awayGA, homeCornersAvg: match.modelData?.homeCornersAvg ?? null, awayCornersAvg: match.modelData?.awayCornersAvg ?? null, homeCardsAvg: match.modelData?.homeCardsAvg ?? null, awayCardsAvg: match.modelData?.awayCardsAvg ?? null, homeCornersVariance: match.modelData?.homeCornersVariance ?? null, awayCornersVariance: match.modelData?.awayCornersVariance ?? null, homeCardsVariance: match.modelData?.homeCardsVariance ?? null, awayCardsVariance: match.modelData?.awayCardsVariance ?? null, leagueAvg: match.modelData?.leagueAvg ?? 2.5, source: "team-form:ESPN/TSDB", historicalSample: sample, dataQuality: sample >= 5 ? "VALID" : "PARTIAL" } as MatchData["modelData"];
-    const enriched: MatchData = { ...match, modelData, sampleSize: { homeGames, awayGames, homeWithStats: homeGames, awayWithStats: awayGames }, homeStats: { goalsFor: homeGF, goalsAgainst: homeGA, gamesCount: homeGames, leagueAvg: modelData.leagueAvg }, awayStats: { goalsFor: awayGF, goalsAgainst: awayGA, gamesCount: awayGames, leagueAvg: modelData.leagueAvg } } as MatchData;
+    const merged = mergeFormIntoMatch(match, { ok: true, home, away } as any);
+    const modelData = {
+      ...(merged.modelData || {}),
+      homeGoalsAvg: homeGF,
+      awayGoalsAvg: awayGF,
+      homeGoalsAgainstAvg: homeGA,
+      awayGoalsAgainstAvg: awayGA,
+      leagueAvg: merged.modelData?.leagueAvg ?? 2.5,
+      source: "team-form:ESPN/TSDB",
+      historicalSample: sample,
+      dataQuality: sample >= 5 ? "VALID" : "PARTIAL",
+    } as MatchData["modelData"];
+    const enriched: MatchData = {
+      ...merged,
+      modelData,
+      sampleSize: {
+        ...(merged.sampleSize || {}),
+        homeGames: Math.max(Number(merged.sampleSize?.homeGames || 0), homeGames),
+        awayGames: Math.max(Number(merged.sampleSize?.awayGames || 0), awayGames),
+        homeWithStats: Math.max(Number(merged.sampleSize?.homeWithStats || 0), homeGames),
+        awayWithStats: Math.max(Number(merged.sampleSize?.awayWithStats || 0), awayGames),
+      },
+      homeStats: {
+        ...(merged as any).homeStats,
+        goalsFor: homeGF,
+        goalsAgainst: homeGA,
+        gamesCount: homeGames,
+        leagueAvg: modelData.leagueAvg,
+      },
+      awayStats: {
+        ...(merged as any).awayStats,
+        goalsFor: awayGF,
+        goalsAgainst: awayGA,
+        gamesCount: awayGames,
+        leagueAvg: modelData.leagueAvg,
+      },
+    } as MatchData;
     quantCache.set(key, { ts: Date.now(), match: enriched }); return enriched;
   } catch (e) { console.warn("[NEXUS-QUANT] team-form enrichment failed", e); return match; }
 }

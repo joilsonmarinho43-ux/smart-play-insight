@@ -70,9 +70,9 @@ fi
 echo "Usuário PostgreSQL para manutenção do pg_cron: ${CRON_DB_USER}"
 
 docker exec -i supabase-db psql -U "$CRON_DB_USER" -d postgres -v ON_ERROR_STOP=1 <<SQL
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
+-- As extensões já são habilitadas pelo estágio de migrations do deploy.
+-- Não executar CREATE EXTENSION aqui: no Supabase self-hosted isso pode
+-- reacionar scripts after-create mesmo quando a extensão já existe.
 -- Em instalações onde a tabela do pg_cron recebeu ACL restritiva,
 -- o usuário operacional local (postgres) precisa conseguir higienizar
 -- jobs legados antes da verificação do deploy.

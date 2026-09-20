@@ -20,16 +20,47 @@ function Badge({ match }: { match: MatchData }) {
   return <span className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-gray-300"><Database className="h-3 w-3"/> {label} · {s.homeGames}/{s.awayGames}</span>;
 }
 
-function StatRow({ label, home, away, suffix = '' }: { label: string; home: unknown; away: unknown; suffix?: string }) {
-  const h=n(home), a=n(away); if(h==null&&a==null)return null;
-  return <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-white/5 py-2.5 last:border-0"><span className="text-right text-sm font-black tabular-nums">{h==null?'—':`${fmt(h)}${suffix}`}</span><span className="text-[11px] text-gray-500 text-center">{label}</span><span className="text-sm font-black tabular-nums">{a==null?'—':`${fmt(a)}${suffix}`}</span></div>;
+function StatRow({ label, home, away, suffix = '', pillHome = true }: { label: string; home: unknown; away: unknown; suffix?: string; pillHome?: boolean }) {
+  const h=n(home), a=n(away);
+  if(h==null&&a==null)return null;
+  const value=(v:number|null)=>v==null?'—':`${fmt(v)}${suffix}`;
+  return <div className="grid grid-cols-[minmax(72px,1fr)_minmax(92px,1.25fr)_minmax(72px,1fr)] items-center gap-2 py-2.5">
+    <div className={`flex justify-end ${pillHome?'':''}`}>
+      {h==null ? <span className="px-2 text-right text-sm font-black tabular-nums">—</span> : <span className="inline-flex min-w-[72px] justify-center rounded-full bg-[#11999b] px-3 py-2 text-sm font-black tabular-nums text-white shadow-sm">{value(h)}</span>}
+    </div>
+    <span className="text-center text-sm font-medium leading-tight text-gray-900 dark:text-gray-200">{label}</span>
+    <span className="text-left text-sm font-black tabular-nums text-gray-900 dark:text-white">{value(a)}</span>
+  </div>;
 }
 
 function Stats({ match }: { match: MatchData }) {
-  const hs:any=(match as any).homeStats||{}, as:any=(match as any).awayStats||{}, md:any=match.modelData||{};
-  return <div><div className="flex items-center justify-between border-b border-white/10 pb-2 mb-1"><span className="max-w-[40%] truncate text-[10px] font-black uppercase text-emerald-400">{match.homeTeam}</span><span className="text-[9px] uppercase tracking-wider text-gray-600">{String((match as any).statsSource||'').startsWith('ai')?'Estimativa IA':'Dados disponíveis'}</span><span className="max-w-[40%] truncate text-right text-[10px] font-black uppercase text-orange-400">{match.awayTeam}</span></div><StatRow label="Gols médios" home={md.homeGoalsAvg} away={md.awayGoalsAvg}/><StatRow label="Gols sofridos" home={md.homeGoalsAgainstAvg} away={md.awayGoalsAgainstAvg}/><StatRow label="Posse" home={hs.possession} away={as.possession} suffix="%"/><StatRow label="Finalizações" home={hs.totalShots} away={as.totalShots}/><StatRow label="No alvo" home={hs.shotsOnGoal} away={as.shotsOnGoal}/><StatRow label="Grandes chances" home={hs.bigChances} away={as.bigChances}/><StatRow label="Escanteios" home={hs.corners} away={as.corners}/><StatRow label="Cartões" home={hs.yellowCards} away={as.yellowCards}/>{!Number(md.homeGoalsAvg||0)&&!Number(md.awayGoalsAvg||0)&&!Number(hs.totalShots||0)&&!Number(as.totalShots||0)&&<p className="py-5 text-center text-xs text-gray-500">Aguardando histórico estatístico das equipes.</p>}</div>;
+  const hs:any=(match as any).homeStats||{}, as:any=(match as any).awayStats||{}, md:any=match.modelData||{}, metrics:any=(match as any).metrics||{};
+  const home=(key:string, metricKey?:string, modelKey?:string)=>metrics?.[metricKey||key]?.[0] ?? hs?.[key] ?? (modelKey?md?.[modelKey]:null);
+  const away=(key:string, metricKey?:string, modelKey?:string)=>metrics?.[metricKey||key]?.[1] ?? as?.[key] ?? (modelKey?md?.[modelKey]:null);
+  const rows=[
+    ['Gols', home('goals','goals','homeGoalsAvg'), away('goals','goals','awayGoalsAvg')],
+    ['Posse de bola', home('possession','possession'), away('possession','possession'), '%'],
+    ['Gols esperados (xG)', home('xG','xG'), away('xG','xG')],
+    ['Finalizações Totais', home('totalShots','totalShots'), away('totalShots','totalShots')],
+    ['Chutes no gol', home('shotsOnGoal','shotsOnTarget'), away('shotsOnGoal','shotsOnTarget')],
+    ['Grandes chances criadas', home('bigChances','bigChances'), away('bigChances','bigChances')],
+    ['Escanteios', home('corners','corners'), away('corners','corners')],
+    ['Impedimentos', home('offsides','offsides'), away('offsides','offsides')],
+    ['Faltas Cometidas', home('fouls','fouls'), away('fouls','fouls')],
+    ['Cartões amarelos', home('yellowCards','yellowCards'), away('yellowCards','yellowCards')],
+  ];
+  const available=rows.filter(r=>n(r[1])!=null||n(r[2])!=null);
+  const hasHistorical= n(md.homeGoalsAvg)!=null || n(md.awayGoalsAvg)!=null;
+  return <div className="rounded-xl bg-white/95 px-2 py-1 dark:bg-transparent">
+    <div className="mb-2 grid grid-cols-[minmax(72px,1fr)_minmax(92px,1.25fr)_minmax(72px,1fr)] items-center gap-2 border-b border-gray-200/10 pb-2">
+      <span className="truncate text-right text-[10px] font-black uppercase text-emerald-400">{match.homeTeam}</span>
+      <span className="text-center text-[9px] font-bold uppercase tracking-wider text-gray-500">ESTATÍSTICAS</span>
+      <span className="truncate text-left text-[10px] font-black uppercase text-orange-400">{match.awayTeam}</span>
+    </div>
+    {available.map(([label,h,a,suffix],i)=><StatRow key={String(label)} label={String(label)} home={h} away={a} suffix={String(suffix||'')} />)}
+    {!available.length && !hasHistorical && <p className="py-5 text-center text-xs text-gray-500">Aguardando histórico estatístico das equipes.</p>}
+  </div>;
 }
-
 function Poisson({ match }: { match: MatchData }) {
   const scores=exactScoreDistribution(match); const top=scores.slice(0,6); const total=top.reduce((a,x)=>a+x.probability,0); const markets=analyzeMarkets(match).filter(x=>x.probability>0).sort((a,b)=>b.probability-a.probability).slice(0,4);
   if(!scores.length) return <div className="py-8 text-center text-sm text-gray-500">Sem amostra suficiente para o modelo Poisson.</div>;

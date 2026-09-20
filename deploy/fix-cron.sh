@@ -32,7 +32,11 @@ WHERE jobname IN (
   'daily-correct-score-broadcast',
   'daily-ticket-settle',
   'daily-bingo-broadcast',
-  'telegram-signal'
+  'telegram-signal',
+  'scanner-pro-server',
+  'auto-mode-server',
+  'invoke-scanner-pro-server',
+  'invoke-auto-mode-server'
 );
 
 -- reaponta host antigo e chave antiga

@@ -96,7 +96,7 @@ async function resolveFromTeamForm(homeTeam: string, awayTeam: string): Promise<
 
     // 5+ jogos reais de cada lado = amostra mínima para o modo normal.
     // 3-4 jogos = conservador; nunca é promovido para SIGNAL.
-    const score = homeGames >= 5 && awayGames >= 5 ? 85 : 75;
+    const score = homeGames >= 5 && awayGames >= 5 ? 80 : 75;
     const diagnostic = `TEAM_FORM_SAMPLE:${homeGames}x${awayGames}`;
 
     return {

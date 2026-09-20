@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Crown, Crosshair, Loader2, RefreshCw, Target, Trophy } from 'lucide-react';
 import { fetchMultiDayMatches } from '@/services/footballApi';
+import { supabase } from '@/integrations/supabase/client';
+import { mergeFormIntoMatch } from '@/hooks/useTeamForm';
 import { analyzeMarkets, exactScoreDistribution } from '@/lib/matchAnalysis';
 import type { MatchData } from '@/types/match';
 
@@ -20,7 +22,59 @@ function isUpcoming(m: MatchData) {
 }
 
 function useMatches() {
-  const query = useQuery({ queryKey: ['nexus-analytical-tools-matches'], queryFn: () => fetchMultiDayMatches(6), staleTime: 30 * 60 * 1000, refetchOnWindowFocus: false, refetchOnReconnect: true, retry: 1 });
+  const query = useQuery({
+    queryKey: ['nexus-analytical-tools-matches-v2'],
+    queryFn: async () => {
+      const raw = (await fetchMultiDayMatches(6)).filter(isUpcoming);
+      const ordered = [...raw].sort((a,b) => {
+        const at = new Date(a.kickoff || a.time || 0).getTime();
+        const bt = new Date(b.kickoff || b.time || 0).getTime();
+        return (Number.isFinite(at) ? at : Number.MAX_SAFE_INTEGER) - (Number.isFinite(bt) ? bt : Number.MAX_SAFE_INTEGER);
+      });
+
+      // Analytical screens previously consumed raw fixtures only. Most free
+      // fixture sources do not carry the historical sample required by the
+      // quantitative engine. Enrich only the first 8 candidates in one
+      // batched edge call; this avoids an N+1 request storm while preserving
+      // the existing screen/UI.
+      const needsForm = (m: MatchData) => {
+        const md:any = m.modelData || {};
+        const s:any = m.sampleSize || {};
+        return !(Number(s.homeGames) >= 3 && Number(s.awayGames) >= 3 &&
+          Number.isFinite(Number(md.homeGoalsAvg)) &&
+          Number.isFinite(Number(md.awayGoalsAvg)) &&
+          Number.isFinite(Number(md.homeGoalsAgainstAvg)) &&
+          Number.isFinite(Number(md.awayGoalsAgainstAvg)));
+      };
+      const targets = ordered.filter(needsForm).slice(0, 8);
+      if (!targets.length) return ordered;
+
+      try {
+        const { data, error } = await supabase.functions.invoke('team-form', {
+          body: { matches: targets.map(m => ({ id: String(m.id), home: m.homeTeam, away: m.awayTeam })) },
+        });
+        if (error || !data?.ok || !Array.isArray(data?.matches)) return ordered;
+
+        const forms = new Map<string, any>(
+          data.matches
+            .filter((x:any) => x?.id)
+            .map((x:any) => [String(x.id), x])
+        );
+        return ordered.map(m => {
+          const form = forms.get(String(m.id));
+          return form?.home && form?.away
+            ? mergeFormIntoMatch(m, { ok: true, home: form.home, away: form.away })
+            : m;
+        });
+      } catch {
+        return ordered;
+      }
+    },
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 1,
+  });
   const data = useMemo(() => ((query.data || []) as MatchData[]).filter(isUpcoming), [query.data]);
   return { ...query, data };
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, BookOpen, Clock, Database, Target, TrendingUp, Trophy, ShieldAlert, RefreshCw } from 'lucide-react';
 import type { MatchData } from '@/types/match';
 import { useTeamForm, mergeFormIntoMatch } from '@/hooks/useTeamForm';
@@ -75,11 +75,20 @@ function Ticket({ match }: { match: MatchData }) {
 
 export default function MatchCard({ match: rawMatch, isPremium }: Props) {
   const [tab,setTab]=useState<Tab>('stats'); const [readingOpen,setReadingOpen]=useState(false);
-  const {data:form}=useTeamForm(rawMatch); const withForm=useMemo(()=>mergeFormIntoMatch(rawMatch,form),[rawMatch,form]);
+  const [visible,setVisible]=useState(false);
+  const cardRef=useRef<HTMLElement|null>(null);
+  useEffect(()=>{
+    const el=cardRef.current;
+    if(!el||typeof IntersectionObserver==='undefined'){setVisible(true);return;}
+    const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'500px 0px'});
+    observer.observe(el);
+    return()=>observer.disconnect();
+  },[]);
+  const {data:form}=useTeamForm(rawMatch,visible); const withForm=useMemo(()=>mergeFormIntoMatch(rawMatch,form),[rawMatch,form]);
   const match=withForm;
   const {reading,loading,context,analyst,analystLoading,analystError,fallback}=useMatchReading(match,readingOpen);
   const tabs:[Tab,string,any][]=[['stats','Estatísticas',BarChart3],['poisson','Poisson',TrendingUp],['ticket','Bilhete',Target]];
-  return <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#101521]/90 shadow-2xl shadow-black/20 backdrop-blur-xl">
+  return <article ref={cardRef} className="overflow-hidden rounded-2xl border border-white/10 bg-[#101521]/90 shadow-2xl shadow-black/20 backdrop-blur-xl">
     <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-4 py-3"><div className="flex min-w-0 items-center gap-2"><Trophy className={`h-4 w-4 shrink-0 ${isPremium?'text-amber-400':'text-orange-400'}`}/><span className="truncate text-xs font-bold text-gray-400">{match.league}</span>{isPremium&&<span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[8px] font-black text-amber-400">PREMIUM</span>}</div><div className="flex shrink-0 items-center gap-1 text-xs text-gray-500"><Clock className="h-3.5 w-3.5"/>{match.time}</div></div>
     <div className="px-4 pt-3"><Badge match={match}/></div>
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-5"><div className="text-right"><h2 className="text-lg font-black leading-tight sm:text-xl">{match.homeTeam}</h2><span className="text-sm font-black text-emerald-400">{match.predictions?.homeWin ?? '—'}%</span></div><div className="text-center"><div className="text-xl font-black text-gray-500">VS</div><div className="text-[10px] text-gray-600">E {match.predictions?.draw ?? '—'}%</div></div><div><h2 className="text-lg font-black leading-tight sm:text-xl">{match.awayTeam}</h2><span className="text-sm font-black text-orange-400">{match.predictions?.awayWin ?? '—'}%</span></div></div>

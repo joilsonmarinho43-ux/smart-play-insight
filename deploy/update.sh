@@ -39,8 +39,10 @@ PY
   bash deploy/sync-functions.sh
   bash deploy/fix-secrets.sh
   bash deploy/apply-migrations.sh
-  # Cron estrutural já é validado por verify.sh. O script fix-cron.sh fica
-  # disponível para correções manuais sem bloquear o deploy automático.
+  # Corrige o estado real do pg_cron antes da verificação. Isso remove
+  # schedulers legados que podem sobreviver no banco mesmo após o código
+  # ter sido neutralizado, inclusive jobs apontando para hosts antigos.
+  bash deploy/fix-cron.sh
   # Não reativa broadcasts legados nem settlement antigo durante o deploy.
   # A geração/registro de sinais permanece sob o Nexus Core.
 fi

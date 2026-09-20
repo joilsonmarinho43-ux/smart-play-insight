@@ -27,7 +27,7 @@ interface TeamFormResponse {
 
 const empty: SideForm = { games: 0, goalsForAvg: 0, goalsAgainstAvg: 0, recentGoalsFor: [], recentGoalsAgainst: [], stats: {} };
 
-export function useTeamForm(match: MatchData | null | undefined) {
+export function useTeamForm(match: MatchData | null | undefined, active = true) {
   const home = match?.homeTeam || '';
   const away = match?.awayTeam || '';
   const enabled = Boolean(home && away);
@@ -43,7 +43,7 @@ export function useTeamForm(match: MatchData | null | undefined) {
 
   return useQuery<TeamFormResponse>({
     queryKey: ['team-form', home, away],
-    enabled: enabled && !alreadyHas,
+    enabled: active && enabled && !alreadyHas,
     staleTime: 1000 * 60 * 60 * 12, // 12h
     gcTime: 1000 * 60 * 60 * 24,
     retry: 1,

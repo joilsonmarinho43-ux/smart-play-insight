@@ -45,6 +45,9 @@ async function getFixtureData(base: string, key: string, matchId: string) {
   if (cancelled) return null;
   const finished = FINISHED.has(status) || FINISHED.has(normalizedStatus) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
   const teams = Array.isArray(payload?.response) ? payload.response : [];
+  const teamIds = teams.map((team: any) => n(team?.team?.id ?? team?.id)).filter((id: number | null): id is number => id != null);
+  const teamNames = teams.map((team: any) => String(team?.team?.name ?? team?.name ?? '').trim()).filter(Boolean);
+  if (teams.length !== 2 || teamIds.length !== 2 || new Set(teamIds).size !== 2 || teamNames.length !== 2) return null;
   const collectComplete = (statType: string): number | null => {
     if (teams.length < 2) return null;
     const values = teams.map((team: any) => {

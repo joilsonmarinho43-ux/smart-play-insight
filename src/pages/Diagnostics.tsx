@@ -38,6 +38,8 @@ const STATUS_COLOR: Record<string, string> = {
 
 const SOURCE_COLOR: Record<string, string> = {
   'sportsrc': 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+  'espn-fixtures': 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+  'worldcup-fallback': 'bg-purple-500/20 text-purple-300 border-purple-500/40',
   'football-data-org': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
   'thesportsdb-public': 'bg-sky-500/20 text-sky-300 border-sky-500/40',
   'stale-local-cache': 'bg-gray-500/20 text-gray-300 border-gray-500/40',
@@ -129,11 +131,12 @@ const Diagnostics = () => {
       (leaguesBySource[s] = leaguesBySource[s] || new Set()).add(m.league || '—');
     }
     const primary = bySource['sportsrc'] || 0;
-    const secondary = (bySource['football-data-org'] || 0) + (bySource['thesportsdb-public'] || 0);
+    const secondary = (bySource['espn-fixtures'] || 0) + (bySource['worldcup-fallback'] || 0) + (bySource['football-data-org'] || 0) + (bySource['thesportsdb-public'] || 0);
     const stale = bySource['stale-local-cache'] || 0;
-    // Cobertura: % de jogos da secundária em relação à primária
+    // Cobertura: % do fallback/secondary em relação à fonte primária.
     const coverage = primary > 0 ? Math.round((secondary / primary) * 100) : (secondary > 0 ? 100 : 0);
-    // Exclusivos da secundária = jogos que só ela trouxe (após dedupe, todo m.__source==='thesportsdb-public' já é exclusivo)
+    // Após a deduplicação do provider, qualquer jogo atribuído a uma fonte secundária
+    // representa cobertura que a fonte prioritária não entregou para aquela assinatura.
     const exclusiveSecondary = secondary;
     // Ligas exclusivas por fonte
     const allLeagues = new Set<string>();

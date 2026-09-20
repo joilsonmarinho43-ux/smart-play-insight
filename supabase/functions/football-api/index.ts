@@ -1,4 +1,5 @@
 /* Nexus 33 football-api: source normalization and provenance only. */
+import { fetchEspnMatches } from "../_shared/espnLive.ts";
 const SPORTSRC_KEY = Deno.env.get("SPORTSRC_API_KEY") || "";
 const SPORTSRC_BASE = "https://api.sportsrc.org/v2";
 const LIVE_STATUSES = new Set(["1H", "2H", "HT", "ET", "P"]);
@@ -134,13 +135,49 @@ Deno.serve(async (req) => {
     if (body?.diag === true) return new Response(JSON.stringify({ ok: true, source: "sportsrc", apiKey: SPORTSRC_KEY ? "present" : "missing" }), { status: 200, headers: cors });
     const date = typeof body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : new Date().toISOString().slice(0, 10);
     const { matches, diag } = await fetchMatches(date);
-    const filtered = body?.live === true ? matches.filter((match) => match.isLive) : matches;
-    return new Response(JSON.stringify({ ok: true, matches: uniqueMatches(filtered), provider: "sportsrc", counts: { total: filtered.length }, diag, provenance: { source: "sportsrc", observedAt: new Date().toISOString(), inferredValues: false } }), { status: 200, headers: cors });
+    let filtered = body?.live === true ? matches.filter((match) => match.isLive) : matches;
+    if (body?.live === true) {
+      try {
+        const espn = await fetchEspnMatches({ liveOnly: true, enrichStats: true, maxEvents: 20, deadline: Date.now() + 12000 });
+        const byTeams = new Map<string, any>();
+        for (const em of espn) byTeams.set(`${teamKey(em.homeTeam)}|${teamKey(em.awayTeam)}`, em);
+        filtered = filtered.map((m:any) => {
+          const em=byTeams.get(`${teamKey(m.homeTeam)}|${teamKey(m.awayTeam)}`);
+          return em?.stats ? {...m,liveStats:toLiveStats(em.stats),stats:em.stats,__liveStatsSource:"espn"} : m;
+        });
+        const existing=new Set(filtered.map((m:any)=>`${teamKey(m.homeTeam)}|${teamKey(m.awayTeam)}`));
+        for(const em of espn){
+          const key=`${teamKey(em.homeTeam)}|${teamKey(em.awayTeam)}`;
+          if(existing.has(key)) continue;
+          filtered.push({...em,liveStats:toLiveStats(em.stats),__source:"espn"});
+        }
+      } catch (e) {
+        console.warn("[football-api] ESPN live enrichment failed",e);
+      }
+    }
+    return new Response(JSON.stringify({ ok: true, matches: uniqueMatches(filtered), provider: body?.live === true ? "sportsrc+espn" : "sportsrc", counts: { total: filtered.length }, diag, provenance: { source: body?.live === true ? "sportsrc+espn" : "sportsrc", observedAt: new Date().toISOString(), inferredValues: false } }), { status: 200, headers: cors });
   } catch (error) {
     return new Response(JSON.stringify({ ok: false, error: "FOOTBALL_API_UNAVAILABLE", detail: String(error).slice(0, 160) }), { status: 502, headers: cors });
   }
 });
 
+function teamKey(name: unknown): string {
+  return String(name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\b(fc|cf|sc|ac|afc|cd|club|de|do|da|dos|das|the)\b/g, "").replace(/[^a-z0-9]+/g, "").trim();
+}
+function toLiveStats(stats: any): any | undefined {
+  if (!stats?.home || !stats?.away) return undefined;
+  const h=stats.home,a=stats.away;
+  const finite=(v:any)=>Number.isFinite(Number(v))?Number(v):0;
+  return {
+    dangerousAttacks:[finite(h.dangerousAttacks),finite(a.dangerousAttacks)],
+    corners:[finite(h.corners),finite(a.corners)],
+    possession:[finite(h.possession),finite(a.possession)],
+    pressureIndex:[
+      Math.min(100,Math.round(finite(h.dangerousAttacks)*0.6+finite(h.shotsOnGoal)*8+finite(h.corners)*3)),
+      Math.min(100,Math.round(finite(a.dangerousAttacks)*0.6+finite(a.shotsOnGoal)*8+finite(a.corners)*3))
+    ],
+  };
+}
 function uniqueMatches(matches: any[]): any[] {
   const seen = new Set<string>();
   return matches.filter((match) => { const key = String(match?.id ?? `${match?.homeTeam}|${match?.awayTeam}|${match?.fixture?.date ?? ""}`); if (seen.has(key)) return false; seen.add(key); return true; });

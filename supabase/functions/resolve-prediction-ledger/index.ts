@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const FINISHED = new Set(['FT', 'AET', 'PEN', 'AP', 'AWARDED', 'FINISHED', 'ENDED', 'FULL TIME', 'FULLTIME', 'FULL-TIME']);
+const CANCELLED = new Set(['CANC', 'CANCELED', 'CANCELLED', 'POSTPONED', 'ABANDONED', 'SUSPENDED', 'DELETED']);
 type Resolution = 'green' | 'loss' | 'pending';
 const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 
@@ -38,7 +39,11 @@ async function getFixtureData(base: string, key: string, matchId: string) {
   if (!response.ok) return null;
   const payload = await response.json().catch(() => null); if (!payload) return null;
   const extra = payload?.extra || {}; const homeGoals = n(extra?.goals?.home); const awayGoals = n(extra?.goals?.away); if (homeGoals == null || awayGoals == null) return null;
-  const status = String(extra?.status || '').toUpperCase(); const finished = FINISHED.has(status) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
+  const status = String(extra?.status || '').toUpperCase().replace(/[\\s_-]+/g, ' ').trim();
+  const normalizedStatus = status.replace(/\s+/g, '');
+  const cancelled = CANCELLED.has(normalizedStatus) || /CANCEL|POSTPON|ABANDON|SUSPEND|DELETED/i.test(status);
+  if (cancelled) return null;
+  const finished = FINISHED.has(status) || FINISHED.has(normalizedStatus) || /ENDED|FULL TIME|AFTER PENALT/i.test(status);
   const teams = Array.isArray(payload?.response) ? payload.response : [];
   const collectComplete = (statType: string): number | null => {
     if (teams.length < 2) return null;
@@ -52,9 +57,10 @@ async function getFixtureData(base: string, key: string, matchId: string) {
   };
   const corners = collectComplete('corner kicks');
   const yellowCards = collectComplete('yellow cards');
+  const redCards = collectComplete('red cards');
   const offsides = collectComplete('offsides');
   const htHome = n(extra?.halftime?.home), htAway = n(extra?.halftime?.away); const halfTimeGoals = htHome != null && htAway != null ? htHome + htAway : undefined;
-  return { homeGoals, awayGoals, corners, yellowCards, offsides, finished, halfTimeGoals };
+  return { homeGoals, awayGoals, corners, yellowCards, redCards, offsides, finished, halfTimeGoals };
 }
 
 Deno.serve(async (req) => {

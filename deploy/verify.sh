@@ -80,17 +80,41 @@ fi
 
 sec "3. Edge functions"
 if [ -n "$SERVICE_KEY" ]; then
-  code="$(curl -s -o /tmp/nx_health.json -w '%{http_code}' \
+  code="$(curl -sS --connect-timeout 5 --max-time 20 -o /tmp/nx_health.json -w '%{http_code}' \
     -H "Authorization: Bearer $SERVICE_KEY" \
-    -H "apikey: $SERVICE_KEY" "$FN/healthcheck")"
-  [ "$code" = "200" ] && ok "healthcheck HTTP 200" || warn "healthcheck protegido respondeu HTTP $code (probe externo não bloqueia o deploy)"
+    -H "apikey: $SERVICE_KEY" "$FN/healthcheck" || true)"
+  # A URL pública passa por Caddy/Kong. Se ela responder 401 mesmo com a
+  # service-role real do edge, repetir pela porta local do Kong evita falso
+  # negativo causado por proxy externo sem relaxar a proteção da função.
+  if [ "$code" = "401" ] && curl -fsS --connect-timeout 3 --max-time 10 -o /tmp/nx_health_local.json \
+      -H "Authorization: Bearer $SERVICE_KEY" \
+      -H "apikey: $SERVICE_KEY" "http://127.0.0.1:8000/functions/v1/healthcheck" >/dev/null 2>&1; then
+    cp /tmp/nx_health_local.json /tmp/nx_health.json
+    code="200"
+    ok "healthcheck HTTP 200 (Kong local; proxy externo rejeita o bearer)"
+  fi
+  [ "$code" = "200" ] && ok "healthcheck HTTP 200" || warn "healthcheck protegido respondeu HTTP $code"
   if grep -q '"db":{"ok":true' /tmp/nx_health.json 2>/dev/null; then
     ok "banco acessível via healthcheck"
   else
     DB_OK="$(docker exec supabase-db psql -U postgres -d postgres -Atqc 'select 1' 2>/dev/null || true)"
     [ "$DB_OK" = "1" ] && ok "banco acessível (probe local)" || bad "banco inacessível"
   fi
-  grep -q '"telegram":{"ok":true' /tmp/nx_health.json 2>/dev/null && ok "bot do Telegram válido" || warn "Telegram indisponível"
+  if grep -q '"telegram":{"ok":true' /tmp/nx_health.json 2>/dev/null; then
+    ok "bot do Telegram válido"
+  else
+    TG_DETAIL="$(python3 - <<'PY' 2>/dev/null
+import json
+try:
+    d=json.load(open('/tmp/nx_health.json'))
+    t=d.get('telegram') or {}
+    print(t.get('error') or ('HTTP '+str(t.get('status')) if t.get('status') is not None else 'sem diagnóstico'))
+except Exception:
+    print('sem diagnóstico')
+PY
+)"
+    warn "Telegram indisponível: $TG_DETAIL"
+  fi
 else
   # Validação local do banco substitui o probe autenticado quando o segredo
   # não está configurado na instalação. Não enfraquece o endpoint.

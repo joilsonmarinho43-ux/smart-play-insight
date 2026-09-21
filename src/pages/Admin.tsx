@@ -69,8 +69,8 @@ const Admin = () => {
   const [showRMA, setShowRMA] = useState(false);
   const [rmaLogs, setRmaLogs] = useState<RMAShadowLog[]>([]);
   const [checkingResults, setCheckingResults] = useState(false);
-  const [autoModeActive, setAutoModeActive] = useState(true);
-  const [togglingAutoMode, setTogglingAutoMode] = useState(false);
+  const autoModeActive = false;
+  
   const [autoModeLastRun, setAutoModeLastRun] = useState<any>(null);
   const [testingAutoMode, setTestingAutoMode] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -382,38 +382,7 @@ const Admin = () => {
                     <p className="text-[10px] text-muted-foreground">Cron: a cada 3 minutos</p>
                   </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    setTogglingAutoMode(true);
-                    try {
-                      if (autoModeActive) {
-                        // Pause: unschedule the cron
-                        const { data, error } = await supabase.rpc('is_admin', { _user_id: profile?.id || '' });
-                        if (!data) throw new Error('Sem permissão');
-                        // We'll use a simple state toggle — the cron continues but the function checks a flag
-                        setAutoModeActive(false);
-                        toast.success('Auto-Mode Server PAUSADO');
-                      } else {
-                        setAutoModeActive(true);
-                        toast.success('Auto-Mode Server ATIVADO');
-                      }
-                    } catch (err: any) {
-                      toast.error('Erro: ' + err.message);
-                    } finally {
-                      setTogglingAutoMode(false);
-                    }
-                  }}
-                  disabled={togglingAutoMode}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all ${
-                    autoModeActive
-                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                      : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                  } disabled:opacity-50`}
-                >
-                  <Power className={`w-4 h-4 ${togglingAutoMode ? 'animate-spin' : ''}`} />
-                  {togglingAutoMode ? 'Processando...' : autoModeActive ? 'Pausar' : 'Ativar'}
-                </button>
-              </div>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs border border-white/10 bg-white/5 text-muted-foreground">\n                  <Power className="w-4 h-4" />\n                  Desativado — Nexus Core\n                </div>            </div>
 
               {/* Info Grid */}
               <div className="grid grid-cols-3 gap-3">
@@ -433,28 +402,7 @@ const Admin = () => {
             </div>
 
             {/* Test Button */}
-            <button
-              onClick={async () => {
-                setTestingAutoMode(true);
-                try {
-                  const { data, error } = await supabase.functions.invoke('auto-mode-server');
-                  if (error) throw error;
-                  setAutoModeLastRun(data);
-                  toast.success(`Análise concluída: ${data.analyzed} jogos, ${data.qualified} qualificados, ${data.signals} enviados`);
-                } catch (err: any) {
-                  toast.error('Erro: ' + err.message);
-                } finally {
-                  setTestingAutoMode(false);
-                }
-              }}
-              disabled={testingAutoMode}
-              className="w-full flex items-center justify-center gap-2 bg-purple-500/20 text-purple-400 py-3 rounded-xl font-bold text-xs hover:bg-purple-500/30 transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${testingAutoMode ? 'animate-spin' : ''}`} />
-              {testingAutoMode ? 'Analisando jogos ao vivo...' : '🔍 Executar Agora (Teste Manual)'}
-            </button>
-
-            {/* Last Run Result */}
+            <div className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-center text-xs text-muted-foreground">\n              Auto-Mode legado desativado. O NEXUS Core é a única autoridade para decisões analíticas.\n            </div>         {/* Last Run Result */}
             {autoModeLastRun && (
               <div className="border border-purple-500/20 bg-purple-500/5 rounded-xl p-4 text-xs space-y-2">
                 <p className="font-bold text-purple-400 text-sm">📊 Último Resultado</p>

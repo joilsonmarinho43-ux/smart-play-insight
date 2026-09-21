@@ -130,7 +130,24 @@ if [ -n "$SERVICE_KEY" ]; then
   if grep -q '"telegram":{"ok":true' /tmp/nx_health.json 2>/dev/null; then
     ok "bot do Telegram válido"
   else
-    TG_DETAIL="$(python3 - <<'PY' 2>/dev/null
+    # Confirmar diretamente a API do Telegram a partir do mesmo edge runtime
+    # que executa as funções. Isso diferencia falha real do parser/proxy.
+    TG_DIRECT="$(docker exec "$EDGE_CT" deno eval '
+      const token = Deno.env.get("TELEGRAM_BOT_TOKEN") || "";
+      try {
+        const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+        const d = await r.json().catch(() => ({}));
+        console.log(JSON.stringify({status:r.status, ok:d?.ok === true, error:d?.description || null}));
+      } catch (e) {
+        console.log(JSON.stringify({status:0, ok:false, error:String(e)}));
+      }
+    ' 2>/dev/null || true)"
+    if printf '%s' "$TG_DIRECT" | grep -q '"ok":true'; then
+      ok "bot do Telegram válido (probe direto no edge runtime)"
+    else
+      TG_DETAIL="$(printf '%s' "$TG_DIRECT" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("error") or ("HTTP "+str(d.get("status")) if d.get("status") is not None else "sem diagnóstico"))' 2>/dev/null || true)"
+      if [ -z "$TG_DETAIL" ]; then
+        TG_DETAIL="$(python3 - <<'PY' 2>/dev/null
 import json
 try:
     d=json.load(open('/tmp/nx_health.json'))
@@ -140,7 +157,9 @@ except Exception:
     print('sem diagnóstico')
 PY
 )"
-    warn "Telegram indisponível: $TG_DETAIL"
+      fi
+      warn "Telegram indisponível: $TG_DETAIL"
+    fi
   fi
 else
   # Validação local do banco substitui o probe autenticado quando o segredo

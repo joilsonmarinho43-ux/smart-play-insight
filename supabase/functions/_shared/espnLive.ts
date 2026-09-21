@@ -96,17 +96,17 @@ export function lastEspnDiagnostics(): EspnDiagnostics {
   return diagnostics;
 }
 
-function n(v: unknown): number {
-  if (v == null) return 0;
+function n(v: unknown): number | null {
+  if (v == null || String(v).trim() === "") return null;
   const s = String(v).replace("%", "").trim();
   const num = Number(s);
-  return Number.isFinite(num) ? num : 0;
+  return Number.isFinite(num) ? num : null;
 }
 
-function pickStat(list: any[], name: string): number {
-  if (!Array.isArray(list)) return 0;
+function pickStat(list: any[], name: string): number | null {
+  if (!Array.isArray(list)) return null;
   const row = list.find((s) => String(s?.name || "").toLowerCase() === name.toLowerCase());
-  if (!row) return 0;
+  if (!row) return null;
   return n(row.value ?? row.displayValue);
 }
 
@@ -145,10 +145,12 @@ async function fetchSummaryStats(
     const red = pickStat(stats, "redCards");
     const saves = pickStat(stats, "saves");
     // dangerousAttacks — proxy a partir de finalizações + escanteios.
-    const da = Math.round(total * 1.5 + corners * 2);
+    const da = Number.isFinite(Number(total)) && Number.isFinite(Number(corners))
+      ? Math.round(Number(total) * 1.5 + Number(corners) * 2)
+      : null;
     return {
       shotsOnGoal: sog, totalShots: total, corners, possession,
-      dangerousAttacks: da, daEstimated: true,
+      dangerousAttacks: da, daEstimated: da !== null,
       fouls, yellowCards: yellow, redCards: red, saves,
     };
   };

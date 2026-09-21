@@ -65,11 +65,6 @@ function dcTau(h: number, a: number, lh: number, la: number, rho: number): numbe
   return 1;
 }
 
-function num(v: unknown, fallback = 0): number {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
 /** Média com decaimento temporal — o array vem do mais recente para o mais antigo. */
 function weightedAvg(list: unknown): number | null {
   if (!Array.isArray(list) || list.length === 0) return null;
@@ -89,11 +84,11 @@ export function extractLambdas(match: any): {
   const canonical = getCanonicalGoalLambdas(match);
   const hs = match?.homeStats || {};
   const as = match?.awayStats || {};
-  const homeN = Number(match?.sampleSize?.homeGames ?? hs.gamesCount ?? 0);
-  const awayN = Number(match?.sampleSize?.awayGames ?? as.gamesCount ?? 0);
-  const hGF = Number(match?.modelData?.homeGoalsAvg ?? hs.goalsFor ?? NaN);
-  const aGF = Number(match?.modelData?.awayGoalsAvg ?? as.goalsFor ?? NaN);
-  const hasRealData = !!canonical && homeN > 0 && awayN > 0 && hGF > 0 && aGF > 0;
+  const homeN = typeof (match?.sampleSize?.homeGames ?? hs.gamesCount) === 'number' ? (match?.sampleSize?.homeGames ?? hs.gamesCount) : 0;
+  const awayN = typeof (match?.sampleSize?.awayGames ?? as.gamesCount) === 'number' ? (match?.sampleSize?.awayGames ?? as.gamesCount) : 0;
+  const hGF = match?.modelData?.homeGoalsAvg ?? hs.goalsFor;
+  const aGF = match?.modelData?.awayGoalsAvg ?? as.goalsFor;
+  const hasRealData = !!canonical && homeN > 0 && awayN > 0 && Number.isFinite(hGF) && Number.isFinite(aGF) && hGF > 0 && aGF > 0;
   if (!canonical) return { homeLambda: 0, awayLambda: 0, sample: { home: homeN, away: awayN }, hasRealData: false };
   return {
     homeLambda: canonical.homeLambda,

@@ -73,10 +73,15 @@ export function mergeFormIntoMatch(match: MatchData, form?: TeamFormResponse | n
     return incoming > 0 && cur <= 0 ? incoming : current ?? incoming;
   };
   const sample = match.sampleSize;
+  const historicalSample = Math.min(Number(h.games || 0), Number(a.games || 0));
+  const modelQuality = historicalSample >= 5 ? 'VALID' : historicalSample >= 3 ? 'PARTIAL' : 'INSUFFICIENT';
   return {
     ...match,
     modelData: {
       ...md,
+      source: md.source || 'team-form:ESPN/TSDB',
+      historicalSample: Math.max(Number(md.historicalSample || 0), historicalSample),
+      dataQuality: md.dataQuality === 'VALID' || modelQuality === 'VALID' ? 'VALID' : modelQuality,
       homeGoalsAvg: useForm(md.homeGoalsAvg, h.goalsForAvg),
       awayGoalsAvg: useForm(md.awayGoalsAvg, a.goalsForAvg),
       homeGoalsAgainstAvg: useForm((md as any).homeGoalsAgainstAvg, h.goalsAgainstAvg),

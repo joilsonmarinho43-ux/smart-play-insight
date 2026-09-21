@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════
 // match-stats-resolver
-// Cascata: cache_api → match_stats_fallback (banco) → API-Football
+// Cascata gratuita: cache_api → match_stats_fallback (banco) → SportsRC
 // → TheSportsDB → histórico (qualquer idade). Nunca inventa dados.
 // Retorna sempre { stats, source, confidence_score, lowConfidence, missing[] }
 // ════════════════════════════════════════════════════════════════
@@ -516,7 +516,7 @@ serve(async (req) => {
       });
       await log({
         match_id: matchId, source_used: "thesportsdb", latency_ms: Date.now() - t0,
-        cache_hit: false, api_football_failed: true, confidence_score: score,
+        cache_hit: false, confidence_score: score,
       });
       console.info(`[match-stats-resolver] provider_used=thesportsdb latency=${Date.now() - t0}ms confidence=${score}`);
       return new Response(JSON.stringify({
@@ -551,7 +551,7 @@ serve(async (req) => {
     // 4) Sem dados em lugar nenhum
     await log({
       match_id: matchId, source_used: "none", latency_ms: Date.now() - t0,
-      cache_hit: false, api_football_failed: true, confidence_score: 0,
+      cache_hit: false, confidence_score: 0,
       error_message: "no data available",
     });
     return new Response(JSON.stringify({

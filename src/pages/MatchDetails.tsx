@@ -9,7 +9,7 @@ import { useTeamForm, mergeFormIntoMatch } from '@/hooks/useTeamForm';
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { data: live, isLoading: loadingLive } = useQuery({ queryKey: ['liveMatches'], queryFn: fetchLiveMatches, staleTime: 120_000, refetchOnWindowFocus: false });
-  const { data: multi, isLoading: loadingMulti } = useQuery({ queryKey: ['multi-day-matches-detail'], queryFn: () => fetchMultiDayMatches(6), staleTime: 600_000, refetchOnWindowFocus: false });
+  const { data: multi, isLoading: loadingMulti } = useQuery({ queryKey: ['multi-day-matches-detail'], queryFn: () => fetchMultiDayMatches(6), staleTime: 120_000, refetchOnWindowFocus: false });
   const match = useMemo(() => { const sid = String(id || ''); const all = [...(live || []), ...(multi || [])] as MatchData[]; return all.find((item) => String(item.id) === sid) || null; }, [live, multi, id]);
 
   const { data: form } = useTeamForm(match);

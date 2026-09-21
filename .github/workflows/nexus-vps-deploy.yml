@@ -67,3 +67,4 @@ jobs:
           REMOTE
 
 # Keep the production deploy workflow active on the corrected Nexus tree.
+# Final production gate: validate the protected healthcheck and Telegram diagnostics after deploy.

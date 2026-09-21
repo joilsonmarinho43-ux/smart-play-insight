@@ -3,7 +3,7 @@ import { MatchData } from '@/types/match';
 import { APP_TIMEZONE, getTodayInPara, formatTimePara } from '@/lib/timezone';
 
 const CACHE_KEYS={PRE:'football_cache_pre',LIVE:'football_cache_live',TIME_PRE:'football_cache_pre_time',TIME_LIVE:'football_cache_live_time'};
-const PRE_MATCH_COOLDOWN=1000*60*60*24; const LIVE_MATCH_COOLDOWN=1000*55; const LIVE_STALE_HARD_MS=1000*60*10;
+const PRE_MATCH_COOLDOWN=1000*60*30; const LIVE_MATCH_COOLDOWN=1000*55; const LIVE_STALE_HARD_MS=1000*60*10;
 const OFFLINE_FLAG_KEY='football_offline_mode'; const OFFLINE_SINCE_KEY='football_offline_since'; const OFFLINE_REASON_KEY='football_offline_reason';
 function setOfflineMode(active:boolean){if(active){localStorage.setItem(OFFLINE_FLAG_KEY,'1');if(!localStorage.getItem(OFFLINE_SINCE_KEY))localStorage.setItem(OFFLINE_SINCE_KEY,String(Date.now()));}else{localStorage.removeItem(OFFLINE_FLAG_KEY);localStorage.removeItem(OFFLINE_SINCE_KEY);}try{window.dispatchEvent(new CustomEvent('football-offline-change'));}catch{}}
 export function isOfflineMode(){const reason=localStorage.getItem(OFFLINE_REASON_KEY);if(reason&&reason!=='provider_unavailable'){setOfflineMode(false);setOfflineReason(null);return false;}return localStorage.getItem(OFFLINE_FLAG_KEY)==='1';}

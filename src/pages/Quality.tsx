@@ -143,7 +143,7 @@ export default function Quality() {
         </Card>
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">ROI médio</div>
-          <div className={`font-display text-3xl mt-1 ${(o?.avg_roi ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          <div className={`font-display text-3xl mt-1 ${o?.avg_roi == null || !Number.isFinite(Number(o.avg_roi)) ? "text-muted-foreground" : Number(o.avg_roi) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
             {o?.avg_roi != null ? `${o.avg_roi >= 0 ? "+" : ""}${(o.avg_roi * 100).toFixed(1)}%` : "—"}
           </div>
           <div className="text-xs text-gray-500 mt-1">Total: {o?.total_roi != null ? `${o.total_roi.toFixed(2)}u` : "—"}</div>

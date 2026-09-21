@@ -97,6 +97,27 @@ if [ -n "$SERVICE_KEY" ]; then
       cp /tmp/nx_health_local.json /tmp/nx_health.json
       code="200"
       ok "healthcheck HTTP 200 (Kong local na porta $KONG_PORT; proxy externo rejeita o bearer)"
+    else
+      # Se Kong não publicar a porta no host, validar diretamente no runtime
+      # Deno do edge container. Isso mantém a função protegida e elimina
+      # falso negativo causado somente pelo proxy externo.
+      INTERNAL_HEALTH="$(docker exec -e NEXUS_PROBE_KEY="$SERVICE_KEY" "$EDGE_CT" deno eval '
+        const key = Deno.env.get("NEXUS_PROBE_KEY") || "";
+        for (const port of [8081, 9999, 8000]) {
+          try {
+            const r = await fetch(`http://127.0.0.1:${port}/functions/v1/healthcheck`, {
+              headers: { Authorization: `Bearer ${key}`, apikey: key }
+            });
+            const body = await r.text();
+            if (r.status === 200) { console.log(body); break; }
+          } catch (_) {}
+        }
+      ' 2>/dev/null || true)"
+      if [ -n "$INTERNAL_HEALTH" ]; then
+        printf '%s' "$INTERNAL_HEALTH" > /tmp/nx_health.json
+        code="200"
+        ok "healthcheck HTTP 200 (edge runtime interno; proxy externo rejeita o bearer)"
+      fi
     fi
   fi
   [ "$code" = "200" ] && ok "healthcheck HTTP 200" || warn "healthcheck protegido respondeu HTTP $code"

@@ -230,7 +230,7 @@ export default function Context() {
                   <td className="text-center text-gray-400">{m.total}</td>
                   <td className="text-center">{pctBadge(wr(m.wins, m.total))}</td>
                   <td className="text-center text-gray-300">{m.avg_time_min != null ? `${Number(m.avg_time_min).toFixed(1)}m` : "—"}</td>
-                  <td className="text-center text-blue-300">{Number(m.avg_pressure ?? 0).toFixed(1)}</td>
+                  <td className="text-center text-blue-300">{Number.isFinite(Number(m.avg_pressure)) ? Number(m.avg_pressure).toFixed(1) : "—"}</td>
                 </tr>
               ))}
             </tbody>

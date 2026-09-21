@@ -9,6 +9,26 @@ import type { MatchData } from '@/types/match';
 import bannerImg from '@/assets/banner-hero.jpg';
 import bgPattern from '@/assets/bg-circuit-pattern.jpg';
 
+function clearNexusDataCache() {
+  const removable = [
+    'football_cache_pre',
+    'football_cache_live',
+    'football_offline_mode',
+    'football_offline_since',
+    'football_offline_reason',
+    'data_provider_log_v1',
+  ];
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && removable.some(prefix => key === prefix || key.startsWith(prefix + '_'))) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {}
+  window.location.reload();
+}
+
 function paraDateString(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 }
@@ -102,7 +122,7 @@ export default function Index() {
           <h1 className="text-2xl font-bold">PRÉ-JOGO</h1>
           <div className="flex items-center gap-2">
             <button onClick={() => refetch()} disabled={isFetching} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Atualizar"><RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin text-primary' : 'text-muted-foreground'}`} /></button>
-            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache"><Trash2 className="w-5 h-5 text-muted-foreground" /></button>
+            <button onClick={clearNexusDataCache} className="p-2.5 bg-black/30 backdrop-blur-sm rounded-lg hover:bg-black/50 transition-colors" title="Limpar cache do NEXUS"><Trash2 className="w-5 h-5 text-muted-foreground" /></button>
           </div>
         </div>
         {offline && <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200"><WifiOff className="w-4 h-4 shrink-0" /><div className="text-xs leading-tight"><strong className="font-bold">Modo offline</strong> — exibindo último pré-jogo salvo{getOfflineSince() && ` (desde ${new Date(getOfflineSince()!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`}.</div></div>}

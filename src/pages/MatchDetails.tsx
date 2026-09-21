@@ -25,7 +25,7 @@ const MatchDetails = () => {
   const model = viewMatch.modelData;
   const sufficientSample = !!sample && Math.min(sample.homeGames, sample.awayGames) >= 3;
   const predictions = viewMatch.predictions;
-  const coreReady = predictions?.probabilitySource === 'MODEL_ESTIMATE' && (predictions.calibrationStatus === 'CALIBRATED' || predictions.calibrationStatus === 'MODEL_VALIDATED');
+  const coreReady = predictions?.probabilitySource === 'MODEL_ESTIMATE' && (predictions.calibrationStatus === 'CALIBRATED' || predictions.calibrationStatus === 'MODEL_VALIDATED') && [predictions.homeWin, predictions.draw, predictions.awayWin].every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100);
 
   return <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
     <Link to="/" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="h-4 w-4" /> Voltar</Link>

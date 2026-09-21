@@ -372,101 +372,55 @@ const Admin = () => {
               <Zap className="w-4 h-4" /> Auto-Mode Server
             </h2>
 
-            {/* Status Card */}
-            <div className={`border rounded-2xl p-5 space-y-4 ${autoModeActive ? 'border-green-500/20 bg-green-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${autoModeActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                  <div>
-                    <p className="font-bold text-sm">{autoModeActive ? '🟢 ATIVO' : '🔴 PAUSADO'}</p>
-                    <p className="text-[10px] text-muted-foreground">Cron: a cada 3 minutos</p>
-                  </div>
+            <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <div>
+                  <p className="font-bold text-sm">🔴 DESATIVADO</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    O Auto-Mode legado não executa decisões nem envia sinais.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs border border-white/10 bg-white/5 text-muted-foreground">\n                  <Power className="w-4 h-4" />\n                  Desativado — Nexus Core\n                </div>            </div>
-
-              {/* Info Grid */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-black/30 rounded-xl p-3 text-center">
-                  <p className="text-[9px] text-muted-foreground uppercase font-bold">Frequência</p>
-                  <p className="text-lg font-bold text-purple-400">3 min</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-3 text-center">
-                  <p className="text-[9px] text-muted-foreground uppercase font-bold">Limite/Dia</p>
-                  <p className="text-lg font-bold text-amber-400">5</p>
-                </div>
-                <div className="bg-black/30 rounded-xl p-3 text-center">
-                  <p className="text-[9px] text-muted-foreground uppercase font-bold">Filtros</p>
-                  <p className="text-lg font-bold text-blue-400">5/5</p>
-                </div>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs border border-white/10 bg-white/5 text-muted-foreground">
+                <Power className="w-4 h-4" />
+                NEXUS Core é a única autoridade analítica.
               </div>
             </div>
 
-            {/* Test Button */}
-            <div className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-center text-xs text-muted-foreground">\n              Auto-Mode legado desativado. O NEXUS Core é a única autoridade para decisões analíticas.\n            </div>         {/* Last Run Result */}
-            {autoModeLastRun && (
-              <div className="border border-purple-500/20 bg-purple-500/5 rounded-xl p-4 text-xs space-y-2">
-                <p className="font-bold text-purple-400 text-sm">📊 Último Resultado</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Jogos analisados:</span> <span className="font-bold">{autoModeLastRun.analyzed}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Qualificados:</span> <span className="font-bold text-amber-400">{autoModeLastRun.qualified}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Sinais enviados:</span> <span className="font-bold text-green-400">{autoModeLastRun.signals}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Status:</span> <span className="font-bold">{autoModeLastRun.success ? '✅ OK' : '❌ Erro'}</span></div>
-                </div>
-                {autoModeLastRun.message && (
-                  <p className="text-muted-foreground/80 italic">💡 {autoModeLastRun.message}</p>
-                )}
-              </div>
-            )}
-
-            {/* Scanner PRO Server */}
-            <div className="border border-orange-500/20 bg-orange-500/5 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
-                  <div>
-                    <p className="font-bold text-sm text-orange-400">🎯 Scanner PRO Server</p>
-                    <p className="text-[10px] text-muted-foreground">Cron: a cada 5 minutos • Prob ≥60% + EV+</p>
-                  </div>
+            <div className="border border-orange-500/20 bg-orange-500/5 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-orange-500" />
+                <div>
+                  <p className="font-bold text-sm text-orange-400">🎯 Scanner PRO</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Quarentenado até existir odd de mercado OBSERVED verificável.
+                  </p>
                 </div>
               </div>
-              <button
-                onClick={async () => {
-                  try {
-                    toast.info('Scanner PRO analisando...');
-                    const { data, error } = await supabase.functions.invoke('scanner-pro-server');
-                    if (error) throw error;
-                    setAutoModeLastRun({ ...data, source: 'scanner' });
-                    toast.success(`Scanner: ${data.analyzed} jogos, ${data.total_opps || 0} opps, ${data.signals} enviados`);
-                  } catch (err: any) {
-                    toast.error('Erro: ' + err.message);
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-orange-500/20 text-orange-400 py-3 rounded-xl font-bold text-xs hover:bg-orange-500/30 transition-all"
-              >
-                <RefreshCw className="w-4 h-4" />
-                🎯 Executar Scanner PRO Agora
-              </button>
+              <p className="text-xs text-muted-foreground">
+                Nenhum sinal é fabricado quando não existe preço real observado. O scanner retorna zero sinais nessa condição.
+              </p>
             </div>
 
-            {/* Cron Jobs Info */}
             <div className="border border-white/5 bg-card/20 rounded-xl p-4 text-xs space-y-2">
-              <p className="font-bold text-muted-foreground uppercase text-[10px]">⏰ Cron Jobs Ativos</p>
+              <p className="font-bold text-muted-foreground uppercase text-[10px]">⏰ Operações</p>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between py-1 border-b border-white/5">
-                  <span className="text-muted-foreground">Auto-Mode Server</span>
-                  <span className="text-purple-400 font-bold">*/3 * * * *</span>
+                  <span className="text-muted-foreground">Auto-Mode legado</span>
+                  <span className="text-red-400 font-bold">DESATIVADO</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-b border-white/5">
-                  <span className="text-muted-foreground">Scanner PRO Server</span>
-                  <span className="text-orange-400 font-bold">*/5 * * * *</span>
+                  <span className="text-muted-foreground">Scanner PRO</span>
+                  <span className="text-orange-400 font-bold">QUARENTENA</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-b border-white/5">
                   <span className="text-muted-foreground">Check Green/Loss</span>
-                  <span className="text-blue-400 font-bold">*/5 * * * *</span>
+                  <span className="text-blue-400 font-bold">ADMIN / SERVIÇO</span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-muted-foreground">Relatório Semanal</span>
-                  <span className="text-green-400 font-bold">Seg 9h (BRT)</span>
+                  <span className="text-green-400 font-bold">ADMIN / SERVIÇO</span>
                 </div>
               </div>
             </div>

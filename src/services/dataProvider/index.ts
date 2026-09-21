@@ -115,7 +115,7 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
       const arr = Array.isArray(result) ? result : [];
       const durationMs = Math.round(performance.now() - t0);
       // tag de fonte (não-invasivo) para diagnóstico — usado apenas em telas admin
-      const tagged = arr.map(m => ({ ...(m as any), __source: src.name } as MatchData));
+      const tagged = arr.map(m => ({ ...(m as any), __source: src.name, __dataFreshness: (m as any).__dataFreshness || 'FRESH' } as MatchData));
       if (tagged.length > 0) {
         pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: tagged.length, durationMs });
         merged.push(...tagged); // dedupe preserva a 1ª (maior prioridade)
@@ -139,7 +139,7 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
       const arr = await src.fetchByDate(date);
       const durationMs = Math.round(performance.now() - t0);
       if (Array.isArray(arr) && arr.length > 0) {
-        const tagged = arr.map(m => ({ ...(m as any), __source: src.name } as MatchData));
+        const tagged = arr.map(m => ({ ...(m as any), __source: src.name, __dataFreshness: (m as any).__dataFreshness || 'FRESH' } as MatchData));
         pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: tagged.length, durationMs });
         return dedupe(tagged);
       }

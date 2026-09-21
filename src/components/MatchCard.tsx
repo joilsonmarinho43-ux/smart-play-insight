@@ -34,11 +34,11 @@ function StatRow({ label, home, away, suffix = '', pillHome = true }: { label: s
 }
 
 function Stats({ match }: { match: MatchData }) {
-  const hs:any=(match as any).homeStats||{}, as:any=(match as any).awayStats||{}, md:any=match.modelData||{}, metrics:any=(match as any).metrics||{};
-  const home=(key:string, metricKey?:string, modelKey?:string)=>metrics?.[metricKey||key]?.[0] ?? hs?.[key] ?? (modelKey?md?.[modelKey]:null);
-  const away=(key:string, metricKey?:string, modelKey?:string)=>metrics?.[metricKey||key]?.[1] ?? as?.[key] ?? (modelKey?md?.[modelKey]:null);
+  const hs:any=(match as any).homeStats||{}, as:any=(match as any).awayStats||{}, metrics:any=(match as any).metrics||{};
+  const home=(key:string, metricKey?:string)=>metrics?.[metricKey||key]?.[0] ?? hs?.[key] ?? null;
+  const away=(key:string, metricKey?:string)=>metrics?.[metricKey||key]?.[1] ?? as?.[key] ?? null;
   const rows=[
-    ['Gols', home('goals','goals','homeGoalsAvg'), away('goals','goals','awayGoalsAvg')],
+    ['Gols', home('goals','goals'), away('goals','goals')],
     ['Posse de bola', home('possession','possession'), away('possession','possession'), '%'],
     ['Gols esperados (xG)', home('xG','xG'), away('xG','xG')],
     ['Finalizações Totais', home('totalShots','totalShots'), away('totalShots','totalShots')],
@@ -50,7 +50,6 @@ function Stats({ match }: { match: MatchData }) {
     ['Cartões amarelos', home('yellowCards','yellowCards'), away('yellowCards','yellowCards')],
   ];
   const available=rows.filter(r=>n(r[1])!=null||n(r[2])!=null);
-  const hasHistorical= n(md.homeGoalsAvg)!=null || n(md.awayGoalsAvg)!=null;
   return <div className="rounded-xl bg-white/95 px-2 py-1 dark:bg-transparent">
     <div className="mb-2 grid grid-cols-[minmax(72px,1fr)_minmax(92px,1.25fr)_minmax(72px,1fr)] items-center gap-2 border-b border-gray-200/10 pb-2">
       <span className="truncate text-right text-[10px] font-black uppercase text-emerald-400">{match.homeTeam}</span>
@@ -58,7 +57,7 @@ function Stats({ match }: { match: MatchData }) {
       <span className="truncate text-left text-[10px] font-black uppercase text-orange-400">{match.awayTeam}</span>
     </div>
     {available.map(([label,h,a,suffix],i)=><StatRow key={String(label)} label={String(label)} home={h} away={a} suffix={String(suffix||'')} />)}
-    {!available.length && !hasHistorical && <p className="py-5 text-center text-xs text-gray-500">Aguardando histórico estatístico das equipes.</p>}
+    {!available.length && <p className="py-5 text-center text-xs text-gray-500">Aguardando histórico estatístico das equipes.</p>}
   </div>;
 }
 function Poisson({ match }: { match: MatchData }) {

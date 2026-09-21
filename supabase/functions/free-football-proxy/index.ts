@@ -103,6 +103,25 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const { data: allowed, error: rateError } = await sb.rpc('check_rate_limit', {
+      _bucket: 'free-football-proxy',
+      _subject: user.id,
+      _max_calls: 60,
+      _window_seconds: 60,
+    });
+    if (rateError) {
+      console.error('[free-football-proxy] rate limit check failed');
+      return new Response(JSON.stringify({ error: 'RATE_LIMIT_UNAVAILABLE' }), {
+        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (allowed === false) {
+      return new Response(JSON.stringify({ error: 'RATE_LIMITED', retry_after: 60 }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' },
+      });
+    }
   }
 
   try {

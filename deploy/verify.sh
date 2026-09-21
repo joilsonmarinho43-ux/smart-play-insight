@@ -130,34 +130,19 @@ if [ -n "$SERVICE_KEY" ]; then
   if grep -q '"telegram":{"ok":true' /tmp/nx_health.json 2>/dev/null; then
     ok "bot do Telegram válido"
   else
-    # Confirmar diretamente a API do Telegram a partir do mesmo edge runtime
-    # que executa as funções. Isso diferencia falha real do parser/proxy.
-    TG_DIRECT="$(docker exec "$EDGE_CT" deno eval '
-      const token = Deno.env.get("TELEGRAM_BOT_TOKEN") || "";
-      try {
-        const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);
-        const d = await r.json().catch(() => ({}));
-        console.log(JSON.stringify({status:r.status, ok:d?.ok === true, error:d?.description || null}));
-      } catch (e) {
-        console.log(JSON.stringify({status:0, ok:false, error:String(e)}));
-      }
-    ' 2>/dev/null || true)"
+    # Probe direto usando o token que está efetivamente no edge runtime.
+    # Não imprime o token; somente status/diagnóstico da API.
+    TG_TOKEN="$(docker exec "$EDGE_CT" printenv TELEGRAM_BOT_TOKEN 2>/dev/null || true)"
+    TG_DIRECT=""
+    if [ -n "$TG_TOKEN" ]; then
+      TG_DIRECT="$(curl -sS --connect-timeout 5 --max-time 15 \
+        "https://api.telegram.org/bot${TG_TOKEN}/getMe" 2>/dev/null || true)"
+    fi
     if printf '%s' "$TG_DIRECT" | grep -q '"ok":true'; then
-      ok "bot do Telegram válido (probe direto no edge runtime)"
+      ok "bot do Telegram válido (probe direto)"
     else
-      TG_DETAIL="$(printf '%s' "$TG_DIRECT" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("error") or ("HTTP "+str(d.get("status")) if d.get("status") is not None else "sem diagnóstico"))' 2>/dev/null || true)"
-      if [ -z "$TG_DETAIL" ]; then
-        TG_DETAIL="$(python3 - <<'PY' 2>/dev/null
-import json
-try:
-    d=json.load(open('/tmp/nx_health.json'))
-    t=d.get('telegram') or {}
-    print(t.get('error') or ('HTTP '+str(t.get('status')) if t.get('status') is not None else 'sem diagnóstico'))
-except Exception:
-    print('sem diagnóstico')
-PY
-)"
-      fi
+      TG_DETAIL="$(printf '%s' "$TG_DIRECT" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("description") or ("HTTP "+str(d.get("error_code")) if d.get("error_code") is not None else "sem diagnóstico"))' 2>/dev/null || true)"
+      [ -n "$TG_DETAIL" ] || TG_DETAIL="sem diagnóstico"
       warn "Telegram indisponível: $TG_DETAIL"
     fi
   fi

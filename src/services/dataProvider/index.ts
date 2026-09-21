@@ -139,7 +139,7 @@ export async function getMatchesByDate(date: string): Promise<MatchData[]> {
       const arr = await src.fetchByDate(date);
       const durationMs = Math.round(performance.now() - t0);
       if (Array.isArray(arr) && arr.length > 0) {
-        const tagged = arr.map(m => ({ ...(m as any), __source: src.name, __dataFreshness: (m as any).__dataFreshness || 'FRESH' } as MatchData));
+        const tagged = arr.map(m => ({ ...(m as any), dataSource: src.name, dataFreshness: (m as any).dataFreshness || (m as any).__dataFreshness || 'FRESH', dataStaleAgeMs: (m as any).dataStaleAgeMs ?? (m as any).__staleAgeMs } as MatchData));
         pushLog({ ts: Date.now(), date, source: src.name, status: 'ok', count: tagged.length, durationMs });
         return dedupe(tagged);
       }

@@ -1,3 +1,4 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 /* Nexus 33 football-api: source normalization and provenance only. */
 import { fetchEspnMatches } from "../_shared/espnLive.ts";
 const SPORTSRC_KEY = Deno.env.get("SPORTSRC_API_KEY") || "";
@@ -129,6 +130,18 @@ async function fetchFixtureStats(fixtureId: string | number): Promise<any> {
 Deno.serve(async (req) => {
   const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Content-Type": "application/json" };
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  const authorization = req.headers.get("authorization")?.replace(/^Bearer\\s+/i, "").trim() || "";
+  const apiKey = req.headers.get("apikey")?.trim() || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const internal = !!serviceKey && (authorization === serviceKey || apiKey === serviceKey);
+  if (!internal) {
+    if (!authorization) return new Response(JSON.stringify({ ok: false, error: "AUTH_REQUIRED" }), { status: 401, headers: cors });
+    const authClient = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+    const { data: { user }, error: authError } = await authClient.auth.getUser(authorization);
+    if (authError || !user) return new Response(JSON.stringify({ ok: false, error: "AUTH_REQUIRED" }), { status: 401, headers: cors });
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     if (body?.fixture != null) return new Response(JSON.stringify(await fetchFixtureStats(body.fixture)), { status: 200, headers: cors });

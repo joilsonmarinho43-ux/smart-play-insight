@@ -167,15 +167,18 @@ function teamKey(name: unknown): string {
 function toLiveStats(stats: any): any | undefined {
   if (!stats?.home || !stats?.away) return undefined;
   const h=stats.home,a=stats.away;
-  const finite=(v:any)=>Number.isFinite(Number(v))?Number(v):0;
+  const finite=(v:any)=>Number.isFinite(Number(v))?Number(v):null;
+  const pressure=(side:any)=>{
+    const da=finite(side?.dangerousAttacks), sog=finite(side?.shotsOnGoal), corners=finite(side?.corners);
+    return da!==null&&sog!==null&&corners!==null
+      ? Math.min(100,Math.round(da*0.6+sog*8+corners*3))
+      : null;
+  };
   return {
     dangerousAttacks:[finite(h.dangerousAttacks),finite(a.dangerousAttacks)],
     corners:[finite(h.corners),finite(a.corners)],
     possession:[finite(h.possession),finite(a.possession)],
-    pressureIndex:[
-      Math.min(100,Math.round(finite(h.dangerousAttacks)*0.6+finite(h.shotsOnGoal)*8+finite(h.corners)*3)),
-      Math.min(100,Math.round(finite(a.dangerousAttacks)*0.6+finite(a.shotsOnGoal)*8+finite(a.corners)*3))
-    ],
+    pressureIndex:[pressure(h),pressure(a)],
   };
 }
 function uniqueMatches(matches: any[]): any[] {

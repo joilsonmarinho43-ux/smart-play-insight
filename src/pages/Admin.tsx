@@ -533,7 +533,7 @@ const Admin = () => {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               {(() => {
                                 const hasPressure = log.pressure != null;
-                                const derivedPressure = log.rma_score != null ? ((log.rma_score - (log.ap_norm ?? 0) * 0.35 - (log.f_norm ?? 0) * 0.15 - (log.sot_norm ?? 0) * 0.10) / 0.4).toFixed(0) : null;
+                                const derivedPressure = [log.rma_score, log.ap_norm, log.f_norm, log.sot_norm].every(v => Number.isFinite(v)) ? ((log.rma_score - log.ap_norm * 0.35 - log.f_norm * 0.15 - log.sot_norm * 0.10) / 0.4).toFixed(0) : null;
                                 const pressureValue = hasPressure ? log.pressure!.toFixed(0) : (derivedPressure ?? '—');
                                 const pressureSuffix = !hasPressure && derivedPressure != null ? ' *' : '';
                                 return [

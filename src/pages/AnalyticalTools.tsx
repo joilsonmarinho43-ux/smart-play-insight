@@ -83,7 +83,8 @@ function MatchName({ match }: { match: any }) { return <>{match.homeTeam || matc
 function validatedMarkets(match: MatchData) {
   return analyzeMarkets(match).filter(m =>
     m.probabilitySource === 'MODEL_ESTIMATE' &&
-    (m.calibrationStatus === 'MODEL_VALIDATED' || m.calibrationStatus === 'CALIBRATED')
+    (m.calibrationStatus === 'MODEL_VALIDATED' || m.calibrationStatus === 'CALIBRATED') &&
+    Number.isFinite(m.probability) && m.probability >= 75
   );
 }
 function hasFiniteNumber(value: unknown): value is number {

@@ -13,6 +13,15 @@ const memCache = new Map<string, { ts: number; ctx: MatchContext }>(); const ana
 const TTL = 8 * 60 * 1000, ANALYST_TTL = 30 * 60 * 1000, FALLBACK_TTL = 60 * 60 * 1000, RESEARCH_TTL = 20 * 60 * 1000, QUANT_TTL = 6 * 60 * 60 * 1000;
 
 async function enrichQuantitativeData(match: MatchData): Promise<MatchData> {
+  const md = match.modelData as any;
+  const sample = match.sampleSize;
+  const readyFromCurrentMatch =
+    Number(sample?.homeGames || 0) >= 3 &&
+    Number(sample?.awayGames || 0) >= 3 &&
+    [md?.homeGoalsAvg, md?.awayGoalsAvg, md?.homeGoalsAgainstAvg, md?.awayGoalsAgainstAvg]
+      .every((v: unknown) => Number.isFinite(Number(v)));
+  if (readyFromCurrentMatch) return match;
+
   const key = `${match.homeTeam}|${match.awayTeam}`; const cached = quantCache.get(key); if (cached && Date.now() - cached.ts < QUANT_TTL) return cached.match;
   try {
     const { data, error } = await supabase.functions.invoke("team-form", { body: { home: match.homeTeam, away: match.awayTeam } }); if (error || !data?.ok) return match;

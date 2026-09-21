@@ -505,8 +505,10 @@ function mergeFairOdds(
   ai: AnalystReading["oddsReferencia"],
   reading?: MatchReadingV2 | null,
 ): { odds: AnalystReading["oddsReferencia"]; fromModel: boolean } {
-  if (!reading) return { odds: ai, fromModel: false };
-  const out = { ...(ai || {}) };
+  if (!reading) return { odds: {}, fromModel: false };
+  // Nunca promove odds fornecidas pela IA a "odd justa". Nesta tela, odds justas
+  // só podem vir de probabilidades calculadas pelo modelo estatístico local.
+  const out: NonNullable<AnalystReading["oddsReferencia"]> = {};
   let fromModel = false;
   const set = (k: keyof NonNullable<AnalystReading["oddsReferencia"]>, p?: number) => {
     if (p == null || p <= 0 || p >= 100) return;

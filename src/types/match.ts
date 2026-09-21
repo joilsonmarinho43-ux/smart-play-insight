@@ -61,6 +61,10 @@ export interface MatchData {
   status?: string;
   minute?: number;
   liveScore?: { home: number; away: number };
+  /** Provider freshness; STALE is display-only and cannot qualify for a signal. */
+  dataFreshness?: 'FRESH' | 'STALE';
+  dataStaleAgeMs?: number;
+  dataSource?: string;
   liveStats?: {
     dangerousAttacks: [number | null, number | null];
     corners: [number | null, number | null];

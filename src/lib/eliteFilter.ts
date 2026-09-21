@@ -49,12 +49,12 @@ function isHighQualityLeague(match: MatchData): boolean {
 
 /** Calcula APM combinado */
 function getCombinedAPM(match: MatchData): number {
-  const hDA = (match as any).homeStats?.dangerousAttacks || 0;
-  const aDA = (match as any).awayStats?.dangerousAttacks || 0;
-  const hShots = (match as any).homeStats?.totalShots || 0;
-  const aShots = (match as any).awayStats?.totalShots || 0;
-  const hSoG = (match as any).homeStats?.shotsOnGoal || 0;
-  const aSoG = (match as any).awayStats?.shotsOnGoal || 0;
+  const hDA = (match as any).homeStats?.dangerousAttacks;
+  const aDA = (match as any).awayStats?.dangerousAttacks;
+  const hShots = (match as any).homeStats?.totalShots;
+  const aShots = (match as any).awayStats?.totalShots;
+  const hSoG = (match as any).homeStats?.shotsOnGoal;
+  const aSoG = (match as any).awayStats?.shotsOnGoal;
 
   if (hDA > 0 || aDA > 0) return (hDA + aDA) / 90;
   return ((hShots + aShots) * 1.5 + (hSoG + aSoG) * 2) / 90;
@@ -64,8 +64,8 @@ function getCombinedAPM(match: MatchData): number {
 
 /** 1. Escanteios: soma das médias ≥ 7 já indica potencial */
 function evaluateCorners(match: MatchData): number {
-  const hCorners = (match as any).homeStats?.corners || match.modelData?.homeCornersAvg || 0;
-  const aCorners = (match as any).awayStats?.corners || match.modelData?.awayCornersAvg || 0;
+  const hCorners = (match as any).homeStats?.corners || match.modelData?.homeCornersAvg;
+  const aCorners = (match as any).awayStats?.corners || match.modelData?.awayCornersAvg;
   const total = hCorners + aCorners;
 
   if (total <= 0) return 0;
@@ -81,13 +81,13 @@ function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
 
-  const hGF = md.homeGoalsAvg || hs.goalsFor || 0;
-  const aGF = md.awayGoalsAvg || as_.goalsFor || 0;
+  const hGF = md.homeGoalsAvg || hs.goalsFor;
+  const aGF = md.awayGoalsAvg || as_.goalsFor;
   const totalGoalsAvg = hGF + aGF;
 
   // Finalizações como indicador de potencial ofensivo
-  const totalShots = (hs.totalShots || 0) + (as_.totalShots || 0);
-  const totalSoG = (hs.shotsOnGoal || 0) + (as_.shotsOnGoal || 0);
+  const totalShots = (hs.totalShots) + (as_.totalShots);
+  const totalSoG = (hs.shotsOnGoal) + (as_.shotsOnGoal);
 
   // Score base via média de gols
   let score = 0;
@@ -111,10 +111,10 @@ function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
 
 /** 3. Cartões: times com alta média de cartões + faltas */
 function evaluateCards(match: MatchData): number {
-  const hCards = (match as any).homeStats?.yellowCards || match.modelData?.homeCardsAvg || 0;
-  const aCards = (match as any).awayStats?.yellowCards || match.modelData?.awayCardsAvg || 0;
-  const hFouls = (match as any).homeStats?.fouls || 0;
-  const aFouls = (match as any).awayStats?.fouls || 0;
+  const hCards = (match as any).homeStats?.yellowCards || match.modelData?.homeCardsAvg;
+  const aCards = (match as any).awayStats?.yellowCards || match.modelData?.awayCardsAvg;
+  const hFouls = (match as any).homeStats?.fouls;
+  const aFouls = (match as any).awayStats?.fouls;
 
   const totalCards = hCards + aCards;
   const totalFouls = hFouls + aFouls;
@@ -126,10 +126,10 @@ function evaluateCards(match: MatchData): number {
 
 /** 4. Intensidade: APM ≥ 1.2 como threshold principal */
 function evaluateIntensity(match: MatchData): number {
-  const hShots = (match as any).homeStats?.totalShots || 0;
-  const aShots = (match as any).awayStats?.totalShots || 0;
-  const hSoG = (match as any).homeStats?.shotsOnGoal || 0;
-  const aSoG = (match as any).awayStats?.shotsOnGoal || 0;
+  const hShots = (match as any).homeStats?.totalShots;
+  const aShots = (match as any).awayStats?.totalShots;
+  const hSoG = (match as any).homeStats?.shotsOnGoal;
+  const aSoG = (match as any).awayStats?.shotsOnGoal;
 
   const totalShots = hShots + aShots;
   const totalSoG = hSoG + aSoG;
@@ -147,8 +147,8 @@ function evaluateIntensity(match: MatchData): number {
 
 /** Dados suficientes? */
 function hasEnoughData(match: MatchData): boolean {
-  const hGames = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount || 0;
-  const aGames = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount || 0;
+  const hGames = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount;
+  const aGames = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount;
   return hGames >= 4 && aGames >= 4;
 }
 
@@ -156,22 +156,22 @@ function hasGoalsData(match: MatchData): boolean {
   const md = (match as any).modelData || {};
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
-  return (md.homeGoalsAvg || hs.goalsFor || 0) > 0 && (md.awayGoalsAvg || as_.goalsFor || 0) > 0;
+  return (md.homeGoalsAvg || hs.goalsFor) > 0 && (md.awayGoalsAvg || as_.goalsFor) > 0;
 }
 
 function hasIntensityData(match: MatchData): boolean {
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
-  return ((hs.totalShots || 0) + (as_.totalShots || 0) + (hs.shotsOnGoal || 0) +
-    (as_.shotsOnGoal || 0) + (hs.dangerousAttacks || 0) + (as_.dangerousAttacks || 0)) > 0;
+  return ((hs.totalShots) + (as_.totalShots) + (hs.shotsOnGoal) +
+    (as_.shotsOnGoal) + (hs.dangerousAttacks) + (as_.dangerousAttacks)) > 0;
 }
 
 // ─── Engine principal ───
 
 /** Menor amostra entre as duas equipes */
 function minSample(match: MatchData): number {
-  const h = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount || 0;
-  const a = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount || 0;
+  const h = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount;
+  const a = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount;
   return Math.min(h, a);
 }
 

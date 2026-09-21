@@ -792,8 +792,8 @@ export function buildMatchReadingV2(
   });
 
   // Sugestão recomendada: maior valor realista
-  // - prioriza Over com maior linha que ainda tenha prob ≥ 72%
-  // - se nenhuma Over alcança, escolhe Under com prob ≥ 72% na menor linha
+  // - prioriza Over com maior linha que ainda tenha prob ≥ 75%
+  // - se nenhuma Over alcança, escolhe Under com prob ≥ 75% na menor linha
   // - fallback: maior probabilidade entre todas
   let recIdx = -1;
   for (let i = linesRaw.length - 1; i >= 0; i--) {
@@ -806,9 +806,9 @@ export function buildMatchReadingV2(
       if (l.side === "under" && l.probability >= 75) { recIdx = i; break; }
     }
   }
-  if (recIdx === -1) {
-    recIdx = linesRaw.reduce((best, l, i, arr) => l.probability > arr[best].probability ? i : best, 0);
-  }
+  // Sem linha com probabilidade >= 75%, nenhuma linha recebe selo de recomendação.
+  // O maior percentual continua visível abaixo, mas permanece apenas informativo.
+
 
   const rationaleFor = (l: { line: number; side: "over" | "under"; probability: number }): string => {
     if (l.side === "over") {
@@ -911,7 +911,7 @@ export function buildMatchReadingV2(
     verdict = `Lesões importantes desestabilizam justamente o lado favorito. Cenário pede paciência: melhor confirmar comportamento ao vivo do que arriscar pré-jogo exposto.`;
   } else if (pred === "vermelho" && goalsVsTacticConflict) {
     verdict = `Números e perfil tático brigam entre si — não há leitura segura para gols agressivos. Mercados conservadores ou específicos oferecem leitura melhor do que linhas amplas.`;
-  } else if (topOp && topOp.confidence >= 72) {
+  } else if (topOp && topOp.confidence >= 75) {
     verdict = `${topOp.market} (${topOp.confidence}%) aparece como a leitura mais sólida do confronto. ${
       goalsMarket && goalsMarket !== topOp
         ? `Os mercados conservadores de gols oferecem leitura mais segura do que linhas agressivas de vencedor.`

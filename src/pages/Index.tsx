@@ -47,7 +47,7 @@ const LEAGUE_LABELS: Record<string, string> = {
 function getMatchDate(match: MatchData): string {
   const iso = match.kickoff || ((match as any).fixture?.date) || (typeof match.time === 'string' && match.time.includes('T') ? match.time : null);
   if (iso) return paraDateString(new Date(iso));
-  return match.date || '';
+  return (match as any).date || '';
 }
 
 function isUpcoming(match: MatchData): boolean {

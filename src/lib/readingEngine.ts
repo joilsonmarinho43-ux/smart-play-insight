@@ -175,8 +175,8 @@ export function buildMatchReadingV2(
   const rawTotal = hL0 + aL0;
 
   // Contexto
-  const homeImpact = ctx?.injuries?.home?.impact || "baixo";
-  const awayImpact = ctx?.injuries?.away?.impact || "baixo";
+  const homeImpact = ctx?.injuries?.home?.impact ?? null;
+  const awayImpact = ctx?.injuries?.away?.impact ?? null;
   const ctxReliab = ctx?.reliability || "limitado";
   const homeMot = ctx?.motivation?.home?.stake || null;
   const awayMot = ctx?.motivation?.away?.stake || null;
@@ -453,13 +453,13 @@ export function buildMatchReadingV2(
   if (hCorners != null && aCorners != null && hCorners + aCorners >= 10)
     indicators.push(`Boa média combinada de escanteios: ${fmt(hCorners + aCorners)} por jogo.`);
   if (physicalProfile)
-    indicators.push(`Tendência de jogo físico — ${fmt((hCards ?? 0) + (aCards ?? 0))} amarelos somados em média.`);
+    indicators.push(`Tendência de jogo físico — ${fmt(hCards! + aCards!)} amarelos somados em média.`);
   if (homeImpact === "alto") indicators.push(`Desfalques pesados no ${home} mexem com a estrutura titular.`);
   if (awayImpact === "alto") indicators.push(`${away} chega com baixas importantes que afetam o setor principal.`);
   if (homeMot === "luta contra rebaixamento")
-    indicators.push(`${home} luta contra o rebaixamento — entrega física máxima é praticamente garantida.`);
+    indicators.push(`${home} está em zona de disputa contra o rebaixamento — a situação competitiva é um fator contextual.`);
   if (awayMot === "luta contra rebaixamento")
-    indicators.push(`${away} luta contra o rebaixamento — tende a se entregar mesmo jogando fora.`);
+    indicators.push(`${away} está em zona de disputa contra o rebaixamento — a situação competitiva é um fator contextual.`);
   if (homeMot === "disputa por título" && homeRank)
     indicators.push(`${home} é ${homeRank}º e briga pelo título — pressão por resultado pesa no roteiro.`);
   if (awayMot === "disputa por título" && awayRank)

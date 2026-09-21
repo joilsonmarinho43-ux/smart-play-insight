@@ -76,7 +76,7 @@ export default function Index() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['nexus-upcoming-matches', todayKey],
     queryFn: () => fetchMultiDayMatches(6),
-    staleTime: 30 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: false,

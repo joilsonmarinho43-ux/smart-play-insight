@@ -84,16 +84,18 @@ export function extractLambdas(match: any): {
   const canonical = getCanonicalGoalLambdas(match);
   const hs = match?.homeStats || {};
   const as = match?.awayStats || {};
-  const homeN = typeof (match?.sampleSize?.homeGames ?? hs.gamesCount) === 'number' ? (match?.sampleSize?.homeGames ?? hs.gamesCount) : 0;
-  const awayN = typeof (match?.sampleSize?.awayGames ?? as.gamesCount) === 'number' ? (match?.sampleSize?.awayGames ?? as.gamesCount) : 0;
+  const homeRaw = match?.sampleSize?.homeGames ?? hs.gamesCount;
+  const awayRaw = match?.sampleSize?.awayGames ?? as.gamesCount;
+  const homeN = typeof homeRaw === 'number' && Number.isFinite(homeRaw) ? homeRaw : null;
+  const awayN = typeof awayRaw === 'number' && Number.isFinite(awayRaw) ? awayRaw : null;
   const hGF = match?.modelData?.homeGoalsAvg ?? hs.goalsFor;
   const aGF = match?.modelData?.awayGoalsAvg ?? as.goalsFor;
-  const hasRealData = !!canonical && homeN > 0 && awayN > 0 && Number.isFinite(hGF) && Number.isFinite(aGF) && hGF > 0 && aGF > 0;
-  if (!canonical) return { homeLambda: 0, awayLambda: 0, sample: { home: homeN, away: awayN }, hasRealData: false };
+  const hasRealData = !!canonical && homeN !== null && awayN !== null && homeN >= 3 && awayN >= 3 && Number.isFinite(hGF) && Number.isFinite(aGF) && hGF > 0 && aGF > 0;
+  if (!canonical) return { homeLambda: 0, awayLambda: 0, sample: { home: homeN ?? 0, away: awayN ?? 0 }, hasRealData: false };
   return {
     homeLambda: canonical.homeLambda,
     awayLambda: canonical.awayLambda,
-    sample: { home: homeN, away: awayN },
+    sample: { home: homeN ?? 0, away: awayN ?? 0 },
     hasRealData,
   };
 }

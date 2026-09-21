@@ -40,11 +40,12 @@ function useMatches() {
       const needsForm = (m: MatchData) => {
         const md:any = m.modelData || {};
         const s:any = m.sampleSize || {};
+        const validMetric = (v:any) => typeof v === 'number' && Number.isFinite(v);
         return !(Number(s.homeGames) >= 3 && Number(s.awayGames) >= 3 &&
-          Number.isFinite(Number(md.homeGoalsAvg)) &&
-          Number.isFinite(Number(md.awayGoalsAvg)) &&
-          Number.isFinite(Number(md.homeGoalsAgainstAvg)) &&
-          Number.isFinite(Number(md.awayGoalsAgainstAvg)));
+          validMetric(md.homeGoalsAvg) &&
+          validMetric(md.awayGoalsAvg) &&
+          validMetric(md.homeGoalsAgainstAvg) &&
+          validMetric(md.awayGoalsAgainstAvg));
       };
       const targets = ordered.filter(needsForm).slice(0, 8);
       if (!targets.length) return ordered;
@@ -85,15 +86,19 @@ function validatedMarkets(match: MatchData) {
     (m.calibrationStatus === 'MODEL_VALIDATED' || m.calibrationStatus === 'CALIBRATED')
   );
 }
+function hasFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 function modelReady(match: MatchData) {
   const s = match.sampleSize;
   const md = match.modelData;
   return Number(s?.homeGames || 0) >= 3 &&
     Number(s?.awayGames || 0) >= 3 &&
-    Number.isFinite(Number(md?.homeGoalsAvg)) &&
-    Number.isFinite(Number(md?.awayGoalsAvg)) &&
-    Number.isFinite(Number(md?.homeGoalsAgainstAvg)) &&
-    Number.isFinite(Number(md?.awayGoalsAgainstAvg));
+    hasFiniteNumber(md?.homeGoalsAvg) &&
+    hasFiniteNumber(md?.awayGoalsAvg) &&
+    hasFiniteNumber(md?.homeGoalsAgainstAvg) &&
+    hasFiniteNumber(md?.awayGoalsAgainstAvg);
 }
 function Loading() { return <div className="flex items-center justify-center py-20 text-gray-400"><Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-400" />Carregando jogos...</div>; }
 function Empty({ text = 'Nenhum jogo futuro disponível.' }: { text?: string }) { return <div className="py-16 text-center text-gray-500">{text}</div>; }

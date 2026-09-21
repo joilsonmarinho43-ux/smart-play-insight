@@ -34,7 +34,9 @@ export async function fetchFootballDataOrg(date: string): Promise<MatchData[]> {
     const raw = localStorage.getItem(CACHE_PREFIX + date);
     if (raw) {
       const { ts, data } = JSON.parse(raw);
-      if (Date.now() - ts < CACHE_TTL && Array.isArray(data)) return data;
+      // An empty provider response is not authoritative; do not let it
+      // block retries for the entire cache TTL.
+      if (Date.now() - ts < CACHE_TTL && Array.isArray(data) && data.length > 0) return data;
     }
   } catch { /* noop */ }
 
@@ -50,7 +52,9 @@ export async function fetchFootballDataOrg(date: string): Promise<MatchData[]> {
     if (!data?.ok) return [];
     const matches: any[] = Array.isArray(data?.data?.matches) ? data.data.matches : [];
     const mapped = matches.map(mapMatch).filter(Boolean) as MatchData[];
-    try { localStorage.setItem(CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: mapped })); } catch {}
+    if (mapped.length > 0) {
+      try { localStorage.setItem(CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: mapped })); } catch {}
+    }
     return mapped;
   } catch {
     return [];

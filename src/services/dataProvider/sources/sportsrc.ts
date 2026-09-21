@@ -57,7 +57,7 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
       const { ts, data } = JSON.parse(raw);
       if (!Array.isArray(data) || Date.now() - ts > STALE_MAX) return [];
       console.warn(`[SportsRC] ${reason} → servindo stale (age=${Math.round((Date.now() - ts) / 60000)}min, n=${data.length})`);
-      return data;
+      return data.map((m: any) => ({ ...m, __dataFreshness: 'STALE', __staleAgeMs: Date.now() - ts }));
     } catch { return []; }
   };
 

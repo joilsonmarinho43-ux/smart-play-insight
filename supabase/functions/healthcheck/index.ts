@@ -6,6 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { getTelegramBotToken } from '../_shared/telegram.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireAdminUser } from '../_shared/internalAuth.ts';
 
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return await Promise.race([
@@ -27,6 +28,9 @@ async function probe(url: string, headers: Record<string, string> = {}) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const authSb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const admin = await requireAdminUser(req, authSb, corsHeaders);
+  if (admin) return admin;
 
   const result: any = { ok: false, db: null, telegram: null, providers: {}, ts: new Date().toISOString() };
 

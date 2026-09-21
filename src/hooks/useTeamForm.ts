@@ -35,10 +35,20 @@ export function useTeamForm(match: MatchData | null | undefined, active = true) 
   // Só pula a busca se a partida já tem médias E amostra de jogos conhecida
   const sample = match?.sampleSize;
   const hasSample = Number(sample?.homeGames || 0) > 0 && Number(sample?.awayGames || 0) > 0;
+  const md = match?.modelData as any;
+  const advancedFields = [
+    md?.homeCornersAvg, md?.awayCornersAvg,
+    md?.homeCardsAvg, md?.awayCardsAvg,
+    md?.homePossessionAvg, md?.awayPossessionAvg,
+    md?.homeXGAvg, md?.awayXGAvg,
+    md?.homeTotalShotsAvg, md?.awayTotalShotsAvg,
+  ];
+  const hasAdvancedStats = advancedFields.every((v) => Number.isFinite(Number(v)));
   const alreadyHas = Boolean(
-    Number(match?.modelData?.homeGoalsAvg || 0) > 0 &&
-    Number(match?.modelData?.awayGoalsAvg || 0) > 0 &&
-    hasSample
+    Number(md?.homeGoalsAvg || 0) > 0 &&
+    Number(md?.awayGoalsAvg || 0) > 0 &&
+    hasSample &&
+    hasAdvancedStats
   );
 
   return useQuery<TeamFormResponse>({

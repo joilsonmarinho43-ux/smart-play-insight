@@ -16,6 +16,7 @@ export interface DataQualityInput {
   estimatedData?: boolean;
   live?: boolean;
   requiredFeaturesPresent?: boolean;
+  dataFreshness?: 'FRESH' | 'STALE';
 }
 
 export interface DataQualityResult {
@@ -52,6 +53,7 @@ export function assessDataQuality(input: DataQualityInput): DataQualityResult {
   if (ageSeconds !== null && ageSeconds > maxAge) reasons.push('DATA_STALE');
   if (input.requiredFeaturesPresent === false) reasons.push('REQUIRED_FEATURES_MISSING');
   if (input.estimatedData === true) reasons.push('ESTIMATED_DATA');
+  if (input.dataFreshness === 'STALE') reasons.push('DATA_STALE');
 
   const completeness = input.sourceCompleteness;
   if (completeness !== undefined && completeness !== null && (!finite(completeness) || completeness < 0 || completeness > 100)) {

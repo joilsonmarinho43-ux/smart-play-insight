@@ -6,7 +6,7 @@ import type { MatchData } from '@/types/match';
 
 function readFavoriteIds(): string[] { try { const v=JSON.parse(localStorage.getItem('liveMatchFavorites')||'[]'); return Array.isArray(v)?v.map((x:any)=>String(x)):[]; } catch { return []; } }
 
-function Side({ name, value }: { name: string; value: number | undefined }) {
+function Side({ name, value }: { name: string; value: number | null | undefined }) {
   return <div className="rounded-lg bg-secondary/30 p-2 text-xs"><div className="truncate text-muted-foreground">{name}</div><div className="mt-1 font-bold tabular-nums">{Number.isFinite(value) ? value : '—'}</div></div>;
 }
 

@@ -448,7 +448,8 @@ const Admin = () => {
               const neutral = rmaLogs.filter(l => l.rma_verdict === 'NEUTRO').length;
               const blocked = rmaLogs.filter(l => l.rma_verdict === 'BLOQUEADO').length;
               const total = rmaLogs.length;
-              const avgScore = total > 0 ? Math.round(rmaLogs.reduce((s, l) => s + (Number.isFinite(l.rma_score) ? l.rma_score : 0), 0) / total * 10) / 10 : null;
+              const scoreValues = rmaLogs.map(l => l.rma_score).filter((v): v is number => Number.isFinite(v));
+              const avgScore = scoreValues.length > 0 ? Math.round(scoreValues.reduce((s, v) => s + v, 0) / scoreValues.length * 10) / 10 : null;
               return (
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <div className="bg-card/40 border border-white/5 p-3 rounded-2xl text-center">

@@ -26,12 +26,20 @@ export default function Suggestions() {
 
   const fetchSuggestions = async () => {
     setFetching(true);
-    const { data, error } = await supabase.from("suggestions").select("*").order("created_at", { ascending: false });
+    if (!profile?.id) return;
+    const { data, error } = await supabase
+      .from("suggestions")
+      .select("*")
+      .eq("user_id", profile.id)
+      .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar sugestões"); else setMySuggestions(data || []);
     setFetching(false);
   };
 
-  useEffect(() => { fetchSuggestions(); }, []);
+  useEffect(() => {
+    if (profile?.id) fetchSuggestions();
+    else setFetching(false);
+  }, [profile?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

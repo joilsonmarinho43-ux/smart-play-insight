@@ -160,9 +160,10 @@ export function buildMatchReadingV2(
   const awayN = match.sampleSize?.awayGames ?? as_.gamesCount ?? null;
   const leagueAvg = md.leagueAvg ?? hs.leagueAvg ?? as_.leagueAvg ?? 2.5;
 
-  const numericInputs = [hGF, aGF, hGA, aGA, hCorners, aCorners, hCards, aCards, leagueAvg, homeN, awayN];
-  if (!numericInputs.every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+  const requiredInputs = [hGF, aGF, hGA, aGA, leagueAvg, homeN, awayN];
+  if (!requiredInputs.every((v) => typeof v === "number" && Number.isFinite(v))) return null;
   if (homeN < 3 || awayN < 3) return null;
+  if ([hCorners, aCorners, hCards, aCards].some((v) => v != null && (typeof v !== "number" || !Number.isFinite(v)))) return null;
 
   // λ base (Bayes + força ofensiva × fragilidade adversária)
   const adjHGF = bayes(hGF, leagueAvg, homeN);

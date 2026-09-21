@@ -89,12 +89,21 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
       console.info(`[SportsRC] date=${date} vazio (cache=${data.cache || 'miss'})`);
       return returnStale('upstream_empty');
     }
-    try {
-      const snap = JSON.stringify({ ts: Date.now(), data: matches });
-      localStorage.setItem(CACHE_PREFIX + date, snap);
-      localStorage.setItem(STALE_PREFIX + date, snap);
-    } catch { /* noop */ }
-    console.info(`[SportsRC] date=${date} matches=${matches.length} cache=${data.cache || 'miss'} latency=${data.latency_ms}ms${data.served_from_stale ? ' STALE' : ''}`);
+    const servedStale = data?.served_from_stale === true || data?.cache === 'stale';
+    if (!servedStale) {
+      try {
+        const snap = JSON.stringify({ ts: Date.now(), data: matches });
+        localStorage.setItem(CACHE_PREFIX + date, snap);
+        localStorage.setItem(STALE_PREFIX + date, snap);
+      } catch { /* noop */ }
+    }
+    if (servedStale) {
+      const staleAgeMs = Number.isFinite(Number(data?.age_ms)) ? Number(data.age_ms) : undefined;
+      const tagged = matches.map(m => ({ ...m, dataFreshness: 'STALE' as const, ...(staleAgeMs != null ? { dataStaleAgeMs: staleAgeMs } : {}) }));
+      console.warn(`[SportsRC] date=${date} proxy served stale data (age=${staleAgeMs != null ? Math.round(staleAgeMs / 60000) + 'min' : 'unknown'})`);
+      return tagged;
+    }
+    console.info(`[SportsRC] date=${date} matches=${matches.length} cache=${data.cache || 'miss'} latency=${data.latency_ms}ms`);
     return matches;
   } catch (e) {
     console.warn('[SportsRC] fetch_exception', e);

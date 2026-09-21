@@ -26,7 +26,7 @@ interface CtxAnalytics {
   by_market: MarketRow[];
 }
 
-const wr = (w: number, t: number) => (t > 0 ? (w / t) * 100 : 0);
+const wr = (w: number, t: number): number | null => (Number.isFinite(w) && Number.isFinite(t) && t > 0 ? (w / t) * 100 : null);
 
 const behaviorMeta: Record<string, { color: string; icon: any; label: string }> = {
   explosivo: { color: "text-orange-400 border-orange-500/30 bg-orange-500/10", icon: Flame, label: "Explosivo" },
@@ -98,7 +98,7 @@ export default function Context() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">Sinais rastreados</div>
-          <div className="font-display text-3xl text-white mt-1">{o?.total ?? 0}</div>
+          <div className="font-display text-3xl text-white mt-1">{o?.total ?? "—"}</div>
         </Card>
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">Tempo médio até gol</div>
@@ -108,15 +108,15 @@ export default function Context() {
         </Card>
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">Pressão entrada</div>
-          <div className="font-display text-3xl text-blue-400 mt-1">{Number(o?.avg_entry_pressure ?? 0).toFixed(1)}</div>
-          <div className="text-xs text-gray-500 mt-1">Sustentada: {Number(o?.avg_sustained_pressure ?? 0).toFixed(1)}</div>
+          <div className="font-display text-3xl text-blue-400 mt-1">{o?.avg_entry_pressure != null ? Number(o.avg_entry_pressure).toFixed(1) : "—"}</div>
+          <div className="text-xs text-gray-500 mt-1">Sustentada: {o?.avg_sustained_pressure != null ? Number(o.avg_sustained_pressure).toFixed(1) : "—"}</div>
         </Card>
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">Queda média</div>
           <div className="font-display text-3xl text-amber-400 mt-1">
-            {((o?.avg_pressure_drop ?? 0) * 100).toFixed(1)}%
+            {o?.avg_pressure_drop != null ? `${(o.avg_pressure_drop * 100).toFixed(1)}%` : "—"}
           </div>
-          <div className="text-xs text-gray-500 mt-1">{Number(o?.avg_snapshots ?? 0).toFixed(1)} snaps/sinal</div>
+          <div className="text-xs text-gray-500 mt-1">{o?.avg_snapshots != null ? `${Number(o.avg_snapshots).toFixed(1)} snaps/sinal` : "—"}</div>
         </Card>
       </div>
 
@@ -169,9 +169,9 @@ export default function Context() {
                 <tr key={w.subject} className="border-b border-white/5">
                   <td className="py-2 text-gray-300">{w.subject}min</td>
                   <td className="text-center text-gray-400">{w.total}</td>
-                  <td className="text-center">{pctBadge(wr(w.wins, w.total))}</td>
+                  <td className="text-center">{pctBadge(wr(w.wins, w.total) ?? NaN)}</td>
                   <td className="text-center text-gray-300">{w.avg_time_min != null ? `${Number(w.avg_time_min).toFixed(1)}m` : "—"}</td>
-                  <td className="text-center text-amber-300">{((w.avg_drop ?? 0) * 100).toFixed(1)}%</td>
+                  <td className="text-center text-amber-300">{w.avg_drop != null ? `${(w.avg_drop * 100).toFixed(1)}%` : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -204,7 +204,7 @@ export default function Context() {
                   <td className="text-center">{pctBadge(wr(l.wins, l.total))}</td>
                   <td className="text-center text-red-400">{l.fakes}</td>
                   <td className="text-center text-gray-500">{l.deaths}</td>
-                  <td className="text-center text-blue-300">{Number(l.avg_pressure ?? 0).toFixed(1)}</td>
+                  <td className="text-center text-blue-300">{l.avg_pressure != null ? Number(l.avg_pressure).toFixed(1) : "—"}</td>
                 </tr>
               ))}
             </tbody>

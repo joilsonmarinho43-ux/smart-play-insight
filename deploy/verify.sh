@@ -50,8 +50,6 @@ fi
 [ "$APP_ST" = "running" ] && ok "frontend: running" || bad "frontend: ${APP_ST:-ausente}"
 
 sec "2. Secrets dentro do edge-runtime"
-"$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-functions|(^|-)functions(-|$)' | head -1 || true)"
-EDGE_CT="${EDGE_CT:-supabase-edge-functions}"
 ENVDUMP="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$EDGE_CT" 2>/dev/null || true)"
 # Se o cofre não expôs a service-role no shell, leia-a somente do
 # edge-runtime já validado. O valor nunca é impresso.

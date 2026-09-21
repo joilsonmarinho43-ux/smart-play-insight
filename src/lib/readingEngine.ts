@@ -156,12 +156,13 @@ export function buildMatchReadingV2(
   const aCorners = md.awayCornersAvg ?? as_.corners ?? null;
   const hCards = md.homeCardsAvg ?? hs.yellowCards ?? null;
   const aCards = md.awayCardsAvg ?? as_.yellowCards ?? null;
-  const homeN = match.sampleSize?.homeGames ?? hs.gamesCount ?? 0;
-  const awayN = match.sampleSize?.awayGames ?? as_.gamesCount ?? 0;
+  const homeN = match.sampleSize?.homeGames ?? hs.gamesCount ?? null;
+  const awayN = match.sampleSize?.awayGames ?? as_.gamesCount ?? null;
   const leagueAvg = md.leagueAvg ?? hs.leagueAvg ?? as_.leagueAvg ?? 2.5;
 
-  if (hGF == null || aGF == null || hGA == null || aGA == null) return null;
-  if (homeN <= 0 && awayN <= 0) return null;
+  const numericInputs = [hGF, aGF, hGA, aGA, hCorners, aCorners, hCards, aCards, leagueAvg, homeN, awayN];
+  if (!numericInputs.every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+  if (homeN < 3 || awayN < 3) return null;
 
   // λ base (Bayes + força ofensiva × fragilidade adversária)
   const adjHGF = bayes(hGF, leagueAvg, homeN);
@@ -565,7 +566,7 @@ export function buildMatchReadingV2(
     /Under 5\.5/i.test(name);
 
   const ranked = [...markets]
-    .filter((m) => m.probability >= 58)
+    .filter((m) => m.probability >= 75)
     .filter((m) => !conf2Side(m))
     .filter((m) => !shallowMarket(m.market))
     .sort((a, b) => b.probability - a.probability);
@@ -594,13 +595,13 @@ export function buildMatchReadingV2(
   // faixa de 5 pontos, preservando a ordem real do modelo.
   const dampen = (prob: number, marketName: string): number => {
     let cap = 85; // teto absoluto: nunca soar como certeza
-    if (balanced) cap = Math.min(cap, 74);
-    if (ctxReliab === "limitado") cap = Math.min(cap, 72);
-    if (homeN < 5 || awayN < 5) cap = Math.min(cap, 72);
-    if (marketDisagrees || injuriesOnFav) cap = Math.min(cap, 70);
+    if (balanced) cap = Math.min(cap, 75);
+    if (ctxReliab === "limitado") cap = Math.min(cap, 75);
+    if (homeN < 5 || awayN < 5) cap = Math.min(cap, 75);
+    if (marketDisagrees || injuriesOnFav) cap = Math.min(cap, 75);
     if (fatigueOnFav) cap = Math.min(cap, 75);
-    if (goalsVsTacticConflict && /Gols|Ambas/i.test(marketName)) cap = Math.min(cap, 68);
-    if (/Handicap/i.test(marketName) && balanced) cap = Math.min(cap, 66);
+    if (goalsVsTacticConflict && /Gols|Ambas/i.test(marketName)) cap = Math.min(cap, 75);
+    if (/Handicap/i.test(marketName) && balanced) cap = Math.min(cap, 75);
     // Mapa monotônico e contínuo: abaixo do "joelho" a probabilidade é
     // exibida como é; acima dela o excedente é comprimido a 25%, sem nunca
     // ultrapassar o teto. Assim um mercado de 88% NUNCA aparece abaixo de um
@@ -796,12 +797,12 @@ export function buildMatchReadingV2(
   let recIdx = -1;
   for (let i = linesRaw.length - 1; i >= 0; i--) {
     const l = linesRaw[i];
-    if (l.side === "over" && l.probability >= 72) { recIdx = i; break; }
+    if (l.side === "over" && l.probability >= 75) { recIdx = i; break; }
   }
   if (recIdx === -1) {
     for (let i = 0; i < linesRaw.length; i++) {
       const l = linesRaw[i];
-      if (l.side === "under" && l.probability >= 72) { recIdx = i; break; }
+      if (l.side === "under" && l.probability >= 75) { recIdx = i; break; }
     }
   }
   if (recIdx === -1) {
@@ -825,6 +826,8 @@ export function buildMatchReadingV2(
     return `Cenário extremo de jogo zerado — só aparece em partidas muito travadas.`;
   };
 
+  // Linhas só recebem selo de recomendação a partir do limiar conservador do Core.
+  // A probabilidade exibida continua sendo a do modelo, sem inflação.
   const goalLines: GoalLineSuggestion[] = linesRaw.map((l, i) => ({
     line: l.line,
     side: l.side,
@@ -1014,7 +1017,8 @@ export function buildMatchReadingV2(
 
   let bestPick: BestMarketPick | null = null;
   if (opportunities.length > 0) {
-    const scored = opportunities.map((op) => {
+    const eligibleForPick = opportunities.filter((op) => (op.modelProbability ?? 0) >= 75 && op.confidence >= 75);
+    const scored = eligibleForPick.map((op) => {
       const cat = op.category || "outro";
       // Odd justa vem da probabilidade REAL do modelo (não da confiança exibida,
       // que é amortecida): usar a confiança inflava artificialmente o edge.

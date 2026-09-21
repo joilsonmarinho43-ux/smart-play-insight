@@ -69,9 +69,24 @@ jobs:
             const page = await context.newPage();
 
             const failures = [];
+            const authNetwork = [];
 
             page.on('pageerror', error => {
               failures.push(`PAGE ERROR: ${error.message}`);
+            });
+
+            page.on('requestfailed', request => {
+              const url = request.url();
+              if (/auth|supabase/i.test(url)) {
+                authNetwork.push(`REQUEST FAILED: ${request.method()} ${url} :: ${request.failure()?.errorText || 'unknown'}`);
+              }
+            });
+
+            page.on('response', response => {
+              const url = response.url();
+              if (/auth|supabase/i.test(url)) {
+                console.log(`AUTH RESPONSE: ${response.status()} ${response.request().method()} ${url}`);
+              }
             });
 
             page.on('console', message => {
@@ -125,6 +140,15 @@ jobs:
             });
 
             if (page.url().includes('/auth')) {
+              console.log('=== LOGIN DIAGNOSTICS ===');
+              console.log('VISIBLE TEXT:');
+              console.log((await page.locator('body').innerText()).slice(0, 12000));
+              console.log('EMAIL VALUE:', await email.inputValue());
+              console.log('PASSWORD FILLED:', Boolean(await password.inputValue()));
+              console.log('LOGIN BUTTON TEXT:', await loginButton.innerText().catch(() => 'UNAVAILABLE'));
+              console.log('AUTH NETWORK FAILURES:');
+              authNetwork.forEach(item => console.log(item));
+              await page.screenshot({ path: 'nexus-login-failed.png', fullPage: true });
               throw new Error('LOGIN FAILED: usuário permaneceu na tela /auth');
             }
 

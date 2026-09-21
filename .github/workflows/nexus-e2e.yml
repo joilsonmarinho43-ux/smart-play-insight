@@ -1,0 +1,191 @@
+name: NEXUS 33 - Functional E2E
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: Browser real - NEXUS 33
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run NEXUS 33 functional browser test
+        env:
+          NEXUS_E2E_EMAIL: ${{ secrets.NEXUS_E2E_EMAIL }}
+          NEXUS_E2E_PASSWORD: ${{ secrets.NEXUS_E2E_PASSWORD }}
+        run: |
+          mkdir -p e2e
+
+          cat > e2e/nexus-functional.spec.js <<'EOF'
+          const { chromium } = require('playwright');
+
+          const BASE_URL = 'https://analista.funecob.com.br';
+
+          const routes = [
+            '/',
+            '/live',
+            '/scanner',
+            '/favorites',
+            '/suggestions',
+            '/bingo',
+            '/elite',
+            '/placar-exato',
+            '/bet-analyzer'
+          ];
+
+          (async () => {
+            const browser = await chromium.launch({
+              headless: true
+            });
+
+            const context = await browser.newContext({
+              viewport: { width: 390, height: 844 },
+              deviceScaleFactor: 1,
+              ignoreHTTPSErrors: false
+            });
+
+            const page = await context.newPage();
+
+            const failures = [];
+
+            page.on('pageerror', error => {
+              failures.push(`PAGE ERROR: ${error.message}`);
+            });
+
+            page.on('console', message => {
+              if (message.type() === 'error') {
+                failures.push(`CONSOLE ERROR: ${message.text()}`);
+              }
+            });
+
+            console.log('=== NEXUS 33 E2E ===');
+            console.log(`URL: ${BASE_URL}`);
+
+            await page.goto(`${BASE_URL}/auth`, {
+              waitUntil: 'domcontentloaded',
+              timeout: 60000
+            });
+
+            console.log(`AUTH URL: ${page.url()}`);
+
+            const email = page.locator(
+              'input[type="email"], input[name="email"], input[autocomplete="email"]'
+            ).first();
+
+            const password = page.locator(
+              'input[type="password"], input[name="password"], input[autocomplete="current-password"]'
+            ).first();
+
+            await email.waitFor({ state: 'visible', timeout: 30000 });
+            await password.waitFor({ state: 'visible', timeout: 30000 });
+
+            await email.fill(process.env.NEXUS_E2E_EMAIL);
+            await password.fill(process.env.NEXUS_E2E_PASSWORD);
+
+            const loginButton = page.locator(
+              'button[type="submit"], button:has-text("Entrar"), button:has-text("Login"), button:has-text("Acessar")'
+            ).first();
+
+            await loginButton.waitFor({
+              state: 'visible',
+              timeout: 15000
+            });
+
+            await loginButton.click();
+
+            await page.waitForTimeout(5000);
+
+            console.log(`AFTER LOGIN URL: ${page.url()}`);
+
+            await page.screenshot({
+              path: 'nexus-after-login.png',
+              fullPage: true
+            });
+
+            if (page.url().includes('/auth')) {
+              throw new Error('LOGIN FAILED: usuário permaneceu na tela /auth');
+            }
+
+            console.log('LOGIN: PASSOU');
+
+            for (const route of routes) {
+              console.log(`\nTESTANDO: ${route}`);
+
+              try {
+                const response = await page.goto(`${BASE_URL}${route}`, {
+                  waitUntil: 'domcontentloaded',
+                  timeout: 60000
+                });
+
+                await page.waitForTimeout(2500);
+
+                const status = response ? response.status() : 'NO_RESPONSE';
+                const title = await page.title();
+
+                console.log(`HTTP: ${status}`);
+                console.log(`FINAL URL: ${page.url()}`);
+                console.log(`TITLE: ${title}`);
+
+                if (status >= 500) {
+                  throw new Error(`HTTP ${status}`);
+                }
+
+                if (page.url().includes('/auth')) {
+                  throw new Error('REDIRECTED TO AUTH');
+                }
+
+                await page.screenshot({
+                  path: `nexus-${route === '/' ? 'home' : route.slice(1).replaceAll('/', '-')}.png`,
+                  fullPage: true
+                });
+
+                console.log(`RESULTADO ${route}: PASSOU`);
+              } catch (error) {
+                console.log(`RESULTADO ${route}: FALHOU`);
+                console.log(error.message);
+                failures.push(`${route}: ${error.message}`);
+              }
+            }
+
+            console.log('\n=== RESULTADO FINAL ===');
+
+            if (failures.length > 0) {
+              console.log('FALHAS ENCONTRADAS:');
+              failures.forEach(f => console.log(`- ${f}`));
+
+              await browser.close();
+              process.exit(1);
+            }
+
+            console.log('TODOS OS TESTES PASSARAM');
+
+            await browser.close();
+          })();
+          EOF
+
+          node e2e/nexus-functional.spec.js
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-e2e-evidence
+          path: |
+            nexus-*.png
+          if-no-files-found: ignore

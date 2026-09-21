@@ -236,8 +236,8 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
               </div>
             )}
             <div className="text-[11px] text-muted-foreground">
-              Média: {(side?.goalsForAvg ?? 0).toFixed(1)} marcados ·{" "}
-              {(side?.goalsAgainstAvg ?? 0).toFixed(1)} sofridos
+              Média: {Number.isFinite(side?.goalsForAvg) ? side.goalsForAvg.toFixed(1) : "—"} marcados ·{" "}
+              {Number.isFinite(side?.goalsAgainstAvg) ? side.goalsAgainstAvg.toFixed(1) : "—"} sofridos
             </div>
           </>
         )}
@@ -245,10 +245,14 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
     );
   };
 
-  const maxGames = Math.max(data?.home?.games ?? 0, data?.away?.games ?? 0);
-  const minGames = Math.min(data?.home?.games ?? 0, data?.away?.games ?? 0);
-  const titleSuffix = maxGames > 0 && maxGames < 5 ? `${maxGames} jogo${maxGames === 1 ? "" : "s"}` : "5 jogos";
-  const limited = !loading && maxGames > 0 && minGames < 5;
+  const homeGames = Number.isFinite(data?.home?.games) ? data.home.games : null;
+  const awayGames = Number.isFinite(data?.away?.games) ? data.away.games : null;
+  const maxGames = homeGames !== null && awayGames !== null ? Math.max(homeGames, awayGames) : null;
+  const minGames = homeGames !== null && awayGames !== null ? Math.min(homeGames, awayGames) : null;
+  const titleSuffix = maxGames !== null
+    ? maxGames > 0 && maxGames < 5 ? `${maxGames} jogo${maxGames === 1 ? "" : "s"}` : "5 jogos"
+    : "dados disponíveis";
+  const limited = !loading && minGames !== null && minGames < 5;
   return (
     <Section icon={TrendingUp} title={`Últimos ${titleSuffix}`}>
       {loading ? (

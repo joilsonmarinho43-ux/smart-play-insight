@@ -71,8 +71,6 @@ const Admin = () => {
   const [checkingResults, setCheckingResults] = useState(false);
   const autoModeActive = false;
   
-  const [autoModeLastRun, setAutoModeLastRun] = useState<any>(null);
-  const [testingAutoMode, setTestingAutoMode] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const resetPanels = () => {

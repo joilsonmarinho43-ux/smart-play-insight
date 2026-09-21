@@ -448,7 +448,7 @@ const Admin = () => {
               const neutral = rmaLogs.filter(l => l.rma_verdict === 'NEUTRO').length;
               const blocked = rmaLogs.filter(l => l.rma_verdict === 'BLOQUEADO').length;
               const total = rmaLogs.length;
-              const avgScore = total > 0 ? Math.round(rmaLogs.reduce((s, l) => s + (l.rma_score || 0), 0) / total * 10) / 10 : 0;
+              const avgScore = total > 0 ? Math.round(rmaLogs.reduce((s, l) => s + (Number.isFinite(l.rma_score) ? l.rma_score : 0), 0) / total * 10) / 10 : null;
               return (
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <div className="bg-card/40 border border-white/5 p-3 rounded-2xl text-center">
@@ -469,7 +469,7 @@ const Admin = () => {
                   </div>
                   <div className="bg-card/40 border border-cyan-500/10 p-3 rounded-2xl text-center">
                     <p className="text-[9px] text-cyan-400 uppercase font-bold">Score Médio</p>
-                    <p className="text-2xl font-bold text-cyan-400">{avgScore}</p>
+                    <p className="text-2xl font-bold text-cyan-400">{avgScore == null ? '—' : avgScore}</p>
                   </div>
                 </div>
               );

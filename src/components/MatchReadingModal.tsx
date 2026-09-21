@@ -53,16 +53,10 @@ const sourceLabel: Record<string, string> = {
   "none": "Sem dados",
 };
 
-// Sanitiza textos do analista: clampa percentuais impossíveis (≥ 100%) para 95%.
-// Modelos às vezes devolvem "100% de chance" — irreal em mercado de futebol.
+// Mantém literalmente os percentuais escritos pela IA. Eles são narrativos e
+// não podem ser reescritos para parecer uma probabilidade calibrada do Core.
 function sanitizePercents(text?: string): string | undefined {
-  if (!text) return text;
-  return text.replace(/(\d{2,3})\s?%/g, (m, n) => {
-    const v = parseInt(n, 10);
-    if (!Number.isFinite(v)) return m;
-    if (v >= 100) return "95%";
-    return m;
-  });
+  return text;
 }
 
 const missingLabel: Record<string, string> = {
@@ -180,9 +174,9 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
   }, [homeTeam, awayTeam]);
 
   const renderSide = (label: string, side: SideForm | undefined) => {
-    const games = side?.games || 0;
-    const gf = side?.recentGoalsFor || [];
-    const ga = side?.recentGoalsAgainst || [];
+    const games = Number.isFinite(side?.games) ? side!.games : null;
+    const gf = Array.isArray(side?.recentGoalsFor) ? side!.recentGoalsFor : [];
+    const ga = Array.isArray(side?.recentGoalsAgainst) ? side!.recentGoalsAgainst : [];
     const results: Array<"W" | "D" | "L"> =
       side?.recentResults?.map((r) => r.result) ||
       gf.map((g, i) => {
@@ -251,8 +245,8 @@ function RecentFormBlock({ homeTeam, awayTeam }: { homeTeam: string; awayTeam: s
     );
   };
 
-  const maxGames = Math.max(data?.home?.games || 0, data?.away?.games || 0);
-  const minGames = Math.min(data?.home?.games || 0, data?.away?.games || 0);
+  const maxGames = Math.max(data?.home?.games ?? 0, data?.away?.games ?? 0);
+  const minGames = Math.min(data?.home?.games ?? 0, data?.away?.games ?? 0);
   const titleSuffix = maxGames > 0 && maxGames < 5 ? `${maxGames} jogo${maxGames === 1 ? "" : "s"}` : "5 jogos";
   const limited = !loading && maxGames > 0 && minGames < 5;
   return (

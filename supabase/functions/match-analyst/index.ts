@@ -32,6 +32,30 @@ async function requireAuthenticatedCaller(req: Request): Promise<Response | null
   return null;
 }
 
+async function enforceAnalystRateLimit(req: Request): Promise<Response | null> {
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const authorization = req.headers.get('authorization')?.replace(/^Bearer\\s+/i, '').trim() || '';
+  const apiKey = req.headers.get('apikey')?.trim() || '';
+  if (serviceKey && (authorization === serviceKey || apiKey === serviceKey)) return null;
+  const { data: { user }, error } = await sb().auth.getUser(authorization);
+  if (error || !user) return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
+    status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+  const { data: allowed, error: rateError } = await sb().rpc('check_rate_limit', {
+    _bucket: 'match-analyst',
+    _subject: user.id,
+    _max_calls: 20,
+    _window_seconds: 60,
+  });
+  if (rateError) return new Response(JSON.stringify({ error: 'RATE_LIMIT_UNAVAILABLE' }), {
+    status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+  if (allowed === false) return new Response(JSON.stringify({ error: 'RATE_LIMITED', retry_after: 60 }), {
+    status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' },
+  });
+  return null;
+}
+
 async function cacheGet(key:string){try{const {data}=await sb().from('cache_api').select('dados_json,ultima_atualizacao').eq('cache_key',key).maybeSingle();if(!data)return null;if(Date.now()-new Date(data.ultima_atualizacao).getTime()>CACHE_TTL_MS)return null;return data.dados_json;}catch{return null;}}
 async function cacheSet(key:string,value:unknown){try{await sb().from('cache_api').upsert({cache_key:key,dados_json:value,status_jogo:'PRE',ultima_atualizacao:new Date().toISOString()});}catch{}}
 
@@ -46,7 +70,7 @@ function safe(reason:string){return{cenario:'Não há dados suficientes para uma
 function normalize(o:any,research:boolean){const text=(v:any,f='não confirmado')=>typeof v==='string'&&v.trim()?v.trim():f;const odd=(v:any)=>{const n=Number(v);return Number.isFinite(n)&&n>1?n:null};const a=o?.aiAudit??{};return{cenario:text(o?.cenario),pontoAtencao:text(o?.pontoAtencao),veredito:text(o?.veredito),risco:['baixo','medio','alto'].includes(o?.risco)?o.risco:'alto',aiAudit:{status:['PASS','CAUTION','BLOCK'].includes(a.status)?a.status:'CAUTION',reasons:Array.isArray(a.reasons)?a.reasons.filter((x:any)=>typeof x==='string').slice(0,6):['auditoria_incompleta'],evidenceQuality:['alta','media','baixa'].includes(a.evidenceQuality)?a.evidenceQuality:'baixa',source:research?'research':(['payload','mixed'].includes(a.source)?a.source:'payload')},contextoDetalhado:{desfalques:text(o?.contextoDetalhado?.desfalques),arbitro:text(o?.contextoDetalhado?.arbitro),clima:text(o?.contextoDetalhado?.clima),motivacao:text(o?.contextoDetalhado?.motivacao)},mercados:{vitoria:text(o?.mercados?.vitoria,'dados insuficientes'),duplaChance:text(o?.mercados?.duplaChance,'dados insuficientes'),handicap:text(o?.mercados?.handicap,'dados insuficientes'),overUnderGols:text(o?.mercados?.overUnderGols,'dados insuficientes'),btts:text(o?.mercados?.btts,'dados insuficientes'),escanteios:text(o?.mercados?.escanteios,'dados insuficientes'),cartoes:text(o?.mercados?.cartoes,'dados insuficientes'),placarExato:text(o?.mercados?.placarExato,'dados insuficientes')},oddsReferencia:{casa:odd(o?.oddsReferencia?.casa),empate:odd(o?.oddsReferencia?.empate),fora:odd(o?.oddsReferencia?.fora),over25:odd(o?.oddsReferencia?.over25),under25:odd(o?.oddsReferencia?.under25),bttsSim:odd(o?.oddsReferencia?.bttsSim),escanteiosOver9:odd(o?.oddsReferencia?.escanteiosOver9),cartoesOver4:odd(o?.oddsReferencia?.cartoesOver4)}};}
 async function groqAudit(system:string,user:string,key:string){try{const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'system',content:system},{role:'user',content:'Audite somente este payload pré-jogo:\n'+user}],response_format:{type:'json_object'},temperature:0.1,max_tokens:2200})});if(!r.ok)return '';const d=await r.json();return d?.choices?.[0]?.message?.content??'';}catch{return ''}}
 
-Deno.serve(async(req)=>{if(req.method==='OPTIONS')return new Response(null,{headers:corsHeaders});const authError=await requireAuthenticatedCaller(req);if(authError)return authError;try{const body=await req.json();const research=body?.pesquisaWeb===true;const id=body?.match?.id??body?.fixtureId??'unknown';const user=makePayload(body);const fingerprint=await payloadHash(user);const key=`analyst:${VERSION}:${research?'research':'standard'}:${id}:${fingerprint}`;const cached=await cacheGet(key);if(cached)return new Response(JSON.stringify({...cached,cached:true}),{headers:{...corsHeaders,'Content-Type':'application/json'}});const system=research?RESEARCH:SYSTEM;const gemini=Deno.env.get('GEMINI_API_KEY');const groq=Deno.env.get('GROQ_API_KEY');let content='';let source='';
+Deno.serve(async(req)=>{if(req.method==='OPTIONS')return new Response(null,{headers:corsHeaders});const authError=await requireAuthenticatedCaller(req);if(authError)return authError;const rateError=await enforceAnalystRateLimit(req);if(rateError)return rateError;try{const body=await req.json();const research=body?.pesquisaWeb===true;const id=body?.match?.id??body?.fixtureId??'unknown';const user=makePayload(body);const fingerprint=await payloadHash(user);const key=`analyst:${VERSION}:${research?'research':'standard'}:${id}:${fingerprint}`;const cached=await cacheGet(key);if(cached)return new Response(JSON.stringify({...cached,cached:true}),{headers:{...corsHeaders,'Content-Type':'application/json'}});const system=research?RESEARCH:SYSTEM;const gemini=Deno.env.get('GEMINI_API_KEY');const groq=Deno.env.get('GROQ_API_KEY');let content='';let source='';
 if(research&&gemini){try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:'Audite somente este payload pré-jogo:\n'+user}]}],generationConfig:{temperature:0.1},tools:[{google_search:{}}]})});if(r.ok){const d=await r.json();content=(d?.candidates?.[0]?.content?.parts??[]).map((p:any)=>p?.text??'').join('');if(content)source='gemini-2.5-pro';}}catch{}}
 if(!content&&groq){content=await groqAudit(system,user,groq);if(content)source='groq-llama-3.3-70b';}
 if(!content&&!research&&gemini){try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{temperature:0.1,responseMimeType:'application/json'}})});if(r.ok){const d=await r.json();content=(d?.candidates?.[0]?.content?.parts??[]).map((p:any)=>p?.text??'').join('');if(content)source='gemini-2.5-flash';}}catch{}}

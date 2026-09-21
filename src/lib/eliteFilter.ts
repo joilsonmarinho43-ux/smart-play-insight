@@ -71,8 +71,8 @@ function getCombinedAPM(match: MatchData): number | null {
 
 /** 1. Escanteios: soma das médias ≥ 7 já indica potencial */
 function evaluateCorners(match: MatchData): number {
-  const hCorners = (match as any).homeStats?.corners || match.modelData?.homeCornersAvg;
-  const aCorners = (match as any).awayStats?.corners || match.modelData?.awayCornersAvg;
+  const hCorners = (match as any).homeStats?.corners ?? match.modelData?.homeCornersAvg;
+  const aCorners = (match as any).awayStats?.corners ?? match.modelData?.awayCornersAvg;
   const hc = numericOrNull(hCorners), ac = numericOrNull(aCorners);
   if (hc === null || ac === null) return 0;
   const total = hc + ac;
@@ -90,8 +90,8 @@ function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
 
-  const hGF = md.homeGoalsAvg || hs.goalsFor;
-  const aGF = md.awayGoalsAvg || as_.goalsFor;
+  const hGF = md.homeGoalsAvg ?? hs.goalsFor;
+  const aGF = md.awayGoalsAvg ?? as_.goalsFor;
   const hg = numericOrNull(hGF), ag = numericOrNull(aGF);
   if (hg === null || ag === null) return 0;
   const totalGoalsAvg = hg + ag;
@@ -124,8 +124,8 @@ function evaluateGoals(match: MatchData, markets: MarketAnalysis[]): number {
 
 /** 3. Cartões: times com alta média de cartões + faltas */
 function evaluateCards(match: MatchData): number {
-  const hCards = (match as any).homeStats?.yellowCards || match.modelData?.homeCardsAvg;
-  const aCards = (match as any).awayStats?.yellowCards || match.modelData?.awayCardsAvg;
+  const hCards = (match as any).homeStats?.yellowCards ?? match.modelData?.homeCardsAvg;
+  const aCards = (match as any).awayStats?.yellowCards ?? match.modelData?.awayCardsAvg;
   const hFouls = (match as any).homeStats?.fouls;
   const aFouls = (match as any).awayStats?.fouls;
 

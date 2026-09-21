@@ -94,10 +94,10 @@ function hasFiniteNumber(value: unknown): value is number {
 function modelReady(match: MatchData) {
   const s = match.sampleSize;
   const md = match.modelData;
-  return Number.isFinite(Number(s?.homeGames)) &&
-    Number.isFinite(Number(s?.awayGames)) &&
-    Number(s?.homeGames) >= 3 &&
-    Number(s?.awayGames) >= 3 &&
+  return hasFiniteNumber(s?.homeGames) &&
+    hasFiniteNumber(s?.awayGames) &&
+    s.homeGames >= 3 &&
+    s.awayGames >= 3 &&
     hasFiniteNumber(md?.homeGoalsAvg) &&
     hasFiniteNumber(md?.awayGoalsAvg) &&
     hasFiniteNumber(md?.homeGoalsAgainstAvg) &&
@@ -116,7 +116,7 @@ export function BingoVIPPro() {
 export function ElitePerformance() {
   const { data, isLoading, refetch } = useMatches();
   const rows = useMemo(() => data.map(m => { const markets=validatedMarkets(m); const best=(category:string)=>Math.max(0,...markets.filter(x=>x.category===category).map(x=>x.probability)); const goals=best('goals'), corners=best('corners'), cards=best('cards'); const values=[goals,corners,cards].filter(v=>v>0); return {m,goals,corners,cards,score:values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length):0}; }).filter(x=>x.score>=60).sort((a,b)=>b.score-a.score).slice(0,20),[data]);
-  return <div className={shell}><main className="container max-w-6xl mx-auto px-4 py-6"><Header icon={<Crown className="h-6 w-6 text-amber-400"/>} title="ELITE PERFORMANCE" subtitle="Filtro analítico baseado no motor quantitativo atual" onRefresh={refetch}/>{isLoading?<Loading/>:rows.length===0?<Empty text="Nenhum jogo atingiu o filtro Elite com dados válidos."/>:<div className="grid gap-3">{rows.map(({m,goals,corners,cards,score})=><section key={String(m.id||(m as any).fixture?.id)} className={card+' p-4'}><div className="flex items-center justify-between"><div className="font-bold text-sm"><MatchName match={m}/></div><span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-400">ELITE {score}%</span></div><div className="mt-4 grid grid-cols-3 gap-2">{[['Gols',goals],['Escanteios',corners],['Cartões',cards]].map(([label,value]:any)=><div key={label} className="rounded-lg bg-white/5 p-2"><div className="text-[10px] text-gray-500">{label}</div><div className="text-lg font-bold">{value}%</div><div className="mt-1 h-1 rounded bg-white/10"><div className="h-1 rounded bg-amber-400" style={{width:`${Math.min(100,value)}%`}}/></div></div>)}</div></section>)}</div>}</main></div>;
+  return <div className={shell}><main className="container max-w-6xl mx-auto px-4 py-6"><Header icon={<Crown className="h-6 w-6 text-amber-400"/>} title="ELITE PERFORMANCE" subtitle="Filtro analítico baseado no motor quantitativo atual" onRefresh={refetch}/>{isLoading?<Loading/>:rows.length===0?<Empty text="Nenhum jogo atingiu o filtro Elite com dados válidos."/>:<div className="grid gap-3">{rows.map(({m,goals,corners,cards,score})=><section key={String(m.id||(m as any).fixture?.id)} className={card+' p-4'}><div className="flex items-center justify-between"><div className="font-bold text-sm"><MatchName match={m}/></div><span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-400">ELITE SCORE {score}</span></div><div className="mt-4 grid grid-cols-3 gap-2">{[['Gols',goals],['Escanteios',corners],['Cartões',cards]].map(([label,value]:any)=><div key={label} className="rounded-lg bg-white/5 p-2"><div className="text-[10px] text-gray-500">{label}</div><div className="text-lg font-bold">{value}%</div><div className="mt-1 h-1 rounded bg-white/10"><div className="h-1 rounded bg-amber-400" style={{width:`${Math.min(100,value)}%`}}/></div></div>)}</div></section>)}</div>}</main></div>;
 }
 
 export function CorrectScore() {

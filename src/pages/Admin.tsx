@@ -151,10 +151,12 @@ const Admin = () => {
     const unseenIds = conflicts.filter(c => !c.seen).map(c => c.id);
     if (unseenIds.length === 0) return;
 
-    await supabase
-      .from('session_conflicts')
-      .update({ seen: true })
-      .in('id', unseenIds);
+    const { error } = await supabase.rpc('mark_session_conflicts_seen', { _ids: unseenIds });
+    if (error) {
+      console.error('Erro ao marcar conflitos como vistos:', error);
+      toast.error('Não foi possível marcar os alertas como vistos');
+      return;
+    }
 
     setConflicts(prev => prev.map(c => ({ ...c, seen: true })));
   };

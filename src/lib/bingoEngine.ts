@@ -87,8 +87,8 @@ export function generatePreGameBingo(match: MatchData, confidenceScore?: number)
   if (!allMarkets || allMarkets.length === 0) return null;
 
   // Conservador: limiar mínimo 80% (vs 72% normal) — exige mais confluência
-  const minProb = mode === 'conservative' ? 80 : 72;
-  const secondMinProb = mode === 'conservative' ? 85 : 78;
+  const minProb = mode === 'conservative' ? 85 : 75;
+  const secondMinProb = mode === 'conservative' ? 90 : 82;
   const maxMarkets = mode === 'conservative' ? 4 : 6;
 
   const highValueMarkets = allMarkets.filter(m => m.probability >= minProb && m.probability <= 98);
@@ -155,7 +155,7 @@ export function formatBingoWhatsApp(bingoMatches: BingoMatchData[]): string {
     return `${matchHeader}${details}${tips}\n`;
   }).join('\n');
 
-  const footer = `\n${'─'.repeat(30)}\n📊 *${bingoMatches.length} jogos selecionados*\n🧠 _Poisson + xG Cross-Validation_\n✅ _Confiança mínima: 72% | Matemática Real_`;
+  const footer = `\n${'─'.repeat(30)}\n📊 *${bingoMatches.length} jogos selecionados*\n🧠 _Poisson + xG Cross-Validation_\n✅ _Confiança mínima: 75% | Matemática Real_`;
 
   return header + body + footer;
 }

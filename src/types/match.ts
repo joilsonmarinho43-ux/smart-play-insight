@@ -62,10 +62,10 @@ export interface MatchData {
   minute?: number;
   liveScore?: { home: number; away: number };
   liveStats?: {
-    dangerousAttacks: [number, number];
-    corners: [number, number];
-    possession: [number, number];
-    pressureIndex: [number, number];
+    dangerousAttacks: [number | null, number | null];
+    corners: [number | null, number | null];
+    possession: [number | null, number | null];
+    pressureIndex: [number | null, number | null];
   };
 }
 

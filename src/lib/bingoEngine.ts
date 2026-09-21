@@ -20,9 +20,17 @@ function isStableLeague(match: MatchData): boolean {
 }
 
 function hasReliableData(match: MatchData): boolean {
-  const hGames = match.sampleSize?.homeGames || (match as any).homeStats?.gamesCount || 0;
-  const aGames = match.sampleSize?.awayGames || (match as any).awayStats?.gamesCount || 0;
-  return hGames >= 3 && aGames >= 3;
+  const hGames = typeof match.sampleSize?.homeGames === 'number' && Number.isFinite(match.sampleSize.homeGames)
+    ? match.sampleSize.homeGames
+    : typeof (match as any).homeStats?.gamesCount === 'number' && Number.isFinite((match as any).homeStats.gamesCount)
+      ? (match as any).homeStats.gamesCount
+      : null;
+  const aGames = typeof match.sampleSize?.awayGames === 'number' && Number.isFinite(match.sampleSize.awayGames)
+    ? match.sampleSize.awayGames
+    : typeof (match as any).awayStats?.gamesCount === 'number' && Number.isFinite((match as any).awayStats.gamesCount)
+      ? (match as any).awayStats.gamesCount
+      : null;
+  return hGames !== null && aGames !== null && hGames >= 3 && aGames >= 3;
 }
 
 /** Ícone e cor por categoria */
@@ -91,7 +99,7 @@ export function generatePreGameBingo(match: MatchData, confidenceScore?: number)
   const secondMinProb = mode === 'conservative' ? 90 : 82;
   const maxMarkets = mode === 'conservative' ? 4 : 6;
 
-  const highValueMarkets = allMarkets.filter(m => m.probability >= minProb && m.probability <= 98);
+  const highValueMarkets = allMarkets.filter(m => m.probabilitySource === 'MODEL_ESTIMATE' && (m.calibrationStatus === 'MODEL_VALIDATED' || m.calibrationStatus === 'CALIBRATED') && m.probability >= minProb && m.probability <= 98);
   if (highValueMarkets.length === 0) return null;
 
   // Prioridade por categoria — pega o melhor de cada

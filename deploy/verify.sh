@@ -29,9 +29,9 @@ SERVICE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
 [ -n "$API" ] || { echo "VITE_SUPABASE_URL / SUPABASE_URL vazio"; exit 1; }
 FN="$API/functions/v1"
 
-# Descobre o nome real do container do Edge Runtime antes de qualquer probe.
-EDGE_CT="$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-functions|(^|-)functions(-|$)' | head -1 || true)"
-EDGE_CT="${EDGE_CT:-supabase-edge-functions}"
+# NEXUS 33 usa este container explicitamente. Não procurar por "functions"
+# genericamente: a mesma VPS hospeda o FuneCob e não podemos cruzar serviços.
+EDGE_CT="supabase-edge-functions"
 
 sec "1. Containers"
 for c in supabase-db supabase-kong supabase-auth supabase-rest; do
@@ -53,6 +53,9 @@ sec "2. Secrets dentro do edge-runtime"
 ENVDUMP="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$EDGE_CT" 2>/dev/null || true)"
 # Se o cofre não expôs a service-role no shell, leia-a somente do
 # edge-runtime já validado. O valor nunca é impresso.
+if [ -z "$SERVICE_KEY" ] && [ -f supabase-docker/.env ]; then
+  SERVICE_KEY="$(grep '^SERVICE_ROLE_KEY=' supabase-docker/.env | head -1 | cut -d= -f2- | tr -d '"' || true)"
+fi
 if [ -z "$SERVICE_KEY" ]; then
   SERVICE_KEY="$(docker exec "$EDGE_CT" printenv SUPABASE_SERVICE_ROLE_KEY 2>/dev/null || true)"
 fi

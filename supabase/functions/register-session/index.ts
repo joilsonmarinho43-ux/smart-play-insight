@@ -90,21 +90,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Upsert the active session
-    if (existing) {
-      await admin
-        .from("active_sessions")
-        .update({
-          session_token,
-          device_info,
-          logged_in_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-    } else {
-      await admin.from("active_sessions").insert({
+    // Atomic upsert closes the select-then-insert race when two devices register
+    // concurrently for the same user.
+    const { error: sessionError } = await admin
+      .from("active_sessions")
+      .upsert({
         user_id: user.id,
         session_token,
         device_info,
+        logged_in_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+
+    if (sessionError) {
+      console.error('[register-session] session write failed:', sessionError);
+      return new Response(JSON.stringify({ error: "SESSION_WRITE_FAILED" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

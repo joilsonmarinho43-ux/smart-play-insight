@@ -88,6 +88,22 @@ async function writeCache(key: string, payload: any): Promise<void> {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const t0 = Date.now();
+  const authorization = req.headers.get('authorization')?.replace(/^Bearer\\s+/i, '').trim() || '';
+  const apiKey = req.headers.get('apikey')?.trim() || '';
+  const internal = !!SERVICE_ROLE && (authorization === SERVICE_ROLE || apiKey === SERVICE_ROLE);
+  if (!internal) {
+    if (!authorization || !sb) {
+      return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: { user }, error: authError } = await sb.auth.getUser(authorization);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
 
   try {
     const body = (await req.json()) as ProxyBody;

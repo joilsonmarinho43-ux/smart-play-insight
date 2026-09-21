@@ -85,12 +85,16 @@ export async function runHealthCheck(): Promise<HealthAlert[]> {
   for (const p of probes) byName[p.source] = p;
 
   const primary = byName['sportsrc'];
+  const espn = byName['espn-fixtures'];
   const fdo = byName['football-data-org'];
   const tsdb = byName['thesportsdb-public'];
+  const worldCup = byName['worldcup-fallback'];
   const stale = byName['stale-local-cache'];
 
+
   const primaryDown = !primary || primary.status === 'error' || (primary.status === 'empty' && (primary.durationMs ?? 0) > 0);
-  const fallbackTotal = (fdo?.count || 0) + (tsdb?.count || 0) + (stale?.count || 0);
+  // ESPN and World Cup are independent fallbacks and must count toward resilience.
+  const fallbackTotal = (espn?.count || 0) + (fdo?.count || 0) + (tsdb?.count || 0) + (worldCup?.count || 0) + (stale?.count || 0);
   const resilience: HealthState['resilience'] =
     fallbackTotal >= 20 ? 'alta' : fallbackTotal >= 5 ? 'média' : 'baixa';
 

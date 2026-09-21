@@ -71,7 +71,7 @@ function useMatches() {
         return ordered;
       }
     },
-    staleTime: 30 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     retry: 1,
@@ -94,8 +94,10 @@ function hasFiniteNumber(value: unknown): value is number {
 function modelReady(match: MatchData) {
   const s = match.sampleSize;
   const md = match.modelData;
-  return Number(s?.homeGames || 0) >= 3 &&
-    Number(s?.awayGames || 0) >= 3 &&
+  return Number.isFinite(Number(s?.homeGames)) &&
+    Number.isFinite(Number(s?.awayGames)) &&
+    Number(s?.homeGames) >= 3 &&
+    Number(s?.awayGames) >= 3 &&
     hasFiniteNumber(md?.homeGoalsAvg) &&
     hasFiniteNumber(md?.awayGoalsAvg) &&
     hasFiniteNumber(md?.homeGoalsAgainstAvg) &&

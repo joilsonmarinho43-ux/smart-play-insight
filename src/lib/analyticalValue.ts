@@ -19,7 +19,7 @@ export function calculateAnalyticalValue(
   probability: number,
   marketOdd?: number | null,
 ): AnalyticalValue {
-  if (!Number.isFinite(probability) || probability <= 0 || probability > 100) {
+  if (!Number.isFinite(probability) || probability < 75 || probability > 100) {
     return { available: false, ev: null, fairOdd: null, marketOdd: null, reason: 'INVALID_PROBABILITY' };
   }
 

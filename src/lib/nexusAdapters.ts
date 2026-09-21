@@ -33,6 +33,6 @@ export function adaptPreMatch(match:MatchData,markets:MarketAnalysis[],confidenc
   const effectiveCalibration=validatedMarket?.calibrationStatus??inheritedCalibration;
   const sampleSize=match.sampleSize?Math.min(match.sampleSize.homeGames,match.sampleSize.awayGames):null;
   const modelDataValid=Boolean(match.modelData&&sampleSize!==null&&sampleSize>=3&&Number.isFinite(match.modelData.homeGoalsAvg)&&Number.isFinite(match.modelData.awayGoalsAvg)&&Number.isFinite(match.modelData.homeGoalsAgainstAvg)&&Number.isFinite(match.modelData.awayGoalsAgainstAvg));
-  const dataQuality=assessDataQuality({live:false,sampleSize,requiredSampleSize:3,sourceCompleteness:modelDataValid?100:75,requiredFeaturesPresent:normalizedMarkets.length>0});
+  const dataQuality=assessDataQuality({live:false,sampleSize,requiredSampleSize:3,sourceCompleteness:modelDataValid?100:75,requiredFeaturesPresent:normalizedMarkets.length>0,dataFreshness:match.dataFreshness});
   return decideNexus({match,mode:'PRE_MATCH',confidence,markets:normalizedMarkets,evidence:[...marketsToNexusEvidence(normalizedMarkets),...researchToNexusEvidence(researchEvidence)],researchEvidence,dataQuality,calibrationStatus:effectiveCalibration,probabilitySource:validatedMarket?.probabilitySource??null});
 }

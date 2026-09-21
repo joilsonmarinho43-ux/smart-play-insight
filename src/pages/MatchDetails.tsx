@@ -25,7 +25,7 @@ const MatchDetails = () => {
   const model = viewMatch.modelData;
   const sufficientSample = !!sample && Math.min(sample.homeGames, sample.awayGames) >= 3;
   const predictions = viewMatch.predictions;
-  const coreReady = predictions?.probabilitySource === 'MODEL_ESTIMATE' && predictions.calibrationStatus === 'CALIBRATED';
+  const coreReady = predictions?.probabilitySource === 'MODEL_ESTIMATE' && (predictions.calibrationStatus === 'CALIBRATED' || predictions.calibrationStatus === 'MODEL_VALIDATED');
 
   return <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto">
     <Link to="/" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
@@ -36,7 +36,7 @@ const MatchDetails = () => {
     </header>
 
     <section className={`mt-4 rounded-2xl border p-5 ${coreReady ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-primary/20 bg-primary/5'}`}>
-      <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">Nexus Core</h2>{coreReady && <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400"><CheckCircle2 className="h-3 w-3" /> Calibrado</span>}</div>
+      <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">Nexus Core</h2>{coreReady && <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400"><CheckCircle2 className="h-3 w-3" /> {predictions?.calibrationStatus === 'CALIBRATED' ? 'Calibrado' : 'Validado pelo modelo'}</span>}</div>
       {coreReady ? <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs"><div className="rounded-lg bg-background/40 p-3"><span className="text-muted-foreground">Casa</span><div className="mt-1 font-bold tabular-nums">{predictions?.homeWin}%</div></div><div className="rounded-lg bg-background/40 p-3"><span className="text-muted-foreground">Empate</span><div className="mt-1 font-bold tabular-nums">{predictions?.draw}%</div></div><div className="rounded-lg bg-background/40 p-3"><span className="text-muted-foreground">Fora</span><div className="mt-1 font-bold tabular-nums">{predictions?.awayWin}%</div></div></div> : <><p className="mt-2 text-sm font-semibold text-amber-300">Nenhuma probabilidade oficial liberada</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">O Nexus Core só publica probabilidades quando a origem do modelo e a calibração estão explicitamente validadas. O restante permanece como informação observada.</p></>}
     </section>
 

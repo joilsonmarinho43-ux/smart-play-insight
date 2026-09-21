@@ -16,9 +16,17 @@ sec()  { echo -e "\n\033[1;36m$*\033[0m"; }
 [ -f deploy/.env ] || { echo "deploy/.env ausente"; exit 1; }
 set -a; . deploy/.env; set +a
 
-API="${VITE_SUPABASE_URL:-}"
+# Healthcheck é protegido: chamadas internas exigem a service-role key.
+# O segredo fica no cofre da VPS e nunca é impresso.
+VAULT="${NEXUS33_VAULT:-/etc/nexus33/secrets.env}"
+if [ -f "$VAULT" ]; then
+  set -a; . "$VAULT"; set +a
+fi
+
+API="${VITE_SUPABASE_URL:-${SUPABASE_URL:-}}"
 KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-}"
-[ -n "$API" ] && [ -n "$KEY" ] || { echo "VITE_SUPABASE_URL / _PUBLISHABLE_KEY vazios em deploy/.env"; exit 1; }
+SERVICE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
+[ -n "$API" ] || { echo "VITE_SUPABASE_URL / SUPABASE_URL vazio"; exit 1; }
 FN="$API/functions/v1"
 
 sec "1. Containers"
@@ -39,24 +47,37 @@ sec "2. Secrets dentro do edge-runtime"
 ENVDUMP="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' supabase-edge-functions 2>/dev/null || true)"
 for k in SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID \
          SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
-  if echo "$ENVDUMP" | grep -q "^${k}=."; then ok "$k presente"; else bad "$k AUSENTE (rode: bash deploy/fix-secrets.sh)"; fi
+  if echo "$ENVDUMP" | grep -q "^\${k}=."; then ok "$k presente"; else bad "$k AUSENTE (rode: bash deploy/fix-secrets.sh)"; fi
 done
 for k in GEMINI_API_KEY GROQ_API_KEY; do
-  echo "$ENVDUMP" | grep -q "^${k}=." && ok "$k presente" || warn "$k ausente (IA cai no fallback local)"
+  echo "$ENVDUMP" | grep -q "^\${k}=." && ok "$k presente" || warn "$k ausente (IA cai no fallback local)"
 done
 
 sec "3. Edge functions"
-code=$(curl -s -o /tmp/nx_health.json -w '%{http_code}' -H "Authorization: Bearer $KEY" "$FN/healthcheck")
+if [ -n "$SERVICE_KEY" ]; then
+  code="$(curl -s -o /tmp/nx_health.json -w '%{http_code}' \
+    -H "Authorization: Bearer $SERVICE_KEY" \
+    -H "apikey: $SERVICE_KEY" "$FN/healthcheck")"
+elif [ -n "$KEY" ]; then
+  # Compatibilidade: publishable key não é suficiente para healthcheck protegido.
+  code="$(curl -s -o /tmp/nx_health.json -w '%{http_code}' -H "Authorization: Bearer $KEY" "$FN/healthcheck")"
+else
+  code="000"
+fi
 [ "$code" = "200" ] && ok "healthcheck HTTP 200" || bad "healthcheck HTTP $code"
 grep -q '"db":{"ok":true' /tmp/nx_health.json 2>/dev/null && ok "banco acessível" || bad "banco inacessível"
 grep -q '"telegram":{"ok":true' /tmp/nx_health.json 2>/dev/null && ok "bot do Telegram válido" || warn "Telegram indisponível"
 
 sec "4. Fontes de dados (football-api)"
-curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $KEY" \
-     -H 'Content-Type: application/json' -d '{"diag":true}' -o /tmp/nx_diag.json
+if [ -n "$SERVICE_KEY" ]; then
+  curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $SERVICE_KEY" -H "apikey: $SERVICE_KEY" \
+       -H 'Content-Type: application/json' -d '{"diag":true}' -o /tmp/nx_diag.json
+else
+  curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $KEY" \
+       -H 'Content-Type: application/json' -d '{"diag":true}' -o /tmp/nx_diag.json
+fi
 python3 - <<'PY' || warn "não foi possível interpretar o diagnóstico"
 import json
-
 d = json.load(open('/tmp/nx_diag.json'))
 env = d.get('env', {})
 for k, v in env.items():
@@ -69,15 +90,17 @@ PY
 
 sec "5. Jogos do dia (fluxo real do app)"
 TODAY=$(date -u +%F)
-curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $KEY" \
-     -H 'Content-Type: application/json' -d "{\"date\":\"$TODAY\"}" -o /tmp/nx_day.json
+if [ -n "$SERVICE_KEY" ]; then
+  curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $SERVICE_KEY" -H "apikey: $SERVICE_KEY" \
+       -H 'Content-Type: application/json' -d "{\"date\":\"$TODAY\"}" -o /tmp/nx_day.json
+else
+  curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $KEY" \
+       -H 'Content-Type: application/json' -d "{\"date\":\"$TODAY\"}" -o /tmp/nx_day.json
+fi
 N=$(python3 -c "import json;print(len(json.load(open('/tmp/nx_day.json')).get('matches',[])))" 2>/dev/null || echo 0)
 if [ "${N:-0}" -gt 0 ]; then
   ok "$N jogos para $TODAY"
 else
-  # Ausência de partidas no calendário não é falha do deploy. As chaves,
-  # containers e endpoint já foram validados acima; manter o deploy aprovado
-  # e registrar a ausência de jogos como aviso operacional.
   warn "0 jogos para $TODAY — calendário vazio ou fonte sem partidas no momento"
 fi
 

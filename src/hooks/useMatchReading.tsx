@@ -16,8 +16,10 @@ async function enrichQuantitativeData(match: MatchData): Promise<MatchData> {
   const md = match.modelData as any;
   const sample = match.sampleSize;
   const readyFromCurrentMatch =
-    Number(sample?.homeGames || 0) >= 3 &&
-    Number(sample?.awayGames || 0) >= 3 &&
+    Number.isFinite(sample?.homeGames) &&
+    Number.isFinite(sample?.awayGames) &&
+    sample.homeGames >= 3 &&
+    sample.awayGames >= 3 &&
     [md?.homeGoalsAvg, md?.awayGoalsAvg, md?.homeGoalsAgainstAvg, md?.awayGoalsAgainstAvg]
       .every((v: unknown) => Number.isFinite(Number(v)));
   if (readyFromCurrentMatch) return match;
@@ -25,7 +27,7 @@ async function enrichQuantitativeData(match: MatchData): Promise<MatchData> {
   const key = `${match.homeTeam}|${match.awayTeam}`; const cached = quantCache.get(key); if (cached && Date.now() - cached.ts < QUANT_TTL) return cached.match;
   try {
     const { data, error } = await supabase.functions.invoke("team-form", { body: { home: match.homeTeam, away: match.awayTeam } }); if (error || !data?.ok) return match;
-    const home = data.home || {}, away = data.away || {}; const homeGames = Number(home.games ?? 0), awayGames = Number(away.games ?? 0); const homeGF = Number(home.goalsForAvg), awayGF = Number(away.goalsForAvg), homeGA = Number(home.goalsAgainstAvg), awayGA = Number(away.goalsAgainstAvg);
+    const home = data.home || {}, away = data.away || {}; const homeGames = home.games, awayGames = away.games; const homeGF = Number(home.goalsForAvg), awayGF = Number(away.goalsForAvg), homeGA = Number(home.goalsAgainstAvg), awayGA = Number(away.goalsAgainstAvg);
     if (![homeGames, awayGames, homeGF, awayGF, homeGA, awayGA].every(Number.isFinite) || homeGames < 3 || awayGames < 3) return match;
     const sample = Math.min(homeGames, awayGames);
     const merged = mergeFormIntoMatch(match, { ok: true, home, away } as any);

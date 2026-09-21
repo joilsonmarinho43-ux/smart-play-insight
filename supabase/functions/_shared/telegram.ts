@@ -20,8 +20,9 @@ export function escapeHtml(input: unknown): string {
 
 export function getTelegramBotToken(): string {
   const token = Deno.env.get('TELEGRAM_BOT_TOKEN') || Deno.env.get('TELEGRAM_API_KEY');
-  if (!token) throw new Error('TELEGRAM_BOT_TOKEN/TELEGRAM_API_KEY not configured');
-  return token;
+  const normalized = token.trim();
+  if (!normalized) throw new Error('TELEGRAM_BOT_TOKEN/TELEGRAM_API_KEY not configured');
+  return normalized;
 }
 
 /** Detecta erros permanentes do Telegram. */

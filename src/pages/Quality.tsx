@@ -36,22 +36,22 @@ interface Suggestion {
   created_at: string;
 }
 
-const wr = (w: number, t: number) => (t > 0 ? (w / t) * 100 : 0);
+const wr = (w: number, t: number): number | null => (Number.isFinite(w) && Number.isFinite(t) && t > 0 ? (w / t) * 100 : null);
 
 const pctBadge = (v: number) => {
   const color = v >= 65 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
     : v >= 50 ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
     : "bg-red-500/15 text-red-400 border-red-500/30";
-  return <Badge variant="outline" className={`${color} font-bold`}>{v.toFixed(1)}%</Badge>;
+  return <Badge variant="outline" className={`${color} font-bold`}>{Number.isFinite(v) ? `${v.toFixed(1)}%` : "—"}</Badge>;
 };
 
 const roiBadge = (v: number) => {
-  const positive = v >= 0;
+  const positive = Number.isFinite(v) && v >= 0;
   return (
     <Badge variant="outline" className={positive
       ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
       : "bg-red-500/15 text-red-400 border-red-500/30"}>
-      {positive ? "+" : ""}{(v * 100).toFixed(1)}%
+      {Number.isFinite(v) ? `${positive ? "+" : ""}${(v * 100).toFixed(1)}%` : "—"}
     </Badge>
   );
 };
@@ -106,7 +106,7 @@ export default function Quality() {
   if (!data) return null;
 
   const o = data.overall;
-  const overallWR = o ? wr(o.wins, o.total) : 0;
+  const overallWR = o ? wr(o.wins, o.total) : null;
   const streak = data.recent_results || [];
 
   return (
@@ -133,20 +133,20 @@ export default function Quality() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">Sinais</div>
-          <div className="font-display text-3xl text-white mt-1">{o?.total ?? 0}</div>
-          <div className="text-xs text-gray-500 mt-1">{o?.wins ?? 0}W / {o?.losses ?? 0}L / {o?.voids ?? 0}V</div>
+          <div className="font-display text-3xl text-white mt-1">{o?.total ?? "—"}</div>
+          <div className="text-xs text-gray-500 mt-1">{o ? `${o.wins}W / ${o.losses}L / ${o.voids}V` : "Sem dados"}</div>
         </Card>
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">Winrate</div>
-          <div className="font-display text-3xl text-emerald-400 mt-1">{overallWR.toFixed(1)}%</div>
-          <div className="text-xs text-gray-500 mt-1">Conf. média: {o?.avg_confidence ?? 0}%</div>
+          <div className="font-display text-3xl text-emerald-400 mt-1">{overallWR != null ? `${overallWR.toFixed(1)}%` : "—"}</div>
+          <div className="text-xs text-gray-500 mt-1">Conf. média: {o?.avg_confidence != null ? `${Number(o.avg_confidence).toFixed(1)}%` : "—"}</div>
         </Card>
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">ROI médio</div>
           <div className={`font-display text-3xl mt-1 ${(o?.avg_roi ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {(o?.avg_roi ?? 0) >= 0 ? "+" : ""}{((o?.avg_roi ?? 0) * 100).toFixed(1)}%
+            {o?.avg_roi != null ? `${o.avg_roi >= 0 ? "+" : ""}${(o.avg_roi * 100).toFixed(1)}%` : "—"}
           </div>
-          <div className="text-xs text-gray-500 mt-1">Total: {(o?.total_roi ?? 0).toFixed(2)}u</div>
+          <div className="text-xs text-gray-500 mt-1">Total: {o?.total_roi != null ? `${o.total_roi.toFixed(2)}u` : "—"}</div>
         </Card>
         <Card className="bg-[#0f172a] border-white/10 p-4">
           <div className="text-[10px] text-gray-500 uppercase tracking-widest">Últimos 20</div>
@@ -285,7 +285,7 @@ function BreakdownCard({ title, rows }: { title: string; rows: Row[] }) {
         <div className="space-y-2">
           {rows.slice(0, 8).map((r) => {
             const rwr = wr(r.wins, r.total);
-            const trend = r.avg_roi >= 0 ? <TrendingUp className="w-3 h-3 text-emerald-400" /> : <TrendingDown className="w-3 h-3 text-red-400" />;
+            const trend = Number.isFinite(r.avg_roi) && r.avg_roi >= 0 ? <TrendingUp className="w-3 h-3 text-emerald-400" /> : <TrendingDown className="w-3 h-3 text-red-400" />;
             return (
               <div key={r.subject} className="flex items-center justify-between gap-2 p-2 rounded bg-black/20">
                 <div className="flex items-center gap-2 min-w-0">
@@ -294,7 +294,7 @@ function BreakdownCard({ title, rows }: { title: string; rows: Row[] }) {
                   <span className="text-[10px] text-gray-500">({r.total})</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {pctBadge(rwr)}
+                  {pctBadge(rwr ?? NaN)}
                   {roiBadge(r.avg_roi)}
                 </div>
               </div>

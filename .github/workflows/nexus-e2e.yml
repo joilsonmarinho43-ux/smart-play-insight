@@ -16,23 +16,29 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Prepare isolated E2E runner
+        run: |
+          mkdir -p e2e-runner
+          cd e2e-runner
+          npm init -y
+          npm install playwright
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          cd e2e-runner
+          npx playwright install --with-deps chromium
 
       - name: Run NEXUS 33 functional browser test
         env:
           NEXUS_E2E_EMAIL: ${{ secrets.NEXUS_E2E_EMAIL }}
           NEXUS_E2E_PASSWORD: ${{ secrets.NEXUS_E2E_PASSWORD }}
         run: |
-          mkdir -p e2e
+          mkdir -p e2e-runner
 
-          cat > e2e/nexus-functional.spec.js <<'EOF'
+          cat > e2e-runner/nexus-functional.spec.js <<'EOF'
           const { chromium } = require('playwright');
 
           const BASE_URL = 'https://analista.funecob.com.br';
@@ -179,7 +185,7 @@ jobs:
           })();
           EOF
 
-          node e2e/nexus-functional.spec.js
+          node e2e-runner/nexus-functional.spec.js
 
       - name: Upload browser evidence
         if: always()

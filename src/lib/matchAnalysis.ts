@@ -27,7 +27,7 @@ export interface CanonicalGoalLambdas { homeLambda: number; awayLambda: number; 
 /** Canonical base goal model used by all market/score consumers. Contextual adjustments belong upstream (e.g. readingEngine). */
 export function getCanonicalGoalLambdas(match:MatchData):CanonicalGoalLambdas|null{
   const h=(match as any).homeStats||{},a=(match as any).awayStats||{};
-  const homeN=Number(match.sampleSize?.homeGames??h.gamesCount??0),awayN=Number(match.sampleSize?.awayGames??a.gamesCount??0),n=Math.min(homeN,awayN);
+  const homeN=numericOrNull(match.sampleSize?.homeGames) ?? numericOrNull(h.gamesCount); const awayN=numericOrNull(match.sampleSize?.awayGames) ?? numericOrNull(a.gamesCount); const n=homeN!==null&&awayN!==null?Math.min(homeN,awayN):null;
   const league=numericOrNull(match.modelData?.leagueAvg) ?? numericOrNull(h.leagueAvg) ?? numericOrNull(a.leagueAvg) ?? 2.5;
   const hGF=numericOrNull(match.modelData?.homeGoalsAvg) ?? numericOrNull(h.goalsFor);
   const aGF=numericOrNull(match.modelData?.awayGoalsAvg) ?? numericOrNull(a.goalsFor);

@@ -268,14 +268,14 @@ const Admin = () => {
         green: counts.green,
         loss: counts.loss,
         total: counts.green + counts.loss,
-        winRate: counts.green + counts.loss > 0 ? Math.round((counts.green / (counts.green + counts.loss)) * 100) : 0,
+        winRate: counts.green + counts.loss > 0 ? Math.round((counts.green / (counts.green + counts.loss)) * 100) : null,
       }))
       .reverse() // most recent last (for chart left-to-right)
       .slice(-14); // last 14 days
 
     const totalGreen = resolved.filter(s => s.status === 'green').length;
     const totalLoss = resolved.filter(s => s.status === 'loss').length;
-    const overallWinRate = totalGreen + totalLoss > 0 ? Math.round((totalGreen / (totalGreen + totalLoss)) * 100) : 0;
+    const overallWinRate = totalGreen + totalLoss > 0 ? Math.round((totalGreen / (totalGreen + totalLoss)) * 100) : null;
 
     return { days, totalGreen, totalLoss, overallWinRate, totalResolved: resolved.length };
   }, [signals]);
@@ -689,8 +689,8 @@ const Admin = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-card/40 border border-white/5 p-4 rounded-2xl text-center">
                 <p className="text-[10px] text-muted-foreground uppercase font-bold">Win Rate</p>
-                <p className={`text-3xl font-bold ${winRateData.overallWinRate >= 60 ? 'text-green-500' : winRateData.overallWinRate >= 40 ? 'text-yellow-500' : 'text-red-500'}`}>
-                  {winRateData.overallWinRate}%
+                <p className={`text-3xl font-bold ${winRateData.overallWinRate == null ? 'text-muted-foreground' : winRateData.overallWinRate >= 60 ? 'text-green-500' : winRateData.overallWinRate >= 40 ? 'text-yellow-500' : 'text-red-500'}`}>
+                  {winRateData.overallWinRate == null ? '—' : `${winRateData.overallWinRate}%`}
                 </p>
               </div>
               <div className="bg-card/40 border border-white/5 p-4 rounded-2xl text-center">
@@ -718,7 +718,7 @@ const Admin = () => {
                     const greenPct = day.total > 0 ? (day.green / day.total) * 100 : 0;
                     return (
                       <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                        <span className="text-[9px] font-bold text-muted-foreground">{day.winRate}%</span>
+                        <span className="text-[9px] font-bold text-muted-foreground">{day.winRate == null ? '—' : `${day.winRate}%`}</span>
                         <div className="w-full rounded-t-md overflow-hidden" style={{ height: `${barHeight}%` }}>
                           <div className="bg-green-500 w-full" style={{ height: `${greenPct}%` }} />
                           <div className="bg-red-500/60 w-full" style={{ height: `${100 - greenPct}%` }} />

@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
     // 1) Cache HIT fresco — devolve direto, sem bater no upstream
     if (cacheKey) {
       const cached = await readCache(cacheKey);
-      if (cached && cached.ageMs < FRESH_TTL_MS) {
+      if (cached && cached.ageMs < FRESH_TTL_MS && hasNonEmptyArray(cached.data)) {
         return new Response(JSON.stringify({
           ok: true, data: cached.data, provider: body.provider,
           latency_ms: Date.now() - t0, cache: 'fresh', age_ms: cached.ageMs,
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
     // 3) Upstream falhou — tenta stale para não quebrar UI
     if (cacheKey) {
       const cached = await readCache(cacheKey);
-      if (cached && cached.ageMs < STALE_MAX_MS) {
+      if (cached && cached.ageMs < STALE_MAX_MS && hasNonEmptyArray(cached.data)) {
         console.warn(`[proxy] upstream_${upstreamStatus || 'fail'} → serving stale (age=${Math.round(cached.ageMs / 60000)}min) key=${cacheKey}`);
         return new Response(JSON.stringify({
           ok: true, data: cached.data, provider: body.provider,

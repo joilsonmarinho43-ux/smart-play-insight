@@ -70,7 +70,10 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !supabaseKey) return new Response(JSON.stringify({ ok: false, error: 'SERVER_CONFIG_MISSING' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   const sb = createClient(supabaseUrl, supabaseKey);
   const internal = requireInternalServiceCall(req, corsHeaders);
-  if (internal) return internal;
+  if (internal) {
+    const admin = await requireAdminUser(req, sb, corsHeaders);
+    if (admin) return admin;
+  }
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

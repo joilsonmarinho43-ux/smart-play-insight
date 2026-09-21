@@ -158,7 +158,7 @@ export function buildMatchReadingV2(
   const aCards = md.awayCardsAvg ?? as_.yellowCards ?? null;
   const homeN = match.sampleSize?.homeGames ?? hs.gamesCount ?? 0;
   const awayN = match.sampleSize?.awayGames ?? as_.gamesCount ?? 0;
-  const leagueAvg = hs.leagueAvg ?? as_.leagueAvg ?? 1.3;
+  const leagueAvg = md.leagueAvg ?? hs.leagueAvg ?? as_.leagueAvg ?? 2.5;
 
   if (hGF == null || aGF == null || hGA == null || aGA == null) return null;
   if (homeN <= 0 && awayN <= 0) return null;

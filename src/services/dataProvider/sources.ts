@@ -92,7 +92,7 @@ registerSource({
       const raw = localStorage.getItem(TSDB_CACHE_PREFIX + date);
       if (raw) {
         const { ts, data } = JSON.parse(raw);
-        if (Date.now() - ts < TSDB_CACHE_TTL && Array.isArray(data)) return data;
+        if (Date.now() - ts < TSDB_CACHE_TTL && Array.isArray(data) && data.length > 0) return data;
       }
     } catch { /* noop */ }
 
@@ -104,9 +104,11 @@ registerSource({
       if (error || !data?.ok) return [];
       const events: any[] = Array.isArray(data?.data?.events) ? data.data.events : [];
       const matches = events.map(tsdbToMatch).filter(Boolean) as MatchData[];
-      try {
-        localStorage.setItem(TSDB_CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: matches }));
-      } catch { /* noop */ }
+      if (matches.length > 0) {
+        try {
+          localStorage.setItem(TSDB_CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: matches }));
+        } catch { /* noop */ }
+      }
       return matches;
     } catch {
       return [];

@@ -119,7 +119,9 @@ export async function fetchWorldCupFallback(date: string): Promise<MatchData[]> 
     const raw = localStorage.getItem(CACHE_PREFIX + date);
     if (raw) {
       const { ts, data } = JSON.parse(raw);
-      if (Date.now() - ts < CACHE_TTL && Array.isArray(data)) return data;
+      // Never cache an empty fallback result: an upstream outage or temporary
+      // empty response must not suppress retries for the full 6h TTL.
+      if (Date.now() - ts < CACHE_TTL && Array.isArray(data) && data.length > 0) return data;
     }
   } catch { /* noop */ }
 
@@ -143,9 +145,13 @@ export async function fetchWorldCupFallback(date: string): Promise<MatchData[]> 
     merged.push(m);
   }
 
-  try {
-    localStorage.setItem(CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: merged }));
-  } catch { /* noop */ }
+  // Only persist a successful snapshot. Empty results are not authoritative
+  // and must remain retryable on the next navigation/check.
+  if (merged.length > 0) {
+    try {
+      localStorage.setItem(CACHE_PREFIX + date, JSON.stringify({ ts: Date.now(), data: merged }));
+    } catch { /* noop */ }
+  }
 
   console.info(`[WC-Fallback] date=${date} matches=${merged.length}`);
   return merged;

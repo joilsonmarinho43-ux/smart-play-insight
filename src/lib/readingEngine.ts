@@ -184,8 +184,8 @@ export function buildMatchReadingV2(
   const awayRank = ctx?.motivation?.away?.rank || null;
   const homeRest = ctx?.fatigue?.home?.restDays;
   const awayRest = ctx?.fatigue?.away?.restDays;
-  const homeLoad = ctx?.fatigue?.home?.gamesLast10d ?? 0;
-  const awayLoad = ctx?.fatigue?.away?.gamesLast10d ?? 0;
+  const homeLoad = ctx?.fatigue?.home?.gamesLast10d ?? null;
+  const awayLoad = ctx?.fatigue?.away?.gamesLast10d ?? null;
   const oddH = ctx?.odds?.home ?? null;
   const oddD = ctx?.odds?.draw ?? null;
   const oddA = ctx?.odds?.away ?? null;
@@ -238,8 +238,8 @@ export function buildMatchReadingV2(
   if (motReleg(homeMot)) hLs *= 0.96;
   if (motReleg(awayMot)) aLs *= 0.94;
   if (motMid(homeMot) && motMid(awayMot)) { hLs *= 0.95; aLs *= 0.95; }
-  if (homeLoad >= 3 || (homeRest != null && homeRest <= 2)) hLs *= 0.93;
-  if (awayLoad >= 3 || (awayRest != null && awayRest <= 2)) aLs *= 0.91;
+  if (homeLoad != null && homeLoad >= 3 || (homeRest != null && homeRest <= 2)) hLs *= 0.93;
+  if (awayLoad != null && awayLoad >= 3 || (awayRest != null && awayRest <= 2)) aLs *= 0.91;
   if (oddH && oddA) {
     if (oddFav === "home" && oddH <= 1.6) hLs *= 1.04;
     if (oddFav === "away" && oddA <= 1.7) aLs *= 1.05;
@@ -297,9 +297,9 @@ export function buildMatchReadingV2(
     const odd = oddByMarket(m.market);
     return { ...m, probability, odd: odd ?? undefined, oddSource: odd != null ? 'OBSERVED' as const : 'UNKNOWN' as const };
   });
-  const o25Prob = markets.find((m) => m.market === "Over 2.5 Gols")?.probability ?? 0;
-  const bttsProb = markets.find((m) => m.market === "Ambas Marcam")?.probability ?? 0;
-  const u25Prob = markets.find((m) => m.market === "Under 2.5 Gols")?.probability ?? Math.max(0, 100 - o25Prob);
+  const o25Prob = markets.find((m) => m.market === "Over 2.5 Gols")?.probability ?? null;
+  const bttsProb = markets.find((m) => m.market === "Ambas Marcam")?.probability ?? null;
+  const u25Prob = markets.find((m) => m.market === "Under 2.5 Gols")?.probability ?? (o25Prob != null ? 100 - o25Prob : null);
 
   const seed = Math.round(hL * 100 + aL * 50 + (homeN + awayN) * 7 + (oddH || 0) * 11);
 
@@ -521,7 +521,7 @@ export function buildMatchReadingV2(
     }
   }
 
-  if (oddO && o25Prob) {
+  if (oddO && o25Prob != null) {
     const implied = (1 / oddO) * 100;
     if (o25Prob - implied >= 8)
       bits.push(`Linha de Over 2.5 (${oddO.toFixed(2)}) parece subdimensionada frente à projeção real (${o25Prob}%) — há valor disponível.`);
@@ -529,7 +529,7 @@ export function buildMatchReadingV2(
       bits.push(`Over 2.5 está caro para o cenário: ${o25Prob}% projetado contra ${implied.toFixed(0)}% implícita no preço. Linha inflada.`);
     else
       bits.push(`Linha de gols parece relativamente ajustada — pouca margem para entradas agressivas.`);
-  } else if (lowScoringProfile && o25Prob < 50) {
+  } else if (lowScoringProfile && o25Prob != null && o25Prob < 50) {
     bits.push(`O perfil do jogo aponta Under com mais consistência do que Over — quem está olhando linha de gols alta precisa redobrar a atenção.`);
   }
 

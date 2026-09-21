@@ -41,7 +41,7 @@ const behaviorMeta: Record<string, { color: string; icon: any; label: string }> 
   insuficiente: { color: "text-gray-500 border-gray-600/30 bg-gray-600/10", icon: Activity, label: "Sem dados" },
 };
 
-const pctBadge = (v: number) => {
+const pctBadge = (v: number | null | undefined) => {\n  if (!Number.isFinite(v)) return <Badge variant="outline" className="bg-gray-500/10 text-gray-400 border-gray-500/30 font-bold">—</Badge>;
   const color = v >= 65 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
     : v >= 50 ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
     : "bg-red-500/15 text-red-400 border-red-500/30";

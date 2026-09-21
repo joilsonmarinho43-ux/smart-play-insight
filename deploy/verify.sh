@@ -29,6 +29,10 @@ SERVICE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
 [ -n "$API" ] || { echo "VITE_SUPABASE_URL / SUPABASE_URL vazio"; exit 1; }
 FN="$API/functions/v1"
 
+# Descobre o nome real do container do Edge Runtime antes de qualquer probe.
+EDGE_CT="$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-functions|(^|-)functions(-|$)' | head -1 || true)"
+EDGE_CT="${EDGE_CT:-supabase-edge-functions}"
+
 sec "1. Containers"
 for c in supabase-db supabase-kong supabase-auth supabase-rest; do
   st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo ausente)"
@@ -46,7 +50,7 @@ fi
 [ "$APP_ST" = "running" ] && ok "frontend: running" || bad "frontend: ${APP_ST:-ausente}"
 
 sec "2. Secrets dentro do edge-runtime"
-EDGE_CT="$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-functions|(^|-)functions(-|$)' | head -1 || true)"
+"$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-functions|(^|-)functions(-|$)' | head -1 || true)"
 EDGE_CT="${EDGE_CT:-supabase-edge-functions}"
 ENVDUMP="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$EDGE_CT" 2>/dev/null || true)"
 # Se o cofre não expôs a service-role no shell, leia-a somente do

@@ -32,6 +32,12 @@ FN="$API/functions/v1"
 # NEXUS 33 usa este container explicitamente. Não procurar por "functions"
 # genericamente: a mesma VPS hospeda o FuneCob e não podemos cruzar serviços.
 EDGE_CT="supabase-edge-functions"
+# The key actually consumed by Deno is authoritative. Prefer it over any
+# stale copy in supabase-docker/.env; never print its value.
+EDGE_SERVICE_KEY="$(docker exec "$EDGE_CT" printenv SUPABASE_SERVICE_ROLE_KEY 2>/dev/null || true)"
+if [ -n "$EDGE_SERVICE_KEY" ]; then
+  SERVICE_KEY="$EDGE_SERVICE_KEY"
+fi
 
 sec "1. Containers"
 for c in supabase-db supabase-kong supabase-auth supabase-rest; do

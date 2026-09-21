@@ -30,10 +30,12 @@ SERVICE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
 FN="$API/functions/v1"
 
 sec "1. Containers"
-for c in supabase-db supabase-kong supabase-auth supabase-rest supabase-edge-functions; do
+for c in supabase-db supabase-kong supabase-auth supabase-rest; do
   st="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo ausente)"
   [ "$st" = "running" ] && ok "$c: running" || bad "$c: $st"
 done
+EDGE_ST="$(docker inspect -f '{{.State.Status}}' "$EDGE_CT" 2>/dev/null || echo ausente)"
+[ "$EDGE_ST" = "running" ] && ok "edge-runtime: running" || bad "edge-runtime: $EDGE_ST"
 APP_ST="$(docker inspect -f '{{.State.Status}}' nexus33-app-1 2>/dev/null || true)"
 if [ -z "$APP_ST" ]; then
   APP_ST="$(docker inspect -f '{{.State.Status}}' deploy-app-1 2>/dev/null || true)"
@@ -44,7 +46,15 @@ fi
 [ "$APP_ST" = "running" ] && ok "frontend: running" || bad "frontend: ${APP_ST:-ausente}"
 
 sec "2. Secrets dentro do edge-runtime"
-ENVDUMP="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' supabase-edge-functions 2>/dev/null || true)"
+EDGE_CT="$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-functions|(^|-)functions(-|$)' | head -1 || true)"
+EDGE_CT="${EDGE_CT:-supabase-edge-functions}"
+ENVDUMP="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$EDGE_CT" 2>/dev/null || true)"
+# Se o cofre não expôs a service-role no shell, leia-a somente do
+# edge-runtime já validado. O valor nunca é impresso.
+if [ -z "$SERVICE_KEY" ]; then
+  SERVICE_KEY="$(docker exec "$EDGE_CT" printenv SUPABASE_SERVICE_ROLE_KEY 2>/dev/null || true)"
+fi
+[ -n "$SERVICE_KEY" ] || warn "SUPABASE_SERVICE_ROLE_KEY não disponível para probes protegidos"
 for k in SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID \
          SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
   if echo "$ENVDUMP" | grep -q "^\${k}=."; then ok "$k presente"; else bad "$k AUSENTE (rode: bash deploy/fix-secrets.sh)"; fi

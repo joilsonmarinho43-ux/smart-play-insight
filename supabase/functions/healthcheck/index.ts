@@ -45,17 +45,33 @@ Deno.serve(async (req) => {
     result.db = { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 
-  // Telegram
+  // Telegram — probe resiliente para evitar falso negativo por latência transitória.
   try {
     const token = getTelegramBotToken();
-    const r = await withTimeout(
-      fetch(`https://api.telegram.org/bot${token}/getMe`).then(async (res) => ({
-        status: res.status, data: await res.json().catch(() => ({})),
-      })), 6000,
-    );
-    result.telegram = { ok: r.status === 200 && r.data?.ok === true, status: r.status, username: r.data?.result?.username || null };
+    let last: any = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const r = await withTimeout(
+          fetch(`https://api.telegram.org/bot${token}/getMe`).then(async (res) => ({
+            status: res.status, data: await res.json().catch(() => ({})),
+          })), 12000,
+        );
+        last = r;
+        if (r.status === 200 && r.data?.ok === true) break;
+        if (r.status === 400 || r.status === 401 || r.status === 403 || r.status === 404) break;
+      } catch (e) {
+        last = { status: 0, data: {}, error: e instanceof Error ? e.message : String(e) };
+      }
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+    result.telegram = {
+      ok: last?.status === 200 && last?.data?.ok === true,
+      status: last?.status ?? 0,
+      username: last?.data?.result?.username || null,
+      error: last?.data?.description || last?.error || null,
+    };
   } catch (e) {
-    result.telegram = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    result.telegram = { ok: false, status: 0, error: e instanceof Error ? e.message : String(e) };
   }
 
   // Providers

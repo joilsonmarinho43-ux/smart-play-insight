@@ -73,6 +73,13 @@ async function readCache(key: string): Promise<{ data: any; ageMs: number } | nu
   } catch { return null; }
 }
 
+function hasNonEmptyArray(value: any, depth = 0): boolean {
+  if (depth > 4 || value == null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value !== 'object') return false;
+  return Object.values(value).some(v => hasNonEmptyArray(v, depth + 1));
+}
+
 async function writeCache(key: string, payload: any): Promise<void> {
   if (!sb) return;
   try {
@@ -187,7 +194,7 @@ Deno.serve(async (req) => {
 
     // 2) Upstream OK — grava cache e devolve
     if (upstreamOk) {
-      if (cacheKey) await writeCache(cacheKey, upstreamJson);
+      if (cacheKey && hasNonEmptyArray(upstreamJson)) await writeCache(cacheKey, upstreamJson);
       return new Response(JSON.stringify({
         ok: true, data: upstreamJson, provider: body.provider,
         latency_ms: Date.now() - t0, cache: 'miss',

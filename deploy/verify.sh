@@ -86,12 +86,18 @@ if [ -n "$SERVICE_KEY" ]; then
   # A URL pública passa por Caddy/Kong. Se ela responder 401 mesmo com a
   # service-role real do edge, repetir pela porta local do Kong evita falso
   # negativo causado por proxy externo sem relaxar a proteção da função.
-  if [ "$code" = "401" ] && curl -fsS --connect-timeout 3 --max-time 10 -o /tmp/nx_health_local.json \
-      -H "Authorization: Bearer $SERVICE_KEY" \
-      -H "apikey: $SERVICE_KEY" "http://127.0.0.1:8000/functions/v1/healthcheck" >/dev/null 2>&1; then
-    cp /tmp/nx_health_local.json /tmp/nx_health.json
-    code="200"
-    ok "healthcheck HTTP 200 (Kong local; proxy externo rejeita o bearer)"
+  if [ "$code" = "401" ]; then
+    # Kong pode publicar 8000 em uma porta host diferente. Descobrir a porta
+    # publicada evita falso negativo sem abrir a função publicamente.
+    KONG_PORT="$(docker port supabase-kong 8000/tcp 2>/dev/null | head -1 | sed -E 's/.*:([0-9]+)$/\1/' || true)"
+    KONG_PORT="${KONG_PORT:-8000}"
+    if curl -fsS --connect-timeout 3 --max-time 10 -o /tmp/nx_health_local.json \
+        -H "Authorization: Bearer $SERVICE_KEY" \
+        -H "apikey: $SERVICE_KEY" "http://127.0.0.1:$KONG_PORT/functions/v1/healthcheck" >/dev/null 2>&1; then
+      cp /tmp/nx_health_local.json /tmp/nx_health.json
+      code="200"
+      ok "healthcheck HTTP 200 (Kong local na porta $KONG_PORT; proxy externo rejeita o bearer)"
+    fi
   fi
   [ "$code" = "200" ] && ok "healthcheck HTTP 200" || warn "healthcheck protegido respondeu HTTP $code"
   if grep -q '"db":{"ok":true' /tmp/nx_health.json 2>/dev/null; then

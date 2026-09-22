@@ -52,7 +52,8 @@ REQUIRED=(SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY GEMINI_API_KEY GROQ_API_KEY
           TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID)
 OPTIONAL=(TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY)
 INFRA=(APP_PUBLIC_URL SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_URL)
-KEYS=("${REQUIRED[@]}" "${OPTIONAL[@]}" "${INFRA[@]}")
+SMTP=(SMTP_ADMIN_EMAIL SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME)
+KEYS=("${REQUIRED[@]}" "${OPTIONAL[@]}" "${INFRA[@]}" "${SMTP[@]}")
 
 for K in "${KEYS[@]}"; do
   V="${!K:-}"
@@ -78,6 +79,12 @@ for K in "${KEYS[@]}"; do
   printf '%s=%s\n' "$K" "$V" >> "$FENV"
 done
 echo "Secrets literais gravados em $FENV ($(wc -l < "$FENV") vars)"
+
+# SMTP de produção é aplicado ao .env do Auth. Nunca imprime valores secretos.
+SMTP_CONFIGURED=0
+if [ -n "${SMTP_HOST:-}" ] && [ -n "${SMTP_USER:-}" ] && [ -n "${SMTP_PASS:-}" ] && [ -n "${SMTP_ADMIN_EMAIL:-}" ]; then SMTP_CONFIGURED=1; fi
+echo "SMTP produção: $([ "$SMTP_CONFIGURED" -eq 1 ] && echo CONFIGURADO || echo NÃO CONFIGURADO)"
+
 
 python3 - "$SB/docker-compose.yml" "functions.secrets.env" <<'PY'
 import os, re, shutil, sys

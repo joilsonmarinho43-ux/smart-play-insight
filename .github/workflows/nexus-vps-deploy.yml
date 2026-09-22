@@ -66,5 +66,17 @@ jobs:
           bash deploy/update.sh
           REMOTE
 
+      - name: Install Playwright dependency
+        run: npm install --no-save playwright
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run functional browser audit after deploy
+        env:
+          NEXUS_E2E_EMAIL: ${{ secrets.NEXUS_E2E_EMAIL }}
+          NEXUS_E2E_PASSWORD: ${{ secrets.NEXUS_E2E_PASSWORD }}
+        run: node scripts/nexus-functional-e2e.mjs
+
 # Keep the production deploy workflow active on the corrected Nexus tree.
 # Final production gate: validate the protected healthcheck and Telegram diagnostics after deploy.

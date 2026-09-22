@@ -44,7 +44,7 @@ for (const route of routes) {
 }
 
 await spaNavigate('/');
-let matchLink = page.locator('a[href*="/match/"]').first();
+let matchLink = page.getByRole('link', { name: /Detalhes completos/i }).first();
 try { await matchLink.waitFor({ state: 'visible', timeout: 12000 }); } catch {}
 if (!(await matchLink.count())) {
   // Hoje pode não haver jogos. Escolha automaticamente o primeiro dia disponível
@@ -58,15 +58,17 @@ if (!(await matchLink.count())) {
     if (m && Number(m[1]) > 0) {
       await b.click();
       await page.waitForTimeout(1800);
-      matchLink = page.locator('a[href*="/match/"]').first();
+      matchLink = page.getByRole('link', { name: /Detalhes completos/i }).first();
       if (await matchLink.count()) break;
     }
   }
 }
 if (await matchLink.count()) {
   const href = await matchLink.getAttribute('href');
-  await page.goto(BASE_URL + href, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(2500);
+  if (!href) throw new Error('MATCH LINK WITHOUT HREF');
+  await matchLink.click();
+  await page.waitForURL(/\/match\//, { timeout: 15000 });
+  await page.waitForTimeout(3500);
   const body = await page.locator('body').innerText();
   const required = ['Estatísticas completas','Posse','Finalizações','No alvo','Grandes chances','Escanteios','Impedimentos','Faltas','Cartões amarelos','xG'];
   const missing = required.filter(x => !body.includes(x));

@@ -2,6 +2,8 @@ name: NEXUS 33 - Functional E2E
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   e2e:
@@ -10,6 +12,20 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Diagnose production auth user
+        env:
+          VPS_HOST: ${{ secrets.NEXUS_VPS_HOST }}
+          VPS_USER: ${{ secrets.NEXUS_VPS_USER }}
+          VPS_PORT: ${{ secrets.NEXUS_VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.NEXUS_VPS_SSH_KEY }}
+        run: |
+          set -e
+          install -m 600 /dev/null /tmp/nexus_key
+          printf '%s\n' "$VPS_SSH_KEY" > /tmp/nexus_key
+          ssh -o StrictHostKeyChecking=no -i /tmp/nexus_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" \
+            'docker exec supabase-db psql -U postgres -d postgres -Atc "select u.email, u.email_confirmed_at is not null, u.banned_until is null, u.deleted_at is null, u.last_sign_in_at, coalesce(p.is_admin,false) from auth.users u left join public.profiles p on p.id=u.id where lower(u.email)=lower('\''joilsonmoreiramarinho@gmail.com'\'');"'
+          rm -f /tmp/nexus_key
+
       - name: Checkout
         uses: actions/checkout@v4
 

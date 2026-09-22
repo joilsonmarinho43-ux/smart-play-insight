@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
     const { data: allowed, error: rateError } = await sb.rpc('check_rate_limit', {
       _bucket: 'free-football-proxy',
       _subject: user.id,
-      _max_calls: 60,
+      _max_calls: 300,
       _window_seconds: 60,
     });
     if (rateError) {

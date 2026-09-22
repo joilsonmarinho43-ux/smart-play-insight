@@ -40,6 +40,9 @@ PY
 
   (cd supabase-docker && docker compose up -d --force-recreate auth)
   bash deploy/sync-functions.sh
+  # Recria o edge-runtime para descartar workers/cache de módulos carregados antes da sincronização.
+  # Sem isso, o volume atualizado pode coexistir com workers antigos em memória.
+  (cd supabase-docker && docker compose up -d --force-recreate edge-runtime)
   bash deploy/fix-secrets.sh
   bash deploy/apply-migrations.sh
   # Corrige o estado real do pg_cron antes da verificação. Isso remove

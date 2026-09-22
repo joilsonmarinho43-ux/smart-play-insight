@@ -87,7 +87,7 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
       } catch (fallbackError) {
         console.warn('[SportsRC] football-api fallback failed', fallbackError);
       }
-      return returnStale('proxy_error');
+      throw new Error(`[SportsRC] proxy_error: ${data?.error || error?.message || 'unknown'}`);
     }
     const payload = data.data;
     const groups: any[] = Array.isArray(payload?.data) ? payload.data : [];
@@ -117,7 +117,7 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
         console.warn('[SportsRC] football-api empty-response fallback failed', fallbackError);
       }
       console.info(`[SportsRC] date=${date} vazio (cache=${data.cache || 'miss'})`);
-      return returnStale('upstream_empty');
+      throw new Error(`[SportsRC] upstream_empty: ${data?.error || 'no matches'}`);
     }
     const servedStale = data?.served_from_stale === true || data?.cache === 'stale';
     if (!servedStale) {

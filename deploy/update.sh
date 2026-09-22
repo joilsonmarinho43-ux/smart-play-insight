@@ -12,7 +12,10 @@ if [ ! -f "$VAULT" ]; then
   echo "  Rode uma única vez: bash deploy/set-secrets.sh"
 fi
 
-if [ -d supabase-docker ]; then\n  # Corrige instalações existentes que perderam o serviço SMTP interno.\n  bash deploy/ensure-supabase-mail.sh\n  (cd supabase-docker && docker compose up -d supabase-mail)
+if [ -d supabase-docker ]; then
+  # Corrige instalações existentes que perderam o serviço SMTP interno.
+  bash deploy/ensure-supabase-mail.sh
+  (cd supabase-docker && docker compose up -d supabase-mail)
   # Mantém o cadastro habilitado também em instalações já existentes.
   # Alterar somente o .env não basta: o container de Auth precisa ser recriado
   # para receber ENABLE_EMAIL_SIGNUP/AUTOCONFIRM atualizados.

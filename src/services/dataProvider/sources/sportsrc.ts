@@ -25,6 +25,7 @@ function mapMatch(m: any, leagueMeta: any): MatchData | null {
     const score = m?.score?.current || {};
     return {
       id: `srcv2-${id}`,
+      providerFixtureId: id,
       time: iso,
       league: leagueMeta?.name || 'Outros',
       homeTeam: home,

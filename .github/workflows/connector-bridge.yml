@@ -13,3 +13,4 @@ jobs:
         run: |
           echo "NEXUS_CONNECTOR_PR_RUN=VISIBLE"
           echo "This workflow exists only to expose PR-triggered Actions to the connector."
+          echo "Validation refresh after MatchDetails source fix."

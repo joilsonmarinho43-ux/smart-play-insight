@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BarChart3, Clock, Database, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { fetchLiveMatches, fetchMultiDayMatches, fetchMatchStats } from '@/services/footballApi';
@@ -8,6 +8,8 @@ import { useTeamForm, mergeFormIntoMatch } from '@/hooks/useTeamForm';
 
 const MatchDetails = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigationMatch = (location.state as any)?.match as MatchData | undefined;
   const { data: live, isLoading: loadingLive } = useQuery({ queryKey: ['liveMatches'], queryFn: fetchLiveMatches, staleTime: 120_000, refetchOnWindowFocus: false });
   const { data: multi, isLoading: loadingMulti } = useQuery({ queryKey: ['multi-day-matches-detail'], queryFn: () => fetchMultiDayMatches(6), staleTime: 120_000, refetchOnWindowFocus: false });
   const match = useMemo(() => {

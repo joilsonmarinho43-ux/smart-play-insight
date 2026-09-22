@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 /* Nexus 33 football-api: source normalization and provenance only. */
-import { fetchEspnMatches } from "../_shared/espnLive.ts";
+import { fetchEspnMatches, lastEspnDiagnostics } from "../_shared/espnLive.ts";
 const SPORTSRC_KEY = Deno.env.get("SPORTSRC_API_KEY") || "";
 const SPORTSRC_BASE = "https://api.sportsrc.org/v2";
 const LIVE_STATUSES = new Set(["1H", "2H", "HT", "ET", "P"]);
@@ -185,7 +185,20 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     if (body?.fixture != null) return new Response(JSON.stringify(await fetchFixtureStats(body.fixture)), { status: 200, headers: cors });
-    if (body?.diag === true) return new Response(JSON.stringify({ ok: true, source: "sportsrc", apiKey: SPORTSRC_KEY ? "present" : "missing" }), { status: 200, headers: cors });
+    if (body?.diag === true) {
+      const date = typeof body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
+        ? body.date
+        : new Date().toISOString().slice(0, 10);
+      const sports = await fetchSportsrc({ type: "matches", date });
+      const espn = await fetchEspnMatches({ date, liveOnly: false, enrichStats: false, maxEvents: 20, deadline: Date.now() + 12000 });
+      return new Response(JSON.stringify({
+        ok: true,
+        source: sports.diag.source,
+        apiKey: SPORTSRC_KEY ? "present" : "missing",
+        sportsrc: sports.diag,
+        espn: { events: espn.length, diagnostics: lastEspnDiagnostics() },
+      }), { status: 200, headers: cors });
+    }
     const date = typeof body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : new Date().toISOString().slice(0, 10);
     const { matches, diag } = await fetchMatches(date);
     let filtered = body?.live === true ? matches.filter((match) => match.isLive) : matches;

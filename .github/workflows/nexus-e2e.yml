@@ -1,11 +1,7 @@
-name: NEXUS 33 - Functional E2E
+name: Nexus E2E
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
   e2e:

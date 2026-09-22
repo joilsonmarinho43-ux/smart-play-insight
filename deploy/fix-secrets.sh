@@ -54,6 +54,7 @@ OPTIONAL=(TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY)
 INFRA=(APP_PUBLIC_URL SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_URL)
 SMTP=(SMTP_ADMIN_EMAIL SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME)
 KEYS=("${REQUIRED[@]}" "${OPTIONAL[@]}" "${INFRA[@]}" "${SMTP[@]}")
+EDGE_KEYS=("${REQUIRED[@]}" "${OPTIONAL[@]}" "${INFRA[@]}")
 
 for K in "${KEYS[@]}"; do
   V="${!K:-}"
@@ -73,7 +74,7 @@ done
 
 FENV="$SB/functions.secrets.env"
 : > "$FENV"; chmod 600 "$FENV"
-for K in "${KEYS[@]}"; do
+for K in "${EDGE_KEYS[@]}"; do
   V="${!K:-}"
   [ -z "$V" ] && continue
   printf '%s=%s\n' "$K" "$V" >> "$FENV"

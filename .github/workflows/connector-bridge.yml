@@ -12,5 +12,5 @@ jobs:
       - name: Connector visibility probe
         run: |
           echo "NEXUS_CONNECTOR_PR_RUN=VISIBLE"
-          echo "This workflow exists only to expose PR-triggered Actions to the connector."
+          echo "This workflow exists only to expose PR-triggered Actions to the connector. Current-main functional audit probe."
           echo "Validation refresh after MatchDetails source fix."

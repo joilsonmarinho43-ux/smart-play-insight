@@ -24,14 +24,16 @@ await page.locator('input[type="email"], input[name="email"], input[autocomplete
 await page.locator('input[type="password"], input[name="password"], input[autocomplete="current-password"]').first().fill(loginPassword);
 await page.locator('button[type="submit"], button:has-text("Entrar"), button:has-text("Login"), button:has-text("Acessar")').first().click();
 await page.waitForTimeout(4000);
+const spaNavigate = async (path) => { await page.evaluate((p) => { window.history.pushState({}, '', p); window.dispatchEvent(new PopStateEvent('popstate', { state: null })); }, path); await page.waitForTimeout(1600); };
+
 console.log('LOGIN URL:', page.url());
 if (page.url().includes('/auth')) failures.push('LOGIN FAILED');
 
 const routes = ['/', '/live', '/scanner', '/favorites', '/suggestions', '/bingo', '/elite', '/placar-exato', '/bet-analyzer'];
 for (const route of routes) {
   try {
-    const r = await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(1200);
+    await spaNavigate(route);
+    const r = null;
     if ((r?.status() ?? 0) >= 500) throw new Error('HTTP ' + r.status());
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
     console.log('ROUTE PASS:', route);
@@ -41,7 +43,7 @@ for (const route of routes) {
   }
 }
 
-await page.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await spaNavigate('/');
 const matchLink = page.locator('a[href*="/match/"]').first();
 try { await matchLink.waitFor({ state: 'visible', timeout: 45000 }); } catch {}
 if (await matchLink.count()) {
@@ -58,8 +60,7 @@ if (await matchLink.count()) {
   console.log('MATCH DETAILS BLOCKED: no match link currently available');
 }
 
-await page.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForTimeout(1200);
+await spaNavigate('/');
 for (const name of ['Poisson', 'Bilhete']) {
   const b = page.getByRole('button', { name }).first();
   if (await b.count()) { await b.click(); await page.waitForTimeout(300); console.log('TAB PASS:', name); }
@@ -74,8 +75,8 @@ if (await reading.count()) {
 
 for (const route of ['/admin','/quality','/diagnostics','/context']) {
   try {
-    const r = await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(800);
+    await spaNavigate(route);
+    const r = null;
     if ((r?.status() ?? 0) >= 500) throw new Error('HTTP ' + r.status());
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
     console.log('AREA PASS:', route);

@@ -90,6 +90,36 @@ async function fetchMatches(date: string): Promise<{ matches: any[]; diag: Sourc
     }
   }
   diag.matches = matches.length;
+
+  // SportsRC is the primary source, but the app must not become empty when
+  // its key/upstream is unavailable. ESPN is a no-key fallback for fixtures.
+  if (matches.length === 0) {
+    try {
+      const espn = await fetchEspnMatches({
+        date,
+        liveOnly: false,
+        enrichStats: true,
+        maxEvents: 80,
+        deadline: Date.now() + 15000,
+      });
+      if (espn.length > 0) {
+        console.warn(`[football-api] SportsRC returned 0 for ${date}; using ESPN fallback: ${espn.length}`);
+        return {
+          matches: espn,
+          diag: {
+            source: "espn",
+            status: 200,
+            ms: diag.ms,
+            matches: espn.length,
+            error: diag.error || "sportsrc_empty_fallback_espn",
+          },
+        };
+      }
+    } catch (e) {
+      console.warn("[football-api] ESPN fixture fallback failed", e);
+    }
+  }
+
   return { matches, diag };
 }
 

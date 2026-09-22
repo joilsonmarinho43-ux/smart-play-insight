@@ -46,6 +46,9 @@ PY
   SVC="${SVC:-functions}"
   (cd supabase-docker && docker compose up -d --force-recreate "$SVC")
   bash deploy/fix-secrets.sh
+  # SMTP/SITE_URL são escritos no .env pelo fix-secrets; recriar Auth depois
+  # garante que o GoTrue receba a configuração de e-mail nesta mesma publicação.
+  (cd supabase-docker && docker compose up -d --force-recreate auth)
   bash deploy/apply-migrations.sh
   # Corrige o estado real do pg_cron antes da verificação. Isso remove
   # schedulers legados que podem sobreviver no banco mesmo após o código

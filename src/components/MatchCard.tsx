@@ -70,7 +70,7 @@ function Poisson({ match }: { match: MatchData }) {
 function Ticket({ match }: { match: MatchData }) {
   const markets=analyzeMarkets(match).filter(x=>x.probability>0).sort((a,b)=>b.probability-a.probability).slice(0,6);
   if(!markets.length) return <div className="py-8 text-center text-sm text-gray-500">Nenhum mercado calculável com os dados disponíveis.</div>;
-  return <div className="space-y-2">{markets.map(m=><div key={m.market} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3"><div><div className="text-sm font-bold">{m.market}</div><div className="text-[10px] text-gray-500">{m.risk} · {m.probabilitySource}</div></div><div className="text-lg font-black text-emerald-400">{m.probability}%</div></div>)}</div>;
+  return <div className="space-y-2">{markets.map(m=><div key={m.market} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3"><div><div className="text-sm font-bold">{m.market}</div><div className="text-[10px] text-gray-500">{m.risk} · {m.probabilitySource}</div><div className="mt-1 text-[10px] text-gray-400">Odd justa: {m.fairOdd ? m.fairOdd.toFixed(2) : '—'} · Odd real: não observada · EV: indisponível</div></div><div className="text-lg font-black text-emerald-400">{m.probability}%</div></div>)}</div>;
 }
 
 export default function MatchCard({ match: rawMatch, isPremium }: Props) {

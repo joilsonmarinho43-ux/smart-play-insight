@@ -44,8 +44,25 @@ for (const route of routes) {
 }
 
 await spaNavigate('/');
-const matchLink = page.locator('a[href*="/match/"]').first();
-try { await matchLink.waitFor({ state: 'visible', timeout: 45000 }); } catch {}
+let matchLink = page.locator('a[href*="/match/"]').first();
+try { await matchLink.waitFor({ state: 'visible', timeout: 12000 }); } catch {}
+if (!(await matchLink.count())) {
+  // Hoje pode não haver jogos. Escolha automaticamente o primeiro dia disponível
+  // dentro da janela de 6 dias, sem alterar o comportamento normal da Home.
+  const dayButtons = page.locator('button').filter({ hasText: /\(\d+\)/ });
+  const totalDays = await dayButtons.count();
+  for (let i = 0; i < totalDays; i++) {
+    const b = dayButtons.nth(i);
+    const text = await b.innerText();
+    const m = text.match(/\((\d+)\)/);
+    if (m && Number(m[1]) > 0) {
+      await b.click();
+      await page.waitForTimeout(1800);
+      matchLink = page.locator('a[href*="/match/"]').first();
+      if (await matchLink.count()) break;
+    }
+  }
+}
 if (await matchLink.count()) {
   const href = await matchLink.getAttribute('href');
   await page.goto(BASE_URL + href, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -95,7 +112,12 @@ const menu = page.getByRole('button', { name: /Toggle Sidebar|Menu/i }).first();
 if (await menu.count()) { await menu.click(); await page.waitForTimeout(600); }
 const logout = page.getByRole('button', { name: /SAIR/i }).first();
 if (await logout.count()) {
-  await logout.click(); await page.waitForTimeout(1200);
+  await logout.click();
+  for (let i = 0; i < 10 && !page.url().includes('/auth'); i++) await page.waitForTimeout(500);
+  if (!page.url().includes('/auth')) {
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await page.waitForTimeout(500);
+  }
   if (!page.url().includes('/auth')) failures.push('LOGOUT DID NOT RETURN TO AUTH');
   else console.log('LOGOUT PASS');
 } else failures.push('LOGOUT BUTTON NOT FOUND');

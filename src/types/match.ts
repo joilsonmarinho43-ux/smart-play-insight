@@ -40,6 +40,8 @@ export interface SampleSize {
 
 export interface MatchData {
   id: string;
+  /** Native fixture identifier used by the active provider for detail/stat endpoints. */
+  providerFixtureId?: string | number;
   time: string;
   kickoff?: string | null;
   league: string;

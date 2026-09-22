@@ -82,6 +82,12 @@ done
 echo "Secrets literais gravados em $FENV ($(wc -l < "$FENV") vars)"
 
 # SMTP de produção é aplicado ao .env do Auth. Nunca imprime valores secretos.
+# URLs usadas pelo GoTrue para montar links de recuperação/confirmacao.
+APP_PUBLIC_URL="${APP_PUBLIC_URL:-https://analista.funecob.com.br}"
+set_env SITE_URL "$APP_PUBLIC_URL"
+set_env GOTRUE_SITE_URL "$APP_PUBLIC_URL"
+set_env ADDITIONAL_REDIRECT_URLS "$APP_PUBLIC_URL/reset-password"
+
 SMTP_CONFIGURED=0
 if [ -n "${SMTP_HOST:-}" ] && [ -n "${SMTP_USER:-}" ] && [ -n "${SMTP_PASS:-}" ] && [ -n "${SMTP_ADMIN_EMAIL:-}" ]; then SMTP_CONFIGURED=1; fi
 echo "SMTP produção: $([ "$SMTP_CONFIGURED" -eq 1 ] && echo CONFIGURADO || echo NÃO CONFIGURADO)"

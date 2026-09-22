@@ -39,7 +39,7 @@ export function getCanonicalGoalLambdas(match:MatchData):CanonicalGoalLambdas|nu
   return {homeLambda:Math.max(.01,(hAttack/league!)*(aDefense/league!)*league!),awayLambda:Math.max(.01,(aAttack/league!)*(hDefense/league!)*league!),sampleSize:n,leagueAvg:league!};
 }
 
-function add(markets:MarketAnalysis[],market:string,probability:number,risk:string,category:string,source:MarketAnalysis['probabilitySource'],calibration:MarketAnalysis['calibrationStatus']='UNCALIBRATED'){if(!Number.isFinite(probability))return;markets.push({market,probability:Math.max(0,Math.min(100,Math.round(probability))),risk,category,probabilitySource:source,calibrationStatus:calibration});}
+function add(markets:MarketAnalysis[],market:string,probability:number,risk:string,category:string,source:MarketAnalysis['probabilitySource'],calibration:MarketAnalysis['calibrationStatus']='UNCALIBRATED'){if(!Number.isFinite(probability))return;const p=Math.max(0,Math.min(100,Math.round(probability)));markets.push({market,probability:p,fairOdd:p>0?Math.round((100/p)*100)/100:undefined,risk,category,probabilitySource:source,calibrationStatus:calibration,oddSource:'UNKNOWN'});}
 export function isValidBet(probability:number,ev=0):boolean{return Number.isFinite(probability)&&probability>=60&&Number.isFinite(ev)&&ev>=0;}
 export interface MarketLambdaOverride { homeLambda: number; awayLambda: number; }
 

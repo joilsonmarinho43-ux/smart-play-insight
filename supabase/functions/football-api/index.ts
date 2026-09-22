@@ -100,7 +100,7 @@ const STAT_KEYS: Record<string, string[]> = {
   "Corner Kicks": ["corners", "corner_kicks"],
   "Ball Possession": ["possession", "ball_possession"],
   "Dangerous Attacks": ["dangerous_attacks", "attacks_dangerous"],
-  "Attacks": ["attacks"], "Yellow Cards": ["yellow_cards", "yellowcards", "yellows"],
+  "Attacks": ["attacks"], "Big Chances": ["big_chances", "big_chances_created", "bigchances"], "Expected Goals": ["expected_goals", "xg", "expectedGoals"], "Yellow Cards": ["yellow_cards", "yellowcards", "yellows"],
   "Red Cards": ["red_cards", "redcards", "reds"], "Fouls": ["fouls"], "Offsides": ["offsides"],
 };
 function statValue(side: any, keys: string[]): any {

@@ -14,7 +14,7 @@ import { MatchData } from '@/types/match';
 import { Bell, Trash2, Trophy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-const DAYS = 3;
+const DAYS = 6;
 
 function buildDates(n: number): string[] {
   const today = getTodayInPara();
@@ -126,7 +126,7 @@ const Diagnostics = () => {
     const bySource: Record<string, number> = {};
     const leaguesBySource: Record<string, Set<string>> = {};
     for (const m of all) {
-      const s = m.__source || 'unknown';
+      const s = m.dataSource || m.__source || 'unknown';
       bySource[s] = (bySource[s] || 0) + 1;
       (leaguesBySource[s] = leaguesBySource[s] || new Set()).add(m.league || '—');
     }

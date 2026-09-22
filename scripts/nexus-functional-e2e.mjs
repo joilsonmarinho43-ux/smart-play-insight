@@ -53,6 +53,7 @@ if (await matchLink.count()) {
   if (missing.length) failures.push('MATCH DETAILS MISSING: ' + missing.join(', '));
   else console.log('MATCH DETAILS PASS');
 } else {
+  failures.push('MATCH DATA EMPTY: nenhum link de jogo disponível na Home');
   console.log('MATCH DETAILS BLOCKED: no match link currently available');
 }
 
@@ -77,12 +78,19 @@ for (const route of ['/admin','/quality','/diagnostics','/context']) {
     if ((r?.status() ?? 0) >= 500) throw new Error('HTTP ' + r.status());
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
     console.log('AREA PASS:', route);
+    if (route === '/diagnostics') {
+      await page.waitForTimeout(3000);
+      const diagText = await page.locator('body').innerText();
+      console.log('DIAGNOSTICS SNAPSHOT:\n' + diagText.slice(0, 12000));
+    }
   } catch (e) {
     failures.push(route + ': ' + e.message);
     console.log('AREA FAIL:', route, e.message);
   }
 }
 
+const menu = page.getByRole('button', { name: /Menu/i }).first();
+if (await menu.count()) { await menu.click(); await page.waitForTimeout(300); }
 const logout = page.getByRole('button', { name: /SAIR/i }).first();
 if (await logout.count()) {
   await logout.click(); await page.waitForTimeout(1200);

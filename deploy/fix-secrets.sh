@@ -36,6 +36,22 @@ fi
 
 readenv() { grep -E "^$1=" "$SB/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'; }
 
+set_env() {
+  local key="$1" val="$2"
+  [ -z "$val" ] && return 0
+  python3 - "$SB/.env" "$key" "$val" <<'PY'
+import sys
+path, key, val = sys.argv[1:4]
+try:
+    lines = open(path).read().splitlines()
+except FileNotFoundError:
+    lines = []
+out = [line for line in lines if not line.startswith(f"{key}=")]
+out.append(f"{key}={val}")
+open(path, "w").write("\n".join(out) + "\n")
+PY
+}
+
 : "${APP_DOMAIN:?defina APP_DOMAIN em deploy/.env}"
 : "${API_DOMAIN:?defina API_DOMAIN em deploy/.env}"
 APP_PUBLIC_URL="${APP_PUBLIC_URL:-https://${APP_DOMAIN}}"

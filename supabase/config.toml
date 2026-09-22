@@ -1,5 +1,8 @@
 project_id = "yeyctdphzrmyxgskehru"
 
+[functions.free-football-proxy]
+verify_jwt = false
+
 [functions.football-api]
 verify_jwt = false
 

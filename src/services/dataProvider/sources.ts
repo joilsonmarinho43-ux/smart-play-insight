@@ -101,7 +101,7 @@ registerSource({
       const { data, error } = await supabase.functions.invoke('free-football-proxy', {
         body: { provider: 'thesportsdb', path: '/eventsday.php', params: { d: date, s: 'Soccer' } },
       });
-      if (error || !data?.ok) return [];
+      if (error || !data?.ok) throw new Error(`[TheSportsDB] proxy_error: ${data?.error || error?.message || 'unknown'}`);
       const events: any[] = Array.isArray(data?.data?.events) ? data.data.events : [];
       const matches = events.map(tsdbToMatch).filter(Boolean) as MatchData[];
       if (matches.length > 0) {
@@ -111,7 +111,7 @@ registerSource({
       }
       return matches;
     } catch {
-      return [];
+      throw new Error(`[TheSportsDB] proxy_exception: ${e instanceof Error ? e.message : String(e)}`);
     }
   },
 });

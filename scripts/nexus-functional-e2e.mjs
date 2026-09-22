@@ -41,8 +41,8 @@ for (const route of routes) {
 }
 
 await page.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForTimeout(1800);
 const matchLink = page.locator('a[href*="/match/"]').first();
+try { await matchLink.waitFor({ state: 'visible', timeout: 45000 }); } catch {}
 if (await matchLink.count()) {
   const href = await matchLink.getAttribute('href');
   await page.goto(BASE_URL + href, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -89,8 +89,8 @@ for (const route of ['/admin','/quality','/diagnostics','/context']) {
   }
 }
 
-const menu = page.getByRole('button', { name: /Menu/i }).first();
-if (await menu.count()) { await menu.click(); await page.waitForTimeout(300); }
+const menu = page.getByRole('button', { name: /Toggle Sidebar|Menu/i }).first();
+if (await menu.count()) { await menu.click(); await page.waitForTimeout(600); }
 const logout = page.getByRole('button', { name: /SAIR/i }).first();
 if (await logout.count()) {
   await logout.click(); await page.waitForTimeout(1200);

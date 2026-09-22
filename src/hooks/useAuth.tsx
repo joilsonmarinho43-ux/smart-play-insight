@@ -20,7 +20,11 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = () => supabase.auth.signOut();
+  const signOut = async () => {
+    // Local scope clears the browser session even if the remote sign-out endpoint is unavailable.
+    await supabase.auth.signOut({ scope: 'local' });
+    window.location.assign('/auth');
+  };
 
   return { session, loading, signOut };
 };

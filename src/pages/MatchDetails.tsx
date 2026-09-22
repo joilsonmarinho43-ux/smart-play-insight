@@ -12,7 +12,7 @@ const MatchDetails = () => {
   const { data: multi, isLoading: loadingMulti } = useQuery({ queryKey: ['multi-day-matches-detail'], queryFn: () => fetchMultiDayMatches(6), staleTime: 120_000, refetchOnWindowFocus: false });
   const match = useMemo(() => { const sid = String(id || ''); const all = [...(live || []), ...(multi || [])] as MatchData[]; return all.find((item) => String(item.id) === sid) || null; }, [live, multi, id]);
 
-  const fixtureId = Number((match as any)?.id || (match as any)?.fixture?.id);
+  const fixtureId = Number((match as any)?.providerFixtureId ?? (match as any)?.fixture?.id ?? (String((match as any)?.id || '').match(/(\d+)$/)?.[1] ?? NaN));
   const { data: observedStats, isLoading: loadingStats } = useQuery({
     queryKey: ['match-stats', fixtureId],
     queryFn: () => fetchMatchStats(fixtureId),

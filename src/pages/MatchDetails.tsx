@@ -36,7 +36,7 @@ const MatchDetails = () => {
   const { data: form } = useTeamForm(match);
   const enrichedMatch = useMemo(() => mergeFormIntoMatch(match as MatchData, form), [match, form]);
 
-  if (loadingLive || loadingMulti) return <div className="p-6 text-sm text-muted-foreground">Carregando dados do jogo…</div>;
+  if ((loadingLive || loadingMulti) && !match) return <div className="p-6 text-sm text-muted-foreground">Carregando dados do jogo…</div>;
   if (!match) return <div className="p-6"><Link to="/" className="inline-flex items-center gap-2 text-sm text-primary"><ArrowLeft className="h-4 w-4" /> Voltar</Link><p className="mt-6 text-sm text-muted-foreground">Jogo não encontrado na fonte de dados atual.</p></div>;
 
   const viewMatch = enrichedMatch as MatchData;

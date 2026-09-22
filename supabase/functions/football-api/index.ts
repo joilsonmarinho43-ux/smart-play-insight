@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
   const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Content-Type": "application/json" };
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
-  const authorization = req.headers.get("authorization")?.replace(/^Bearer\\s+/i, "").trim() || "";
+  const authorization = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() || "";
   const apiKey = req.headers.get("apikey")?.trim() || "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   const internal = !!serviceKey && (authorization === serviceKey || apiKey === serviceKey);

@@ -44,11 +44,13 @@ function Stats({ match }: { match: MatchData }) {
     ['Gols esperados (xG)', home('xG','xG'), away('xG','xG')],
     ['Finalizações Totais', home('totalShots','totalShots'), away('totalShots','totalShots')],
     ['Chutes no gol', home('shotsOnGoal','shotsOnTarget'), away('shotsOnGoal','shotsOnTarget')],
+    ['Chutes para fora', home('shotsOffGoal','shotsOffGoal'), away('shotsOffGoal','shotsOffGoal')],
     ['Grandes chances criadas', home('bigChances','bigChances'), away('bigChances','bigChances')],
     ['Escanteios', home('corners','corners'), away('corners','corners')],
     ['Impedimentos', home('offsides','offsides'), away('offsides','offsides')],
     ['Faltas Cometidas', home('fouls','fouls'), away('fouls','fouls')],
     ['Cartões amarelos', home('yellowCards','yellowCards'), away('yellowCards','yellowCards')],
+    ['Cartões vermelhos', home('redCards','redCards'), away('redCards','redCards')],
   ];
   const available=rows.filter(r=>n(r[1])!=null||n(r[2])!=null);
   return <div className="rounded-xl bg-white/95 px-2 py-1 dark:bg-transparent">

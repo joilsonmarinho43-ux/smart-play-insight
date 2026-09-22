@@ -72,6 +72,21 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
     });
     if (error || !data?.ok) {
       console.warn('[SportsRC] proxy_error', { error, body: data });
+      // Secondary edge route: football-api talks to SportsRC directly and
+      // remains useful when the unified free-football-proxy is unavailable.
+      try {
+        const fallback = await supabase.functions.invoke('football-api', { body: { date } });
+        const fallbackMatches = Array.isArray(fallback.data?.matches) ? fallback.data.matches : [];
+        const mappedFallback = fallbackMatches
+          .map((m: any) => mapMatch(m, m?.league))
+          .filter(Boolean) as MatchData[];
+        if (mappedFallback.length > 0) {
+          console.info(`[SportsRC] football-api fallback date=${date} matches=${mappedFallback.length}`);
+          return mappedFallback;
+        }
+      } catch (fallbackError) {
+        console.warn('[SportsRC] football-api fallback failed', fallbackError);
+      }
       return returnStale('proxy_error');
     }
     const payload = data.data;
@@ -86,7 +101,21 @@ export async function fetchSportsRC(date: string): Promise<MatchData[]> {
       }
     }
     if (matches.length === 0) {
-      // upstream pode ter devolvido vazio por limite — preserva snapshot anterior
+      // If the proxy answered successfully but without fixtures, use the
+      // independent football-api edge route before accepting an empty day.
+      try {
+        const fallback = await supabase.functions.invoke('football-api', { body: { date } });
+        const fallbackMatches = Array.isArray(fallback.data?.matches) ? fallback.data.matches : [];
+        const mappedFallback = fallbackMatches
+          .map((m: any) => mapMatch(m, m?.league))
+          .filter(Boolean) as MatchData[];
+        if (mappedFallback.length > 0) {
+          console.info(`[SportsRC] football-api empty-response fallback date=${date} matches=${mappedFallback.length}`);
+          return mappedFallback;
+        }
+      } catch (fallbackError) {
+        console.warn('[SportsRC] football-api empty-response fallback failed', fallbackError);
+      }
       console.info(`[SportsRC] date=${date} vazio (cache=${data.cache || 'miss'})`);
       return returnStale('upstream_empty');
     }

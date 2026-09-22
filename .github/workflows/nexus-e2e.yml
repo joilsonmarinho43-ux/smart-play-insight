@@ -100,9 +100,21 @@ jobs:
 
             page.on('response', response => {
               const url = response.url();
+              const status = response.status();
+              const method = response.request().method();
+
               if (/auth|supabase/i.test(url)) {
-                console.log(`AUTH RESPONSE: ${response.status()} ${response.request().method()} ${url}`);
+                console.log(`AUTH RESPONSE: ${status} ${method} ${url}`);
               }
+
+              if (status >= 400) {
+                console.log(`HTTP ERROR RESPONSE: ${status} ${method} ${url}`);
+              }
+            });
+
+            page.on('requestfailed', request => {
+              const url = request.url();
+              console.log(`REQUEST FAILED: ${request.method()} ${url} :: ${request.failure()?.errorText || 'unknown'}`);
             });
 
             page.on('console', message => {

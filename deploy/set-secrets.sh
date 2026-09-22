@@ -8,6 +8,18 @@ declare -A WHY=([SPORTSRC_API_KEY]='jogos ao vivo e pré-jogo' [FOOTBALL_DATA_OR
 mkdir -p "$VAULT_DIR";touch "$VAULT";chmod 600 "$VAULT"
 current(){ grep -E "^$1=" "$VAULT" 2>/dev/null|head -1|cut -d= -f2-; }
 setv(){ local k="$1" v="$2" tmp;tmp="$(mktemp)";grep -vE "^${k}=" "$VAULT">"$tmp" 2>/dev/null||true;printf '%s=%s\n' "$k" "$v">>"$tmp";mv "$tmp" "$VAULT";chmod 600 "$VAULT"; }
+if [ "${1:-}" = "--smtp-only" ]; then
+  for K in SMTP_ADMIN_EMAIL SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME; do
+    CUR="$(current "$K")"
+    [ -n "$CUR" ] && echo "✓ $K já definido (${#CUR} chars) — Enter mantém" || echo "• $K"
+    read -r -s -p "  $K: " V || V=''
+    echo
+    [ -n "$V" ] && setv "$K" "$V"
+  done
+  echo "SMTP gravado no cofre. O próximo deploy aplicará a configuração ao Auth."
+  exit 0
+fi
+
 FROM_ENV=0;[ "${1:-}" = '--from-env' ]&&FROM_ENV=1
 for K in "${REQUIRED[@]}" "${OPTIONAL[@]}";do CUR="$(current "$K")";if [ "$FROM_ENV" -eq 1 ];then V="${!K:-}";[ -n "$V" ]&&setv "$K" "$V";continue;fi;[ -n "$CUR" ]&&echo "✓ $K já definido (${#CUR} chars) — Enter mantém"||echo "• $K — ${WHY[$K]}";read -r -s -p "  $K: " V||V='';echo;[ -n "$V" ]&&setv "$K" "$V";done
 BOT="$(current TELEGRAM_BOT_TOKEN)";API="$(current TELEGRAM_API_KEY)";[ -z "$API" ]&&[ -n "$BOT" ]&&setv TELEGRAM_API_KEY "$BOT";[ -z "$BOT" ]&&[ -n "$API" ]&&setv TELEGRAM_BOT_TOKEN "$API";CHAT="$(current TELEGRAM_CHAT_ID)";ADM="$(current TELEGRAM_ADMIN_CHAT_ID)";[ -z "$ADM" ]&&[ -n "$CHAT" ]&&setv TELEGRAM_ADMIN_CHAT_ID "$CHAT"

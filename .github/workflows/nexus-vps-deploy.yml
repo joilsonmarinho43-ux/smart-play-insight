@@ -73,10 +73,11 @@ jobs:
           VPS_PORT: ${{ secrets.NEXUS_VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.NEXUS_VPS_SSH_KEY }}
         run: |
-          set -e
+          set -euo pipefail
           install -m 600 /dev/null /tmp/nexus_key
           printf '%s\n' "$VPS_SSH_KEY" > /tmp/nexus_key
-          ssh -o StrictHostKeyChecking=no -i /tmp/nexus_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST"             'docker exec supabase-db psql -U postgres -d postgres -Atc "select lower(u.email), (u.email_confirmed_at is not null), (u.banned_until is null), (u.deleted_at is null), coalesce(to_char(u.last_sign_in_at, '''YYYY-MM-DD HH24:MI:SS'''), '''never''') from auth.users u where lower(u.email)=lower('''joilsonmarinho43@gmail.com''');"'
+          ssh -o StrictHostKeyChecking=no -i /tmp/nexus_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" \
+            'docker exec supabase-db psql -U postgres -d postgres -Atc "select lower(u.email), (u.email_confirmed_at is not null), (u.banned_until is null), (u.deleted_at is null), coalesce(to_char(u.last_sign_in_at, '''YYYY-MM-DD HH24:MI:SS'''), '''never''') from auth.users u where lower(u.email)=lower('''joilsonmarinho43@gmail.com''');"'
           rm -f /tmp/nexus_key
 
       - name: Install Playwright dependency

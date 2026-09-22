@@ -279,7 +279,17 @@ TESTE PROFUNDO: /match/:id');
               console.log('ADMIN AREA ' + route + ': PASSOU (' + page.url() + ')');
             }
 
-            const logoutButton = page.getByRole('button', { name: /SAIR/i }).first();\n            if (await logoutButton.count() > 0) {\n              await logoutButton.click();\n              await page.waitForTimeout(1500);\n              if (!page.url().includes('/auth')) throw new Error('LOGOUT DID NOT RETURN TO AUTH');\n              console.log('LOGOUT/SESSION: PASSOU');\n            } else {\n              throw new Error('LOGOUT BUTTON NOT FOUND');\n            }\n\n            console.log('\n=== RESULTADO FINAL ===');
+            const logoutButton = page.getByRole('button', { name: /SAIR/i }).first();
+            if (await logoutButton.count() > 0) {
+              await logoutButton.click();
+              await page.waitForTimeout(1500);
+              if (!page.url().includes('/auth')) throw new Error('LOGOUT DID NOT RETURN TO AUTH');
+              console.log('LOGOUT/SESSION: PASSOU');
+            } else {
+              throw new Error('LOGOUT BUTTON NOT FOUND');
+            }
+
+            console.log('\n=== RESULTADO FINAL ===');
 
             if (failures.length > 0) {
               console.log('FALHAS ENCONTRADAS:');

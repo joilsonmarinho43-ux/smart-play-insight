@@ -115,16 +115,21 @@ Deno.serve(async (req) => {
   const internal = !!SERVICE_ROLE && (authorization === SERVICE_ROLE || apiKey === SERVICE_ROLE);
 
   if (!internal) {
-    if (!authorization || !sb) {
-      return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    const { data: { user }, error: authError } = await sb.auth.getUser(authorization);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Fixture lists are public sports data. Allow cacheable fixture requests
+    // without an end-user JWT so a stale/expired browser session cannot blank
+    // the Home screen. Non-cacheable calls (stats, details) remain protected.
+    if (!cacheKey) {
+      if (!authorization || !sb) {
+        return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: { user }, error: authError } = await sb.auth.getUser(authorization);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Fresh cache hits do not consume the per-user upstream rate-limit budget.

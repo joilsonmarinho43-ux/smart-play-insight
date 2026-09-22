@@ -91,13 +91,14 @@ export async function fetchEspnFixtures(date: string): Promise<MatchData[]> {
     }
   } catch (e) {
     console.warn('[ESPN-Fixtures] proxy_exception', e);
+    throw new Error(`[ESPN-Fixtures] proxy_exception: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   // 2) Sem acesso direto: não expor ESPN ao navegador. O proxy edge é a única rota.
   // Isso evita CORS/403 e mantém o fallback previsível quando a fonte estiver indisponível.
 
   console.warn(`[ESPN-Fixtures] date=${date} sem dados em todas as rotas`);
-  return [];
+  throw new Error(`[ESPN-Fixtures] empty response for ${date}`);
 }
 
 

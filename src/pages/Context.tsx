@@ -142,7 +142,7 @@ export default function Context() {
                     <span className="text-xs opacity-70">{b.total}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="opacity-70">WR {winrate.toFixed(1)}%</span>
+                    <span className="opacity-70">WR {winrate != null ? `${winrate.toFixed(1)}%` : '—'}</span>
                     <span className="opacity-70">
                       {b.avg_time_min != null ? `${Number(b.avg_time_min).toFixed(1)}min` : ""}
                     </span>

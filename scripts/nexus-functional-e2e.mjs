@@ -10,6 +10,7 @@ const page = await context.newPage();
 page.on('pageerror', e => failures.push('PAGE ERROR: ' + e.message));
 page.on('console', m => { if (m.type() === 'error') failures.push('CONSOLE ERROR: ' + m.text()); });
 page.on('response', r => {
+  if (r.status() >= 400) console.log('HTTP ERROR RESPONSE: ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
   if (r.status() >= 500) failures.push('HTTP ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
 });
 

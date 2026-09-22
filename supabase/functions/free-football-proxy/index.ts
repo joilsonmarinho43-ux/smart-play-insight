@@ -170,6 +170,7 @@ Deno.serve(async (req) => {
     }
   }
 
+    try {
     const url = buildUrl(body.provider, body.path || '/', body.params);
     const headers: Record<string, string> = { 'Accept': 'application/json' };
     if (body.provider === 'football-data-org') {

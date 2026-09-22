@@ -95,9 +95,25 @@ async function writeCache(key: string, payload: any): Promise<void> {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const t0 = Date.now();
+  let body: ProxyBody;
+  try {
+    body = (await req.json()) as ProxyBody;
+  } catch {
+    return new Response(JSON.stringify({ error: 'invalid_body' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  if (!body?.provider) {
+    return new Response(JSON.stringify({ error: 'invalid_body' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const cacheKey = cacheKeyFor(body);
   const authorization = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() || '';
   const apiKey = req.headers.get('apikey')?.trim() || '';
   const internal = !!SERVICE_ROLE && (authorization === SERVICE_ROLE || apiKey === SERVICE_ROLE);
+
   if (!internal) {
     if (!authorization || !sb) {
       return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
@@ -109,6 +125,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'AUTH_REQUIRED' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Fresh cache hits do not consume the per-user upstream rate-limit budget.
+    // This is critical because cached fixture requests are safe to serve repeatedly.
+    if (cacheKey) {
+      const cached = await readCache(cacheKey);
+      if (cached && cached.ageMs < FRESH_TTL_MS && hasNonEmptyArray(cached.data)) {
+        return new Response(JSON.stringify({
+          ok: true, data: cached.data, provider: body.provider,
+          latency_ms: Date.now() - t0, cache: 'fresh', age_ms: cached.ageMs,
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     const { data: allowed, error: rateError } = await sb.rpc('check_rate_limit', {
@@ -131,26 +159,16 @@ Deno.serve(async (req) => {
     }
   }
 
-  try {
-    const body = (await req.json()) as ProxyBody;
-    if (!body?.provider) {
-      return new Response(JSON.stringify({ error: 'invalid_body' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+  // 1) Cache HIT fresco for internal/service-role calls.
+  if (internal && cacheKey) {
+    const cached = await readCache(cacheKey);
+    if (cached && cached.ageMs < FRESH_TTL_MS && hasNonEmptyArray(cached.data)) {
+      return new Response(JSON.stringify({
+        ok: true, data: cached.data, provider: body.provider,
+        latency_ms: Date.now() - t0, cache: 'fresh', age_ms: cached.ageMs,
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-
-    const cacheKey = cacheKeyFor(body);
-
-    // 1) Cache HIT fresco — devolve direto, sem bater no upstream
-    if (cacheKey) {
-      const cached = await readCache(cacheKey);
-      if (cached && cached.ageMs < FRESH_TTL_MS && hasNonEmptyArray(cached.data)) {
-        return new Response(JSON.stringify({
-          ok: true, data: cached.data, provider: body.provider,
-          latency_ms: Date.now() - t0, cache: 'fresh', age_ms: cached.ageMs,
-        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-    }
+  }
 
     const url = buildUrl(body.provider, body.path || '/', body.params);
     const headers: Record<string, string> = { 'Accept': 'application/json' };

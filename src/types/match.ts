@@ -90,7 +90,9 @@ export interface MarketAnalysis {
   probability: number;
   risk: string;
   category: string;
-  odd?: number;\n  /** Fair odd derived only from the model probability; not a market quote. */\n  fairOdd?: number;
+  odd?: number;
+  /** Fair odd derived only from the model probability; not a market quote. */
+  fairOdd?: number;
   /** Provenance of the price; SIGNAL requires an explicitly observed market odd. */
   oddSource?: 'OBSERVED' | 'UNKNOWN';
   probabilitySource?: ProbabilitySource;

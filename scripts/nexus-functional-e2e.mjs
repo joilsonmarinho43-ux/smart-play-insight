@@ -7,8 +7,10 @@ const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
 
-page.on('pageerror', e => failures.push('PAGE ERROR: ' + e.message));
+page.on('pageerror', e => { console.log('PAGE ERROR STACK:', e.stack || e.message); failures.push('PAGE ERROR: ' + e.message); });
 page.on('console', m => { if (m.type() === 'error') failures.push('CONSOLE ERROR: ' + m.text()); });
+const proxyBodies = new Set();
+page.on('request', req => { if (req.url().includes('/functions/v1/free-football-proxy')) { const body=req.postData()||''; if(!proxyBodies.has(body)){ proxyBodies.add(body); console.log('PROXY REQUEST:', body.slice(0,1000)); } } });
 page.on('response', r => {
   if (r.status() >= 400) console.log('HTTP ERROR RESPONSE: ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
   if (r.status() >= 500) failures.push('HTTP ' + r.status() + ' ' + r.request().method() + ' ' + r.url());

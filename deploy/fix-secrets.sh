@@ -28,8 +28,17 @@ set -a; . deploy/.env; set +a
 
 VAULT="${NEXUS33_VAULT:-/etc/nexus33/secrets.env}"
 if [ -f "$VAULT" ]; then
-  set -a; . "$VAULT"; set +a
-  echo "Cofre carregado: $VAULT"
+  # Treat the vault strictly as KEY=VALUE data, never as shell code.
+  # This also lets deploy recover automatically from malformed/pasted lines.
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ "$line" =~ ^[A-Z][A-Z0-9_]*= ]] || continue
+    key="${line%%=*}"; val="${line#*=}"
+    case "$key" in
+      SPORTSRC_API_KEY|FOOTBALL_DATA_ORG_KEY|GEMINI_API_KEY|GROQ_API_KEY|TELEGRAM_BOT_TOKEN|TELEGRAM_CHAT_ID|TELEGRAM_ADMIN_CHAT_ID|TELEGRAM_API_KEY|SMTP_ADMIN_EMAIL|SMTP_HOST|SMTP_PORT|SMTP_USER|SMTP_PASS|SMTP_SENDER_NAME)
+        printf -v "$key" '%s' "$val"; export "$key" ;;
+    esac
+  done < "$VAULT"
+  echo "Cofre carregado com parser seguro: $VAULT"
 else
   echo "ℹ Cofre $VAULT não existe — rode: bash deploy/set-secrets.sh"
 fi

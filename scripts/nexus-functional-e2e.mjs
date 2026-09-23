@@ -11,7 +11,11 @@ page.on('pageerror', e => { console.log('PAGE ERROR STACK:', e.stack || e.messag
 page.on('console', m => { if (m.type() === 'error') failures.push('CONSOLE ERROR: ' + m.text()); });
 const proxyBodies = new Set();
 page.on('request', req => { if (req.url().includes('/functions/v1/free-football-proxy')) { const body=req.postData()||''; if(!proxyBodies.has(body)){ proxyBodies.add(body); console.log('PROXY REQUEST:', body.slice(0,1000)); } } });
-page.on('response', r => {
+page.on('response', async r => {
+  if (r.url().includes('/functions/v1/football-api')) {
+    try { console.log('FOOTBALL-API RESPONSE:', r.status(), (await r.text()).slice(0,2000)); } catch {}
+  }
+
   if (r.status() >= 400) console.log('HTTP ERROR RESPONSE: ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
   if (r.status() >= 500) failures.push('HTTP ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
 });

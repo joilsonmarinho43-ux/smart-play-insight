@@ -35,9 +35,9 @@ REGRAS:
 5. Não use conhecimento interno como confirmação. A confirmação precisa vir da pesquisa web.
 6. Priorize fontes oficiais de competição/clubes e calendários reconhecidos.
 7. Não retorne resultados já encerrados como próximos. Para a Home, priorize jogos agendados e jogos em andamento.
-8. Responda SOMENTE JSON válido.
-FORMATO:
-{"matches":[{"homeTeam":"","awayTeam":"","league":"","kickoff":"ISO-8601","status":"scheduled|live","sourceName":"","sourceUrl":""}]}`;
+8. Retorne os campos estruturados pedidos abaixo. A fonte precisa ser uma URL web real consultada.
+FORMATO DE CADA ITEM:
+homeTeam, awayTeam, league, kickoff ISO-8601, status scheduled|live, sourceName, sourceUrl`;
 
 function normalize(raw:any, requestedDate:string): Candidate[] {
   const items = Array.isArray(raw?.matches) ? raw.matches : [];
@@ -113,11 +113,19 @@ Deno.serve(async(req)=>{
     const gemini=Deno.env.get('GEMINI_API_KEY')||'';
     if(!gemini)return new Response(JSON.stringify({ok:true,matches:[],status:'AI_UNAVAILABLE',reason:'GEMINI_API_KEY_MISSING'}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
     const query=`Encontre jogos de futebol REAIS e confirmados para ${date} (fuso America/Belem/Brasil). Pesquise na web agora. Liste até 20 partidas, cobrindo competições relevantes. Para cada jogo informe mandante, visitante, competição, horário de início, status e a fonte que confirma o jogo. Não inclua partidas de outra data.`;
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:SYSTEM}]},contents:[{role:'user',parts:[{text:query}]}],generationConfig:{temperature:0.05},tools:[{google_search:{}}]})});
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:SYSTEM}]},contents:[{role:'user',parts:[{text:query}]}],generationConfig:{temperature:0.05,responseMimeType:'application/json'},tools:[{google_search:{}}]})});
     if(!resp.ok)return new Response(JSON.stringify({ok:true,matches:[],status:'AI_RESEARCH_FAILED',upstreamStatus:resp.status}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
     const data=await resp.json();
-    const rawText=(data?.candidates?.[0]?.content?.parts||[]).map((p:any)=>p?.text||'').join('');
-    let parsed:any=null; try{parsed=JSON.parse(rawText.replace(/^\`\`\`json/i,'').replace(/\`\`\`$/,'').trim());}catch{}
+    const parts=data?.candidates?.[0]?.content?.parts||[];
+    const rawText=parts.map((p:any)=>p?.text||'').join('');
+    let parsed:any=null;
+    try{parsed=JSON.parse(rawText.replace(/^\`\`\`(?:json)?/i,'').replace(/\`\`\`$/,'').trim());}catch{}
+    // Search-grounded Gemini can wrap JSON in explanatory text. Recover the
+    // first JSON object without weakening evidence validation below.
+    if(!parsed){
+      const start=rawText.indexOf('{'), end=rawText.lastIndexOf('}');
+      if(start>=0&&end>start){try{parsed=JSON.parse(rawText.slice(start,end+1));}catch{}}
+    }
     const matches=normalize(parsed,date);
     const result={ok:true,status:matches.length?'AI_FIXTURES_OK':'NO_CONFIRMED_FIXTURES',matches,provider:'gemini-2.5-pro-google-search',generatedAt:new Date().toISOString()};
     await cacheSet(key,result);

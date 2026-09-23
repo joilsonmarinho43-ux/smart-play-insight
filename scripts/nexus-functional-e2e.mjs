@@ -8,7 +8,7 @@ const context = await browser.newContext({ viewport: { width: 390, height: 844 }
 const page = await context.newPage();
 
 page.on('pageerror', e => { console.log('PAGE ERROR STACK:', e.stack || e.message); failures.push('PAGE ERROR: ' + e.message); });
-page.on('console', m => { if (m.type() === 'error') failures.push('CONSOLE ERROR: ' + m.text()); });
+page.on('console', m => { console.log('BROWSER CONSOLE [' + m.type() + ']: ' + m.text()); if (m.type() === 'error') failures.push('CONSOLE ERROR: ' + m.text()); });
 const proxyBodies = new Set();
 page.on('request', req => { if (req.url().includes('/functions/v1/free-football-proxy')) { const body=req.postData()||''; if(!proxyBodies.has(body)){ proxyBodies.add(body); console.log('PROXY REQUEST:', body.slice(0,1000)); } } });
 page.on('response', async r => {
@@ -55,6 +55,10 @@ for (const route of routes) {
     const r = null;
     if ((r?.status() ?? 0) >= 500) throw new Error('HTTP ' + r.status());
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    const buttons = await page.getByRole('button').allTextContents().catch(() => []);
+    const links = await page.getByRole('link').allTextContents().catch(() => []);
+    console.log('ROUTE AUDIT:', route, JSON.stringify({url:page.url(),body:bodyText.slice(0,5000),buttons:buttons.slice(0,40),links:links.slice(0,40)}));
     console.log('ROUTE PASS:', route);
   } catch (e) {
     failures.push(route + ': ' + e.message);
@@ -119,6 +123,9 @@ for (const route of ['/admin','/quality','/diagnostics','/context']) {
     const r = null;
     if ((r?.status() ?? 0) >= 500) throw new Error('HTTP ' + r.status());
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    const buttons = await page.getByRole('button').allTextContents().catch(() => []);
+    console.log('AREA AUDIT:', route, JSON.stringify({url:page.url(),body:bodyText.slice(0,7000),buttons:buttons.slice(0,60)}));
     console.log('AREA PASS:', route);
     if (route === '/diagnostics') {
       await page.waitForTimeout(3000);

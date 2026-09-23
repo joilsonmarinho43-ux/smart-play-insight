@@ -42,101 +42,17 @@ function mapMatch(m: any, leagueMeta: any): MatchData | null {
 }
 
 export async function fetchSportsRC(date: string): Promise<MatchData[]> {
-  // 1) Cache fresco local (12h)
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + date);
-    if (raw) {
-      const { ts, data } = JSON.parse(raw);
-      if (Date.now() - ts < CACHE_TTL && Array.isArray(data) && data.length > 0) return data;
-    }
-  } catch { /* noop */ }
-
-  const returnStale = (reason: string): MatchData[] => {
-    try {
-      const raw = localStorage.getItem(STALE_PREFIX + date);
-      if (!raw) return [];
-      const { ts, data } = JSON.parse(raw);
-      if (!Array.isArray(data) || Date.now() - ts > STALE_MAX) return [];
-      console.warn(`[SportsRC] ${reason} → servindo stale (age=${Math.round((Date.now() - ts) / 60000)}min, n=${data.length})`);
-      return data.map((m: any) => ({ ...m, dataFreshness: 'STALE', dataStaleAgeMs: Date.now() - ts }));
-    } catch { return []; }
-  };
-
-  try {
-    const { data, error } = await supabase.functions.invoke('free-football-proxy', {
-      body: {
-        provider: 'sportsrc',
-        path: '/',
-        params: { type: 'matches', date },
-      },
-    });
-    if (error || !data?.ok) {
-      console.warn('[SportsRC] proxy_error', { error, body: data });
-      // Secondary edge route: football-api talks to SportsRC directly and
-      // remains useful when the unified free-football-proxy is unavailable.
-      try {
-        const fallback = await supabase.functions.invoke('football-api', { body: { date } });
-        const fallbackMatches = Array.isArray(fallback.data?.matches) ? fallback.data.matches : [];
-        const mappedFallback = fallbackMatches
-          .map((m: any) => mapMatch(m, m?.league))
-          .filter(Boolean) as MatchData[];
-        if (mappedFallback.length > 0) {
-          console.info(`[SportsRC] football-api fallback date=${date} matches=${mappedFallback.length}`);
-          return mappedFallback;
-        }
-      } catch (fallbackError) {
-        console.warn('[SportsRC] football-api fallback failed', fallbackError);
-      }
-      throw new Error(`[SportsRC] proxy_error: ${data?.error || error?.message || 'unknown'}`);
-    }
-    const payload = data.data;
-    const groups: any[] = Array.isArray(payload?.data) ? payload.data : [];
-    const matches: MatchData[] = [];
-    for (const g of groups) {
-      const league = g?.league || null;
-      const list: any[] = Array.isArray(g?.matches) ? g.matches : [];
-      for (const m of list) {
-        const mapped = mapMatch(m, league);
-        if (mapped) matches.push(mapped);
-      }
-    }
-    if (matches.length === 0) {
-      // If the proxy answered successfully but without fixtures, use the
-      // independent football-api edge route before accepting an empty day.
-      try {
-        const fallback = await supabase.functions.invoke('football-api', { body: { date } });
-        const fallbackMatches = Array.isArray(fallback.data?.matches) ? fallback.data.matches : [];
-        const mappedFallback = fallbackMatches
-          .map((m: any) => mapMatch(m, m?.league))
-          .filter(Boolean) as MatchData[];
-        if (mappedFallback.length > 0) {
-          console.info(`[SportsRC] football-api empty-response fallback date=${date} matches=${mappedFallback.length}`);
-          return mappedFallback;
-        }
-      } catch (fallbackError) {
-        console.warn('[SportsRC] football-api empty-response fallback failed', fallbackError);
-      }
-      console.info(`[SportsRC] date=${date} vazio (cache=${data.cache || 'miss'})`);
-      throw new Error(`[SportsRC] upstream_empty: ${data?.error || 'no matches'}`);
-    }
-    const servedStale = data?.served_from_stale === true || data?.cache === 'stale';
-    if (!servedStale) {
-      try {
-        const snap = JSON.stringify({ ts: Date.now(), data: matches });
-        localStorage.setItem(CACHE_PREFIX + date, snap);
-        localStorage.setItem(STALE_PREFIX + date, snap);
-      } catch { /* noop */ }
-    }
-    if (servedStale) {
-      const staleAgeMs = Number.isFinite(Number(data?.age_ms)) ? Number(data.age_ms) : undefined;
-      const tagged = matches.map(m => ({ ...m, dataFreshness: 'STALE' as const, ...(staleAgeMs != null ? { dataStaleAgeMs: staleAgeMs } : {}) }));
-      console.warn(`[SportsRC] date=${date} proxy served stale data (age=${staleAgeMs != null ? Math.round(staleAgeMs / 60000) + 'min' : 'unknown'})`);
-      return tagged;
-    }
-    console.info(`[SportsRC] date=${date} matches=${matches.length} cache=${data.cache || 'miss'} latency=${data.latency_ms}ms`);
+    const raw=localStorage.getItem(CACHE_PREFIX+date);
+    if(raw){const {ts,data}=JSON.parse(raw);if(Date.now()-ts<CACHE_TTL&&Array.isArray(data)&&data.length>0)return data;}
+  }catch{}
+  const stale=():MatchData[]=>{try{const raw=localStorage.getItem(STALE_PREFIX+date);if(!raw)return[];const {ts,data}=JSON.parse(raw);if(!Array.isArray(data)||Date.now()-ts>STALE_MAX)return[];return data;}catch{return[];}};
+  try{
+    const {data,error}=await supabase.functions.invoke('football-api',{body:{date}});
+    if(error)throw error;
+    const matches=(Array.isArray(data?.matches)?data.matches:[]).map((m:any)=>mapMatch(m,m?.league)).filter(Boolean) as MatchData[];
+    if(!matches.length)return stale();
+    try{const snap=JSON.stringify({ts:Date.now(),data:matches});localStorage.setItem(CACHE_PREFIX+date,snap);localStorage.setItem(STALE_PREFIX+date,snap);}catch{}
     return matches;
-  } catch (e) {
-    console.warn('[SportsRC] fetch_exception', e);
-    return returnStale('fetch_exception');
-  }
+  }catch(e){console.warn('[SportsRC] football-api fetch_exception',e);return stale();}
 }

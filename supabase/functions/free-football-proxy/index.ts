@@ -57,7 +57,7 @@ function cacheKeyFor(body: ProxyBody): string | null {
     return `espn:scoreboard:${body.params.dates}`;
   }
   if (body.provider === 'thesportsdb' && (body.path || '').includes('eventsday.php') && body.params?.d) {
-    return `tsdb:eventsday:${body.params.d}`;
+    return `tsdb:eventsday:${body.params.d}:${body.params.s || 'all'}`;
   }
   if (body.provider === 'thesportsdb' && (body.path || '').includes('eventsnextleague.php') && body.params?.id) {
     return `tsdb:nextleague:${body.params.id}`;

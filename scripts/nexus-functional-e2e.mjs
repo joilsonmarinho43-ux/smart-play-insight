@@ -17,6 +17,8 @@ page.on('response', async r => {
   }
 
   if (r.status() >= 400) console.log('HTTP ERROR RESPONSE: ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
+  // During login/bootstrap a request can race the auth-session hydration and
+  // legitimately receive 401. Treat only post-login server failures as fatal.
   if (r.status() >= 500) failures.push('HTTP ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
 });
 
@@ -34,6 +36,11 @@ const spaNavigate = async (path) => { await page.evaluate((p) => { window.histor
 
 console.log('LOGIN URL:', page.url());
 if (page.url().includes('/auth')) failures.push('LOGIN FAILED');
+else {
+  // Reload after auth is hydrated so provider requests carry the fresh JWT.
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(1800);
+}
 
 const routes = ['/', '/live', '/scanner', '/favorites', '/suggestions', '/bingo', '/elite', '/placar-exato', '/bet-analyzer'];
 for (const route of routes) {

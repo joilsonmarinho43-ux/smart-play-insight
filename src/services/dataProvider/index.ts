@@ -57,6 +57,14 @@ export async function getMatchesByDate(date:string):Promise<MatchData[]>{
   }
   return[];
 }
-export async function getMatchesForDays(dates:string[]){const results=await Promise.allSettled(dates.map(d=>getMatchesByDate(d)));const all:MatchData[]=[];for(const r of results)if(r.status==='fulfilled')all.push(...r.value);return dedupe(all);}
+export async function getMatchesForDays(dates:string[]){
+  const all:MatchData[]=[];
+  // Keep upstream load bounded: the public edge proxy is shared and can
+  // otherwise receive a burst of 6 dates × multiple fallback providers.
+  for(const date of dates){
+    try{ all.push(...await getMatchesByDate(date)); }catch{}
+  }
+  return dedupe(all);
+}
 export interface SourceProbe{source:string;priority:number;status:'ok'|'empty'|'error';count:number;durationMs:number;error?:string;sample?:MatchData[];}
 export async function probeAllSources(date:string){const out:SourceProbe[]=[];for(const src of sources){const t=performance.now();try{if(src.isAvailable&&!(await src.isAvailable())){out.push({source:src.name,priority:src.priority,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:'unavailable'});continue;}const arr=await src.fetchByDate(date);const list=Array.isArray(arr)?arr:[];out.push({source:src.name,priority:src.priority,status:list.length?'ok':'empty',count:list.length,durationMs:Math.round(performance.now()-t),sample:list.slice(0,5)});}catch(err:any){out.push({source:src.name,priority:src.priority,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:err?.message||String(err)});}}return out;}

@@ -50,6 +50,8 @@ for (const route of routes) {
 }
 
 await spaNavigate('/');
+await page.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForTimeout(8000);
 let matchLink = page.getByRole('link', { name: /Detalhes completos/i }).first();
 try { await matchLink.waitFor({ state: 'visible', timeout: 12000 }); } catch {}
 if (!(await matchLink.count())) {

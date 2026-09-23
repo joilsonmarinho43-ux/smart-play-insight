@@ -15,10 +15,10 @@ const LIVE_STATUSES = new Set(['live', 'inprogress', 'in_progress', '1h', '2h', 
 function mapMatch(m: any, leagueMeta: any): MatchData | null {
   try {
     const id = String(m?.id ?? '');
-    const home = m?.teams?.home?.name || '';
-    const away = m?.teams?.away?.name || '';
+    const home = m?.homeTeam || m?.teams?.home?.name || '';
+    const away = m?.awayTeam || m?.teams?.away?.name || '';
     if (!id || !home || !away) return null;
-    const ts: number | undefined = typeof m?.timestamp === 'number' ? m.timestamp : undefined;
+    const ts: number | undefined = typeof m?.timestamp === 'number' ? m.timestamp : (typeof m?.fixture?.timestamp === 'number' ? m.fixture.timestamp : undefined);
     const iso = ts ? new Date(ts).toISOString() : new Date().toISOString();
     const status = String(m?.status || '').toLowerCase();
     const isLive = LIVE_STATUSES.has(status);
@@ -33,7 +33,9 @@ function mapMatch(m: any, leagueMeta: any): MatchData | null {
       homeLogo: m?.teams?.home?.badge || undefined,
       awayLogo: m?.teams?.away?.badge || undefined,
       isLive,
-      status: m?.status_detail || m?.status || undefined,
+      kickoff: m?.kickoff || m?.fixture?.date || iso,
+      fixture: m?.fixture || undefined,
+      status: m?.status_detail || m?.status || m?.fixture?.status?.short || undefined,
       liveScore: isLive && typeof score.home === 'number' && typeof score.away === 'number'
         ? { home: score.home, away: score.away }
         : undefined,

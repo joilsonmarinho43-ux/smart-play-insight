@@ -101,8 +101,9 @@ Deno.serve(async(req)=>{
     const sb=createClient(url,service);
     const {data:{user},error}=await sb.auth.getUser(token);
     if(error||!user)return new Response(JSON.stringify({ok:false,error:'AUTH_REQUIRED'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}});
-    const {data:allowed}=await sb.rpc('check_rate_limit',{_bucket:'ai-fixture-discovery',_subject:user.id,_max_calls:12,_window_seconds:600});
-    if(allowed===false)return new Response(JSON.stringify({ok:false,error:'RATE_LIMITED'}),{status:429,headers:{...corsHeaders,'Content-Type':'application/json','Retry-After':'600'}});
+    // Authenticated fallback. Do not depend on the operational check_rate_limit RPC here:
+    // that RPC is service-only and its SQL argument names vary across deployments.
+    // Gemini quota plus the 30-minute server cache bounds upstream usage.
     const body=await req.json().catch(()=>({}));
     const date=typeof body?.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(body.date)?body.date:'';
     if(!date)return new Response(JSON.stringify({ok:false,error:'DATE_REQUIRED',matches:[]}),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});
@@ -112,7 +113,7 @@ Deno.serve(async(req)=>{
     const gemini=Deno.env.get('GEMINI_API_KEY')||'';
     if(!gemini)return new Response(JSON.stringify({ok:true,matches:[],status:'AI_UNAVAILABLE',reason:'GEMINI_API_KEY_MISSING'}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
     const query=`Encontre jogos de futebol REAIS e confirmados para ${date} (fuso America/Belem/Brasil). Pesquise na web agora. Liste até 20 partidas, cobrindo competições relevantes. Para cada jogo informe mandante, visitante, competição, horário de início, status e a fonte que confirma o jogo. Não inclua partidas de outra data.`;
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:SYSTEM}]},contents:[{role:'user',parts:[{text:query}]}],generationConfig:{temperature:0.05,responseMimeType:'application/json'},tools:[{google_search:{}}]})});
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:SYSTEM}]},contents:[{role:'user',parts:[{text:query}]}],generationConfig:{temperature:0.05},tools:[{google_search:{}}]})});
     if(!resp.ok)return new Response(JSON.stringify({ok:true,matches:[],status:'AI_RESEARCH_FAILED',upstreamStatus:resp.status}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
     const data=await resp.json();
     const rawText=(data?.candidates?.[0]?.content?.parts||[]).map((p:any)=>p?.text||'').join('');

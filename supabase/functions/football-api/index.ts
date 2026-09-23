@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     const { data: allowed, error: rateError } = await authClient.rpc("check_rate_limit", {
       _bucket: "football-api",
       _subject: user.id,
-      _max_calls: 30,
+      _max_calls: 300,
       _window_seconds: 60,
     });
     if (rateError) return new Response(JSON.stringify({ ok: false, error: "RATE_LIMIT_UNAVAILABLE" }), { status: 503, headers: cors });

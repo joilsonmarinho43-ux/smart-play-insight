@@ -111,7 +111,7 @@ registerSource({
         } catch { /* noop */ }
       }
       return matches;
-    } catch {
+    } catch (e) {
       throw new Error(`[TheSportsDB] proxy_exception: ${e instanceof Error ? e.message : String(e)}`);
     }
   },

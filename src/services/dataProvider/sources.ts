@@ -12,6 +12,7 @@ import { fetchFootballDataOrg } from './sources/footballDataOrg';
 import { fetchSportsRC } from './sources/sportsrc';
 import { fetchEspnFixtures } from './sources/espnFixtures';
 import { fetchWorldCupFallback } from './sources/worldCupFallback';
+import { fetchAiFixtures } from './sources/aiFixtures';
 
 
 // =====================================================================
@@ -131,6 +132,17 @@ registerSource({
   },
 });
 
+
+// =====================================================================
+// FONTE 6: IA WEB — último recurso para descoberta de partidas reais.
+// Só é consultada depois que todas as fontes estruturadas retornam vazio.
+// Gemini usa Google Search e cada partida exige fonte/URL observável.
+// =====================================================================
+registerSource({
+  name: 'ai-web-research',
+  priority: 6,
+  fetchByDate: async (date: string): Promise<MatchData[]> => fetchAiFixtures(date),
+});
 
 // FONTE 99 (CACHE EXPIRADO — ATIVA): rede de segurança final.
 // =====================================================================

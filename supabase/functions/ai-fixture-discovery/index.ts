@@ -2,8 +2,6 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
-const MAX_DAYS = 6;
-
 type Candidate = {
   id: string;
   providerFixtureId?: string;
@@ -14,7 +12,7 @@ type Candidate = {
   awayTeam: string;
   homeLogo?: string;
   awayLogo?: string;
-  isLive: false;
+  isLive: boolean;
   status: string;
   __source: string;
   aiEvidence: {
@@ -96,7 +94,7 @@ async function cacheSet(key:string,value:any){
 Deno.serve(async(req)=>{
   if(req.method==='OPTIONS')return new Response(null,{headers:corsHeaders});
   try {
-    const token=req.headers.get('authorization')?.replace(/^Bearer\\s+/i,'').trim()||'';
+    const token=req.headers.get('authorization')?.replace(/^Bearer\s+/i,'').trim()||'';
     const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'';
     const url=Deno.env.get('SUPABASE_URL')||'';
     if(!token)return new Response(JSON.stringify({ok:false,error:'AUTH_REQUIRED'}),{status:401,headers:{...corsHeaders,'Content-Type':'application/json'}});
@@ -106,7 +104,7 @@ Deno.serve(async(req)=>{
     const {data:allowed}=await sb.rpc('check_rate_limit',{_bucket:'ai-fixture-discovery',_subject:user.id,_max_calls:12,_window_seconds:600});
     if(allowed===false)return new Response(JSON.stringify({ok:false,error:'RATE_LIMITED'}),{status:429,headers:{...corsHeaders,'Content-Type':'application/json','Retry-After':'600'}});
     const body=await req.json().catch(()=>({}));
-    const date=typeof body?.date==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(body.date)?body.date:'';
+    const date=typeof body?.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(body.date)?body.date:'';
     if(!date)return new Response(JSON.stringify({ok:false,error:'DATE_REQUIRED',matches:[]}),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});
     const key=`ai-fixtures:v1:${date}`;
     const cached=await cacheGet(key);

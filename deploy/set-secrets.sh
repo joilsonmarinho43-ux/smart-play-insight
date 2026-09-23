@@ -6,7 +6,7 @@ REQUIRED=(SPORTSRC_API_KEY FOOTBALL_DATA_ORG_KEY GEMINI_API_KEY GROQ_API_KEY TEL
 OPTIONAL=(TELEGRAM_ADMIN_CHAT_ID TELEGRAM_API_KEY SMTP_ADMIN_EMAIL SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME)
 declare -A WHY=([SPORTSRC_API_KEY]='jogos ao vivo e pré-jogo' [FOOTBALL_DATA_ORG_KEY]='fallback futebol' [GEMINI_API_KEY]='pesquisa e auditoria IA' [GROQ_API_KEY]='auditoria IA' [TELEGRAM_BOT_TOKEN]='envio Telegram' [TELEGRAM_CHAT_ID]='canal Telegram' [TELEGRAM_ADMIN_CHAT_ID]='alertas admin' [TELEGRAM_API_KEY]='espelho do BOT_TOKEN')
 mkdir -p "$VAULT_DIR";touch "$VAULT";chmod 600 "$VAULT"
-current(){ grep -E "^$1=" "$VAULT" 2>/dev/null|head -1|cut -d= -f2-; }
+current(){ { grep -E "^$1=" "$VAULT" 2>/dev/null || true; } | head -1 | cut -d= -f2-; }
 setv(){ local k="$1" v="$2" tmp;tmp="$(mktemp)";grep -vE "^${k}=" "$VAULT">"$tmp" 2>/dev/null||true;printf '%s=%s\n' "$k" "$v">>"$tmp";mv "$tmp" "$VAULT";chmod 600 "$VAULT"; }
 if [ "${1:-}" = "--smtp-only" ]; then
   for K in SMTP_ADMIN_EMAIL SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME; do

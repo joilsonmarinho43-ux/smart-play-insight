@@ -86,13 +86,6 @@ export default function Index() {
 
   const matches = useMemo(() => ((data || []) as MatchData[]).filter(isUpcoming), [data]);
 
-  useEffect(() => {
-    if (!matches.length) return;
-    const current = days[selectedDay]?.date;
-    if (current && matches.some(m => getMatchDate(m) === current)) return;
-    const firstAvailable = days.findIndex(day => matches.some(m => getMatchDate(m) === day.date));
-    if (firstAvailable >= 0) setSelectedDay(firstAvailable);
-  }, [matches, days, selectedDay]);
   const days = useMemo(() => {
     const base = new Date(`${todayKey}T12:00:00-03:00`);
     return Array.from({ length: 6 }, (_, i) => {
@@ -104,6 +97,15 @@ export default function Index() {
     });
   }, [todayKey]);
 
+
+
+  useEffect(() => {
+    if (!matches.length) return;
+    const current = days[selectedDay]?.date;
+    if (current && matches.some(m => getMatchDate(m) === current)) return;
+    const firstAvailable = days.findIndex(day => matches.some(m => getMatchDate(m) === day.date));
+    if (firstAvailable >= 0) setSelectedDay(firstAvailable);
+  }, [matches, days, selectedDay]);
   const dayMatches = useMemo(() => {
     const selected = days[selectedDay]?.date;
     return selected ? matches.filter(m => getMatchDate(m) === selected) : matches;

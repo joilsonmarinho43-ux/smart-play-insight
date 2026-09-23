@@ -15,6 +15,12 @@ page.on('response', async r => {
   if (r.url().includes('/functions/v1/football-api')) {
     try { console.log('FOOTBALL-API RESPONSE:', r.status(), (await r.text()).slice(0,2000)); } catch {}
   }
+  if (r.url().includes('/functions/v1/ai-fixture-discovery')) {
+    try { console.log('AI-FIXTURE RESPONSE:', r.status(), (await r.text()).slice(0,4000)); } catch {}
+  }
+  if (r.url().includes('/functions/v1/free-football-proxy')) {
+    try { console.log('PROXY RESPONSE:', r.status(), (await r.text()).slice(0,2000)); } catch {}
+  }
 
   if (r.status() >= 400) console.log('HTTP ERROR RESPONSE: ' + r.status() + ' ' + r.request().method() + ' ' + r.url());
   // During login/bootstrap a request can race the auth-session hydration and

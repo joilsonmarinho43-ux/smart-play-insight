@@ -177,6 +177,26 @@ for s in d.get('sources', []):
     print(f"  {mark} {s['source']}: status={s.get('status')} matches={s.get('matches')} {s.get('error','')}")
 PY
 
+sec "5.1 Proxy público de fixtures"
+if [ -n "$SERVICE_KEY" ]; then
+  curl -sS -X POST "$FN/free-football-proxy" -H "Authorization: Bearer $SERVICE_KEY" -H "apikey: $SERVICE_KEY" -H 'Content-Type: application/json' \
+    -d '{"provider":"thesportsdb","path":"/eventsday.php","params":{"d":"2026-09-22","s":"Soccer"}}' -o /tmp/nx_proxy.json -w "HTTP=%{http_code}\n" || true
+  python3 - <<'PY' || true
+import json
+try:
+    d=json.load(open('/tmp/nx_proxy.json'))
+    print("PROXY_OK=", d.get("ok"), "PROVIDER=", d.get("provider"), "ERROR=", d.get("error"), "STATUS=", d.get("status"))
+    data=d.get("data")
+    if isinstance(data,dict):
+        print("PROXY_EVENTS=", len(data.get("events") or []))
+except Exception as e:
+    print("PROXY_PARSE_ERROR=", e)
+    print(open('/tmp/nx_proxy.json').read()[:1000] if __import__('os').path.exists('/tmp/nx_proxy.json') else 'no response')
+PY
+else
+  warn "proxy fixture probe skipped: service key absent"
+fi
+
 sec "5. Jogos do dia (fluxo real do app)"
 TODAY=$(date -u +%F)
 if [ -n "$SERVICE_KEY" ]; then

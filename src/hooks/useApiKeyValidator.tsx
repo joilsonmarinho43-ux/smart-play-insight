@@ -24,8 +24,8 @@ export function useApiKeyValidator() {
     const validate = async () => {
       try {
         // Health-check do provider primário (SportsRC v2)
-        const { data, error } = await supabase.functions.invoke('free-football-proxy', {
-          body: { provider: 'sportsrc', path: '/', params: { type: 'account' } },
+        const { data, error } = await supabase.functions.invoke('football-api', {
+          body: { diag: true },
         });
 
         if (error) {

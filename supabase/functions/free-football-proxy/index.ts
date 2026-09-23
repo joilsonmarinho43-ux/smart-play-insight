@@ -50,11 +50,20 @@ function cacheKeyFor(body: ProxyBody): string | null {
   if (body.provider === 'football-data-org' && body.params?.dateFrom && body.params?.dateTo) {
     return `fdo:matches:${body.params.dateFrom}:${body.params.dateTo}`;
   }
+  if (body.provider === 'football-data-org' && (body.path || '').includes('/v4/competitions/') && body.params?.dateFrom && body.params?.dateTo) {
+    return `fdo:competition:${body.path}:${body.params.dateFrom}:${body.params.dateTo}`;
+  }
   if (body.provider === 'espn' && body.params?.dates) {
     return `espn:scoreboard:${body.params.dates}`;
   }
   if (body.provider === 'thesportsdb' && (body.path || '').includes('eventsday.php') && body.params?.d) {
     return `tsdb:eventsday:${body.params.d}`;
+  }
+  if (body.provider === 'thesportsdb' && (body.path || '').includes('eventsnextleague.php') && body.params?.id) {
+    return `tsdb:nextleague:${body.params.id}`;
+  }
+  if (body.provider === 'thesportsdb' && (body.path || '').includes('eventspastleague.php') && body.params?.id) {
+    return `tsdb:pastleague:${body.params.id}`;
   }
   return null;
 }

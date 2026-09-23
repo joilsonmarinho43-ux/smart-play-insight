@@ -17,7 +17,46 @@ function pushLog(e:ProviderLog){try{const raw=localStorage.getItem(LOG_KEY);cons
 export function getProviderLog(){try{const raw=localStorage.getItem(LOG_KEY);return raw?JSON.parse(raw):[];}catch{return[];}}
 function tagSource(m:MatchData,s:MatchSource):MatchData{return{...(m as any),dataSource:s.name,__source:s.name,dataFreshness:(m as any).dataFreshness||(m as any).__dataFreshness||'FRESH',dataStaleAgeMs:(m as any).dataStaleAgeMs??(m as any).__staleAgeMs} as MatchData;}
 function dedupe(matches:MatchData[]){const seen=new Set<string>();const out:MatchData[]=[];for(const m of matches){const h=(m as any).teams?.home?.name||(m as any).homeTeam||'';const a=(m as any).teams?.away?.name||(m as any).awayTeam||'';const d=(m as any).fixture?.date||(m as any).date||(m as any).time||'';const id=(m as any).id||(m as any).fixture?.id;const k=h&&a?matchSignature(h,a,d):`id:${id}`;if(seen.has(k))continue;seen.add(k);out.push(m);}return out;}
-export async function getMatchesByDate(date:string):Promise<MatchData[]>{const live=sources.filter(s=>s.priority<90),last=sources.filter(s=>s.priority>=90),merged:MatchData[]=[];for(const src of live){const t=performance.now();try{if(src.isAvailable&&!(await src.isAvailable())){pushLog({ts:Date.now(),date,source:src.name,status:'empty',count:0,durationMs:Math.round(performance.now()-t),error:'unavailable'});continue;}const result=await src.fetchByDate(date);const arr=Array.isArray(result)?result:[];const durationMs=Math.round(performance.now()-t);const tagged=arr.map(m=>tagSource(m,src));if(tagged.length){pushLog({ts:Date.now(),date,source:src.name,status:'ok',count:tagged.length,durationMs});merged.push(...tagged);}else pushLog({ts:Date.now(),date,source:src.name,status:'empty',count:0,durationMs});}catch(err:any){pushLog({ts:Date.now(),date,source:src.name,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:err?.message||String(err)});}}if(merged.length)return dedupe(merged);for(const src of last){const t=performance.now();try{const arr=await src.fetchByDate(date);if(Array.isArray(arr)&&arr.length){const tagged=arr.map(m=>tagSource(m,src));pushLog({ts:Date.now(),date,source:src.name,status:'ok',count:tagged.length,durationMs:Math.round(performance.now()-t)});return dedupe(tagged);}}catch(err:any){pushLog({ts:Date.now(),date,source:src.name,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:err?.message||String(err)});}}return[];}
+export async function getMatchesByDate(date:string):Promise<MatchData[]>{
+  const live=sources.filter(s=>s.priority<90),last=sources.filter(s=>s.priority>=90);
+  // Primary-first fallback: do not fan out every provider for every date.
+  // This prevents concurrent edge requests/rate limits and preserves the
+  // documented priority order. Fallbacks are consulted only when needed.
+  for(const src of live){
+    const t=performance.now();
+    try{
+      if(src.isAvailable&&!(await src.isAvailable())){
+        pushLog({ts:Date.now(),date,source:src.name,status:'empty',count:0,durationMs:Math.round(performance.now()-t),error:'unavailable'});
+        continue;
+      }
+      const result=await src.fetchByDate(date);
+      const arr=Array.isArray(result)?result:[];
+      const durationMs=Math.round(performance.now()-t);
+      const tagged=arr.map(m=>tagSource(m,src));
+      if(tagged.length){
+        pushLog({ts:Date.now(),date,source:src.name,status:'ok',count:tagged.length,durationMs});
+        return dedupe(tagged);
+      }
+      pushLog({ts:Date.now(),date,source:src.name,status:'empty',count:0,durationMs});
+    }catch(err:any){
+      pushLog({ts:Date.now(),date,source:src.name,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:err?.message||String(err)});
+    }
+  }
+  for(const src of last){
+    const t=performance.now();
+    try{
+      const arr=await src.fetchByDate(date);
+      if(Array.isArray(arr)&&arr.length){
+        const tagged=arr.map(m=>tagSource(m,src));
+        pushLog({ts:Date.now(),date,source:src.name,status:'ok',count:tagged.length,durationMs:Math.round(performance.now()-t)});
+        return dedupe(tagged);
+      }
+    }catch(err:any){
+      pushLog({ts:Date.now(),date,source:src.name,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:err?.message||String(err)});
+    }
+  }
+  return[];
+}
 export async function getMatchesForDays(dates:string[]){const results=await Promise.allSettled(dates.map(d=>getMatchesByDate(d)));const all:MatchData[]=[];for(const r of results)if(r.status==='fulfilled')all.push(...r.value);return dedupe(all);}
 export interface SourceProbe{source:string;priority:number;status:'ok'|'empty'|'error';count:number;durationMs:number;error?:string;sample?:MatchData[];}
 export async function probeAllSources(date:string){const out:SourceProbe[]=[];for(const src of sources){const t=performance.now();try{if(src.isAvailable&&!(await src.isAvailable())){out.push({source:src.name,priority:src.priority,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:'unavailable'});continue;}const arr=await src.fetchByDate(date);const list=Array.isArray(arr)?arr:[];out.push({source:src.name,priority:src.priority,status:list.length?'ok':'empty',count:list.length,durationMs:Math.round(performance.now()-t),sample:list.slice(0,5)});}catch(err:any){out.push({source:src.name,priority:src.priority,status:'error',count:0,durationMs:Math.round(performance.now()-t),error:err?.message||String(err)});}}return out;}

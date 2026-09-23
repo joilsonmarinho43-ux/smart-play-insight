@@ -36,9 +36,11 @@ export async function fetchAiFixtures(date:string):Promise<MatchData[]>{
   }catch{}
   try{
     const {data,error}=await supabase.functions.invoke('ai-fixture-discovery',{body:{date}});
-    if(error||!data?.ok)return [];
+    if(error){console.error('[AI-Fixtures] invoke error',error.message||error);return [];}
+    if(!data?.ok){console.error('[AI-Fixtures] rejected',data?.error||data?.status||'unknown');return [];}
+    console.info('[AI-Fixtures] response',JSON.stringify({date,status:data?.status,count:Array.isArray(data?.matches)?data.matches.length:0,reason:data?.reason,upstreamStatus:data?.upstreamStatus}));
     const matches=(Array.isArray(data?.matches)?data.matches:[]).map(normalize).filter(Boolean) as MatchData[];
     if(matches.length)try{localStorage.setItem(CACHE_PREFIX+date,JSON.stringify({ts:Date.now(),data:matches}));}catch{}
     return matches;
-  }catch{return []}
+  }catch(e){console.error('[AI-Fixtures] exception',e);return []}
 }

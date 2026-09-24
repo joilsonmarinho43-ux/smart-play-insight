@@ -22,7 +22,7 @@ page.on('response', async r => {
     try {
       const data = await r.json();
       const count = Object.keys(data?.stats?.home || {}).length + Object.keys(data?.stats?.away || {}).length;
-      console.log('TEAM-STATS-RESEARCH:', JSON.stringify({ http: r.status(), status: data?.status, count, provider: data?.provider, groundingCount: data?.groundingCount }));
+      console.log('TEAM-STATS-RESEARCH:', JSON.stringify({ http: r.status(), status: data?.status, count, provider: data?.provider, groundingCount: data?.groundingCount, attempts: data?.attempts }));
       if (r.status() >= 400 || !data?.ok) failures.push('TEAM-STATS-RESEARCH HTTP ' + r.status() + ': ' + (data?.error || 'unknown'));
     } catch { failures.push('TEAM-STATS-RESEARCH invalid response'); }
   }

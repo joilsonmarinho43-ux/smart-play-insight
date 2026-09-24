@@ -67,6 +67,7 @@ jobs:
           git reset --hard origin/main
           git clean -fd -e deploy/.env -e supabase-docker/.env
           bash deploy/update.sh
+          printf 'NEXUS_DEPLOYED_SHA=%s\n' "$(git rev-parse HEAD)"
           REMOTE
 
       - name: Verify target account auth state

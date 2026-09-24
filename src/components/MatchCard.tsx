@@ -10,7 +10,7 @@ import { analyzeMarkets, exactScoreDistribution } from '@/lib/matchAnalysis';
 interface Props { match: MatchData; isPremium?: boolean; }
 type Tab = 'stats' | 'poisson' | 'ticket';
 
-const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : null; };
+const n = (v: unknown) => { if (v == null || v === '') return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
 const fmt = (v: unknown, digits = 1) => { const x = n(v); return x == null ? '—' : x.toFixed(digits); };
 
 function Badge({ match }: { match: MatchData }) {

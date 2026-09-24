@@ -22,9 +22,7 @@ async function resolveTeam(name:string){
     const items=(j?.items||[]).filter((x:any)=>x?.type==='team' || x?.team?.id);
     if(!items.length)continue;
     const target=norm(q);
-    const hit=items.find((x:any)=>norm(x?.displayName||x?.name||x?.team?.displayName||x?.team?.name||'')===target)
-      ||items.find((x:any)=>norm(x?.displayName||x?.name||x?.team?.displayName||x?.team?.name||'').includes(target))
-      ||items[0];
+    const hit=items.find((x:any)=>norm(x?.displayName||x?.name||x?.team?.displayName||x?.team?.name||'')===target);
     const id=hit?.id ?? hit?.team?.id;
     const slug=hit?.defaultLeagueSlug ?? hit?.league?.slug ?? hit?.league?.abbreviation ?? hit?.team?.defaultLeagueSlug;
     if(id&&slug){
@@ -37,7 +35,8 @@ async function resolveTeam(name:string){
   return null;
 }
 function completed(e:any){return !!e?.competitions?.[0]?.status?.type?.completed;}
-function espnNormalize(e:any,teamId:string,slug:string){if(!completed(e))return null;const cs=e?.competitions?.[0]?.competitors||[];if(cs.length<2)return null;const h=cs.find((x:any)=>x?.homeAway==='home')||cs[0];const a=cs.find((x:any)=>x?.homeAway==='away')||cs[1];const hs=Number(h?.score?.value??h?.score),as=Number(a?.score?.value??a?.score);if(!Number.isFinite(hs)||!Number.isFinite(as))return null;const isHome=String(h?.team?.id||h?.id)===String(teamId);return{eventId:String(e?.id||''),leagueSlug:slug,date:String(e?.date||'').slice(0,10),isHome,homeName:String(h?.team?.displayName||h?.team?.name||''),awayName:String(a?.team?.displayName||a?.team?.name||''),hs,as};}
+function scoreValue(value:any){return value==null||value===''?null:Number.isFinite(Number(value))?Number(value):null;}
+function espnNormalize(e:any,teamId:string,slug:string){if(!completed(e))return null;const cs=e?.competitions?.[0]?.competitors||[];if(cs.length<2)return null;const h=cs.find((x:any)=>x?.homeAway==='home')||cs[0];const a=cs.find((x:any)=>x?.homeAway==='away')||cs[1];const hs=scoreValue(h?.score?.value??h?.score),as=scoreValue(a?.score?.value??a?.score);if(hs==null||as==null)return null;const isHome=String(h?.team?.id||h?.id)===String(teamId);return{eventId:String(e?.id||''),leagueSlug:slug,date:String(e?.date||'').slice(0,10),isHome,homeName:String(h?.team?.displayName||h?.team?.name||''),awayName:String(a?.team?.displayName||a?.team?.name||''),hs,as};}
 async function espnGames(team:{id:string;slug:string}){const key=`${team.slug}|${team.id}`;const c=scheduleCache.get(key);if(c&&Date.now()-c.ts<TTL)return c.games;const year=new Date().getUTCFullYear();const queries=['',`?season=${year}&seasontype=1`,`?season=${year-1}&seasontype=1`,`?season=${year-2}&seasontype=1`];const raw:any[]=[];const seen=new Set<string>();for(const q of queries){if(raw.filter(completed).length>=10)break;const j=await get(`${ESPN}/apis/site/v2/sports/soccer/${encodeURIComponent(team.slug)}/teams/${team.id}/schedule${q}`);for(const e of j?.events||[]){const id=String(e?.id||'');if(id&&seen.has(id))continue;if(id)seen.add(id);raw.push(e);}}const games=raw.map(e=>espnNormalize(e,team.id,team.slug)).filter(Boolean);scheduleCache.set(key,{ts:Date.now(),games});return games;}
 async function tsdbGames(name:string,teamId?:string){
   const key=norm(name);
@@ -55,7 +54,7 @@ async function tsdbGames(name:string,teamId?:string){
         const j=await get(`${TSDB}/searchteams.php?t=${encodeURIComponent(q)}`);
         const teams=Array.isArray(j?.teams)?j.teams:[];
         const target=norm(q);
-        const hit=teams.find((x:any)=>norm(x?.strTeam||'')===target)||teams[0];
+        const hit=teams.find((x:any)=>norm(x?.strTeam||'')===target);
         if(hit?.idTeam){resolvedId=String(hit.idTeam);break;}
       }
       tsdbTeamCache.set(key,resolvedId);
@@ -64,8 +63,8 @@ async function tsdbGames(name:string,teamId?:string){
   if(resolvedId){
     const j=await get(`${TSDB}/eventslast.php?id=${encodeURIComponent(resolvedId)}`);
     for(const e of j?.results||j?.events||[]){
-      const hs=Number(e?.intHomeScore),as=Number(e?.intAwayScore);
-      if(!Number.isFinite(hs)||!Number.isFinite(as))continue;
+      const hs=scoreValue(e?.intHomeScore),as=scoreValue(e?.intAwayScore);
+      if(hs==null||as==null)continue;
       const isHome=String(e?.idHomeTeam)===String(resolvedId);
       out.push({date:String(e?.dateEvent||''),isHome,homeName:String(e?.strHomeTeam||''),awayName:String(e?.strAwayTeam||''),hs,as});
     }
@@ -74,8 +73,8 @@ async function tsdbGames(name:string,teamId?:string){
     for(const q of variants(name)){
       const j=await get(`${TSDB}/searchevents.php?e=${encodeURIComponent(q)}`);
       for(const e of j?.event||[]){
-        const hs=Number(e?.intHomeScore),as=Number(e?.intAwayScore);
-        if(!Number.isFinite(hs)||!Number.isFinite(as)||!/soccer|football/i.test(e?.strSport||''))continue;
+        const hs=scoreValue(e?.intHomeScore),as=scoreValue(e?.intAwayScore);
+        if(hs==null||as==null||!/soccer|football/i.test(e?.strSport||''))continue;
         const isHome=resolvedId?String(e?.idHomeTeam)===String(resolvedId):norm(e?.strHomeTeam||'')===key;
         if(resolvedId && !isHome && String(e?.idAwayTeam)!==String(resolvedId))continue;
         out.push({date:String(e?.dateEvent||''),isHome,homeName:String(e?.strHomeTeam||''),awayName:String(e?.strAwayTeam||''),hs,as});
@@ -96,10 +95,13 @@ function avg(values:number[]){return values.length?values.reduce((a,b)=>a+b,0)/v
 function summarize(games:any[],summaries:any[]=[]){const seen=new Set<string>();const sorted=games.filter(Boolean).sort((a,b)=>b.date.localeCompare(a.date)).filter(g=>{const k=`${g.date}|${norm(g.isHome?g.awayName:g.homeName)}`;if(seen.has(k))return false;seen.add(k);return true;}).slice(0,5);const gf:number[]=[],ga:number[]=[],recentResults:any[]=[];for(const g of sorted){const my=g.isHome?g.hs:g.as,opp=g.isHome?g.as:g.hs;gf.push(my);ga.push(opp);recentResults.push({result:my>opp?'W':my<opp?'L':'D',gf:my,ga:opp,opp:g.isHome?g.awayName:g.homeName,date:g.date});}const keys=['possession','xG','totalShots','shotsOnGoal','bigChances','corners','offsides','fouls','yellowCards'];const vals:any=Object.fromEntries(keys.map(k=>[k,[]]));const byEvent=new Map(summaries.map((x:any)=>[String(x?.g?.eventId),x?.stats]));for(const g of sorted){const bucket=byEvent.get(String(g.eventId))?.[g.isHome?'home':'away']||{};for(const k of keys)if(Number.isFinite(bucket[k]))vals[k].push(bucket[k]);}const n=gf.length;return{games:n,goalsForAvg:n?gf.reduce((x,y)=>x+y,0)/n:0,goalsAgainstAvg:n?ga.reduce((x,y)=>x+y,0)/n:0,recentGoalsFor:gf,recentGoalsAgainst:ga,recentResults,stats:Object.fromEntries(keys.map(k=>[k,avg(vals[k])])),statsSample:Object.fromEntries(keys.map(k=>[k,vals[k].length]))};}
 
 async function form(name:string){
+  // ESPN and TheSportsDB have unrelated team IDs. Resolve each provider
+  // independently and start the public TSDB history while ESPN is resolving.
+  const tsdbPromise=tsdbGames(name);
   const team=await resolveTeam(name);
   const [espn,tsdb]=await Promise.all([
     team?espnGames(team):Promise.resolve([]),
-    tsdbGames(name,team?.id),
+    tsdbPromise,
   ]);
   const games=[...espn,...tsdb];
   const summaries=await fetchSummaryStats(games);const result=summarize(games,summaries);

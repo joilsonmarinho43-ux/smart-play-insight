@@ -23,7 +23,10 @@ interface TeamFormResponse {
   ok: boolean;
   home: SideForm;
   away: SideForm;
+  research?: { home: Record<string, ResearchItem>; away: Record<string, ResearchItem> };
 }
+
+export interface ResearchItem { value: number; sample: number; sourceUrl: string; sourceName: string; observedAt: string }
 
 const empty: SideForm = { games: 0, goalsForAvg: 0, goalsAgainstAvg: 0, recentGoalsFor: [], recentGoalsAgainst: [], stats: {} };
 
@@ -43,7 +46,7 @@ export function useTeamForm(match: MatchData | null | undefined, active = true) 
     md?.homeXGAvg, md?.awayXGAvg,
     md?.homeTotalShotsAvg, md?.awayTotalShotsAvg,
   ];
-  const hasAdvancedStats = advancedFields.every((v) => Number.isFinite(Number(v)));
+  const hasAdvancedStats = advancedFields.every((v) => v != null && v !== '' && Number.isFinite(Number(v)));
   const alreadyHas = Boolean(
     Number(md?.homeGoalsAvg || 0) > 0 &&
     Number(md?.awayGoalsAvg || 0) > 0 &&
@@ -52,7 +55,7 @@ export function useTeamForm(match: MatchData | null | undefined, active = true) 
   );
 
   return useQuery<TeamFormResponse>({
-    queryKey: ['team-form', home, away],
+    queryKey: ['team-form', home, away, match?.league],
     enabled: active && enabled && !alreadyHas,
     staleTime: 1000 * 60 * 60 * 12, // 12h
     gcTime: 1000 * 60 * 60 * 24,
@@ -61,15 +64,26 @@ export function useTeamForm(match: MatchData | null | undefined, active = true) 
       const { data, error } = await supabase.functions.invoke('team-form', {
         body: { home, away },
       });
-      if (error || !data?.ok) return { ok: false, home: empty, away: empty } as TeamFormResponse;
-      return data as TeamFormResponse;
+      const form = error || !data?.ok ? { ok: false, home: empty, away: empty } : data as TeamFormResponse;
+      const sides = [form.home?.stats, form.away?.stats];
+      const fields = ['possession','xG','totalShots','shotsOnGoal','bigChances','corners','offsides','fouls','yellowCards'];
+      const needsResearch = fields.some(field => sides.some(side => (side as Record<string, number | null> | undefined)?.[field] == null));
+      if (!needsResearch) return form;
+      try {
+        const { data: researched, error: researchError } = await supabase.functions.invoke('team-stats-research', {
+          body: { home, away, league: match?.league, kickoff: match?.kickoff },
+        });
+        if (!researchError && researched?.ok && researched?.status === 'GROUNDED_STATS')
+          return { ...form, research: researched.stats } as TeamFormResponse;
+      } catch { /* no confirmed data: leave the fields empty */ }
+      return form;
     },
   });
 }
 
 /** Mescla o resultado de useTeamForm em uma MatchData (não muta original). */
 export function mergeFormIntoMatch(match: MatchData, form?: TeamFormResponse | null): MatchData {
-  if (!form?.ok) return match;
+  if (!form?.ok) return form?.research ? { ...match, researchStats: form.research } as MatchData : match;
   const h = form.home || empty;
   const a = form.away || empty;
   const md = match.modelData || ({} as any);
@@ -90,6 +104,7 @@ export function mergeFormIntoMatch(match: MatchData, form?: TeamFormResponse | n
   const modelQuality = historicalSample >= 5 ? 'VALID' : historicalSample >= 3 ? 'PARTIAL' : 'INSUFFICIENT';
   return {
     ...match,
+    researchStats: form.research,
     modelData: {
       ...md,
       source: md.source || 'team-form:ESPN/TSDB',

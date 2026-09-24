@@ -71,6 +71,23 @@ if (page.url().includes('/auth')) {
 await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForTimeout(1800);
 console.log('LOGIN PASS:', page.url());
+// Verify the research response independently of route navigation/cancellation.
+const loginSession = await authResponse.json();
+const researchUrl = new URL(authResponse.url());
+researchUrl.pathname = '/functions/v1/team-stats-research';
+researchUrl.search = '';
+try {
+  const result = await context.request.post(researchUrl.href, {
+    headers: { Authorization: `Bearer ${loginSession.access_token}`, apikey: authResponse.request().headers()['apikey'] || '' },
+    data: { home: 'Arsenal', away: 'Chelsea', league: 'English Premier League', kickoff: new Date().toISOString() },
+    timeout: 95000,
+  });
+  const data = await result.json();
+  const count = Object.keys(data?.stats?.home || {}).length + Object.keys(data?.stats?.away || {}).length;
+  console.log('RESEARCH DIRECT DIAGNOSTIC:', JSON.stringify({ http: result.status(), status: data?.status, count, groundingCount: data?.groundingCount, attempts: data?.attempts, stats: data?.stats }));
+  if (!result.ok() || !data?.ok) failures.push('Research direct request failed: ' + result.status());
+} catch (error) { failures.push('Research direct request: ' + error.message); }
+
 
 const routes = ['/', '/live', '/scanner', '/favorites', '/suggestions', '/bingo', '/elite', '/placar-exato', '/bet-analyzer'];
 for (const route of routes) {

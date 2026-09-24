@@ -177,10 +177,11 @@ for s in d.get('sources', []):
     print(f"  {mark} {s['source']}: status={s.get('status')} matches={s.get('matches')} {s.get('error','')}")
 PY
 
+PROBE_DATE="$(TZ=America/Belem date +%F)"
 sec "5.1 Proxy público de fixtures"
 if [ -n "$SERVICE_KEY" ]; then
   curl -sS -X POST "$FN/free-football-proxy" -H "Authorization: Bearer $SERVICE_KEY" -H "apikey: $SERVICE_KEY" -H 'Content-Type: application/json' \
-    -d '{"provider":"thesportsdb","path":"/eventsday.php","params":{"d":"2026-09-22","s":"Soccer"}}' -o /tmp/nx_proxy.json -w "HTTP=%{http_code}\n" || true
+    -d "{\"provider\":\"thesportsdb\",\"path\":\"/eventsday.php\",\"params\":{\"d\":\"$PROBE_DATE\",\"s\":\"Soccer\"}}" -o /tmp/nx_proxy.json -w "HTTP=%{http_code}\n" || true
   python3 - <<'PY' || true
 import json
 try:
@@ -198,7 +199,7 @@ else
 fi
 
 sec "5. Jogos do dia (fluxo real do app)"
-TODAY=$(date -u +%F)
+TODAY="$PROBE_DATE"
 if [ -n "$SERVICE_KEY" ]; then
   curl -s -X POST "$FN/football-api" -H "Authorization: Bearer $SERVICE_KEY" -H "apikey: $SERVICE_KEY" \
        -H 'Content-Type: application/json' -d "{\"date\":\"$TODAY\"}" -o /tmp/nx_day.json

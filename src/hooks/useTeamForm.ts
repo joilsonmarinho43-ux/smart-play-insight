@@ -17,6 +17,8 @@ interface SideForm {
     shotsOnGoal?: number | null; bigChances?: number | null; corners?: number | null;
     offsides?: number | null; fouls?: number | null; yellowCards?: number | null;
   };
+  statsSample?: Record<string, number>;
+  statsSources?: Record<string, string[]>;
 }
 
 interface TeamFormResponse {
@@ -105,6 +107,7 @@ export function mergeFormIntoMatch(match: MatchData, form?: TeamFormResponse | n
   return {
     ...match,
     researchStats: form.research,
+    historicalStats: { home: { stats: hStats, sample: h.statsSample || {}, sources: h.statsSources || {} }, away: { stats: aStats, sample: a.statsSample || {}, sources: a.statsSources || {} } },
     modelData: {
       ...md,
       source: md.source || 'team-form:ESPN/TSDB',

@@ -52,6 +52,7 @@ export interface MatchData {
   metrics?: MatchMetrics;
   modelData?: ModelData;
   sampleSize?: SampleSize;
+  historicalStats?: Record<'home' | 'away', { stats: Record<string, number | null | undefined>; sample: Record<string, number>; sources: Record<string, string[]> }>;
   predictions?: {
     homeWin: string;
     draw: string;

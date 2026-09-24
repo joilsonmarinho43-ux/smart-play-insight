@@ -26,6 +26,15 @@ page.on('response', async r => {
       if (r.status() >= 400 || !data?.ok) failures.push('TEAM-STATS-RESEARCH HTTP ' + r.status() + ': ' + (data?.error || 'unknown'));
     } catch { failures.push('TEAM-STATS-RESEARCH invalid response'); }
   }
+  if (r.url().includes('/functions/v1/team-form')) {
+    try {
+      const data = await r.json();
+      const sides = data?.matches?.flatMap(m => [m.home, m.away]) || [data?.home, data?.away];
+      const verified = sides.filter(Boolean).flatMap(side => Object.entries(side.statsSample || {}).filter(([,n]) => n > 0).map(([field,n]) => ({ field, sample: n, sources: side.statsSources?.[field]?.length || 0 })));
+      console.log('TEAM-FORM VERIFIED STATS:', JSON.stringify({ count: verified.length, examples: verified.slice(0, 12) }));
+      if (verified.some(x => x.sources !== x.sample)) failures.push('TEAM-FORM: statistic without matching source URLs');
+    } catch { failures.push('TEAM-FORM invalid response'); }
+  }
   if (r.url().includes('/functions/v1/free-football-proxy')) {
     try { console.log('PROXY RESPONSE:', r.status(), (await r.text()).slice(0,2000)); } catch {}
   }

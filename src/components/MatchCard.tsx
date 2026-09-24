@@ -38,6 +38,7 @@ function StatRow({ label, home, away, suffix = '', pillHome = true }: { label: s
 function Stats({ match }: { match: MatchData }) {
   const hs:any=(match as any).homeStats||{}, as:any=(match as any).awayStats||{}, metrics:any=(match as any).metrics||{};
   const research:any=(match as any).researchStats||{};
+  const history:any=(match as any).historicalStats||{};
   const home=(key:string, metricKey?:string)=>metrics?.[metricKey||key]?.[0] ?? hs?.[key] ?? research?.home?.[key]?.value ?? null;
   const away=(key:string, metricKey?:string)=>metrics?.[metricKey||key]?.[1] ?? as?.[key] ?? research?.away?.[key]?.value ?? null;
   const rows=[
@@ -63,6 +64,10 @@ function Stats({ match }: { match: MatchData }) {
     </div>
     {available.map(([label,h,a,suffix],i)=><StatRow key={String(label)} label={String(label)} home={h} away={a} suffix={String(suffix||'')} />)}
     {!available.length && <p className="py-5 text-center text-xs text-gray-500">Aguardando histórico estatístico das equipes.</p>}
+    {Object.keys(history.home?.sample||{}).some(k=>history.home.sample[k]>0)||Object.keys(history.away?.sample||{}).some(k=>history.away.sample[k]>0) ? <div className="mt-3 border-t border-gray-200/10 pt-2">
+      <p className="mb-1 text-center text-[10px] font-bold uppercase text-gray-500">Médias dos últimos jogos · amostra por métrica</p>
+      {([['Posse','possession','%'],['xG','xG',''],['Finalizações','totalShots',''],['No alvo','shotsOnGoal',''],['Grandes chances','bigChances',''],['Escanteios','corners',''],['Impedimentos','offsides',''],['Faltas','fouls',''],['Cartões amarelos','yellowCards','']] as const).filter(([,k])=>history.home?.sample?.[k]>0||history.away?.sample?.[k]>0).map(([label,k,suffix])=><div key={k}><StatRow label={label} home={history.home?.sample?.[k]>0?history.home.stats[k]:null} away={history.away?.sample?.[k]>0?history.away.stats[k]:null} suffix={suffix}/><div className="text-center text-[9px] text-gray-500">Amostra {history.home?.sample?.[k]||0}/{history.away?.sample?.[k]||0} · {(['home','away'] as const).flatMap(side=>(history[side]?.sources?.[k]||[]).slice(0,5).map((url:string,i:number)=><a key={`${side}-${k}-${i}`} href={url} target="_blank" rel="noopener noreferrer" className="ml-1 underline">{side==='home'?'Casa':'Fora'} {i+1}</a>))}</div></div>)}
+    </div> : null}
     {Object.keys(research.home||{}).length + Object.keys(research.away||{}).length > 0 && <div className="border-t border-gray-200/10 pt-2 text-[10px] text-gray-500">Pesquisa web por IA · médias apenas de dados citados. Amostra e fonte: {(['home','away'] as const).flatMap(side => Object.entries(research[side]||{}).map(([field,item]:[string,any]) => <a key={`${side}-${field}`} className="ml-2 underline" href={item.sourceUrl} target="_blank" rel="noopener noreferrer">{side==='home'?match.homeTeam:match.awayTeam} {field} ({item.sample})</a>))}</div>}
   </div>;
 }

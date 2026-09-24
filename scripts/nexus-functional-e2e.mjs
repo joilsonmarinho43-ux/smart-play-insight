@@ -84,7 +84,7 @@ try {
   });
   const data = await result.json();
   const count = Object.keys(data?.stats?.home || {}).length + Object.keys(data?.stats?.away || {}).length;
-  console.log('RESEARCH DIRECT DIAGNOSTIC:', JSON.stringify({ http: result.status(), status: data?.status, count, groundingCount: data?.groundingCount, attempts: data?.attempts, stats: data?.stats }));
+  console.log('RESEARCH DIRECT DIAGNOSTIC:', JSON.stringify({ http: result.status(), independentSearchConfigured: data?.independentSearchConfigured, status: data?.status, count, groundingCount: data?.groundingCount, attempts: data?.attempts, stats: data?.stats }));
   if (!result.ok() || !data?.ok) failures.push('Research direct request failed: ' + result.status());
 } catch (error) { failures.push('Research direct request: ' + error.message); }
 

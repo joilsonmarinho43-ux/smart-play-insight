@@ -32,6 +32,7 @@ function extract(raw: any, grounded: Set<string>, now: string) {
 
 async function research(home: string, away: string, league: string, kickoff: string) {
   const prompt = `Pesquise na web os últimos até 5 jogos CONCLUÍDOS de ${home} e ${away}, da partida ${home} x ${away}, ${league}, início ${kickoff}. Para cada equipe, retorne somente médias aritméticas de estatísticas publicadas explicitamente nas páginas consultadas: possession (%), xG, totalShots, shotsOnGoal, bigChances, corners, offsides, fouls, yellowCards. Cada campo deve ser {"value":número,"sample":quantidade de jogos medidos,"sourceUrl":"URL HTTPS exata da fonte"}. Se um campo não tiver valores observados, use null. Não deduza de placares, não estime e não invente. Responda JSON {"home":{...},"away":{...}}.`;
+  const attempts: string[] = [];
   for (const model of ['gemini-2.5-pro', 'gemini-2.5-flash']) {
     try {
       const controller = new AbortController();
@@ -43,21 +44,21 @@ async function research(home: string, away: string, league: string, kickoff: str
           body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0 } }),
         });
       } finally { clearTimeout(timer); }
-      if (!response.ok) { if (response.status === 404 || response.status === 400) continue; break; }
+      if (!response.ok) { attempts.push(`${model}:HTTP_${response.status}`); continue; }
       const data = await response.json();
       const candidate = data?.candidates?.[0];
       const grounded = new Set<string>((candidate?.groundingMetadata?.groundingChunks || []).flatMap((x: any) => {
         try { return [new URL(x?.web?.uri).href]; } catch { return []; }
       }));
-      if (!grounded.size) continue;
+      if (!grounded.size) { attempts.push(`${model}:NO_GROUNDING`); continue; }
       const text = (candidate?.content?.parts || []).map((x: any) => x?.text || '').join('');
       const start = text.indexOf('{'), end = text.lastIndexOf('}');
-      if (start < 0 || end <= start) continue;
+      if (start < 0 || end <= start) { attempts.push(`${model}:NO_JSON`); continue; }
       const parsed = JSON.parse(text.slice(start, end + 1));
-      return { stats: extract(parsed, grounded, new Date().toISOString()), provider: model, groundingCount: grounded.size };
-    } catch (error) { console.warn('[team-stats-research] provider unavailable', String(error)); }
+      return { stats: extract(parsed, grounded, new Date().toISOString()), provider: model, groundingCount: grounded.size, attempts };
+    } catch (error) { attempts.push(`${model}:${error instanceof Error ? error.name : 'ERROR'}`); }
   }
-  return { stats: { home: {}, away: {} }, provider: 'unavailable', groundingCount: 0 };
+  return { stats: { home: {}, away: {} }, provider: 'unavailable', groundingCount: 0, attempts };
 }
 
 Deno.serve(async (req) => {
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
   const league = String(body.league || '').trim().slice(0, 100);
   const kickoff = String(body.kickoff || '').trim().slice(0, 35);
   if (!home || !away || home === away) return json({ ok: false, error: 'TEAMS_REQUIRED' }, 400);
-  const cacheKey = `team-stats-research:v1:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
+  const cacheKey = `team-stats-research:v2:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
   const { data: cached } = await sb.from('cache_api').select('dados_json,ultima_atualizacao').eq('cache_key', cacheKey).maybeSingle();
   if (cached && Date.now() - new Date(cached.ultima_atualizacao).getTime() < 60 * 60 * 1000) return json(cached.dados_json);
   const { data: allowed, error: rateError } = await sb.rpc('check_rate_limit', {

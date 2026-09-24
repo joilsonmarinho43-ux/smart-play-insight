@@ -18,6 +18,14 @@ page.on('response', async r => {
   if (r.url().includes('/functions/v1/ai-fixture-discovery')) {
     try { console.log('AI-FIXTURE RESPONSE:', r.status(), (await r.text()).slice(0,4000)); } catch {}
   }
+  if (r.url().includes('/functions/v1/team-stats-research')) {
+    try {
+      const data = await r.json();
+      const count = Object.keys(data?.stats?.home || {}).length + Object.keys(data?.stats?.away || {}).length;
+      console.log('TEAM-STATS-RESEARCH:', JSON.stringify({ http: r.status(), status: data?.status, count, provider: data?.provider, groundingCount: data?.groundingCount, attempts: data?.attempts }));
+      if (r.status() >= 400 || !data?.ok) failures.push('TEAM-STATS-RESEARCH HTTP ' + r.status() + ': ' + (data?.error || 'unknown'));
+    } catch { failures.push('TEAM-STATS-RESEARCH invalid response'); }
+  }
   if (r.url().includes('/functions/v1/free-football-proxy')) {
     try { console.log('PROXY RESPONSE:', r.status(), (await r.text()).slice(0,2000)); } catch {}
   }
@@ -58,6 +66,7 @@ console.log('LOGIN PASS:', page.url());
 const routes = ['/', '/live', '/scanner', '/favorites', '/suggestions', '/bingo', '/elite', '/placar-exato', '/bet-analyzer'];
 for (const route of routes) {
   try {
+    const researchResponse = route === '/' ? page.waitForResponse(r => r.url().includes('/functions/v1/team-stats-research'), { timeout: 60000 }).catch(() => null) : null;
     const r = await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 60000 });
     if (!r || r.status() >= 400) throw new Error('HTTP ' + (r?.status() ?? 'NO_RESPONSE'));
     if (route === '/') {
@@ -67,6 +76,10 @@ for (const route of routes) {
         .waitFor({ state: 'hidden', timeout: 120000 }).catch(() => {});
     } else await page.waitForTimeout(1200);
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
+    if (route === '/' && await page.getByRole('link', { name: /Detalhes completos/i }).count()) {
+      const researched = await researchResponse;
+      if (!researched) failures.push('HOME: missing-statistics research did not respond within 60s');
+    }
     const bodyText = await page.locator('body').innerText().catch(() => '');
     const buttons = await page.getByRole('button').allTextContents().catch(() => []);
     const links = await page.getByRole('link').allTextContents().catch(() => []);

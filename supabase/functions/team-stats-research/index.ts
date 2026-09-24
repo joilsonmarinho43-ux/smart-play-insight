@@ -17,7 +17,13 @@ async function requestJson(endpoint: string, payload: unknown, headers: Record<s
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
     const response = await fetch(endpoint, { method: 'POST', headers, signal: controller.signal, body: JSON.stringify(payload) });
-    if (!response.ok) throw new Error(`HTTP_${response.status}`);
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      const details = errorBody?.error?.details || [];
+      const quotaIds = details.flatMap((detail:any) => (detail.violations || []).map((v:any) => String(v.quotaId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0,120))).filter(Boolean);
+      const retryDelay = details.map((detail:any) => String(detail.retryDelay || '')).find((x:string) => /^\d+(?:\.\d+)?s$/.test(x));
+      throw new Error(`HTTP_${response.status}${quotaIds.length ? ':'+quotaIds.join(',') : ''}${retryDelay ? ':RETRY_'+retryDelay : ''}`);
+    }
     return await response.json();
   } finally { clearTimeout(timer); }
 }
@@ -51,7 +57,7 @@ async function research(home: string, away: string, league: string, kickoff: str
     let text: string;
     if (groq) {
       try {
-        const extracted = await requestJson('https://api.groq.com/openai/v1/chat/completions', { model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: instruction }], temperature: 0, response_format: { type: 'json_object' } }, { 'Content-Type': 'application/json', Authorization: `Bearer ${groq}` }, 15000);
+        const extracted = await requestJson('https://api.groq.com/openai/v1/chat/completions', { model: Deno.env.get('GROQ_EXTRACTION_MODEL') || 'qwen/qwen3.8-27b', messages: [{ role: 'user', content: instruction }], temperature: 0, response_format: { type: 'json_object' } }, { 'Content-Type': 'application/json', Authorization: `Bearer ${groq}` }, 15000);
         text = extracted?.choices?.[0]?.message?.content || '';
       } catch (error) {
         attempts.push(`groq:${error instanceof Error ? error.message : 'ERROR'}`);
@@ -107,7 +113,7 @@ Deno.serve(async (req) => {
   const league = String(body.league || '').trim().slice(0, 100);
   const kickoff = String(body.kickoff || '').trim().slice(0, 35);
   if (!home || !away || home === away) return json({ ok: false, error: 'TEAMS_REQUIRED' }, 400);
-  const cacheKey = `team-stats-research:v5:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
+  const cacheKey = `team-stats-research:v6:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
   const { data: cached } = await sb.from('cache_api').select('dados_json,ultima_atualizacao').eq('cache_key', cacheKey).maybeSingle();
   const cacheTtl = cached?.dados_json?.status === 'GROUNDED_STATS' ? 60 * 60 * 1000 : 5 * 60 * 1000;
   if (cached && Date.now() - new Date(cached.ultima_atualizacao).getTime() < cacheTtl) return json(cached.dados_json);

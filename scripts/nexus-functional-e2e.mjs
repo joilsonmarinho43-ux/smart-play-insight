@@ -60,7 +60,12 @@ for (const route of routes) {
   try {
     const r = await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 60000 });
     if (!r || r.status() >= 400) throw new Error('HTTP ' + (r?.status() ?? 'NO_RESPONSE'));
-    await page.waitForTimeout(1200);
+    if (route === '/') {
+      await page.locator('text=/Nenhum jogo para|Detalhes completos/').first()
+        .waitFor({ state: 'visible', timeout: 120000 }).catch(() => {});
+      await page.locator('button[title="Atualizar"] svg.animate-spin').first()
+        .waitFor({ state: 'hidden', timeout: 120000 }).catch(() => {});
+    } else await page.waitForTimeout(1200);
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
     const bodyText = await page.locator('body').innerText().catch(() => '');
     const buttons = await page.getByRole('button').allTextContents().catch(() => []);

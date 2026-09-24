@@ -42,7 +42,7 @@ function Stats({ match }: { match: MatchData }) {
   const home=(key:string, metricKey?:string)=>metrics?.[metricKey||key]?.[0] ?? hs?.[key] ?? research?.home?.[key]?.value ?? null;
   const away=(key:string, metricKey?:string)=>metrics?.[metricKey||key]?.[1] ?? as?.[key] ?? research?.away?.[key]?.value ?? null;
   const rows=[
-    ['Gols', home('goals','goals'), away('goals','goals')],
+    ['Média de gols marcados', n(hs?.gamesCount) && n(hs?.gamesCount)! > 0 ? hs?.goalsFor : null, n(as?.gamesCount) && n(as?.gamesCount)! > 0 ? as?.goalsFor : null],
     ['Posse de bola', home('possession','possession'), away('possession','possession'), '%'],
     ['Gols esperados (xG)', home('xG','xG'), away('xG','xG')],
     ['Finalizações Totais', home('totalShots','totalShots'), away('totalShots','totalShots')],

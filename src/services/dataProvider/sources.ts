@@ -34,7 +34,7 @@ registerSource({
 // =====================================================================
 registerSource({
   name: 'espn-fixtures',
-  priority: 2,
+  priority: 4,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     return await fetchEspnFixtures(date);
   },
@@ -86,7 +86,7 @@ function tsdbToMatch(ev: any): MatchData | null {
 
 registerSource({
   name: 'thesportsdb-public',
-  priority: 4,
+  priority: 2,
   fetchByDate: async (date: string): Promise<MatchData[]> => {
     // cache curto (6h) para evitar bater no endpoint repetidamente
     try {

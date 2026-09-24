@@ -39,7 +39,14 @@ async function research(home: string, away: string, league: string, kickoff: str
   try {
     let evidence: WebEvidence[] = [];
     if (webSearchKey) {
-      evidence = await searchWebEvidence(webSearchKey, [home, away], league, cutoff, requestJson);
+      // A falha do provedor de busca não pode impedir o fallback Gemini.
+      // Isso evita transformar chave expirada/401 em resposta final sem pesquisa.
+      try {
+        evidence = await searchWebEvidence(webSearchKey, [home, away], league, cutoff, requestJson);
+      } catch (error) {
+        attempts.push(`tavily:${error instanceof Error ? error.message : 'WEB_SEARCH_FAILED'}`);
+        evidence = [];
+      }
     } else { attempts.push('TAVILY_NOT_CONFIGURED'); }
     if (!evidence.length && key) {
       searchProvider = model;

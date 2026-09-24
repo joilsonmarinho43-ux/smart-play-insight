@@ -49,7 +49,7 @@ function normalize(raw:any, requestedDate:string): Candidate[] {
     const kickoff=String(x?.kickoff||'').trim();
     const sourceName=String(x?.sourceName||'').trim();
     const sourceUrl=String(x?.sourceUrl||'').trim();
-    if(!home||!away||!league||!kickoff||!sourceName||!/^https?:\\/\\//i.test(sourceUrl)) return [];
+    if(!home||!away||!league||!kickoff||!sourceName||!(sourceUrl.startsWith('https://')||sourceUrl.startsWith('http://'))) return [];
     const ms=Date.parse(kickoff);
     if(Number.isNaN(ms)) return [];
     const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Belem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ms));

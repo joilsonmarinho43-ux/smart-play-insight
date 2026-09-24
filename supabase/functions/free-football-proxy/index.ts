@@ -57,7 +57,7 @@ function cacheKeyFor(body: ProxyBody): string | null {
     return `espn:scoreboard:${body.params.dates}`;
   }
   if (body.provider === 'thesportsdb' && (body.path || '').includes('eventsday.php') && body.params?.d) {
-    return `tsdb:eventsday:${body.params.d}`;
+    return `tsdb:eventsday:${body.params.d}:${body.params.s || 'all'}`;
   }
   if (body.provider === 'thesportsdb' && (body.path || '').includes('eventsnextleague.php') && body.params?.id) {
     return `tsdb:nextleague:${body.params.id}`;
@@ -122,6 +122,7 @@ Deno.serve(async (req) => {
   const authorization = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() || '';
   const apiKey = req.headers.get('apikey')?.trim() || '';
   const internal = !!SERVICE_ROLE && (authorization === SERVICE_ROLE || apiKey === SERVICE_ROLE);
+  let authenticatedUserId: string | null = null;
 
   if (!internal) {
     // Fixture lists are public sports data. Allow cacheable fixture requests
@@ -139,6 +140,7 @@ Deno.serve(async (req) => {
           status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      authenticatedUserId = user.id;
     }
 
     // Fresh cache hits do not consume the per-user upstream rate-limit budget.
@@ -159,7 +161,7 @@ Deno.serve(async (req) => {
     if (!cacheKey) {
       const { data: allowed, error: rateError } = await sb.rpc('check_rate_limit', {
         _bucket: 'free-football-proxy',
-        _subject: user.id,
+        _subject: authenticatedUserId!,
         _max_calls: 1000,
         _window_seconds: 60,
       });

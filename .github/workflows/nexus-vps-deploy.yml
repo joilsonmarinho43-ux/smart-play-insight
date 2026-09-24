@@ -40,6 +40,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Parse Nexus edge functions
+        run: npx esbuild supabase/functions/{football-api,free-football-proxy,ai-fixture-discovery}/index.ts --outdir=/tmp/nexus-edge-syntax
+
       - name: Deploy through SSH
         env:
           VPS_HOST: ${{ secrets.NEXUS_VPS_HOST }}

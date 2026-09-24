@@ -120,6 +120,34 @@ async function fetchMatches(date: string): Promise<{ matches: any[]; diag: Sourc
     }
   }
 
+  // TheSportsDB provides real fixture metadata when SportsRC is rate limited
+  // and ESPN is unavailable. It does not provide advanced match statistics.
+  try {
+    const response = await fetchJson(
+      `https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d=${encodeURIComponent(date)}&s=Soccer`,
+    );
+    const events = Array.isArray(response.json?.events) ? response.json.events : [];
+    const fallback = events.flatMap((event: any) => {
+      const id = String(event?.idEvent ?? "");
+      const home = String(event?.strHomeTeam ?? "").trim();
+      const away = String(event?.strAwayTeam ?? "").trim();
+      const kickoff = event?.strTimestamp ? new Date(event.strTimestamp + (/[zZ]|[+-]\\d{2}:?\\d{2}$/.test(event.strTimestamp) ? "" : "Z")) : null;
+      if (!id || !home || !away || !kickoff || !Number.isFinite(kickoff.getTime())) return [];
+      const status = normalizeStatus(event?.strStatus || "NS");
+      const score = (value: unknown) => value == null || value === "" ? null : Number.isFinite(Number(value)) ? Number(value) : null;
+      return [{
+        id: `tsdb-${id}`, homeTeam: home, awayTeam: away,
+        fixture: { id: `tsdb-${id}`, date: kickoff.toISOString(), timestamp: Math.floor(kickoff.getTime() / 1000), status: { short: status, long: status, elapsed: null } },
+        league: { id: event?.idLeague ?? null, name: event?.strLeague || "Outros", country: event?.strCountry ?? null, logo: null },
+        teams: { home: { id: event?.idHomeTeam ?? null, name: home, logo: event?.strHomeTeamBadge ?? null }, away: { id: event?.idAwayTeam ?? null, name: away, logo: event?.strAwayTeamBadge ?? null } },
+        goals: { home: score(event?.intHomeScore), away: score(event?.intAwayScore) },
+        isLive: false, __source: "thesportsdb",
+      }];
+    });
+    if (fallback.length) return { matches: fallback, diag: { source: "thesportsdb", status: response.status, ms: response.ms, matches: fallback.length } };
+  } catch (error) {
+    console.warn("[football-api] TheSportsDB fixture fallback failed", error);
+  }
   return { matches, diag };
 }
 

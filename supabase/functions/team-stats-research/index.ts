@@ -31,7 +31,7 @@ function extract(raw: any, grounded: Set<string>, now: string) {
 }
 
 async function research(home: string, away: string, league: string, kickoff: string) {
-  const prompt = `Pesquise na web os últimos até 5 jogos CONCLUÍDOS de ${home} e ${away}, da partida ${home} x ${away}, ${league}, início ${kickoff}. Para cada equipe, retorne somente médias aritméticas de estatísticas publicadas explicitamente nas páginas consultadas: possession (%), xG, totalShots, shotsOnGoal, bigChances, corners, offsides, fouls, yellowCards. Cada campo deve ser {"value":número,"sample":quantidade de jogos medidos,"sourceUrl":"URL HTTPS exata da fonte"}. Se um campo não tiver valores observados, use null. Não deduza de placares, não estime e não invente. Responda JSON {"home":{...},"away":{...}}.`;
+  const prompt = `Pesquise agora estatísticas publicadas dos jogos concluídos mais recentes de ${home} e ${away} (${league}, próximo jogo ${kickoff}). Use no máximo 5 jogos por equipe. Retorne JSON {"home":{},"away":{}}; em cada equipe, inclua apenas campos comprovados: possession, xG, totalShots, shotsOnGoal, bigChances, corners, offsides, fouls, yellowCards. Cada campo: {"value": média numérica observada, "sample": número de jogos medidos, "sourceUrl": URL HTTPS exata consultada}. Omita campos sem números publicados. Não deduza estatísticas do placar.`;
   const attempts: string[] = [];
   for (const model of ['gemini-2.5-flash']) {
     try {
@@ -41,7 +41,7 @@ async function research(home: string, away: string, league: string, kickoff: str
       try {
         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
           method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0 } }),
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0, thinkingConfig: { thinkingBudget: 0 } } }),
         });
       } finally { clearTimeout(timer); }
       if (!response.ok) { attempts.push(`${model}:HTTP_${response.status}`); continue; }
@@ -50,7 +50,7 @@ async function research(home: string, away: string, league: string, kickoff: str
       const grounded = new Set<string>((candidate?.groundingMetadata?.groundingChunks || []).flatMap((x: any) => {
         try { return [new URL(x?.web?.uri).href]; } catch { return []; }
       }));
-      if (!grounded.size) { attempts.push(`${model}:NO_GROUNDING`); continue; }
+      if (!grounded.size) { attempts.push(`${model}:NO_GROUNDING:${candidate?.groundingMetadata?.webSearchQueries?.length || 0}_SEARCHES`); continue; }
       const text = (candidate?.content?.parts || []).map((x: any) => x?.text || '').join('');
       const start = text.indexOf('{'), end = text.lastIndexOf('}');
       if (start < 0 || end <= start) { attempts.push(`${model}:NO_JSON`); continue; }
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
   const league = String(body.league || '').trim().slice(0, 100);
   const kickoff = String(body.kickoff || '').trim().slice(0, 35);
   if (!home || !away || home === away) return json({ ok: false, error: 'TEAMS_REQUIRED' }, 400);
-  const cacheKey = `team-stats-research:v3:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
+  const cacheKey = `team-stats-research:v4:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
   const { data: cached } = await sb.from('cache_api').select('dados_json,ultima_atualizacao').eq('cache_key', cacheKey).maybeSingle();
   const cacheTtl = cached?.dados_json?.status === 'GROUNDED_STATS' ? 60 * 60 * 1000 : 5 * 60 * 1000;
   if (cached && Date.now() - new Date(cached.ultima_atualizacao).getTime() < cacheTtl) return json(cached.dados_json);

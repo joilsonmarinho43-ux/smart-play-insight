@@ -67,6 +67,9 @@ jobs:
           git reset --hard origin/main
           git clean -fd -e deploy/.env -e supabase-docker/.env
           bash deploy/update.sh
+          # Reinjeta o cofre no edge-runtime em todo deploy; isso mantém
+          # TAVILY/Gemini/Groq disponíveis sem gravar segredos no GitHub.
+          bash deploy/fix-secrets.sh
           printf 'NEXUS_DEPLOYED_SHA=%s\n' "$(git rev-parse HEAD)"
           REMOTE
 

@@ -75,7 +75,10 @@ export function mergeFormIntoMatch(match: MatchData, form?: TeamFormResponse | n
   const md = match.modelData || ({} as any);
   const hStats = h.stats || {};
   const aStats = a.stats || {};
-  const stat = (current: any, incoming: any) => Number.isFinite(Number(incoming)) ? (Number.isFinite(Number(current)) ? current : Number(incoming)) : current ?? null;
+  const stat = (current: any, incoming: any) => {
+    const present = (value: any) => value != null && value !== '' && Number.isFinite(Number(value));
+    return present(current) ? current : present(incoming) ? Number(incoming) : null;
+  };
   const hs = (match as any).homeStats || {};
   const as_ = (match as any).awayStats || {};
   const useForm = (current: any, incoming: number) => {

@@ -58,11 +58,12 @@ export async function getMatchesByDate(date:string):Promise<MatchData[]>{
   return[];
 }
 export async function getMatchesForDays(dates:string[]){
+  // Two dates at a time keep the shared proxy load bounded while preventing
+  // a slow or blocked provider for one date from holding up the entire Home.
   const all:MatchData[]=[];
-  // Keep upstream load bounded: the public edge proxy is shared and can
-  // otherwise receive a burst of 6 dates × multiple fallback providers.
-  for(const date of dates){
-    try{ all.push(...await getMatchesByDate(date)); }catch{}
+  for(let i=0;i<dates.length;i+=2){
+    const batch=await Promise.allSettled(dates.slice(i,i+2).map(getMatchesByDate));
+    for(const result of batch) if(result.status==='fulfilled') all.push(...result.value);
   }
   return dedupe(all);
 }

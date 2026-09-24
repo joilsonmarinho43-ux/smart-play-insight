@@ -17,7 +17,8 @@ function Badge({ match }: { match: MatchData }) {
   const s = match.sampleSize;
   const homeGames = n(s?.homeGames); const awayGames = n(s?.awayGames); const min = homeGames !== null && awayGames !== null ? Math.min(homeGames, awayGames) : null;
   if (!s || min === null || min < 1) return <span className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] text-red-300"><ShieldAlert className="h-3 w-3"/> Dados insuficientes</span>;
-  const label = min >= 5 ? 'Confiança alta' : min >= 3 ? 'Confiança média' : 'Amostra limitada';
+  const advanced = (match as any).homeStats?.possession ?? (match as any).awayStats?.possession ?? (match as any).researchStats?.home?.possession?.value ?? null;
+  const label = advanced == null ? 'Histórico de gols' : min >= 5 ? 'Confiança alta' : min >= 3 ? 'Confiança média' : 'Amostra limitada';
   return <span className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-gray-300"><Database className="h-3 w-3"/> {label} · {s.homeGames}/{s.awayGames}</span>;
 }
 

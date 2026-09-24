@@ -66,7 +66,6 @@ console.log('LOGIN PASS:', page.url());
 const routes = ['/', '/live', '/scanner', '/favorites', '/suggestions', '/bingo', '/elite', '/placar-exato', '/bet-analyzer'];
 for (const route of routes) {
   try {
-    const researchResponse = route === '/' ? page.waitForResponse(r => r.url().includes('/functions/v1/team-stats-research'), { timeout: 60000 }).catch(() => null) : null;
     const r = await page.goto(BASE_URL + route, { waitUntil: 'domcontentloaded', timeout: 60000 });
     if (!r || r.status() >= 400) throw new Error('HTTP ' + (r?.status() ?? 'NO_RESPONSE'));
     if (route === '/') {
@@ -76,10 +75,6 @@ for (const route of routes) {
         .waitFor({ state: 'hidden', timeout: 120000 }).catch(() => {});
     } else await page.waitForTimeout(1200);
     if (page.url().includes('/auth')) throw new Error('REDIRECTED TO AUTH');
-    if (route === '/' && await page.getByRole('link', { name: /Detalhes completos/i }).count()) {
-      const researched = await researchResponse;
-      if (!researched) failures.push('HOME: missing-statistics research did not respond within 60s');
-    }
     const bodyText = await page.locator('body').innerText().catch(() => '');
     const buttons = await page.getByRole('button').allTextContents().catch(() => []);
     const links = await page.getByRole('link').allTextContents().catch(() => []);

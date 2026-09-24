@@ -19,7 +19,10 @@ function mapMatch(m: any, leagueMeta: any): MatchData | null {
     const away = m?.awayTeam || m?.teams?.away?.name || '';
     if (!id || !home || !away) return null;
     const ts: number | undefined = typeof m?.timestamp === 'number' ? m.timestamp : (typeof m?.fixture?.timestamp === 'number' ? m.fixture.timestamp : undefined);
-    const iso = ts ? new Date(ts).toISOString() : new Date().toISOString();
+    const timestamp = ts ? (ts < 1e12 ? ts * 1000 : ts) : null;
+    const date = timestamp != null ? new Date(timestamp) : m?.fixture?.date ? new Date(m.fixture.date) : null;
+    if (!date || !Number.isFinite(date.getTime())) return null;
+    const iso = date.toISOString();
     const status = String(m?.status || '').toLowerCase();
     const isLive = LIVE_STATUSES.has(status);
     const score = m?.score?.current || {};

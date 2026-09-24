@@ -62,6 +62,7 @@ if (!authResponse || authResponse.status() >= 400) {
   await browser.close();
   throw new Error('AUTH BLOCKED: ' + (authResponse?.status() ?? 'NO_RESPONSE') + '; protected routes were not tested');
 }
+const loginSession = await authResponse.json();
 await page.waitForURL(url => !url.pathname.includes('/auth'), { timeout: 30000 }).catch(() => {});
 if (page.url().includes('/auth')) {
   await page.screenshot({ path: 'nexus-auth-failed.png', fullPage: true });
@@ -72,7 +73,6 @@ await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForTimeout(1800);
 console.log('LOGIN PASS:', page.url());
 // Verify the research response independently of route navigation/cancellation.
-const loginSession = await authResponse.json();
 const researchUrl = new URL(authResponse.url());
 researchUrl.pathname = '/functions/v1/team-stats-research';
 researchUrl.search = '';

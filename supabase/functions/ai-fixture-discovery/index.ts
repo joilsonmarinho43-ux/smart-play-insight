@@ -39,7 +39,7 @@ REGRAS:
 FORMATO DE CADA ITEM:
 homeTeam, awayTeam, league, kickoff ISO-8601, status scheduled|live, sourceName, sourceUrl`;
 
-function normalize(raw:any, requestedDate:string): Candidate[] {
+function normalize(raw:any, requestedDate:string, grounded:Set<string>): Candidate[] {
   const items = Array.isArray(raw?.matches) ? raw.matches : [];
   const now = new Date().toISOString();
   return items.slice(0, 30).flatMap((x:any, i:number) => {
@@ -49,7 +49,9 @@ function normalize(raw:any, requestedDate:string): Candidate[] {
     const kickoff=String(x?.kickoff||'').trim();
     const sourceName=String(x?.sourceName||'').trim();
     const sourceUrl=String(x?.sourceUrl||'').trim();
-    if(!home||!away||!league||!kickoff||!sourceName||!(sourceUrl.startsWith('https://')||sourceUrl.startsWith('http://'))) return [];
+    let verifiedUrl: string;
+    try { verifiedUrl = new URL(sourceUrl).href; } catch { return []; }
+    if(!home||!away||!league||!kickoff||!sourceName||!grounded.has(verifiedUrl)) return [];
     const ms=Date.parse(kickoff);
     if(Number.isNaN(ms)) return [];
     const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Belem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ms));
@@ -67,7 +69,7 @@ function normalize(raw:any, requestedDate:string): Candidate[] {
       isLive:status==='live',
       status,
       __source:'ai-web-research',
-      aiEvidence:{sourceName:sourceName.slice(0,120),sourceUrl,observedAt:now,observed:true,estimated:false},
+      aiEvidence:{sourceName:sourceName.slice(0,120),sourceUrl:verifiedUrl,observedAt:now,observed:true,estimated:false},
     } as Candidate];
   });
 }
@@ -107,15 +109,27 @@ Deno.serve(async(req)=>{
     const body=await req.json().catch(()=>({}));
     const date=typeof body?.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(body.date)?body.date:'';
     if(!date)return new Response(JSON.stringify({ok:false,error:'DATE_REQUIRED',matches:[]}),{status:200,headers:{...corsHeaders,'Content-Type':'application/json'}});
-    const key=`ai-fixtures:v1:${date}`;
+    const key=`ai-fixtures:v2:${date}`;
     const cached=await cacheGet(key);
     if(cached)return new Response(JSON.stringify({...cached,cached:true}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
     const gemini=Deno.env.get('GEMINI_API_KEY')||'';
     if(!gemini)return new Response(JSON.stringify({ok:true,matches:[],status:'AI_UNAVAILABLE',reason:'GEMINI_API_KEY_MISSING'}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
     const query=`Encontre jogos de futebol REAIS e confirmados para ${date} (fuso America/Belem/Brasil). Pesquise na web agora. Liste até 20 partidas, cobrindo competições relevantes. Para cada jogo informe mandante, visitante, competição, horário de início, status e a fonte que confirma o jogo. Não inclua partidas de outra data.`;
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${gemini}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:SYSTEM}]},contents:[{role:'user',parts:[{text:query}]}],generationConfig:{temperature:0.05,responseMimeType:'application/json'},tools:[{google_search:{}}]})});
-    if(!resp.ok)return new Response(JSON.stringify({ok:true,matches:[],status:'AI_RESEARCH_FAILED',upstreamStatus:resp.status}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
-    const data=await resp.json();
+    let data:any=null, provider='', upstreamStatus=0;
+    for(const model of ['gemini-2.5-flash-lite','gemini-2.5-flash']) {
+      try {
+        const controller=new AbortController();
+        const timer=setTimeout(()=>controller.abort(),45000);
+        let resp:Response;
+        try {
+          resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gemini}`,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:SYSTEM}]},contents:[{role:'user',parts:[{text:query}]}],generationConfig:{temperature:0.05},tools:[{google_search:{}}]})});
+        } finally {clearTimeout(timer);}
+        if(!resp.ok){upstreamStatus=resp.status;continue;}
+        data=await resp.json();provider=model;break;
+      } catch {upstreamStatus=504;}
+    }
+    if(!data)return new Response(JSON.stringify({ok:true,matches:[],status:'AI_RESEARCH_FAILED',upstreamStatus}),{headers:{...corsHeaders,'Content-Type':'application/json'}});
+    const grounded=new Set<string>((data?.candidates?.[0]?.groundingMetadata?.groundingChunks||[]).flatMap((x:any)=>{try{return [new URL(x?.web?.uri).href];}catch{return [];}}));
     const parts=data?.candidates?.[0]?.content?.parts||[];
     const rawText=parts.map((p:any)=>p?.text||'').join('');
     let parsed:any=null;
@@ -126,8 +140,8 @@ Deno.serve(async(req)=>{
       const start=rawText.indexOf('{'), end=rawText.lastIndexOf('}');
       if(start>=0&&end>start){try{parsed=JSON.parse(rawText.slice(start,end+1));}catch{}}
     }
-    const matches=normalize(parsed,date);
-    const result={ok:true,status:matches.length?'AI_FIXTURES_OK':'NO_CONFIRMED_FIXTURES',matches,provider:'gemini-2.5-pro-google-search',generatedAt:new Date().toISOString()};
+    const matches=normalize(parsed,date,grounded);
+    const result={ok:true,status:matches.length?'AI_FIXTURES_OK':'NO_CONFIRMED_FIXTURES',matches,provider:`${provider}-google-search`,generatedAt:new Date().toISOString()};
     await cacheSet(key,result);
     return new Response(JSON.stringify(result),{headers:{...corsHeaders,'Content-Type':'application/json'}});
   } catch(e) {

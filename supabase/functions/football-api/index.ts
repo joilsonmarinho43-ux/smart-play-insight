@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
         console.warn("[football-api] ESPN live enrichment failed",e);
       }
     }
-    return new Response(JSON.stringify({ ok: true, matches: uniqueMatches(filtered), provider: body?.live === true ? "sportsrc+espn" : "sportsrc", counts: { total: filtered.length }, diag, provenance: { source: body?.live === true ? "sportsrc+espn" : "sportsrc", observedAt: new Date().toISOString(), inferredValues: false } }), { status: 200, headers: cors });
+    return new Response(JSON.stringify({ ok: true, matches: uniqueMatches(filtered), provider: body?.live === true ? "sportsrc+espn" : diag.source, counts: { total: filtered.length }, diag, provenance: { source: body?.live === true ? "sportsrc+espn" : diag.source, observedAt: new Date().toISOString(), inferredValues: false } }), { status: 200, headers: cors });
   } catch (error) {
     return new Response(JSON.stringify({ ok: false, error: "FOOTBALL_API_UNAVAILABLE", detail: String(error).slice(0, 160) }), { status: 502, headers: cors });
   }

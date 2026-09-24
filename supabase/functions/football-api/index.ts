@@ -131,7 +131,7 @@ async function fetchMatches(date: string): Promise<{ matches: any[]; diag: Sourc
       const id = String(event?.idEvent ?? "");
       const home = String(event?.strHomeTeam ?? "").trim();
       const away = String(event?.strAwayTeam ?? "").trim();
-      const kickoff = event?.strTimestamp ? new Date(event.strTimestamp + (/[zZ]|[+-]\\d{2}:?\\d{2}$/.test(event.strTimestamp) ? "" : "Z")) : null;
+      const kickoff = event?.strTimestamp ? new Date(event.strTimestamp + (/[zZ]|[+-]\d{2}:?\d{2}$/.test(event.strTimestamp) ? "" : "Z")) : null;
       if (!id || !home || !away || !kickoff || !Number.isFinite(kickoff.getTime())) return [];
       const status = normalizeStatus(event?.strStatus || "NS");
       const score = (value: unknown) => value == null || value === "" ? null : Number.isFinite(Number(value)) ? Number(value) : null;

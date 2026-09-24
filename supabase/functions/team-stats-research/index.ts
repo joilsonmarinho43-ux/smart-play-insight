@@ -33,10 +33,10 @@ function extract(raw: any, grounded: Set<string>, now: string) {
 async function research(home: string, away: string, league: string, kickoff: string) {
   const prompt = `Pesquise na web os últimos até 5 jogos CONCLUÍDOS de ${home} e ${away}, da partida ${home} x ${away}, ${league}, início ${kickoff}. Para cada equipe, retorne somente médias aritméticas de estatísticas publicadas explicitamente nas páginas consultadas: possession (%), xG, totalShots, shotsOnGoal, bigChances, corners, offsides, fouls, yellowCards. Cada campo deve ser {"value":número,"sample":quantidade de jogos medidos,"sourceUrl":"URL HTTPS exata da fonte"}. Se um campo não tiver valores observados, use null. Não deduza de placares, não estime e não invente. Responda JSON {"home":{...},"away":{...}}.`;
   const attempts: string[] = [];
-  for (const model of ['gemini-2.5-pro', 'gemini-2.5-flash']) {
+  for (const model of ['gemini-2.5-flash-lite', 'gemini-2.5-flash']) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20000);
+      const timer = setTimeout(() => controller.abort(), 45000);
       let response: Response;
       try {
         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
   const league = String(body.league || '').trim().slice(0, 100);
   const kickoff = String(body.kickoff || '').trim().slice(0, 35);
   if (!home || !away || home === away) return json({ ok: false, error: 'TEAMS_REQUIRED' }, 400);
-  const cacheKey = `team-stats-research:v2:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
+  const cacheKey = `team-stats-research:v3:${canonical(home)}:${canonical(away)}:${canonical(league)}`;
   const { data: cached } = await sb.from('cache_api').select('dados_json,ultima_atualizacao').eq('cache_key', cacheKey).maybeSingle();
   if (cached && Date.now() - new Date(cached.ultima_atualizacao).getTime() < 60 * 60 * 1000) return json(cached.dados_json);
   const { data: allowed, error: rateError } = await sb.rpc('check_rate_limit', {

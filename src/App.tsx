@@ -31,6 +31,7 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWind
 const LoadingScreen = () => <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center"><Loader2 className="w-8 h-8 text-primary animate-spin" /></div>;
 const ProtectedRoute = ({ children }: { children: ReactNode }) => { const { session, profile, loading } = useProfile(); useSessionGuard(); if (loading) return <LoadingScreen />; if (!session) return <Navigate to="/auth" replace />; const expired = profile?.subscription_expiry_date ? new Date(profile.subscription_expiry_date) < new Date() : true; if (!profile?.is_admin && expired) return <Navigate to="/expired" replace />; return <>{children}</>; };
 const AdminRoute = ({ children }: { children: ReactNode }) => { const { profile, loading } = useProfile(); useDataProviderHealthMonitor(!!profile?.is_admin); if (loading) return <LoadingScreen />; if (!profile?.is_admin) return <Navigate to="/" replace />; return <>{children}</>; };
+const TraderRoute = ({ children }: { children: ReactNode }) => { const { session, profile, loading } = useProfile(); if (loading) return <LoadingScreen />; if (!session) return <Navigate to="/auth" replace />; if (!profile?.is_admin) return <Navigate to="/" replace />; return <>{children}</>; };
 
 const App = () => { useApiKeyValidator(); return <QueryClientProvider client={queryClient}><TooltipProvider><Toaster /><Sonner /><BrowserRouter><Routes>
   <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
@@ -39,7 +40,7 @@ const App = () => { useApiKeyValidator(); return <QueryClientProvider client={qu
   <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
   <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
   <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
-  <Route path="/trader" element={<ProtectedRoute><AppLayout><TraderMarkets /></AppLayout></ProtectedRoute>} />
+  <Route path="/trader" element={<TraderRoute><AppLayout><TraderMarkets /></AppLayout></TraderRoute>} />
   <Route path="/bingo" element={<ProtectedRoute><AppLayout><BingoVIPPro /></AppLayout></ProtectedRoute>} />
   <Route path="/elite" element={<ProtectedRoute><AppLayout><ElitePerformance /></AppLayout></ProtectedRoute>} />
   <Route path="/placar-exato" element={<ProtectedRoute><AppLayout><CorrectScore /></AppLayout></ProtectedRoute>} />

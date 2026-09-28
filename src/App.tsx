@@ -22,6 +22,7 @@ import Suggestions from "./pages/Suggestions";
 import Paywall from "./pages/Paywall";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import TraderMarkets from "./pages/TraderMarkets";
 import { AppLayout } from "./components/AppLayout";
 import { Loader2 } from "lucide-react";
 import { BingoVIPPro, ElitePerformance, CorrectScore, BetAnalyzer } from "./pages/AnalyticalTools";
@@ -38,6 +39,7 @@ const App = () => { useApiKeyValidator(); return <QueryClientProvider client={qu
   <Route path="/scanner" element={<ProtectedRoute><AppLayout><Scanner /></AppLayout></ProtectedRoute>} />
   <Route path="/favorites" element={<ProtectedRoute><AppLayout><Favorites /></AppLayout></ProtectedRoute>} />
   <Route path="/suggestions" element={<ProtectedRoute><AppLayout><Suggestions /></AppLayout></ProtectedRoute>} />
+  <Route path="/trader" element={<ProtectedRoute><AppLayout><TraderMarkets /></AppLayout></ProtectedRoute>} />
   <Route path="/bingo" element={<ProtectedRoute><AppLayout><BingoVIPPro /></AppLayout></ProtectedRoute>} />
   <Route path="/elite" element={<ProtectedRoute><AppLayout><ElitePerformance /></AppLayout></ProtectedRoute>} />
   <Route path="/placar-exato" element={<ProtectedRoute><AppLayout><CorrectScore /></AppLayout></ProtectedRoute>} />

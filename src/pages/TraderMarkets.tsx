@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, CandlestickChart, Clock3 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 type Market = 'WIN' | 'WDO' | 'NASDAQ' | 'OURO';
 type Decision = 'CANDIDATA' | 'AGUARDAR' | 'SEM_ENTRADA';
@@ -26,7 +27,7 @@ const MARKETS: { id: Market; title: string }[] = [
 ];
 
 const endpoint = import.meta.env.VITE_TRADER_ANALYSIS_URL?.trim();
-const MAX_AGE_MS = 90_000;
+const MAX_AGE_MS = 25_000;
 
 function isSnapshot(value: unknown): value is Snapshot {
   if (!value || typeof value !== 'object') return false;
@@ -84,7 +85,10 @@ export default function TraderMarkets() {
     const controller = new AbortController();
     const update = async () => {
       try {
-        const response = await fetch(endpoint, { signal: controller.signal, cache: 'no-store' });
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('sessão ausente');
+        const response = await fetch(endpoint, { signal: controller.signal, cache: 'no-store',
+          headers: { Authorization: `Bearer ${session.access_token}` } });
         if (!response.ok) throw new Error('feed indisponível');
         const payload: unknown = await response.json();
         if (!Array.isArray(payload)) throw new Error('formato inválido');

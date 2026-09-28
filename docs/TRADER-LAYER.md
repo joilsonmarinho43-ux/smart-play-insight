@@ -1,0 +1,11 @@
+# Camada financeira isolada
+
+Rota `/trader` exclusiva de administrador no mesmo login do NEXUS 33, com dados e lógica financeiros separados. O serviço exige também `TRADER_ALLOWED_USER_ID` no backend para permitir apenas o titular configurado. Nenhum arquivo do FuneCob ou serviço da VPS é utilizado. Esta entrega não muda o deploy, o banco, as funções esportivas ou as filas existentes.
+
+O painel inicia em **sem cotação atual verificada**. O serviço isolado em `trader_service/` expõe `GET /snapshot` para usuários autenticados no Supabase do NEXUS e `POST /bar` para um adaptador de feed com token exclusivo. Configure `VITE_TRADER_ANALYSIS_URL` para o endpoint HTTPS `/snapshot`; o navegador envia seu JWT, verificado no backend via `/auth/v1/user`. Não inclua chaves de feed ou token de ingestão em variáveis `VITE_`.
+
+Cada item deve trazer `market` (`WIN`, `WDO`, `NASDAQ`, `OURO`), `instrument`, `source`, `bar_end` (ISO 8601 com fuso), `decision` (`CANDIDATA`, `AGUARDAR`, `SEM_ENTRADA`). Para candidata: `direction` (`COMPRA` ou `VENDA`), `reference_entry`, `stop`, `target`, `risk_points`, e opcionalmente `reward_risk`. Cliente e backend bloqueiam cotação com mais de 25 segundos, data futura e preço/stop/alvo inválidos; o backend deve validar origem/licença, horários e vencimento.
+
+O serviço inicia somente com `TRADER_INGEST_TOKEN`, `NEXUS_AUTH_URL`, `NEXUS_ANON_KEY`, `TRADER_ALLOWED_ORIGIN` e `TRADER_ALLOWED_USER_ID`; escuta em `127.0.0.1:8765` e requer um proxy HTTPS isolado para o aplicativo. Exemplo local: `python3 -m trader_service.server` na raiz do repositório. `TRADER_INGEST_TOKEN` deve ser aleatório, exclusivo e guardado no servidor e no adaptador, nunca no frontend. O endpoint de ingestão aceita barras de 1 minuto fechadas no mesmo formato do protótipo.
+
+Nenhum fornecedor foi contratado ou conectado; o serviço não foi implantado e nenhuma cotação ao vivo está disponível. Contratar e testar feed B3 (WIN/WDO) e CME (futuros Nasdaq/Ouro) ou uma fonte compatível com os instrumentos reais permanece necessário. O motor é uma hipótese sem vantagem estatística comprovada e não deve ser usado em operações reais sem histórico, custos, simulação e licença do feed. A rota não envia ordens e não integra corretora ou mesa proprietária.
